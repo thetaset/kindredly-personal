@@ -1,0 +1,8 @@
+User-agent: *
+Disallow: /private/
+Disallow: /logs/
+Disallow: /backup/
+Disallow: /config/
+Disallow: /cache/
+
+Allow: /
