@@ -1,0 +1,10 @@
+export const ACCOUNT_INFO = '/account/info';
+export const ACCOUNT_STATS = '/account/stats';
+export const ACCOUNT_SPACE_USAGE = '/account/getSpaceUsage';
+export const ACCOUNT_OPTIONS_UPDATE = '/account/options/update';
+export const ACCOUNT_USERS = '/account/users';
+export const ACCOUNT_DELETE = '/account/delete';
+export const ACCOUNT_EXPORT = '/account/export';
+export const ACCOUNT_IMPORT = '/account/import';
+export const ACCOUNT_INVITES_LIST = '/account/invites/list';
+export const ACCOUNT_INVITES_CANCEL = '/account/invites/cancel';

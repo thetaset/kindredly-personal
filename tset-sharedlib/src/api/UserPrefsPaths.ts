@@ -1,0 +1,10 @@
+export const PUBLIC_UPDATE = '/user/public/update';
+export const OPTIONS_UPDATE = '/user/options/update';
+export const PROFILE_IMAGE_UPDATE = '/user/profileImage/update';
+export const PROFILE_GET = '/user/profile/get';
+export const PREFS_GET = '/user/prefs/get';
+export const PREFS_GET_VALUE = '/user/prefs/getValue';
+export const PREFS_DEFAULTS = '/user/prefs/defaults';
+export const PREFS_UPDATE = '/user/prefs/update';
+export const PLUGIN_LIST = '/user/plugin/list';
+export const PLUGIN_UPDATE = '/user/plugin/update';

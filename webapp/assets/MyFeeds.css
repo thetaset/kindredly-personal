@@ -1,0 +1,1 @@
+.expand-from-right{animation:expand .1s forwards;overflow:hidden;white-space:nowrap}@keyframes expand{0%{width:0}to{width:100%}}.animate-text{animation:typing .1s steps(14);overflow:hidden;white-space:nowrap}@keyframes typing{0%{width:0}to{width:100%}}

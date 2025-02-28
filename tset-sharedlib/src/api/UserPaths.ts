@@ -1,0 +1,14 @@
+export const CURRENT = '/user/current';
+export const PUBLIC_GET = '/user/public/get';
+export const MY_PUBLIC_PROFILE = '/user/mypublicprofile';
+export const MISC_STATS = '/user/miscStats';
+export const DEBUG = '/user/debug';
+export const INFO = '/user/info';
+export const USER_TYPE_UPDATE = '/user/userType/update';
+export const EMAIL_UPDATE = '/user/email/update';
+export const SEND_EMAIL_VERIFICATION = '/user/sendEmailVerification';
+export const INFO_UPDATE = '/user/info/update';
+export const INFO_UPDATE_USERNAME = '/user/info/updateUsername';
+export const DELETE = '/user/delete';
+export const CLIENT_LIST = '/user/client/list';
+export const CLIENT_UPDATE_DEVICE_TOKEN = '/user/client/updateDeviceToken';

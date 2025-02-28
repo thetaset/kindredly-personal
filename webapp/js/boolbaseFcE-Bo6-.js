@@ -1,0 +1,1 @@
+import{g as u}from"./@mozillaCDB2aYYy.js";var n={trueFunc:function(){return!0},falseFunc:function(){return!1}};const a=u(n);var r={trueFunc:function(){return!0},falseFunc:function(){return!1}};const o=u(r);export{r as a,n as b,a as c,o as d};

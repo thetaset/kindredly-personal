@@ -1,0 +1,98 @@
+shreddit-post > div.shreddit-post-container,
+shreddit-dynamic-ad-link,
+body > shreddit-app > reddit-header-large > reddit-header-action-items > header,
+div.shreddit-post-container.flex.gap-sm.flex-row.items-center.flex-nowrap.overflow-hidden.justify-start.h-2xl.mt-md.px-md.xs\:px-0,
+#t3_1hgkflm > div.mb-sm.flex.justify-between.items-center > div,
+div.shreddit-post-container.flex.gap-sm.flex-row.items-center.flex-nowrap.overflow-hidden.justify-start.h-2xl.mt-md.px-md.xs\:px-0,
+#main-content > shreddit-async-loader > comment-body-header,
+#right-sidebar-container,
+#comment-tree {
+  display: none !important;
+}
+/* Hides the entire sidebar on Reddit */
+.side,
+.right-side,
+.reddit-sidebar,
+.left-sidebar {
+    display: none !important;
+}
+.side-wrap {
+    display: none !important;
+}
+
+/* Hides promoted posts (ads) */
+div[data-promoted='true'],
+a[href*='utm_'], /* Links containing UTM tracking */
+div[class*='promotedlink'], /* Promoted content */
+div[aria-label*='advertisement'],
+div[role='region'][aria-label*='sponsored'] {
+    display: none !important;
+}
+
+/* Removes Reddit's header bar for a cleaner look */
+#header,
+.header,
+.top-nav,
+div[class*='header'] {
+    display: none !important;
+}
+
+/* Hides footer elements */
+.footer-parent,
+footer {
+    display: none !important;
+}
+
+/* Hides comment sections for videos */
+.commentarea,
+.comments-page,
+.comments-wrapper {
+    display: none !important;
+}
+
+/* Hides video overlays like share buttons */
+.video-overlay,
+div[class*='overlay'] {
+    display: none !important;
+}
+
+/* Removes "Trending" or "Suggestions" content */
+div[class*='trending'],
+div[class*='suggested'],
+div[aria-label*='Trending'] {
+    display: none !important;
+}
+
+/* Optional: Expands the video container to full width */
+.video-container,
+.video-player {
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 auto !important;
+}
+
+
+/* Optional: Specifically hide vote buttons */
+.shreddit-post-container button[aria-pressed="false"] {
+  display: none !important;
+}
+
+/* Optional: Hide award buttons */
+.award-button,
+shreddit-post-share-button {
+  display: none !important;
+}
+
+/* Optional: Block comment buttons */
+.shreddit-post-container [data-post-click-location="comments-button"] {
+  display: none !important;
+}
+
+/* Optional: Block share buttons */
+shreddit-post-share-button {
+  display: none !important;
+}
+
+.shreddit-post-container {
+  display: none !important;
+}

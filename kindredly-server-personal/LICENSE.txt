@@ -1,0 +1,6 @@
+This software is licensed under the CC BY-NC 4.0 License.
+
+You may NOT:
+- Use this software for commercial purposes unless explicitly permitted by the copyright holder.
+
+Exception: Thetaset Inc. and its employees are granted full rights to use this software for commercial purposes.

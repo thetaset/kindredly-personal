@@ -1,0 +1,100 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!-- Uploaded to: SVG Repo, www.svgrepo.com, Generator: SVG Repo Mixer Tools -->
+
+<svg
+   height="800px"
+   width="800px"
+   version="1.1"
+   id="_x35_"
+   viewBox="0 0 512 512"
+   xml:space="preserve"
+   sodipodi:docname="mountain-part-2-svgrepo-com.svg"
+   inkscape:version="1.1.2 (0a00cf5339, 2022-02-04)"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg"><defs
+   id="defs31" /><sodipodi:namedview
+   id="namedview29"
+   pagecolor="#ffffff"
+   bordercolor="#666666"
+   borderopacity="1.0"
+   inkscape:pageshadow="2"
+   inkscape:pageopacity="0.0"
+   inkscape:pagecheckerboard="0"
+   showgrid="false"
+   inkscape:zoom="0.805"
+   inkscape:cx="399.37888"
+   inkscape:cy="400"
+   inkscape:window-width="3840"
+   inkscape:window-height="2075"
+   inkscape:window-x="0"
+   inkscape:window-y="54"
+   inkscape:window-maximized="1"
+   inkscape:current-layer="_x35_" />
+<g
+   id="g26"
+   style="opacity:0.72"
+   transform="translate(0,104.96)">
+	<linearGradient
+   id="SVGID_1_"
+   gradientUnits="userSpaceOnUse"
+   x1="0"
+   y1="187.2422"
+   x2="281.87869"
+   y2="187.2422">
+		<stop
+   offset="0"
+   style="stop-color:#8B9E73"
+   id="stop2" />
+		<stop
+   offset="1"
+   style="stop-color:#94B482"
+   id="stop4" />
+	</linearGradient>
+	<polygon
+   style="fill:url(#SVGID_1_)"
+   points="109.515,126.848 140.97,78.242 205.394,177.939 206.727,180 281.879,296.242 0,296.242 7.151,285.151 75.152,180 "
+   id="polygon7" />
+	<path
+   style="fill:none;stroke:#ffffff;stroke-miterlimit:10"
+   d="M 51.185,182.025"
+   id="path9" />
+	<polygon
+   style="fill:#fafafb"
+   points="78.512,186.063 110.807,166.188 126.645,183.578 149.624,164.946 181.92,185.441 203.347,199.571 205.702,189.478 140.944,89.334 "
+   id="polygon11" />
+	<polygon
+   style="opacity:0.04;fill:#040000"
+   points="205.394,177.939 206.727,180 281.879,296.242 219.03,296.242 173.939,226.545 143.879,180 139.454,173.212 113.151,132.424 109.515,126.848 140.97,78.242 "
+   id="polygon13" />
+	<linearGradient
+   id="SVGID_2_"
+   gradientUnits="userSpaceOnUse"
+   x1="128.9091"
+   y1="148.1515"
+   x2="512"
+   y2="148.1515">
+		<stop
+   offset="0"
+   style="stop-color:#8B9E73"
+   id="stop15" />
+		<stop
+   offset="1"
+   style="stop-color:#94B482"
+   id="stop17" />
+	</linearGradient>
+	<polygon
+   style="fill:url(#SVGID_2_)"
+   points="173.939,226.545 194.969,194.061 201.818,183.455 205.394,177.939 231.03,138.242 284.121,56.182 312.485,12.424 320.485,0.061 357.758,57.697 357.878,57.818 409.879,138.242 512,296.242 128.909,296.242 "
+   id="polygon20" />
+	<path
+   style="fill:#fafafb"
+   d="m 299.378,107.822 c 0,0 24.301,43.663 24.301,41.131 0,-2.532 28.724,-54.499 28.724,-54.499 l 43.475,30.743 -74.958,-114.011 -67.577,105.161 20.961,-11.645 0.932,31.209 z"
+   id="path22" />
+	<polygon
+   style="opacity:0.04;fill:#040000"
+   points="288.061,62.303 284.121,56.182 312.424,12.363 320.424,0 320.485,0.061 357.758,57.697 357.878,57.818 409.879,138.242 512,296.242 439.333,296.242 337.212,138.242 332.545,131.03 "
+   id="polygon24" />
+</g>
+</svg>

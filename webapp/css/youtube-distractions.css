@@ -1,0 +1,21 @@
+#comments,
+#center,
+#secondary,
+ytd-banner-promo-renderer-background,
+.ytp-autonav-overlay,
+.ytp-autonav-endscreen-upnext-thumbnail,
+.ytp-autonav-endscreen-countdown-container,
+.ytp-endscreen-content,
+#movie_player.ad-showing.ad-created video,
+ytm-item-section-renderer,
+header .mobile-topbar-header-content .topbar-menu-button-avatar-button,
+#related {
+  display: none !important;
+}
+
+
+/* replace below with svg that says AD */
+#movie_player.ad-showing.ad-created{
+  background: url("https://kindredly.ai/images/dog_funny_small_oil.jpg") no-repeat center center;
+}
+

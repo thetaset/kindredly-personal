@@ -1,0 +1,81 @@
+.DS_Store
+node_modules
+/dist
+
+.env.local*
+/serverprisma/src/logs/*
+testemail_output.html
+testemail.html
+
+.env.local
+.env.*.local
+
+# Log files
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Editor directories and files
+.idea
+.vscode
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Vue Browser Extension Output
+*.pem
+*.pub
+*.zip
+/artifacts
+
+.idea
+.DS_Store
+.sqlite3
+.vscode
+
+# Node related
+node_modules
+/dist
+
+
+# Log files
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Redis dump
+dump.rdb
+
+# Editor directories and files
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# misc
+*~
+*.bak
+*.map
+*.swp
+.DS_Store
+.log/
+\#*#
+.#*
+
+
+build
+dist
+
+
+
+.DS_Store
+/build
+
+
+tmp/*
+tmp/

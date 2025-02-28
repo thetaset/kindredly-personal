@@ -1,0 +1,21 @@
+/* #primary{
+    display:none;
+} */
+
+body{
+    display:none;
+}
+
+#content{
+    display:none;
+}
+
+.thetaset-container-spinner {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    width: 100%;
+    height: 100vh;
+}
+
+
