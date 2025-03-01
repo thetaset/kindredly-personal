@@ -1255,7 +1255,6 @@ class ItemService {
       }
     }
 
-
     return;
   }
 

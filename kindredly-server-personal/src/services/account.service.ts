@@ -15,6 +15,7 @@ import { inject , injectable} from 'inversify';
 import { TYPES } from "@/types";
 import type SetupService from "./_interfaces/syssetup.service";
 import { container } from "@/inversify.config";
+import UserService from "./user.service";
 
 
 @injectable()
@@ -29,6 +30,7 @@ class AccountService {
   private verificationService = new VerificationService();
   private itemService = new ItemService();
 
+  private userService = new UserService();
 
 
 
@@ -125,6 +127,14 @@ class AccountService {
 
   async _updateAccountInfo(accountId:string, info) {
     await this.accounts.updateWithId(accountId, info);
+  }
+
+
+  async deleteAccountForPersonalServer(ctx: RequestContext) {
+    const accountId = ctx.accountId;
+
+
+    throw new Error("Not implemented for personal server");
   }
 
 }

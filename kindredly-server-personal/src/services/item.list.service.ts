@@ -13,16 +13,33 @@ import {
 import FeedbackService from "./feedback.service";
 import PermissionService from "./permission.service";
 import { RequestContext } from "../base/request_context";
+import { get } from "http";
 
 const feedbackFields = [
   "reaction",
   "reactionDate",
   "isReadDate",
   "isReadLaterDate",
+  "snoozeUntilDate",
   "archivedDate",
   "starredDate",
   "isHidden",
 ];
+
+const feedbackFieldNaming = feedbackFields.map((v) => "item_feedback." + v + " as " + v)
+
+function getFeedbackData(v:any){
+  return {
+    reaction: v.reaction,
+    reactionDate: v.reactionDate,
+    isReadDate: v.isReadDate,
+    isReadLaterDate: v.isReadLaterDate,
+    starredDate: v.starredDate,
+    isHidden: v.isHidden == true,
+    snoozeUntilDate: v.snoozeUntilDate,
+    archivedDate: v.archivedDate,
+  } as ItemFeedbackView
+}
 
 class ItemListService {
   private feedbackService = new FeedbackService();
@@ -132,7 +149,7 @@ class ItemListService {
       .leftJoin("item", "item_feedback.itemId", "=", "item._id")
       .select(
         "item.*",
-        ...feedbackFields.map((v) => "item_feedback." + v + " as " + v)
+        ...feedbackFieldNaming
       )
       .orderBy(`item_feedback.${feedbackType}`, "desc")
       .limit(limit);
@@ -150,15 +167,7 @@ class ItemListService {
         return {
           itemId: v._id,
           details: v,
-          feedback: {
-            reaction: v.reaction,
-            reactionDate: v.reactionDate,
-            isReadDate: v.isReadDate,
-            isReadLaterDate: v.isReadLaterDate,
-            starredDate: v.starredDate,
-            isHidden: v.isHidden == true,
-            // archivedDate: v.archivedDate,
-          } as ItemFeedbackView,
+          feedback: getFeedbackData(v),
         };
       });
   }
@@ -196,7 +205,7 @@ class ItemListService {
         "user_perm.createdAt as sharedAt",
         "user_perm.sharedByUserId as sharedByUserId",
         "user.username as sharedByUsername",
-        ...feedbackFields.map((v) => "item_feedback." + v + " as " + v)
+        ...feedbackFieldNaming
       );
 
     let collectionIds = explicitPermission
@@ -223,7 +232,7 @@ class ItemListService {
       .select(
         "item.*",
         "item_relation.collectionId as parentCollectionId",
-        ...feedbackFields.map((v) => "item_feedback." + v + " as " + v)
+        ...feedbackFieldNaming
       );
 
     let allRecordsWithDups = [...explicitPermission, ...childItems];
@@ -252,15 +261,7 @@ class ItemListService {
         return {
           itemId: v._id,
           details: v,
-          feedback: {
-            reaction: v.reaction,
-            reactionDate: v.reactionDate,
-            isReadDate: v.isReadDate,
-            isReadLaterDate: v.isReadLaterDate,
-            starredDate: v.starredDate,
-            isHidden: v.isHidden == true,
-            archivedDate: v.archivedDate,
-          },
+          feedback: getFeedbackData(v),
           collectionIds: v.parentCollectionIds,
         };
       })
@@ -296,7 +297,7 @@ class ItemListService {
       })
       .select(
         "item.*",
-        ...feedbackFields.map((v) => "item_feedback." + v + " as " + v)
+        ...feedbackFieldNaming
       );
 
 
@@ -380,15 +381,8 @@ class ItemListService {
           itemId: v._id,
           details: v,
           collectionIds: collectionIds,
-          feedback: {
-            reaction: v.reaction,
-            reactionDate: v.reactionDate,
-            isReadDate: v.isReadDate,
-            isReadLaterDate: v.isReadLaterDate,
-            starredDate: v.starredDate,
-            isHidden: v.isHidden == true,
-            archivedDate: v.archivedDate,
-          } as ItemFeedbackView,
+          feedback: getFeedbackData(v),
+
         };
       })
       .filter((v) => v.feedback?.isHidden != true);
@@ -442,7 +436,7 @@ class ItemListService {
         "user_perm.permission as permission",
         "user_perm.userId as permissionUserId",
         "user_perm.createdAt as permissionCreatedAt",
-        ...feedbackFields.map((v) => "item_feedback." + v + " as " + v)
+        ...feedbackFieldNaming
       )
       .orderBy("item.name", "asc");
 
@@ -513,16 +507,8 @@ class ItemListService {
       .map((v) => {
         return {
           itemId: v._id,
-          details: v, //TODO: remove feedback
-          feedback: {
-            reaction: v.reaction,
-            reactionDate: v.reactionDate,
-            isReadDate: v.isReadDate,
-            isReadLaterDate: v.isReadLaterDate,
-            starredDate: v.starredDate,
-            isHidden: v.isHidden == true,
-            archivedDate: v.archivedDate,
-          } as ItemFeedbackView,
+          details: v, 
+          feedback: getFeedbackData(v),
         };
       });
     return resultItems;
@@ -596,7 +582,7 @@ class ItemListService {
     );
     const feedbackLookup = {};
     for (const f of itemFeedback) {
-      feedbackLookup[f.itemId] = f;
+      feedbackLookup[f.itemId] = getFeedbackData(f);
     }
 
     return resultItems
@@ -679,7 +665,7 @@ class ItemListService {
         "item_relation.details as itemRelationDetails",
         "item_relation.encrypted as relationEncrypted",
         "item_relation.order as order",
-        ...feedbackFields.map((v) => "item_feedback." + v + " as " + v)
+        ...feedbackFieldNaming
       )
       .orderBy("order", "desc");
 
@@ -738,15 +724,7 @@ class ItemListService {
             encInfo: v.encInfo,
             order: v.order,
           },
-          feedback: {
-            reaction: v.reaction,
-            reactionDate: v.reactionDate,
-            isReadDate: v.isReadDate,
-            isReadLaterDate: v.isReadLaterDate,
-            starredDate: v.starredDate,
-            isHidden: v.isHidden == true,
-            archivedDate: v.archivedDate,
-          },
+          feedback: getFeedbackData(v),
         };
       });
   }
@@ -780,7 +758,7 @@ class ItemListService {
         "user_perm.createdAt as sharedAt",
         "user_perm.sharedByUserId as sharedByUserId",
         "user.username as sharedByUsername",
-        ...feedbackFields.map((v) => "item_feedback." + v + " as " + v)
+        ...feedbackFieldNaming
       )
       .orderBy("sharedAt", "desc");
 
@@ -788,15 +766,7 @@ class ItemListService {
       return {
         itemId: v._id,
         details: v,
-        feedback: {
-          reaction: v.reaction,
-          reactionDate: v.reactionDate,
-          isReadDate: v.isReadDate,
-          isReadLaterDate: v.isReadLaterDate,
-          starredDate: v.starredDate,
-          isHidden: v.isHidden == true,
-          archivedDate: v.archivedDate,
-        },
+        feedback: getFeedbackData(v),
       };
     });
   }
@@ -823,7 +793,7 @@ class ItemListService {
         "user_perm.createdAt as sharedAt",
         "user_perm.userId as sharedWithUserId",
         "user.username as sharedWithUsername",
-        ...feedbackFields.map((v) => "item_feedback." + v + " as " + v)
+        ...feedbackFieldNaming
       )
       .orderBy("sharedAt", "desc");
 
@@ -831,15 +801,7 @@ class ItemListService {
       return {
         itemId: v._id,
         details: v,
-        feedback: {
-          reaction: v.reaction,
-          reactionDate: v.reactionDate,
-          isReadDate: v.isReadDate,
-          isReadLaterDate: v.isReadLaterDate,
-          starredDate: v.starredDate,
-          isHidden: v.isHidden == true,
-          archivedDate: v.archivedDate,
-        },
+        feedback: getFeedbackData(v),
       };
     });
   }

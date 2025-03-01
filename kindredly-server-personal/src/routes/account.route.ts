@@ -50,6 +50,21 @@ class AccountRoute implements Routes {
           res.json(result);
         }),
       );
+
+      this.router.post(
+        AccountPaths.ACCOUNT_DELETE,
+        authenticateJWT,
+        errorHelper(async (req, res) => {
+          const account = await this.accountService.getAccountDetails(RequestContext.instance(req));
+          const result = {
+            success: true,
+            results: account,
+          };
+          res.json(result);
+        }),
+      );
+
+      
     }
 
 
