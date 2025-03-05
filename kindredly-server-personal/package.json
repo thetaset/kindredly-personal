@@ -62,6 +62,15 @@
     "winston": "^3.11.0",
     "winston-daily-rotate-file": "^5.0.0"
   },
+  "overrides": {
+    "cross-spawn": "6.0.6",
+    "execa": "^7.0.0",
+    "@babel/traverse": ">=7.23.2",
+    "json5": ">=2.2.2",
+    "semver": ">=7.5.2"
+  
+  
+  },
   "devDependencies": {
     "@jest/globals": "^29.7.0",
     "@swc/cli": "^0.3.10",
