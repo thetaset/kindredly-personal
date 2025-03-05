@@ -103,8 +103,17 @@ class ActivityService {
     return await this.userActivity.deleteWhere({ userId: targetUserId });
   }
 
-  async updateLastVisited(userId, itemId) {
-    const now = new Date();
+    // ROUTE-METHOD
+  async updateVisitHistoryForItems(ctx: RequestContext, updateList: { id: string, visitTime: string }[]) {
+    for (const item of updateList) {
+      await this.updateLastVisited(ctx.currentUserId, item.id, new Date(item.visitTime));
+    }
+    return null;
+
+  }
+
+  async updateLastVisited(userId, itemId, visitTime=null) {
+    const now = visitTime || new Date();
     const id = this.feedbackService.feedbackId(userId, itemId);
     const data = await this.feedbackService._getItemFeedbackById(id);
 
@@ -138,7 +147,7 @@ class ActivityService {
     return null;
   }
 
-  async logVisit(
+  async logURLVisit(
     ctx: RequestContext,
     activityType: string,
     url: string,

@@ -41,7 +41,7 @@ class SyncService {
 
       for (const v of lst) {
         const data = v.data as DynamicObject;
-        if (data.type == SyncType.itemUpdate && Array.isArray(data.items)) {
+        if (data?.type == SyncType.itemUpdate && Array.isArray(data.items)) {
           for (const itemId of data.items) updatedItemIdsSet.add(itemId);
         } else if (data?.type == SyncType.fullReset) {
           fullResetRequest = true;
@@ -67,7 +67,7 @@ class SyncService {
 
     // Otherwise, get changed items only
 
-    return await this._syncPartial(ctx, targetUserId, updatedItemIdsSet,);
+    return await this._syncPartial(ctx, targetUserId, updatedItemIdsSet);
   }
 
 
@@ -136,6 +136,9 @@ class SyncService {
       : [];
 
     const updatedItems = [...updatedItemsInLibrary, ...additionalAddedItems];
+
+
+    
     let removedItemIds = [];
 
     // ************************REMOVED ITEMS************************

@@ -43,13 +43,39 @@ class UserActivityRoute implements Routes {
       }),
     );
 
+    
+
     this.router.post(
-      UserActivityPaths.LOG_VISIT,
+      UserActivityPaths.UPDATE_ITEM_VISIT_HISTORY,
       authenticateJWT,
       errorHelper(async (req, res) => {
         const ctx = RequestContext.instance(req);
 
-        await this.activityService.logVisit(
+        console.log('updateList', req.body.updateList);
+        await this.activityService.updateVisitHistoryForItems(
+          ctx,
+          req.body.updateList
+        );
+
+        let itemIds = req.body.updateList.map((item) => item.id);
+        await this.changeLogService.logItemChangeForUserIds([ctx.currentUserId], itemIds, null);
+
+        const result = {
+          success: true,
+          results: {},
+        };
+        res.json(result);
+      }),
+    );
+
+
+    this.router.post(
+      UserActivityPaths.LOG_URL_VISIT,
+      authenticateJWT,
+      errorHelper(async (req, res) => {
+        const ctx = RequestContext.instance(req);
+
+        await this.activityService.logURLVisit(
           ctx,
           'visit',
           req.body.url,

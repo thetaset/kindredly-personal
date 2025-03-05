@@ -24,6 +24,9 @@ const feedbackFields = [
   "archivedDate",
   "starredDate",
   "isHidden",
+  "visitTime",
+  "lastVisit",
+  "visitCount",
 ];
 
 const feedbackFieldNaming = feedbackFields.map((v) => "item_feedback." + v + " as " + v)
@@ -38,6 +41,9 @@ function getFeedbackData(v:any){
     isHidden: v.isHidden == true,
     snoozeUntilDate: v.snoozeUntilDate,
     archivedDate: v.archivedDate,
+    visitTime: v.visitTime,
+    lastVisit: v.lastVisit,
+    visitCount: v.visitCount,
   } as ItemFeedbackView
 }
 
@@ -52,6 +58,7 @@ class ItemListService {
 
 
   // ROUTE-METHOD
+  // TODO: optimize
   async listArchived(ctx: RequestContext, targetUserId: string) {
     await ctx.verifySelfOrAdmin(targetUserId);
 
@@ -64,7 +71,7 @@ class ItemListService {
           "user_perm.userId": targetUserId,
         } as any);
       })
-      .leftJoin("item", "item._id", "=", "user_perm.itemId")
+     
       .where("item.archived", true)
       .select("item.*");
 

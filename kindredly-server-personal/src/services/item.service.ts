@@ -811,7 +811,6 @@ class ItemService {
       }
     }
     //add user permission info to each collection
-    console.log("targetUserPermissionLookup", targetUserPermissionLookup);
     for (const col of collections) {
       const permEntry = targetUserPermissionLookup[col._id];
       col["permission"] = permEntry?.permission;

@@ -76,6 +76,7 @@ export let MAIN_EMAIL_TEMPLATE = 'CONTENT_BODY';
 try {
   MAIN_EMAIL_TEMPLATE = fs.readFileSync('src/templates/kindred_email_template.html').toString();
 } catch (error) {
+  if (!config.privateServer)
   console.error('Failed to load email template');
 }
 
