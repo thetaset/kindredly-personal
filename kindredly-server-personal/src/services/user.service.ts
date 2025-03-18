@@ -278,13 +278,16 @@ class UserService {
       }
 
       let { fileData, imagePreview, imageType } = imageData.data;
+      imageType = imageType.split("/")[1];
       const fileName = `${targetUserId}.${imageType}`;
       const fileNamePre = `${targetUserId}_pre.${imageType}`;
 
-      if (fileData.startsWith("data:image")) fileData = fileData.split(",")[1];
+      if (fileData.startsWith("data:image")) 
+        fileData = fileData.split(",")[1];
 
       if (imagePreview.startsWith("data:image"))
         imagePreview = imagePreview.split(",")[1];
+
       await this.fileService.fileAccessProvider.uploadUserFileData(
         fileData,
         "userprofile",

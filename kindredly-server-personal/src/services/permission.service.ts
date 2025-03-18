@@ -390,9 +390,9 @@ class PermissionService {
 
   }
 
-  async _hasEditPermissionForCollection(userId: string, collectionId: string): Promise<boolean> {
-    const permission = await this._getDirectUserPermissionToItemOrCollectionExcludingOwner(userId, collectionId);
-    return PermissionTypeEditableList.includes(permission);
+  async _hasEditPermissionForCollection(ctx: RequestContext, collectionId: string): Promise<boolean> {
+    
+    return await this._hasPermissionDirectlyOrAsAdmin(ctx, collectionId, PermissionTypeEditableList, false);
   }
 
   async _hasEditPermissionDirectOrAsAdmin(ctx: RequestContext, itemId: string): Promise<boolean> {

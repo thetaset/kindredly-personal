@@ -128,7 +128,7 @@ class ItemRelationService {
   ) {
     if (
       !(await this.permissionService._hasEditPermissionForCollection(
-        ctx.currentUserId,
+        ctx,
         collectionId
       ))
     ) {

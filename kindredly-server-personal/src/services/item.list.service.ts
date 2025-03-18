@@ -27,6 +27,7 @@ const feedbackFields = [
   "visitTime",
   "lastVisit",
   "visitCount",
+  "neverRemindDate",
 ];
 
 const feedbackFieldNaming = feedbackFields.map((v) => "item_feedback." + v + " as " + v)
@@ -37,9 +38,11 @@ function getFeedbackData(v:any){
     reactionDate: v.reactionDate,
     isReadDate: v.isReadDate,
     isReadLaterDate: v.isReadLaterDate,
+    neverRemindDate: v.neverRemindDate,
+    snoozeUntilDate: v.snoozeUntilDate,
+
     starredDate: v.starredDate,
     isHidden: v.isHidden == true,
-    snoozeUntilDate: v.snoozeUntilDate,
     archivedDate: v.archivedDate,
     visitTime: v.visitTime,
     lastVisit: v.lastVisit,

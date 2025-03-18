@@ -105,6 +105,8 @@ class ActivityService {
 
     // ROUTE-METHOD
   async updateVisitHistoryForItems(ctx: RequestContext, updateList: { id: string, visitTime: string }[]) {
+
+    //TODO: update mutliple items at once or at least pull items from db in one query
     for (const item of updateList) {
       await this.updateLastVisited(ctx.currentUserId, item.id, new Date(item.visitTime));
     }
@@ -115,28 +117,30 @@ class ActivityService {
   async updateLastVisited(userId, itemId, visitTime=null) {
     const now = visitTime || new Date();
     const id = this.feedbackService.feedbackId(userId, itemId);
-    const data = await this.feedbackService._getItemFeedbackById(id);
+    const feedback = await this.feedbackService._getItemFeedbackById(id);
+    await this._updateFeedbackVisitRecord(feedback, id, userId, itemId, now);
 
-    if (!data) {
+    return;
+  }
+
+  private async _updateFeedbackVisitRecord(feedback: any, feedbackId: string, userId: any, itemId: any, lastVisit: any) {
+    if (!feedback) {
       await this.feedback.create({
-        _id: id,
+        _id: feedbackId,
         userId,
         itemId,
-        lastVisit: now,
-        visitTime: now,
+        lastVisit: lastVisit,
+        visitTime: lastVisit,
         visitCount: 1,
       });
     } else {
       // check if more than 15 minutes have passed since last visit
-      const countVisit =
-        !data.visitTime || data.visitTime < new Date(Date.now() - config.visitCountThresholdSec * 1000);
-      data.lastVisit = data.visitTime;
-      data.visitTime = now;
-      if (countVisit) data.visitCount += 1;
-      await this.feedback.updateWithId(id, { lastVisit: now, visitTime: now, visitCount: data.visitCount });
+      const countVisit = !feedback.visitTime || feedback.visitTime < new Date(Date.now() - config.visitCountThresholdSec * 1000);
+      feedback.lastVisit = feedback.visitTime;
+      feedback.visitTime = lastVisit;
+      if (countVisit) feedback.visitCount += 1;
+      await this.feedback.updateWithId(feedbackId, { lastVisit: lastVisit, visitTime: lastVisit, visitCount: feedback.visitCount });
     }
-
-    return;
   }
 
   async logCollectionVisit(

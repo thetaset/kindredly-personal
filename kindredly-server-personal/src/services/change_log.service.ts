@@ -22,6 +22,7 @@ class ChangeLogService {
   async logRemovalOfItems<T>(ctx: RequestContext, itemIds: string[], fn: () => Promise<T>) {
     let userIdGroups = []
     for (const itemId of itemIds) {
+      if (!itemId) continue;
       const userIds = await this.permissionService._listUserIdsWithPermissionsToItem(ctx, itemId, true);
       userIdGroups.push(userIds);
     }

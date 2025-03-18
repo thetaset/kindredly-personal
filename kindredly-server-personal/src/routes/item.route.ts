@@ -66,7 +66,7 @@ class ItemRoute implements Routes {
 
         const ctx = RequestContext.instance(req);
 
-        const results = await this.changeLogService.logRemovalOfItems(ctx, [req.body.itemId,req.body.collectionId],
+        const results = await this.changeLogService.logRemovalOfItems(ctx, [req.body.itemId],
           async () => {
             return await this.itemService.deleteItem(
               RequestContext.instance(req),
@@ -91,7 +91,7 @@ class ItemRoute implements Routes {
 
         const ctx = RequestContext.instance(req);
 
-        const results = await this.changeLogService.logRemovalOfItems(ctx, [req.body.itemId,req.body.collectionId],
+        const results = await this.changeLogService.logRemovalOfItems(ctx, [req.body.itemId],
           async () => {
             return await this.itemRelationService.removeItemFromCollection(
               ctx,

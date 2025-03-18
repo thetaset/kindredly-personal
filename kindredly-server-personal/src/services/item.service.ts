@@ -188,7 +188,7 @@ class ItemService {
     const cats = (await this.sysInfo.findById("cats")) as DynamicObject;
     if (!cats) return [];
     else {
-      logger.log("cats", cats);
+      logger.info("cats", cats);
       return cats?.data?.items;
     }
   }
@@ -199,14 +199,14 @@ class ItemService {
       console.error("Failed to update categories, with ", categories);
       return;
     }
-    logger.log("Updating available categories in database", categories);
+    logger.info("Updating available categories in database", categories);
     const currentCats = replace ? [] : (await this._getAvailCategories()) || [];
 
     const cats = new Set([...currentCats, ...categories]);
 
     //TODO: silly to sort here
     const catsList = Array.from(cats).filter((v) => !!v);
-    logger.log("catsList", catsList);
+    logger.info("catsList", catsList);
     await this.sysInfo.create({ _id: "cats", data: { items: catsList } });
   }
 
@@ -633,6 +633,14 @@ class ItemService {
 
   // ROUTE-METHOD
   async deleteItem(ctx: RequestContext, itemId:string) {
+
+    console.log("Deleting item", itemId);
+
+    if (!itemId) {
+      throw new Error("No item id provided");
+    }
+
+
     const item = await this.itemRepo.findById(itemId);
     if (!item) {
       return true;

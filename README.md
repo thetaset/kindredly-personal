@@ -12,7 +12,7 @@ Kindredly Personal Edition is a free, open-source, and self-hosted version of ou
 - Share and give access to content in one action
 - Add many types of content, including posts, images, links, notes, videos and files.
 - End-to-end encryption for all content
-- Many clients available (webapp, browser extensions, android, ios)
+- Many clients available: webapp, browser extensions - (android, ios work also but require setting up ssl cert).
 
 ## Requirements
 - docker (https://docs.docker.com/get-docker/)
@@ -30,7 +30,11 @@ Kindredly Personal Edition is a free, open-source, and self-hosted version of ou
 - Install the browser extension from the Chrome Web Store (https://kindredly.ai/download)
 - Visit the custom server settings link on the Sign-in page and give IP address and port of the server (http://localhost:4444/api/v2.3)
 
-
+## Current Limitations 
+ (only applies to the personal edition and we plan to address them in the future)
+ - Push or email notifications not working
+ - Cannot yet sync data into Kindredly Official Server
+ - Cannot yet access Kindredly Official Server content
 
 ## Planned Features
  - One click installer
@@ -39,7 +43,7 @@ Kindredly Personal Edition is a free, open-source, and self-hosted version of ou
  - Backup and restore features
  - Intergration with Kindredly Published Content
  - Android and IOS app support
- - AI Powered features
+ - Better AI Powered features
 
  ## Contributing
 - We are looking for contributors to help us build this project. If you are interested in contributing, please contact us through github or through http://kindredly.ai/contactUs.

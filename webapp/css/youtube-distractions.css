@@ -19,3 +19,21 @@ header .mobile-topbar-header-content .topbar-menu-button-avatar-button,
   background: url("https://kindredly.ai/images/dog_funny_small_oil.jpg") no-repeat center center;
 }
 
+#movie_player.ad-showing.ad-created::before {
+  content: "Ad Playing"; 
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.7); /* Semi-transparent black */
+  color: white;
+  font-size: 24px;
+  font-weight: bold;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10; /* Ensure it's on top */
+  text-transform: uppercase;
+  font-family: Arial, sans-serif;
+}

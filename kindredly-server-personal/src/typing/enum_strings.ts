@@ -41,9 +41,9 @@ export enum RequestTypes {
 }
 
 export enum TaskRunnerJobTypes {
-  runAutoPublish = 'runAutoPublish',
-  subscribe = 'subscribe',
-  updateSubscription = 'updateSubscription',
+  runAutoPublish = 'publishedService.runAutoPublish',
+  subscribe = 'publishedService.subscribe',
+  updateSubscription = 'publishedService.updateSubscription',
   getBannerImageDataForUrl = 'getBannerImageDataForUrl',
   TASKRUNNER_TEST = 'TASKRUNNER_TEST',
   fetchMetadata = 'fetchMetadata',

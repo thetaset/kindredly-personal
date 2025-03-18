@@ -114,7 +114,7 @@ class AuthService {
     let user: User = null;
 
     if (!!accountId) {
-      logger.log("Creating User for existing account", userData.email);
+      logger.info("Creating User for existing account", userData.email);
       user = await this._createUser(new RequestContext({ accountId }), userData);
     } else {
       user = await this._createAccount(userData);
