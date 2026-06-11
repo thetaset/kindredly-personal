@@ -1,0 +1,1 @@
+import{a as s}from"./@vueCtd8-HiN.js";function c(e=50){const t=s(!1);function a(){t.value=!1}async function i(){await new Promise(n=>setTimeout(n,e)),t.value=!0}async function o(n){a();const r=await n();return await i(),r}return{isReady:t,resetAnimation:a,triggerAnimation:i,withAnimation:o}}export{c as u};

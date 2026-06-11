@@ -1,50 +1,49 @@
-import { RequestContext } from "@/base/request_context";
-import { v4 as uuidv4 } from "uuid";
-import { sendEmail } from "../utils/email_utils";
+import {RequestContext} from '@/base/request_context';
+import {v4 as uuidv4} from 'uuid';
+import {sendEmail} from '../utils/email_utils';
 
-import { friendRequestTemplate, MAIN_EMAIL_TEMPLATE } from '@/templates/email.templates';
+import {friendRequestTemplate, MAIN_EMAIL_TEMPLATE} from '@/templates/email.templates';
 
-import { config } from "@/config";
-import { NotificationRepo } from "@/db/notification.repo";
-import { UserRepo } from "@/db/user.repo";
-import { UserPrefKeys, UserPrefRepo } from "@/db/user_pref.repo";
-import  Notification from "@/schemas/public/Notification";
-import User from "@/schemas/public/User";
-import {
-  NotificationGroupType,
-  NotificationMethod,
-  NotificationType,
-} from "@/typing/enum_strings";
-import { UserType } from "tset-sharedlib/shared.types";
-import ClientInfoService from "./client_info.service";
-import VerificationService from "./verification.service";
-import { ACCOUNT_INVITE_MSG, INVITATION_TO_ACCOUNT } from "@/defaults/message_templates";
+import {config} from '@/config';
+import {NotificationRepo} from '@/db/notification.repo';
+import {UserRepo} from '@/db/user.repo';
+import {UserPrefKeys, UserPrefRepo} from '@/db/user_pref.repo';
+import Notification from 'tset-sharedlib/schemas/public/Notification';
+import User from 'tset-sharedlib/schemas/public/User';
+import {NotificationGroupType, NotificationMethod, NotificationType} from '@/typing/enum_strings';
+import {UserType} from 'tset-sharedlib/shared.types';
+import ClientInfoService from './client_info.service';
+import VerificationService from './verification.service';
+import {ACCOUNT_INVITE_MSG, INVITATION_TO_ACCOUNT} from '@/defaults/message_templates';
 
 const typeToTitle = {
-  WELCOME_USER: "Welcome to Kindredly!",
-  FRIEND_REQUEST: "New Friend Request",
-  ACCESS_REQUEST: "New Access Request",
-  ACCESS_REQUEST_UPDATE: "Access Request Update",
-  NEW_POST: "New Post",
-  NEW_COMMENT: "New Comment",
-  NEW_ITEM: "New Item Added to Your Library",
-  SHARED_ITEM: "New Shared Item",
+  WELCOME_USER: 'Welcome to Kindredly!',
+  FRIEND_REQUEST: 'New Friend Request',
+  ACCESS_REQUEST: 'New Request',
+  ACCESS_REQUEST_UPDATE: 'Request Update',
+  LIBRARY_AUTO_APPROVAL_APPROVED: 'Auto Approval Granted',
+  LIBRARY_AUTO_APPROVAL_DENIED: 'Auto Approval Denied',
+  LIBRARY_AUTO_APPROVAL_REVIEW: 'Auto Approval Needs Review',
+  NEW_POST: 'New Post',
+  NEW_COMMENT: 'New Comment',
+  NEW_ITEM: 'New Item Added to Your Library',
+  SHARED_ITEM: 'New Shared Item',
+  RESTRICTED_USER_PUBLISHED: 'Restricted User Published',
 };
 
 function notiticationTypeToTitle(type: string) {
   if (typeToTitle[type]) {
     return typeToTitle[type];
   } else {
-    return "New Notification";
+    return 'New Notification';
   }
 }
 
 const maxAgeOfDevicesInDays = 10;
-import { TYPES } from "@/types";
-import type SetupService from "./_interfaces/syssetup.service";
-import { inject } from "inversify";
+import {TYPES} from '@/types';
+import type SetupService from './_interfaces/syssetup.service';
+import {inject} from 'inversify';
 class NotificationService {
-
   constructor(@inject(TYPES.SetupService) private setupService: SetupService) {}
 
   private userRepo = new UserRepo();
@@ -53,15 +52,8 @@ class NotificationService {
   private clientInfoService = new ClientInfoService();
   private userPrefRepo = new UserPrefRepo();
 
-  async sendPushNotificationToAllUserDevices(
-    userId: string,
-    notification: { title: string; body: string },
-    data: any
-  ) {
-    const tokens = await this.clientInfoService.listDeviceTokensUsedSinceXDaysAgo(
-      userId,
-      maxAgeOfDevicesInDays
-    );
+  async sendPushNotificationToAllUserDevices(userId: string, notification: {title: string; body: string}, data: any) {
+    const tokens = await this.clientInfoService.listDeviceTokensUsedSinceXDaysAgo(userId, maxAgeOfDevicesInDays);
 
     if (tokens.length > 0) {
       const message = {
@@ -85,21 +77,20 @@ class NotificationService {
         tokens: tokens,
       };
 
-      console.log("Sending push notification", message);
+      console.log('Sending push notification', message);
 
       this.setupService.sendPushNotification(message);
     }
   }
 
-
   async sendPushNotificationToAllUserDevicesMultipleUsers(
     userIds: string[],
-    notification: { title: string; body: string },
-    data: any
+    notification: {title: string; body: string},
+    data: any,
   ) {
     const tokens = await this.clientInfoService.listDeviceTokensForUsersUsedSinceXDaysAgo(
       userIds,
-      maxAgeOfDevicesInDays
+      maxAgeOfDevicesInDays,
     );
     if (tokens.length > 0) {
       const message = {
@@ -118,28 +109,34 @@ class NotificationService {
           ...data,
           title: notification.title,
           body: notification.body,
-          targetUserType: "ADMIN",
+          targetUserType: 'ADMIN',
         },
         tokens,
       };
-    
-    this.setupService.sendPushNotification(message);
 
+      this.setupService.sendPushNotification(message);
     }
   }
 
-  async canSend(
-    notificationSettings: Record<string, any>,
-    method: string,
-    type: string
-  ) {
+  async canSend(notificationSettings: Record<string, any>, method: string, type: string) {
     if (type == NotificationType.USER_JOINED_ACCOUNT) {
       return true;
     }
 
-    if (!!notificationSettings && notificationSettings[type]) {
-      return notificationSettings[type][method] == true;
+    if (!notificationSettings || typeof notificationSettings !== 'object') {
+      return true;
     }
+
+    const categoryMap =
+      notificationSettings?.categories && typeof notificationSettings.categories === 'object'
+        ? notificationSettings.categories
+        : notificationSettings;
+
+    const selectedCategory = categoryMap?.[type] || categoryMap?.DEFAULT;
+    if (selectedCategory && typeof selectedCategory === 'object') {
+      return selectedCategory?.[method] === true;
+    }
+
     return true;
   }
 
@@ -157,14 +154,11 @@ class NotificationService {
       highPriority?: boolean;
       refInfo?: any;
     },
-    sendPush = false
+    sendPush = false,
   ) {
     const targetUser = await this.userRepo.findById(targetUserId);
 
-    const notificationSettings = await this.userPrefRepo.getUserPref(
-      targetUserId,
-      UserPrefKeys.notificationSettings
-    );
+    const notificationSettings = await this.userPrefRepo.getUserPref(targetUserId, UserPrefKeys.notificationSettings);
 
     const id = uuidv4();
     const now = new Date();
@@ -184,10 +178,7 @@ class NotificationService {
     }
 
     //PUSH NOTIFICATIONS
-    if (
-      sendPush &&
-      (await this.canSend(notificationSettings, NotificationMethod.push, type))
-    ) {
+    if (sendPush && (await this.canSend(notificationSettings, NotificationMethod.push, type))) {
       this.sendPushNotificationToAllUserDevices(
         targetUserId,
         {
@@ -197,16 +188,14 @@ class NotificationService {
         {
           ...data.refInfo,
           type: type,
-        }
+        },
       ).catch((err) => {
         console.log(err);
       });
     }
 
     //EMAIL NOTIFICATIONS
-    if (
-      await this.canSend(notificationSettings, NotificationMethod.email, type)
-    )
+    if (await this.canSend(notificationSettings, NotificationMethod.email, type))
       this.createAndSendEmail(type, targetUser, data).catch((err) => {
         console.log(err);
       });
@@ -222,30 +211,34 @@ class NotificationService {
       emailMessage?: string;
       message?: string;
       refInfo?: any;
-    }
+    },
   ) {
+    const emailFooterLink = this.getEmailFooterLink(type);
+
     if (
       [
         NotificationType.WELCOME_USER,
         NotificationType.FRIEND_REQUEST,
         NotificationType.ACCESS_REQUEST,
         NotificationType.ACCESS_REQUEST_UPDATE,
+        NotificationType.LIBRARY_AUTO_APPROVAL_APPROVED,
+        NotificationType.LIBRARY_AUTO_APPROVAL_DENIED,
+        NotificationType.LIBRARY_AUTO_APPROVAL_REVIEW,
         NotificationType.NEW_POST,
         NotificationType.SHARED_ITEM,
         NotificationType.FOLLOWING_UPDATE,
         NotificationType.NEW_COMMENT,
+        NotificationType.RESTRICTED_USER_PUBLISHED,
       ].includes(type)
     ) {
       if (targetUser.email != null && targetUser.email.length > 0) {
         sendEmail(
           [targetUser.email],
-          data.title || "New Notification",
-          `${data.emailMessage || data.message || "New Notification"}
+          data.title || 'New Notification',
+          `${data.emailMessage || data.message || 'New Notification'}
                 <br/>
                 <br/>
-                <a href="${
-                  config.serverHostname
-                }/kindredapp/#/?show=notifications">View all my notifications</a>.
+                <a href="${config.serverHostname}${emailFooterLink.href}">${emailFooterLink.label}</a>.
                 <br/>
                 <br/>
                 <br/>
@@ -253,36 +246,45 @@ class NotificationService {
                 <br/>`,
           MAIN_EMAIL_TEMPLATE,
           [],
-          "Kindredly <notify-noreply@thetaset.com>"
+          'Kindredly <notify-noreply@thetaset.com>',
         );
       }
     }
   }
 
+  private getEmailFooterLink(type: NotificationType) {
+    if (type === NotificationType.NEW_POST) {
+      return {
+        href: '/kindredapp/#/feeds/sharing',
+        label: 'View shared posts',
+      };
+    }
+
+    return {
+      href: '/kindredapp/#/notifications',
+      label: 'View all my notifications',
+    };
+  }
 
   // ROUTE-METHOD
   async removeNotificationById(ctx: RequestContext, id: string) {
     const notification = await this.notificationsRepo.findById(id);
-    if (
-      notification &&
-      (notification.targetKey == ctx.accountId ||
-        notification.targetKey == ctx.currentUserId)
-    ) {
+    if (notification && (notification.targetKey == ctx.accountId || notification.targetKey == ctx.currentUserId)) {
       await this.notificationsRepo.deleteWithId(id); //todo, pass check auth function
       if (notification.type == NotificationGroupType.USER) {
         await this.listUserNotifcations(ctx);
       }
     } else {
-      console.error("Unable to remove notification", id);
+      console.error('Unable to remove notification', id);
     }
   }
 
   // ROUTE-METHOD
   async clearNotifications(ctx: RequestContext) {
     if (await ctx.isAdmin()) {
-      await this.notificationsRepo.deleteWhere({ targetKey: ctx.accountId });
+      await this.notificationsRepo.deleteWhere({targetKey: ctx.accountId});
     }
-    await this.notificationsRepo.deleteWhere({ targetKey: ctx.currentUserId });
+    await this.notificationsRepo.deleteWhere({targetKey: ctx.currentUserId});
   }
 
   async addAccountNotification(
@@ -297,7 +299,7 @@ class NotificationService {
       shortMessage?: string | null;
       refInfo?: any;
     },
-    sendPush = false
+    sendPush = false,
   ) {
     const id = uuidv4();
     const now = new Date();
@@ -316,39 +318,51 @@ class NotificationService {
 
     const users = await this.userRepo.listByAccountId(accountId);
 
-    const adminUserIds = users
-      .filter((v) => v.type == UserType.admin)
-      .map((v) => v._id);
+    const adminUsers = users.filter((v) => v.type == UserType.admin);
+    const adminSettings = await Promise.all(
+      adminUsers.map(async (user) => ({
+        user,
+        notificationSettings: await this.userPrefRepo.getUserPref(user._id, UserPrefKeys.notificationSettings),
+      })),
+    );
 
-    // TODO: Check notification settings
-
-    this.sendPushNotificationToAllUserDevicesMultipleUsers(
-      adminUserIds,
-      {
-        title: notiticationTypeToTitle(type),
-        body: data.shortMessage || data.title,
-      },
-      {
-        type: type,
-        ...data.refInfo,
-        sysId: id,
+    if (sendPush) {
+      const pushEnabledAdminUserIds: string[] = [];
+      for (const admin of adminSettings) {
+        if (await this.canSend(admin.notificationSettings, NotificationMethod.push, type)) {
+          pushEnabledAdminUserIds.push(admin.user._id);
+        }
       }
-    ).catch((err) => {
-      console.log(err);
-    });
+
+      if (pushEnabledAdminUserIds.length > 0) {
+        this.sendPushNotificationToAllUserDevicesMultipleUsers(
+          pushEnabledAdminUserIds,
+          {
+            title: notiticationTypeToTitle(type),
+            body: data.shortMessage || data.title,
+          },
+          {
+            type: type,
+            ...data.refInfo,
+            sysId: id,
+          },
+        ).catch((err) => {
+          console.log(err);
+        });
+      }
+    }
 
     //Send email to all account admins
-    if (["ACCESS_REQUEST"].includes(type)) {
-      for (const user of users) {
-        if (
-          user.type == "admin" &&
-          user.email != null &&
-          user.email.length > 0
-        ) {
+    if (['ACCESS_REQUEST'].includes(type)) {
+      for (const admin of adminSettings) {
+        const user = admin.user;
+        const canSendEmail = await this.canSend(admin.notificationSettings, NotificationMethod.email, type);
+
+        if (canSendEmail && user.type == 'admin' && user.email != null && user.email.length > 0) {
           sendEmail(
             [user.email],
-            data.title || "New Access Request",
-            `${data.emailMessage || data.message || "New Access Request"}
+            data.title || 'New Access Request',
+            `${data.emailMessage || data.message || 'New Access Request'}
 
                     <br/>
                     <br/>
@@ -360,14 +374,12 @@ class NotificationService {
                     }/kindredapp/#/settings/useraccessrequests"> - View Access Requests</a>
                        <br/>
                        <br/>
-                <a href="${
-                  config.serverHostname
-                }/kindredapp/#/notifications"> - View all my notifications</a>
+                <a href="${config.serverHostname}/kindredapp/#/notifications"> - View all my notifications</a>
                 <br/>
                 <br/>`,
             MAIN_EMAIL_TEMPLATE,
             [],
-            "Kindredly <notify-noreply@thetaset.com>"
+            'Kindredly <notify-noreply@thetaset.com>',
           );
         }
       }
@@ -385,11 +397,11 @@ class NotificationService {
 
   // ROUTE-METHOD
   async listUserNotifcations(ctx: RequestContext, pageInfo: any = null) {
-    let { page, pageSize, sort, order, unreadOnly } = pageInfo || {
+    let {page, pageSize, sort, order, unreadOnly} = pageInfo || {
       page: 0,
       pageSize: 30,
-      sort: "createdAt",
-      order: "desc",
+      sort: 'createdAt',
+      order: 'desc',
       unreadOnly: false,
     };
 
@@ -399,7 +411,7 @@ class NotificationService {
       })
       .where(function () {
         if (unreadOnly) {
-          this.whereNull("readAt").orWhere("readAt", null);
+          this.whereNull('readAt').orWhere('readAt', null);
         }
       })
       .orderBy(sort, order)
@@ -409,13 +421,11 @@ class NotificationService {
     const user = await ctx.getCurrentUser();
 
     if (!user) {
-      throw new Error("User not found");
+      throw new Error('User not found');
     }
 
     if (user.type == UserType.admin) {
-      const accountNotifications = await this._listAccountNotifcations(
-        ctx.accountId
-      );
+      const accountNotifications = await this._listAccountNotifcations(ctx.accountId);
       notifications.push(...accountNotifications);
     }
 
@@ -452,7 +462,7 @@ class NotificationService {
         targetKey: ctx.currentUserId,
       })
       .where(function () {
-        this.whereNull("readAt").orWhere("readAt", null);
+        this.whereNull('readAt').orWhere('readAt', null);
       });
     let cnt = await this.notificationsRepo.countFromQuery(query1);
 
@@ -463,24 +473,23 @@ class NotificationService {
           targetKey: ctx.accountId,
         })
         .where(function () {
-          this.whereNull("readAt").orWhere("readAt", null);
+          this.whereNull('readAt').orWhere('readAt', null);
         });
       cnt += await this.notificationsRepo.countFromQuery(query1);
     }
     return cnt;
   }
 
-
   // ROUTE-METHOD
   async markNotificationsAsRead(ctx: RequestContext, ids: string[]) {
     if (!ctx.isAuthenticated()) {
-      throw new Error("User not authenticated");
+      throw new Error('User not authenticated');
     }
     await this.notificationsRepo
       .query()
-      .whereIn("_id", ids)
+      .whereIn('_id', ids)
       .where(function () {
-        this.where({ targetKey: ctx.currentUserId }).orWhere({
+        this.where({targetKey: ctx.currentUserId}).orWhere({
           targetKey: ctx.accountId,
         });
       })
@@ -492,13 +501,13 @@ class NotificationService {
   // ROUTE-METHOD
   async markNotificationsAsUnread(ctx: RequestContext, ids: string[]) {
     if (!ctx.isAuthenticated) {
-      throw new Error("User not authenticated");
+      throw new Error('User not authenticated');
     }
     await this.notificationsRepo
       .query()
-      .whereIn("_id", ids)
+      .whereIn('_id', ids)
       .where(function () {
-        this.where({ targetKey: ctx.currentUserId }).orWhere({
+        this.where({targetKey: ctx.currentUserId}).orWhere({
           targetKey: ctx.accountId,
         });
       })
@@ -508,28 +517,27 @@ class NotificationService {
   }
 
   async verifyEmail(verificationId: string) {
-    const verification = await this.verificationService._getVerificationById(
-      verificationId
-    );
+    const verification = await this.verificationService._getVerificationById(verificationId);
     if (!verification) return null;
   }
 
   async sendAccessRequestNotification(ctx: RequestContext, requester: User, accessRequestId: string, key: string) {
+    // TODO: Fix
     const notificationData = {
-      title: `Access Request from ${requester.username} to ${key}`,
-      message: `<a href="/kindredapp/#/settings/useraccessrequests?requestId=${accessRequestId}">Access request</a> from ${requester.username} to ${key}`,
-      emailMessage: `Access Request from ${requester.username} to ${key}.
+      title: `New Request from ${requester.username} to ${key}`,
+      message: `<a href="/kindredapp/#/settings/useraccessrequests?requestId=${accessRequestId}">request</a> from ${requester.username} to ${key}`,
+      emailMessage: `Request from ${requester.username} to ${key}.
         <br/>
         <br/>
         <a class="button" href="${config.serverHostname}/kindredapp/#/settings/useraccessrequests?requestId=${accessRequestId}">Open Request</a>`,
 
       refInfo: {
-        'requestId': accessRequestId,
-        'requesterUsername': requester.username,
-        'resourceType': 'url',
-        'resourceId': key,
-        'resourceName': key
-      }
+        requestId: accessRequestId,
+        requesterUsername: requester.username,
+        resourceType: 'url',
+        resourceId: key,
+        resourceName: key,
+      },
     };
 
     await this.addAccountNotification(
@@ -537,15 +545,13 @@ class NotificationService {
       NotificationType.ACCESS_REQUEST,
       ctx.currentUserId,
       ctx.accountId,
-      notificationData
+      notificationData,
     );
   }
 
-
   async notifyOfInvitation(email: string, inviterName: string, accountUser: User, inviteCode: string, message: string) {
-
     const inviteLink = `${config.serverHostname}/kindredapp/#/joinAccount?accountInvitationCode=${inviteCode}`;
-    console.log("Invite Link Created:", inviteLink);
+    console.log('Invite Link Created:', inviteLink);
 
     sendEmail(
       [email],
@@ -553,7 +559,7 @@ class NotificationService {
       ACCOUNT_INVITE_MSG(accountUser, config, inviteLink, inviteCode, inviterName, message),
       MAIN_EMAIL_TEMPLATE,
       [],
-      "Kindredly  <noreply@kindredly.ai>"
+      'Kindredly  <noreply@kindredly.ai>',
     );
 
     sendEmail(
@@ -562,94 +568,85 @@ class NotificationService {
       INVITATION_TO_ACCOUNT(config, inviteCode, email),
       MAIN_EMAIL_TEMPLATE,
       [],
-      "Kindredly  <noreply@kindredly.ai>"
+      'Kindredly  <noreply@kindredly.ai>',
     );
   }
 
+  async sendUserJoinNotification(ctx: RequestContext, newUser: User, users: User[]) {
+    if (users.length > 0 && newUser.type == UserType.admin) {
+      const adminUsers = users.filter((u) => u.type == UserType.admin && u._id != newUser._id);
 
-   async sendUserJoinNotification(ctx: RequestContext, newUser: User, users: User[]) {
-
-      if (users.length > 0 && newUser.type == UserType.admin) {
-        const adminUsers = users.filter(
-          (u) => u.type == UserType.admin && u._id != newUser._id
-        );
-  
-        const message = `
+      const message = `
             ${newUser.username} (${newUser.email}) accepted your invite and joined your account. 
             <br/>
             <br/> 
             Action Required: You must visit your <a href="TS_BASE_PATH#/settings/encryption">Encryption Settings</a> to give them access to the account encryption key.`;
-  
-        const notificationData = {
-          title: `[Action Required] A new user has joined the account and need permission to your account encryption key.`,
-          message: message.replace(/TS_BASE_PATH/g, "/kindredapp/"),
-          emailMessage: message.replace(
-            /TS_BASE_PATH/g,
-            `${config.serverHostname}/kindredapp/`
-          ),
-          refInfo: {
-            action: "path",
-            path: "/settings/encryption?action=shareAccountKey&userId=" + newUser._id,
-          },
-          highPriority: true,
-          actions: [
-            { label: "Grant Access", name: "shareKey", data: { userId: newUser._id } },
-          ],
-        };
-  
-        for (const adminUser of adminUsers) {
-          this
-            .addUserNotification(
-              RequestContext.instanceForSystem(),
-              NotificationType.USER_JOINED_ACCOUNT,
-              ctx.currentUserId,
-              ctx.accountId,
-              adminUser._id,
-              notificationData,
-              true
-            )
-            .catch((e) => { });
-        }
+
+      const notificationData = {
+        title: `[Action Required] A new user has joined the account and need permission to your account encryption key.`,
+        message: message.replace(/TS_BASE_PATH/g, '/kindredapp/'),
+        emailMessage: message.replace(/TS_BASE_PATH/g, `${config.serverHostname}/kindredapp/`),
+        refInfo: {
+          action: 'path',
+          path: '/settings/encryption?action=shareAccountKey&userId=' + newUser._id,
+        },
+        highPriority: true,
+        actions: [{label: 'Grant Access', name: 'shareKey', data: {userId: newUser._id}}],
+      };
+
+      for (const adminUser of adminUsers) {
+        this.addUserNotification(
+          RequestContext.instanceForSystem(),
+          NotificationType.USER_JOINED_ACCOUNT,
+          ctx.currentUserId,
+          ctx.accountId,
+          adminUser._id,
+          notificationData,
+          true,
+        ).catch((e) => {});
       }
     }
+  }
 
+  async sendReactionNotifications(currentUser: User, post: any, userIdUpdateList: any[], ctx: RequestContext) {
+    const notificationForPosterData = {
+      title: `${currentUser.username} reacted to your post`,
+      shortMessage: `${currentUser.username} reacted to your post.`,
+      message: `<a href="/kindredapp/#/p/${post._id}">View Post</a>`,
+      emailMessage: `${currentUser.username} reacted to your post.... <a href="${config.serverHostname}/kindredapp/#/p/${post._id}">view</a>`,
+      refInfo: {
+        postId: post._id,
+      },
+    };
 
-   async sendReactionNotifications(currentUser: User, post: any, userIdUpdateList: any[], ctx: RequestContext) {
-        const notificationForPosterData = {
-          title: `${currentUser.username} reacted to your post`,
-          shortMessage: `${currentUser.username} reacted to your post.`,
-          message: `<a href="/kindredapp/#/p/${post._id}">View Post</a>`,
-          emailMessage: `${currentUser.username} reacted to your post.... <a href="${config.serverHostname}/kindredapp/#/p/${post._id}">view</a>`,
-          refInfo: {
-            postId: post._id,
-          },
-        };
-    
-        for (const userId of userIdUpdateList) {
-          const user = await this.userRepo.findById(userId);
-          if (user) {
-            ctx.cacheUser(user);
-            //check if permissions allow posting to this user
-            let postData = notificationForPosterData;
-            this
-              .addUserNotification(
-                ctx,
-                NotificationType.NEW_COMMENT,
-                ctx.currentUserId,
-                ctx.accountId,
-                userId,
-                postData,
-                true
-              )
-              .catch((err) => {
-                console.log(err);
-              });
-          }
-        }
+    for (const userId of userIdUpdateList) {
+      const user = await this.userRepo.findById(userId);
+      if (user) {
+        ctx.cacheUser(user);
+        //check if permissions allow posting to this user
+        let postData = notificationForPosterData;
+        this.addUserNotification(
+          ctx,
+          NotificationType.NEW_COMMENT,
+          ctx.currentUserId,
+          ctx.accountId,
+          userId,
+          postData,
+          true,
+        ).catch((err) => {
+          console.log(err);
+        });
       }
+    }
+  }
 
-
-   async notifyCommentPosterAndWatchers(currentUser: User, post: any, commentId: string, userIdUpdateList: any[], ctx: RequestContext) {
+  async notifyCommentPosterAndWatchers(
+    currentUser: User,
+    post: any,
+    commentId: string,
+    userIdUpdateList: any[],
+    ctx: RequestContext,
+  ) {
     const notificationForPosterData = {
       title: `${currentUser.username} commented on your post`,
       shortMessage: `${currentUser.username} added a comment to your post.`,
@@ -680,101 +677,111 @@ class NotificationService {
         ctx.cacheUser(user);
         //check if permissions allow posting to this user
         let postData = userId != post.userId ? notificationForWatcherData : notificationForPosterData;
-        this
-          .addUserNotification(ctx, NotificationType.NEW_COMMENT, ctx.currentUserId, ctx.accountId, userId, postData, true)
-          .catch((err) => {
-            console.log(err);
-          });
+        this.addUserNotification(
+          ctx,
+          NotificationType.NEW_COMMENT,
+          ctx.currentUserId,
+          ctx.accountId,
+          userId,
+          postData,
+          true,
+        ).catch((err) => {
+          console.log(err);
+        });
       }
     }
   }
 
-   notifyItemUsersOfComment(currentUser: User, refId: string, commentId: string, userIds: string[], ctx: RequestContext) {
-      const notificationData = {
-        title: `New Item Comment`,
-        shortMessage: `${currentUser.username} added a comment to an item in your library.`,
-        message: `${currentUser.username} added a comment to an item in your library. <a href="/kindredapp/#/item/${refId}?commentId=${commentId}">View Comment</a>`,
-        emailMessage: `${currentUser.username} added a commented to an item in your library. <a href="${config.serverHostname}/kindredapp/#/item/${refId}?commentId=${commentId}">view</a>`,
-        refInfo: {
-          commentId: commentId,
-          refType: 'item',
-          refId: refId,
-          commenterUsername: currentUser.username,
-        },
-      };
-      for (const userId of userIds) {
-        if (userId == ctx.currentUserId) continue;
-  
-        this
-          .addUserNotification(
-            ctx,
-            NotificationType.NEW_COMMENT,
-            ctx.currentUserId,
-            ctx.accountId,
-            userId,
-            notificationData,
-            true
-          )
-          .catch((err) => {
-            console.log(err);
-          });
-      }
+  notifyItemUsersOfComment(
+    currentUser: User,
+    refId: string,
+    commentId: string,
+    userIds: string[],
+    ctx: RequestContext,
+  ) {
+    const notificationData = {
+      title: `New Item Comment`,
+      shortMessage: `${currentUser.username} added a comment to an item in your library.`,
+      message: `${currentUser.username} added a comment to an item in your library. <a href="/kindredapp/#/item/${refId}?commentId=${commentId}">View Comment</a>`,
+      emailMessage: `${currentUser.username} added a commented to an item in your library. <a href="${config.serverHostname}/kindredapp/#/item/${refId}?commentId=${commentId}">view</a>`,
+      refInfo: {
+        commentId: commentId,
+        refType: 'item',
+        refId: refId,
+        commenterUsername: currentUser.username,
+      },
+    };
+    for (const userId of userIds) {
+      if (userId == ctx.currentUserId) continue;
+
+      this.addUserNotification(
+        ctx,
+        NotificationType.NEW_COMMENT,
+        ctx.currentUserId,
+        ctx.accountId,
+        userId,
+        notificationData,
+        true,
+      ).catch((err) => {
+        console.log(err);
+      });
     }
+  }
 
-       async sendFriendRequestNotification(ctx: RequestContext, userId: any, accountId: any) {
-        const notificationData = {
-          title: `You have one or more friend requests`,
-          message: `<a href="/kindredapp/#/people?show=friends">View</a> your friend requests`,
-          emailMessage: `<a href="${config.serverHostname}/kindredapp/#/people?show=friends">View</a> your friend requests`,
-        };
-        await this.addUserNotification(
-          ctx,
-          NotificationType.FRIEND_REQUEST,
-          userId,
-          accountId,
-          userId,
-          notificationData
-        );
-      }
+  async sendFriendRequestNotification(ctx: RequestContext, userId: any, accountId: any) {
+    const notificationData = {
+      title: `You have one or more friend requests`,
+      message: `<a href="/kindredapp/#/people?show=friends">View</a> your friend requests`,
+      emailMessage: `<a href="${config.serverHostname}/kindredapp/#/people?show=friends">View</a> your friend requests`,
+    };
+    await this.addUserNotification(ctx, NotificationType.FRIEND_REQUEST, userId, accountId, userId, notificationData);
+  }
 
-       createFriendRequestNotification(displayedInviterName: any, targetUser: User, message: any, id1: string, targetUserId: any, ctx: RequestContext, friendUser: any) {
-        const notificationData = {
-          title: `Friend Request from ${displayedInviterName}`,
-          shortMessage: `You have a new friend request from ${displayedInviterName}${targetUser?.email ? " (" + targetUser.email + ")" : ""}!${message ? " --" + message : ""}!`,
-          message: `You have a new friend request from ${displayedInviterName}${targetUser?.email ? " (" + targetUser.email + ")" : ""}! <br/><br/>${message ? 'Invite Message:' + message : ''}<br/> <br/><a href="/kindredapp/#/people?show=friends">Click here to approve or deny friend requests</a>`,
-          emailMessage: `You have a new friend request from ${displayedInviterName}${targetUser?.email ? " (" + targetUser.email + ")" : ""}!  <br/> <br/><a href="${config.serverHostname}/kindredapp/#/people?show=friends">Click here to approve or deny friend requests</a>`,
-          refInfo: {
-            friendRequestId: id1,
-            requestingUserId: targetUserId,
-            requestingUserEmail: targetUser.email,
-            requestingUserUsername: targetUser.username,
-          }
-        };
-        this.addUserNotification(
-          ctx,
-          NotificationType.FRIEND_REQUEST,
-          ctx.currentUserId,
-          friendUser.accountId,
-          friendUser._id,
-          notificationData,
-          true
-        ).catch((e) => {
-          console.log('Error sending friend request notification', e);
-        });
-      }
+  createFriendRequestNotification(
+    displayedInviterName: any,
+    targetUser: User,
+    message: any,
+    id1: string,
+    targetUserId: any,
+    ctx: RequestContext,
+    friendUser: any,
+  ) {
+    const notificationData = {
+      title: `Friend Request from ${displayedInviterName}`,
+      shortMessage: `You have a new friend request from ${displayedInviterName}${targetUser?.email ? ' (' + targetUser.email + ')' : ''}!${message ? ' --' + message : ''}!`,
+      message: `You have a new friend request from ${displayedInviterName}${targetUser?.email ? ' (' + targetUser.email + ')' : ''}! <br/><br/>${message ? 'Invite Message:' + message : ''}<br/> <br/><a href="/kindredapp/#/people?show=friends">Click here to approve or deny friend requests</a>`,
+      emailMessage: `You have a new friend request from ${displayedInviterName}${targetUser?.email ? ' (' + targetUser.email + ')' : ''}!  <br/> <br/><a href="${config.serverHostname}/kindredapp/#/people?show=friends">Click here to approve or deny friend requests</a>`,
+      refInfo: {
+        friendRequestId: id1,
+        requestingUserId: targetUserId,
+        requestingUserEmail: targetUser.email,
+        requestingUserUsername: targetUser.username,
+      },
+    };
+    this.addUserNotification(
+      ctx,
+      NotificationType.FRIEND_REQUEST,
+      ctx.currentUserId,
+      friendUser.accountId,
+      friendUser._id,
+      notificationData,
+      true,
+    ).catch((e) => {
+      console.log('Error sending friend request notification', e);
+    });
+  }
 
-     sendFriendRequestEmail(inviterName: any, accountUser: any, email: any, message: any) {
-        const displayedInviterName = inviterName || accountUser.email;
-        sendEmail(
-          [email],
-          friendRequestTemplate.subject(displayedInviterName),
-          friendRequestTemplate.content(displayedInviterName, message, accountUser),
-          MAIN_EMAIL_TEMPLATE,
-          [],
-          config.notificationSourceEmailString
-        );
-      }
-    
+  sendFriendRequestEmail(inviterName: any, accountUser: any, email: any, message: any) {
+    const displayedInviterName = inviterName || accountUser.email;
+    sendEmail(
+      [email],
+      friendRequestTemplate.subject(displayedInviterName),
+      friendRequestTemplate.content(displayedInviterName, message, accountUser),
+      MAIN_EMAIL_TEMPLATE,
+      [],
+      config.notificationSourceEmailString,
+    );
+  }
 }
 
 export default NotificationService;

@@ -1,6 +1,5 @@
-import { config } from '@/config';
+import {config} from '@/config';
 import fs from 'fs';
-
 
 export function getContactUsEmailTemplate(type, refId) {
   if (type == 'waitinglist') {
@@ -76,13 +75,10 @@ export let MAIN_EMAIL_TEMPLATE = 'CONTENT_BODY';
 try {
   MAIN_EMAIL_TEMPLATE = fs.readFileSync('src/templates/kindred_email_template.html').toString();
 } catch (error) {
-  if (!config.privateServer)
-  console.error('Failed to load email template');
+  if (!config.privateServer) console.error('Failed to load email template');
 }
 
-
 export const friendRequestTemplate = {
-
   subject(displayedInviterName: any): string {
     return `Friend Request from ${displayedInviterName} on Kindredly`;
   },
@@ -109,6 +105,5 @@ export const friendRequestTemplate = {
       ${displayedInviterName}'s email is ${accountUser.email}. 
    
       `;
-  }
-}
-
+  },
+};

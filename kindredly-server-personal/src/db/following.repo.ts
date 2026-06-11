@@ -1,6 +1,6 @@
 import knex from './knex_config';
-import { Knex } from 'knex';
-import Following from '@/schemas/public/Following';
+import {Knex} from 'knex';
+import Following from 'tset-sharedlib/schemas/public/Following';
 import {BaseRepo} from './base.repo';
 
 export class FollowingRepo extends BaseRepo<Following> {

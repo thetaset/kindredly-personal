@@ -1,12 +1,12 @@
 import PluginService from '@/services/plugin.service';
-import { Routes } from '@interfaces/routes.interface';
-import { NextFunction, Router, Request, Response } from 'express';
-import { errorHelper } from '../utils/auth_utils';
-import * as SystemPaths from 'tset-sharedlib/api/SystemPaths';
-import { config } from '@/config';
+import {Routes} from '@interfaces/routes.interface';
+import {NextFunction, Router, Request, Response} from 'express';
+import {ApiReq} from '@/types/api-types';
+import {errorHelper} from '../utils/auth_utils';
+import {config} from '@/config';
 import SysSetupService from '@/services/_interfaces/syssetup.service';
-import { inject, injectable } from 'inversify';
-import { TYPES } from '@/types';
+import {inject, injectable} from 'inversify';
+import {TYPES} from '@/types';
 const indexRequest = (req: Request, res: Response, next: NextFunction): void => {
   try {
     res.sendStatus(200);
@@ -15,10 +15,9 @@ const indexRequest = (req: Request, res: Response, next: NextFunction): void => 
   }
 };
 
-
 const versionReq = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
-    res.status(200).json({ success: true, results: config.version });
+    res.status(200).json({success: true, results: config.version});
   } catch (error) {
     next(error);
   }
@@ -36,25 +35,24 @@ class SystemRoute implements Routes {
   }
 
   private initializeRoutes() {
-    this.router.all(SystemPaths.SYSTEM_STATUS, async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    this.router.all('/system/status', async (req: Request, res: Response, next: NextFunction): Promise<void> => {
       try {
         console.log('systemStatus');
         const results = await this.setupService.systemInfo();
-        res.status(201).json({ success: true, message: 'request complete', results });
+        res.status(201).json({success: true, message: 'request complete', results});
       } catch (error) {
         next(error);
       }
     });
 
-    this.router.all(SystemPaths.VERSION, versionReq);
+    this.router.all('/system/version', versionReq);
 
-    this.router.get(SystemPaths.ROOT, indexRequest);
-
+    this.router.get('/', indexRequest);
 
     // SCH-FAILED
     this.router.post(
-      SystemPaths.PLUGIN_LIST,
-      errorHelper(async (req, res) => {
+      '/plugin/list',
+      errorHelper(async (req: ApiReq<'/plugin/list'>, res) => {
         const items = await this.pluginService.listSitePlugins();
         const result = {
           success: true,
@@ -63,7 +61,6 @@ class SystemRoute implements Routes {
         res.json(result);
       }),
     );
-
   }
 }
 

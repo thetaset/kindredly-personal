@@ -1,7 +1,7 @@
-import Reaction from '@/schemas/public/Reaction';
+import Reaction from 'tset-sharedlib/schemas/public/Reaction';
 import {BaseRepo} from './base.repo';
 import knex from './knex_config';
-import { Knex } from 'knex';
+import {Knex} from 'knex';
 
 export class ReactionRepo extends BaseRepo<Reaction> {
   constructor(db: Knex = knex) {

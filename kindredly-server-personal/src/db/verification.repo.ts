@@ -1,9 +1,8 @@
-import Verification from '@/schemas/public/Verification';
+import Verification from 'tset-sharedlib/schemas/public/Verification';
 import {BaseRepo} from './base.repo';
 import knex from './knex_config';
 
 export class VerificationRepo extends BaseRepo<Verification> {
-
   constructor(db = knex) {
     super('verification', db);
   }

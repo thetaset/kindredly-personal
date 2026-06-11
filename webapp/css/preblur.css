@@ -1,0 +1,24 @@
+img {
+  filter: blur(20px);
+  transition: filter 0.2s ease, opacity 0.2s ease;
+  animation: ts-preload-loading-pulse 2.2s ease-in-out infinite;
+  will-change: opacity;
+}
+
+img[style*="filter: none"],
+img[data-ts-blocked="true"] {
+  animation: none !important;
+  opacity: 1 !important;
+}
+
+@keyframes ts-preload-loading-pulse {
+  0% { opacity: 0.94; }
+  50% { opacity: 1; }
+  100% { opacity: 0.94; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  img {
+    animation: none;
+  }
+}

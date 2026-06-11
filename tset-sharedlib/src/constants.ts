@@ -1,11 +1,93 @@
-export enum ItemPageTypes{
-    YOUTUBE_CHANNEL= "YOUTUBE_CHANNEL"
-    ,
-    YOUTUBE_PAGE="YOUTUBE_PAGE"
+import { TopicCategory } from "./shared.types";
+
+// TODO: Rectify with ResourceType
+export enum ItemResourceType {
+  SITE_ROOT = "SITE_ROOT",
+  SITE_ITEM = "SITE_ITEM",
+  SITE_ITEM_FEED = "SITE_ITEM_FEED",
+  YT_CHANNEL = "YOUTUBE_CHANNEL",
+  YT_PAGE = "YOUTUBE_PAGE",
+  YT_VIDEO = "YOUTUBE_VIDEO",
+  UNKNOWN = "UNKNOWN",
 }
 
-export const BASE64_DELIM = '\r\n--TSB_$$\r\n';
+export const BASE64_DELIM = "\r\n--TSB_$$\r\n";
 
+export const OFFICIAL_PUBLISHER_PUBLIC_ID = 'kindredly-official';
+export const OFFICIAL_PUBLISHER_USERNAME = 'Kindredly';
+export const OFFICIAL_PUBLISHER_FULL_NAME = 'Kindredly Official';
+export const OFFICIAL_PUBLISHER_ABOUT = 'Official published content from Kindredly.';
+
+export function isOfficialPublisherId(value: string | null | undefined): boolean {
+  return value === OFFICIAL_PUBLISHER_PUBLIC_ID;
+}
+
+const YOUTUBE_CATEGORIES = {
+  "01": "Film & Animation",
+  "02": "Autos & Vehicles",
+  "10": "Music",
+  "15": "Pets & Animals",
+  "17": "Sports",
+  "18": "Short Movies",
+  "19": "Travel & Events",
+  "20": "Gaming",
+  "21": "Videoblogging",
+  "22": "People & Blogs",
+  "23": "Comedy",
+  "24": "Entertainment",
+  "25": "News & Politics",
+  "26": "How‑to & Style",
+  "27": "Education",
+  "28": "Science & Technology",
+  "29": "Nonprofits & Activism",
+  "30": "Movies",
+  "31": "Anime/Animation",
+  "32": "Action/Adventure",
+  "33": "Classics",
+  "34": "Comedy (legacy)",
+  "35": "Documentary",
+  "36": "Drama",
+  "37": "Family",
+  "38": "Foreign",
+  "39": "Horror",
+  "40": "Sci‑Fi/Fantasy",
+  "41": "Thriller",
+  "42": "Shorts",
+  "43": "Shows",
+  "44": "Trailers",
+};
+
+const InternalCategories = {
+  "00": "Unknown",
+  "01": "Educational",
+};
+const educationalYTCategoryIds = ["26", "27", "28"];
+
+export const DefaultCategories: TopicCategory[] = [
+  { name: "Art", id: "cat_art" },
+  { name: "DIY", id: "cat_diy" },
+  { name: "Entertainment", id: "cat_entertainment" },
+  { name: "Education", id: "cat_education" },
+  { name: "Exercise", id: "cat_exercise" },
+  { name: "Finance", id: "cat_finance" },
+  { name: "Food and Diet", id: "cat_food" },
+  { name: "Language and Literature", id: "cat_language" },
+  { name: "Health", id: "cat_health" },
+  { name: "History and Culture", id: "cat_history" },
+  { name: "Kids and Family", id: "cat_kids" },
+  { name: "Math", id: "cat_math" },
+  { name: "Music", id: "cat_music" },
+  { name: "Miscellaneous", id: "cat_misc" },
+  { name: "News", id: "cat_news" },
+  { name: "Politics", id: "cat_politics" },
+  { name: "Productivity", id: "cat_productivity" },
+  { name: "Reference", id: "cat_reference" },
+  { name: "Science and Nature", id: "cat_science" },
+  { name: "Shopping", id: "cat_shopping" },
+  { name: "Sports", id: "cat_sports" },
+  { name: "Technology", id: "cat_technology" },
+  { name: "Other", id: "cat_other" },
+];
 
 export const STOP_WORDS = [
   "a",

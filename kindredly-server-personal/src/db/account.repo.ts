@@ -1,13 +1,13 @@
-import Account from '@/schemas/public/Account';
+import Account from 'tset-sharedlib/schemas/public/Account';
 import {BaseRepo} from './base.repo';
 import knex from './knex_config';
-import { Knex } from 'knex';
+import {Knex} from 'knex';
 
 export class AccountRepo extends BaseRepo<Account> {
   constructor(db: Knex = knex) {
     super('account', db);
   }
-  async findById(id: string) : Promise<Account> {
+  async findById(id: string): Promise<Account> {
     return await this.where({_id: id}).first();
   }
 

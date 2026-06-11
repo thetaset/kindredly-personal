@@ -1,5 +1,5 @@
-import {IsEmail, IsObject, IsOptional, IsString} from 'class-validator';
-import { LoginType, UserType } from 'tset-sharedlib/shared.types';
+import {IsBoolean, IsEmail, IsObject, IsOptional, IsString} from 'class-validator';
+import {LoginType, UserType} from 'tset-sharedlib/shared.types';
 
 export class CreateUserDto {
   @IsOptional()
@@ -48,7 +48,7 @@ export class CreateUserDto {
 
   @IsOptional()
   @IsString()
-  public type?: UserType
+  public type?: UserType;
 
   @IsOptional()
   @IsString()
@@ -57,4 +57,8 @@ export class CreateUserDto {
   @IsOptional()
   @IsObject()
   public clientInfoData?: Record<string, any>;
+
+  @IsOptional()
+  @IsBoolean()
+  public deferEncryptionBackup?: boolean;
 }

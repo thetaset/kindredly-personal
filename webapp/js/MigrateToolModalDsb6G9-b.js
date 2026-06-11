@@ -1,0 +1,1 @@
+import{d as o,l,V as s,v as t}from"./@vueCtd8-HiN.js";const c=o({__name:"MigrateToolModal",emits:["close"],setup(a,{emit:n}){return(r,e)=>(s(),l("div",null,[...e[0]||(e[0]=[t("div",{class:"text-center p-4"},[t("p",null,"Migration tool is currently disabled.")],-1)])]))}});export{c as default};

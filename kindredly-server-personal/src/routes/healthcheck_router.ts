@@ -1,6 +1,6 @@
-import { config } from '@/config';
+import {config} from '@/config';
 import {Routes} from '@interfaces/routes.interface';
-import { NextFunction, Router, Request, Response } from 'express';
+import {NextFunction, Router, Request, Response} from 'express';
 
 export enum HealthCheckPaths {
   PING = '/healthcheckping',
@@ -13,7 +13,6 @@ const versionReq = async (req: Request, res: Response, next: NextFunction): Prom
   }
 };
 class HealthCheckRouter implements Routes {
-  
   public router = Router();
 
   constructor() {
@@ -22,7 +21,6 @@ class HealthCheckRouter implements Routes {
   }
 
   private initializeRoutes() {
-
     // SCH-OK
     this.router.all(HealthCheckPaths.PING, versionReq);
   }

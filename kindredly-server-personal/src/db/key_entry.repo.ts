@@ -1,7 +1,7 @@
-import KeyEntry from '@/schemas/public/KeyEntry';
+import KeyEntry from 'tset-sharedlib/schemas/public/KeyEntry';
 import {BaseRepo} from './base.repo';
 import knex from './knex_config';
-import { Knex } from 'knex';
+import {Knex} from 'knex';
 
 export class KeyEntryRepo extends BaseRepo<KeyEntry> {
   public jsonArrayFields = ['keyData', 'keyAlgo', 'keyOps'];
@@ -13,7 +13,9 @@ export class KeyEntryRepo extends BaseRepo<KeyEntry> {
   }
 
   async listPublicKeysForUsers(userIds: string[]) {
-    return await this.query().whereIn('selectId', userIds).where({selectType: 'user', keyType: 'pub', keyName: 'default'});
+    return await this.query()
+      .whereIn('selectId', userIds)
+      .where({selectType: 'user', keyType: 'pub', keyName: 'default'});
   }
 
   async listForUser(userId: string) {
@@ -28,16 +30,21 @@ export class KeyEntryRepo extends BaseRepo<KeyEntry> {
     return await this.where({_id: id}).update(this._updateInput(update));
   }
 
-  async create(input: KeyEntry) {
-    return (await this.query().insert(this._updateInput(input)).onConflict('_id').merge().returning('*')) as any;
+  async create(input: KeyEntry): Promise<KeyEntry> {
+    const rows = (await this.query()
+      .insert(this._updateInput(input))
+      .onConflict('_id')
+      .merge()
+      .returning('*')) as KeyEntry[];
+    return rows[0];
   }
 
-  async createMany(inputs: KeyEntry[]) {
+  async createMany(inputs: KeyEntry[]): Promise<KeyEntry[]> {
     return (await this.query()
       .insert(inputs.map((r) => this._updateInput(r)))
       .onConflict('_id')
       .merge()
-      .returning('*')) as any;
+      .returning('*')) as KeyEntry[];
   }
 
   async findWhereUserIdIn(col: string, vals: any[]) {

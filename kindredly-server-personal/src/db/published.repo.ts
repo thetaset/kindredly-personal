@@ -1,7 +1,7 @@
-import Published from '@/schemas/public/Published';
+import Published from 'tset-sharedlib/schemas/public/Published';
 import {BaseRepo} from './base.repo';
 import knex from './knex_config';
-import { Knex } from 'knex';
+import {Knex} from 'knex';
 
 export class PublishedRepo extends BaseRepo<Published> {
   public jsonArrayFields = ['useCriteria', 'categories'];
@@ -11,6 +11,11 @@ export class PublishedRepo extends BaseRepo<Published> {
 
   async updateWithId(id: string, update: Published) {
     return await this.where({_id: id}).update(this._updateInput(update));
+  }
+
+  async incrementViewCount(id: string) {
+    //statViewCount
+    return await this.query().where({_id: id}).increment('statViewCount', 1);
   }
 
   async create(input: Published) {
@@ -28,8 +33,8 @@ export class PublishedRepo extends BaseRepo<Published> {
   }
 
   findWhereIdsIn(vals: any[]) {
-    const easyIds = vals.filter((v) => !v.startsWith('pub_'));
-    const regIds = vals.filter((v) => v.startsWith('pub_'));
+    const easyIds = vals.filter((v) => !v.startsWith('pub_') && !v.startsWith('pub-'));
+    const regIds = vals.filter((v) => v.startsWith('pub_') || v.startsWith('pub-'));
     return this.query().whereIn('_id', regIds).orWhereIn('easyId', easyIds);
   }
 

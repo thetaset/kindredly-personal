@@ -1,7 +1,7 @@
-import UserPref, { userPrefDefaults } from '@/schemas/public/UserPref';
-import { BaseRepo } from './base.repo';
+import UserPref, {userPrefDefaults} from 'tset-sharedlib/schemas/public/UserPref';
+import {BaseRepo} from './base.repo';
 import knex from './knex_config';
-import { Knex } from 'knex';
+import {Knex} from 'knex';
 
 export enum UserPrefKeys {
   notificationSettings = 'notificationSettings',
@@ -21,7 +21,10 @@ export class UserPrefRepo extends BaseRepo<UserPref> {
   _addPrefDefaults(prefs: UserPref[], keys) {
     const prefsMap = Object.fromEntries(prefs.map((p) => [p.key, p]));
     if (!prefsMap.notificationSettings && keys.includes(UserPrefKeys.notificationSettings)) {
-      prefsMap.notificationSettings = { key: UserPrefKeys.notificationSettings, value: userPrefDefaults.notificationSettings };
+      prefsMap.notificationSettings = {
+        key: UserPrefKeys.notificationSettings,
+        value: userPrefDefaults.notificationSettings,
+      };
     }
 
     return Object.values(prefsMap);
@@ -42,10 +45,23 @@ export class UserPrefRepo extends BaseRepo<UserPref> {
     if (!pref) {
       return userPrefDefaults[key];
     }
+
+    const rawValue = pref.value;
+    if (typeof rawValue === 'string') {
+      const trimmed = rawValue.trim();
+      if (!trimmed) return rawValue;
+      try {
+        return JSON.parse(trimmed);
+      } catch {
+        return rawValue;
+      }
+    }
+
+    return rawValue;
   }
 
   async updateWithId(id: string, update: UserPref) {
-    return await this.where({ _id: id }).update(this._updateInput(update));
+    return await this.where({_id: id}).update(this._updateInput(update));
   }
 
   prefId(userId: string, key: string) {
@@ -66,10 +82,10 @@ export class UserPrefRepo extends BaseRepo<UserPref> {
   }
 
   async findById(id: string) {
-    return await this.where({ _id: id }).first();
+    return await this.where({_id: id}).first();
   }
 
   async deleteWithId(id: string) {
-    return await this.where({ _id: id }).delete();
+    return await this.where({_id: id}).delete();
   }
 }

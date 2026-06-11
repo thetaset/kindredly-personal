@@ -1,7 +1,7 @@
-import Post from '@/schemas/public/Post';
-import { BaseRepo } from './base.repo';
+import Post from 'tset-sharedlib/schemas/public/Post';
+import {BaseRepo} from './base.repo';
 import knex from './knex_config';
-import { Knex } from 'knex';
+import {Knex} from 'knex';
 
 export class PostRepo extends BaseRepo<Post> {
   public jsonArrayFields = ['data', 'sharedWith', 'attachedItems'];
@@ -10,11 +10,11 @@ export class PostRepo extends BaseRepo<Post> {
   }
 
   async findById(id: string) {
-    return await this.where({ _id: id }).first();
+    return await this.where({_id: id}).first();
   }
 
   async updateWithId(id: string, update: Post) {
-    return await this.where({ _id: id }).update(this._updateInput(update));
+    return await this.where({_id: id}).update(this._updateInput(update));
   }
 
   async create(input: Post) {
@@ -22,7 +22,7 @@ export class PostRepo extends BaseRepo<Post> {
   }
 
   async deleteWithId(id: string) {
-    return await this.where({ _id: id }).delete();
+    return await this.where({_id: id}).delete();
   }
 
   async findWhereIdIn(vals: string[]) {

@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" width="128" height="128" aria-hidden="true" focusable="false">
+  <g transform="rotate(-45 8 8)">
+  <path d="M8 8 L8 0 A8 8 0 0 1 12 1.0718 Z" fill="#ff3b30" />
+  <path d="M8 8 L12 1.0718 A8 8 0 0 1 14.9282 4 Z" fill="#ff9500" />
+  <path d="M8 8 L14.9282 4 A8 8 0 0 1 16 8 Z" fill="#ffcc00" />
+  <path d="M8 8 L16 8 A8 8 0 0 1 14.9282 12 Z" fill="#a8e300" />
+  <path d="M8 8 L14.9282 12 A8 8 0 0 1 12 14.9282 Z" fill="#34c759" />
+  <path d="M8 8 L12 14.9282 A8 8 0 0 1 8 16 Z" fill="#00c7be" />
+  <path d="M8 8 L8 16 A8 8 0 0 1 4 14.9282 Z" fill="#32ade6" />
+  <path d="M8 8 L4 14.9282 A8 8 0 0 1 1.0718 12 Z" fill="#007aff" />
+  <path d="M8 8 L1.0718 12 A8 8 0 0 1 0 8 Z" fill="#5856d6" />
+  <path d="M8 8 L0 8 A8 8 0 0 1 1.0718 4 Z" fill="#af52de" />
+  <path d="M8 8 L1.0718 4 A8 8 0 0 1 4 1.0718 Z" fill="#ff2d55" />
+  <path d="M8 8 L4 1.0718 A8 8 0 0 1 8 0 Z" fill="#ff375f" />
+
+  </g>
+
+  <circle cx="8" cy="8" r="7.7" fill="none" stroke="rgba(0,0,0,0.18)" stroke-width="0.6" />
+  <circle cx="8" cy="8" r="7.25" fill="none" stroke="rgba(255,255,255,0.25)" stroke-width="0.6" />
+</svg>

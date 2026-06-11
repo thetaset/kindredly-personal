@@ -1,0 +1,1 @@
+function u(e,a){if(!(e!=null&&e.y))return null;const n=new Date,t=new Date(e.y,(e.m||1)-1,e.d||1),r=n.getFullYear()-t.getFullYear(),c=n.getMonth()-t.getMonth(),l=n.getDate()-t.getDate();return c<0||c===0&&l<0?r-1:r}function f(e,a=18,n){const t=u(e);return t===null?null:t<a}export{u as c,f as i};

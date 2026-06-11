@@ -1,13 +1,12 @@
-import { Routes } from '@interfaces/routes.interface';
-import { Router } from 'express';
+import {Routes} from '@interfaces/routes.interface';
+import {Router} from 'express';
+import {ApiReq} from '@/types/api-types';
 
-import { authenticateJWT, errorHelper, getTargetUserId } from '../utils/auth_utils';
-
+import {authenticateJWT, errorHelper, getTargetUserId} from '../utils/auth_utils';
 
 import ActivityService from '@/services/activity.service';
-import { RequestContext } from '@/base/request_context';
+import {RequestContext} from '@/base/request_context';
 import ChangeLogService from '@/services/change_log.service';
-import * as UserActivityPaths from 'tset-sharedlib/api/UserActivityPaths';
 
 class UserActivityRoute implements Routes {
   public router = Router();
@@ -22,104 +21,15 @@ class UserActivityRoute implements Routes {
   }
 
   private initializeRoutes() {
-
-    this.router.post(
-      UserActivityPaths.LOG_COLLECTION_VISIT,
-      authenticateJWT,
-      errorHelper(async (req, res) => {
-        const ctx = RequestContext.instance(req);
-
-        await this.activityService.logCollectionVisit(
-          ctx,
-          req.body.id,
-        );
-        await this.changeLogService.logItemChangeForUserIds([ctx.currentUserId], req.body.id, null);
-
-        const result = {
-          success: true,
-          results: {},
-        };
-        res.json(result);
-      }),
-    );
-
-    
-
-    this.router.post(
-      UserActivityPaths.UPDATE_ITEM_VISIT_HISTORY,
-      authenticateJWT,
-      errorHelper(async (req, res) => {
-        const ctx = RequestContext.instance(req);
-
-        console.log('updateList', req.body.updateList);
-        await this.activityService.updateVisitHistoryForItems(
-          ctx,
-          req.body.updateList
-        );
-
-        let itemIds = req.body.updateList.map((item) => item.id);
-        await this.changeLogService.logItemChangeForUserIds([ctx.currentUserId], itemIds, null);
-
-        const result = {
-          success: true,
-          results: {},
-        };
-        res.json(result);
-      }),
-    );
-
-
-    this.router.post(
-      UserActivityPaths.LOG_URL_VISIT,
-      authenticateJWT,
-      errorHelper(async (req, res) => {
-        const ctx = RequestContext.instance(req);
-
-        await this.activityService.logURLVisit(
-          ctx,
-          'visit',
-          req.body.url,
-          req.body.info,
-          req.body.matchingItemIds,
-          req.body.blocked,
-          req.body.context,
-          req.body.encInfo,
-        );
-        await this.changeLogService.logItemChangeForUserIds([ctx.currentUserId], req.body.matchingItemIds, null);
-
-        const result = {
-          success: true,
-          results: {},
-        };
-        res.json(result);
-      }),
-    );
-
-    this.router.post(
-      UserActivityPaths.LIST,
-      authenticateJWT,
-      errorHelper(async (req, res) => {
-        const results = await this.activityService.listUserActivity(
-          RequestContext.instance(req),
-          getTargetUserId(req),
-          req.body.options,
-        );
-        const result = {
-          success: true,
-          results: results,
-        };
-        res.json(result);
-      }),
-    );
-
-
     // SCH-OK
+    // - de
     this.router.post(
-      UserActivityPaths.PUSH,
+      '/user/activity/push',
       authenticateJWT,
-      errorHelper(async (req, res) => {
+      errorHelper(async (req: ApiReq<'/user/activity/push'>, res) => {
         const results = await this.activityService.saveUserActivityLog(
           RequestContext.instance(req),
+          req.body.userId,
           req.body.monitorId,
           req.body.createdAt,
           req.body.updatedAt,
@@ -136,18 +46,74 @@ class UserActivityRoute implements Routes {
       }),
     );
 
-
-   
+    this.router.post(
+      '/user/activity/reportClassificationIssue',
+      authenticateJWT,
+      errorHelper(async (req: ApiReq<'/user/activity/reportClassificationIssue'>, res) => {
+        const results = await this.activityService.reportClassificationIssue(RequestContext.instance(req), req.body);
+        const result = {
+          success: true,
+          results,
+        };
+        res.json(result);
+      }),
+    );
 
     this.router.post(
-      UserActivityPaths.CLEAR_USAGE_LOG,
+      '/user/activity/getClassificationEvalProgramStatus',
       authenticateJWT,
-      errorHelper(async (req, res) => {
-        const results = await this.activityService.clearUsageLog(
+      errorHelper(async (req: ApiReq<'/user/activity/getClassificationEvalProgramStatus'>, res) => {
+        const results = await this.activityService.getClassificationEvalProgramStatus(
           RequestContext.instance(req),
-          getTargetUserId(req),
-
+          req.body,
         );
+        const result = {
+          success: true,
+          results,
+        };
+        res.json(result);
+      }),
+    );
+
+    this.router.post(
+      '/user/activity/uploadClassificationDatasetSamples',
+      authenticateJWT,
+      errorHelper(async (req: ApiReq<'/user/activity/uploadClassificationDatasetSamples'>, res) => {
+        const results = await this.activityService.uploadClassificationDatasetSamples(
+          RequestContext.instance(req),
+          req.body,
+        );
+        const result = {
+          success: true,
+          results,
+        };
+        res.json(result);
+      }),
+    );
+
+    //     this.router.post(
+    //   '/user/activity/push'_ACTIVITY_ENTRIES,
+    //   authenticateJWT,
+    //   errorHelper(async (req, res) => {
+    //     const results = await this.activityService.saveUserActivityLogEntries(
+    //       RequestContext.instance(req),
+    //       req.body.monitorId,
+    //       req.body.entries
+    //     );
+    //     const result = {
+    //       success: true,
+    //       results: results,
+    //     };
+    //     res.json(result);
+    //   }),
+    // );
+
+    // SCH-OK
+    this.router.post(
+      '/user/activity/clearUsageLog',
+      authenticateJWT,
+      errorHelper(async (req: ApiReq<'/user/activity/clearUsageLog'>, res) => {
+        const results = await this.activityService.clearUsageLog(RequestContext.instance(req), getTargetUserId(req));
         const result = {
           success: true,
           results: results,
@@ -157,13 +123,42 @@ class UserActivityRoute implements Routes {
     );
 
     this.router.post(
-      UserActivityPaths.LOG_LIST,
+      '/user/activity/invalidateMonitors',
       authenticateJWT,
-      errorHelper(async (req, res) => {
+      errorHelper(async (req: ApiReq<'/user/activity/invalidateMonitors'>, res) => {
+        const results = await this.activityService.invalidateActivityMonitors(
+          RequestContext.instance(req),
+          getTargetUserId(req),
+        );
+        const result = {
+          success: true,
+          results,
+        };
+        res.json(result);
+      }),
+    );
+
+    this.router.post(
+      '/user/activity/fixClassification',
+      authenticateJWT,
+      errorHelper(async (req: ApiReq<any>, res) => {
+        const results = await this.activityService.fixActivityLogClassification(RequestContext.instance(req), req.body);
+        res.json({
+          success: true,
+          results,
+        });
+      }),
+    );
+
+    // SCH-OK
+    this.router.post(
+      '/user/activity/logList',
+      authenticateJWT,
+      errorHelper(async (req: ApiReq<'/user/activity/logList'>, res) => {
         const results = await this.activityService.listUserActivityLogSince(
           RequestContext.instance(req),
           getTargetUserId(req),
-          req.body.type || 'active',
+          req.body.type || 'default',
           req.body.options,
         );
         const result = {
@@ -174,12 +169,48 @@ class UserActivityRoute implements Routes {
       }),
     );
 
+    this.router.post(
+      '/activity/updateItemVisitHistory',
+      authenticateJWT,
+      errorHelper(async (req: ApiReq<'/activity/updateItemVisitHistory'>, res) => {
+        const ctx = RequestContext.instance(req);
+
+        await this.activityService.updateVisitHistoryForItems_deprecate(ctx, req.body.updateList);
+
+        let itemIds = req.body.updateList.map((item) => item.id);
+        await this.changeLogService.logItemChangeForUserIds([ctx.currentUserId], itemIds, null);
+
+        const result = {
+          success: true,
+          results: {},
+        };
+        res.json(result);
+      }),
+    );
+
+    // TODO: Deprecate this endpoint
+    this.router.post(
+      '/user/activity/list',
+      authenticateJWT,
+      errorHelper(async (req: ApiReq<'/user/activity/list'>, res) => {
+        const results = await this.activityService.listUserActivity_deprecating(
+          RequestContext.instance(req),
+          getTargetUserId(req),
+          req.body.options,
+        );
+        const result = {
+          success: true,
+          results: results,
+        };
+        res.json(result);
+      }),
+    );
 
     this.router.post(
-      UserActivityPaths.REMOVE_ENTRY,
+      '/user/activity/removeEntry',
       authenticateJWT,
-      errorHelper(async (req, res) => {
-        const results = await this.activityService.removeActivityEntry(
+      errorHelper(async (req: ApiReq<'/user/activity/removeEntry'>, res) => {
+        const results = await this.activityService.removeActivityEntry_deprecating(
           RequestContext.instance(req),
           getTargetUserId(req),
           req.body.id,
@@ -193,10 +224,13 @@ class UserActivityRoute implements Routes {
     );
 
     this.router.post(
-      UserActivityPaths.DELETE_ALL,
+      '/user/activity/deleteAll',
       authenticateJWT,
-      errorHelper(async (req, res) => {
-        const results = await this.activityService.deleteAllForUser(RequestContext.instance(req), getTargetUserId(req));
+      errorHelper(async (req: ApiReq<'/user/activity/deleteAll'>, res) => {
+        const results = await this.activityService.deleteAllForUser_deprecating(
+          RequestContext.instance(req),
+          getTargetUserId(req),
+        );
         const result = {
           success: true,
           results: results,

@@ -1,7 +1,7 @@
-import Comment from '@/schemas/public/Comment';
+import Comment from 'tset-sharedlib/schemas/public/Comment';
 import {BaseRepo} from './base.repo';
 import knex from './knex_config';
-import { Knex } from 'knex';
+import {Knex} from 'knex';
 
 export class CommentRepo extends BaseRepo<Comment> {
   public jsonArrayFields = ['data'];

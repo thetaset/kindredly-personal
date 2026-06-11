@@ -1,6 +1,5 @@
-import { config } from '@/config';
+import {config} from '@/config';
 import crypto from 'crypto';
-
 
 const webcrypto = crypto.webcrypto as any;
 const subtle = webcrypto.subtle as any;
@@ -12,7 +11,11 @@ export function hashString(st: string) {
 export const passwordSalt = String(config.passwordSalt);
 
 export function secureCompareSecrets(secret1: string, secret2: string) {
-  return crypto.timingSafeEqual(Uint8Array.from(Buffer.from(secret1)), Uint8Array.from(Buffer.from(secret2)));
+  // Hash both sides first: timingSafeEqual requires equal-length buffers and
+  // would otherwise throw (leaking length) on mismatched-length inputs.
+  const a = crypto.createHash('sha256').update(String(secret1)).digest();
+  const b = crypto.createHash('sha256').update(String(secret2)).digest();
+  return crypto.timingSafeEqual(a, b);
 }
 /**
  * @method isEmpty
@@ -35,11 +38,11 @@ export const isEmpty = (value: string | number | object): boolean => {
 };
 
 export type ArrayElement<A> = A extends readonly (infer T)[] ? T : never;
-type DeepWriteable<T> = { -readonly [P in keyof T]: DeepWriteable<T[P]> };
+type DeepWriteable<T> = {-readonly [P in keyof T]: DeepWriteable<T[P]>};
 type Cast<X, Y> = X extends Y ? X : Y;
 type FromEntries<T> = T extends [infer Key, any][]
-  ? { [K in Cast<Key, string>]: Extract<ArrayElement<T>, [K, any]>[1] }
-  : { [key in string]: any };
+  ? {[K in Cast<Key, string>]: Extract<ArrayElement<T>, [K, any]>[1]}
+  : {[key in string]: any};
 
 export type FromEntriesWithReadOnly<T> = FromEntries<DeepWriteable<T>>;
 
@@ -67,58 +70,55 @@ export interface DynamicObject {
 }
 
 export function asPath(path: string) {
-  return "/" + config.apiVersion + path;
+  return '/' + config.apiVersion + path;
 }
 
-
-export { hashStringWithSalt }; export function hashMD5({ s }: { s; }) {
+export {hashStringWithSalt};
+export function hashMD5({s}: {s}) {
   return crypto.createHash('md5').update(s).digest('hex');
 }
 export function generateToken() {
-  const token = crypto.randomBytes(32).toString("hex");
+  const token = crypto.randomBytes(32).toString('hex');
   return token;
 }
 
 function getEncryptionKey(): Uint8Array {
   let key = config.passwordStorageEncryptionKey;
-  
+
   if (key.length !== 32) {
     throw new Error(`Invalid key length: ${key.length}. Must be exactly 32 bytes.`);
   }
 
-  return new Uint8Array(Buffer.from(key, "utf8"));
+  return new Uint8Array(Buffer.from(key, 'utf8'));
 }
-
-
 
 export function encryptPassword(str: string) {
   if (!str) return null;
-  
+
   const key = getEncryptionKey();
-  const iv = Uint8Array.from(crypto.randomBytes(16)); 
+  const iv = Uint8Array.from(crypto.randomBytes(16));
 
-  const cipher = crypto.createCipheriv("aes-256-cbc", key, iv); 
+  const cipher = crypto.createCipheriv('aes-256-cbc', key, iv);
 
-  let encryptedData = cipher.update(str, "utf8", "hex");
-  encryptedData += cipher.final("hex");
+  let encryptedData = cipher.update(str, 'utf8', 'hex');
+  encryptedData += cipher.final('hex');
 
-  return { iv: Buffer.from(iv).toString("hex"), encryptedData }; 
+  return {iv: Buffer.from(iv).toString('hex'), encryptedData};
 }
 
-export function decryptPassword(pwdInfo: { iv: string; encryptedData: string }) {
+export function decryptPassword(pwdInfo: {iv: string; encryptedData: string}) {
   if (!pwdInfo) return null;
 
-  const iv = Uint8Array.from(Buffer.from(pwdInfo.iv, "hex")); 
+  const iv = Uint8Array.from(Buffer.from(pwdInfo.iv, 'hex'));
   const key = getEncryptionKey();
 
-  const decipher = crypto.createDecipheriv("aes-256-cbc", key, iv); 
+  const decipher = crypto.createDecipheriv('aes-256-cbc', key, iv);
 
-  let decryptedData = decipher.update(pwdInfo.encryptedData, "hex", "utf8");
-  decryptedData += decipher.final("utf8");
+  let decryptedData = decipher.update(pwdInfo.encryptedData, 'hex', 'utf8');
+  decryptedData += decipher.final('utf8');
 
   return decryptedData;
 }
-
 
 // export function encryptPasswordx(str: string) {
 //   if (!str) return null;
@@ -140,8 +140,6 @@ export function decryptPassword(pwdInfo: { iv: string; encryptedData: string }) 
 //   return { iv: iv.toString("hex"), encryptedData: encryptedData };
 // }
 
-
-
 // export function decryptPasswordx(pwdInfo: { iv: string; encryptedData: string; }) {
 //   if (!pwdInfo) return null;
 //   const iv = pwdInfo.iv;
@@ -157,5 +155,3 @@ export function decryptPassword(pwdInfo: { iv: string; encryptedData: string }) 
 //   decryptedData += decipher.final("utf-8");
 //   return decryptedData;
 // }
-
-

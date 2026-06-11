@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="referrer" content="strict-origin-when-cross-origin">
+  <title>Video Player</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body { width: 100%; height: 100%; overflow: hidden; background: #000; }
+    #player { width: 100%; height: 100%; }
+    .ytp-error { color: #fff; text-align: center; padding: 20px; font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; }
+  </style>
+</head>
+<body>
+  <div id="player"></div>
+
+  <script>
+    // Load YouTube IFrame API
+    var tag = document.createElement('script');
+    tag.src = 'https://www.youtube.com/iframe_api';
+    var firstScriptTag = document.getElementsByTagName('script')[0];
+    firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
+
+    // Parse query params
+    const queryParams = new URLSearchParams(window.location.search);
+    const videoId = queryParams.get('v');
+    const hostWidgetId = queryParams.get('widgetid');
+    const expectedHostOrigin = queryParams.get('origin');
+    const debugEnabled = queryParams.get('dbg') === '1' || queryParams.get('debug') === '1';
+
+    function dbgLog() {
+      if (!debugEnabled) return;
+      try {
+        const args = Array.prototype.slice.call(arguments);
+        args.unshift('YTE-embed');
+        console.log.apply(console, args);
+      } catch (_) {
+        // ignore
+      }
+    }
+
+    if (debugEnabled) {
+      dbgLog('boot', {
+        href: window.location.href,
+        origin: window.location.origin,
+        referrer: document.referrer,
+        expectedHostOrigin,
+        videoId,
+        userAgent: navigator.userAgent,
+      });
+
+      window.addEventListener('error', (e) => {
+        dbgLog('window.error', {
+          message: e && e.message,
+          filename: e && e.filename,
+          lineno: e && e.lineno,
+          colno: e && e.colno,
+        });
+      });
+
+      window.addEventListener('unhandledrejection', (e) => {
+        dbgLog('unhandledrejection', {
+          reason: e && e.reason,
+        });
+      });
+    }
+    
+    // Build player vars from query params (exclude internal params)
+    const excludeParams = ['v', 'widgetid', 'origin', 'dbg', 'debug'];
+    const playerVars = {};
+    queryParams.forEach((value, key) => {
+      if (!excludeParams.includes(key)) {
+        playerVars[key] = value;
+      }
+    });
+
+    // Ensure playsinline for mobile
+    playerVars.playsinline = 1;
+
+    var player;
+    function onYouTubeIframeAPIReady() {
+      if (!videoId) {
+        document.body.innerHTML = '<div class="ytp-error">No video ID provided</div>';
+        return;
+      }
+
+      dbgLog('YT API ready; creating player', {
+        videoId,
+        playerVars,
+      });
+      
+      player = new YT.Player('player', {
+        height: '100%',
+        width: '100%',
+        videoId: videoId,
+        playerVars: playerVars,
+        events: {
+          onReady: function () {
+            // YouTube will inject an iframe into #player; the src is critical for debugging.
+            const iframe = document.querySelector('iframe');
+            dbgLog('onReady', {
+              injectedIframeSrc: iframe ? iframe.src : null,
+            });
+          },
+          onError: function (evt) {
+            dbgLog('onError', {
+              data: evt && evt.data,
+            });
+          },
+        },
+      });
+    }
+
+    // Relay messages between parent app and YouTube iframe
+    function proxyMessageEvents(event) {
+      // Relay messages from your app to the YouTube iframe
+      if (event.origin !== 'https://www.youtube.com') {
+        if (expectedHostOrigin && event.origin !== expectedHostOrigin) {
+          return;
+        }
+        if (debugEnabled) {
+          dbgLog('message host->yt', {
+            origin: event.origin,
+            expectedHostOrigin,
+            type: typeof event.data,
+          });
+        }
+        const iframe = document.querySelector('iframe');
+        if (iframe && iframe.contentWindow) {
+          iframe.contentWindow.postMessage(event.data, 'https://www.youtube.com');
+        }
+      } else {
+        // Relay messages from YouTube iframe to parent app
+        let parsed = null;
+        try {
+          parsed = JSON.parse(event.data);
+        } catch (err) {
+          return;
+        }
+
+        if (debugEnabled) {
+          dbgLog('message yt->host', {
+            id: parsed && parsed.id,
+            event: parsed && parsed.event,
+            info: parsed && parsed.info,
+          });
+        }
+
+        // Patch the ID so YouTube's JS API on host app recognizes it
+        if (parsed && hostWidgetId) {
+          parsed.id = hostWidgetId;
+        }
+
+        const targetOrigin = queryParams.get('origin') || '*';
+        window.parent.postMessage(JSON.stringify(parsed), targetOrigin);
+      }
+    }
+
+    window.addEventListener('message', proxyMessageEvents);
+  </script>
+</body>
+</html>

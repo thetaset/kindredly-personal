@@ -1,4 +1,9 @@
 
+/* Prevent double-tap zoom on mobile apps */
+* {
+  touch-action: manipulation;
+}
+
 .loading-container {
     position: fixed;
     top: 0;

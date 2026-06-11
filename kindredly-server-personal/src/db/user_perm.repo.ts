@@ -1,7 +1,7 @@
-import UserPerm from '@/schemas/public/UserPerm';
+import UserPerm from 'tset-sharedlib/schemas/public/UserPerm';
 import {BaseRepo} from './base.repo';
 import knex from './knex_config';
-import { Knex } from 'knex';
+import {Knex} from 'knex';
 
 export class UserPermRepo extends BaseRepo<UserPerm> {
   constructor(db: Knex = knex) {

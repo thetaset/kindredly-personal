@@ -1,0 +1,1 @@
+import{ar as t}from"./appLifecycle.storeDV-_C-2q.js";const s=[...t];function n(e){return e.replace(/[.*+?^${}()|[\]\\]/g,"\\$&")}const c=s.map(e=>`^https?:\\/\\/([^\\/?#]*\\.)?${n(e)}(?:[\\/:?#]|$).*`);function i(e){if(!e)return!1;const a=e.toLowerCase().replace(/\.$/,"");return s.some(r=>a===r||a.endsWith(`.${r}`))}export{c as S,s as a,i};

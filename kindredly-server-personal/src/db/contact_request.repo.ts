@@ -1,7 +1,7 @@
-import ContactRequest from '@/schemas/public/ContactRequest';
+import ContactRequest from 'tset-sharedlib/schemas/public/ContactRequest';
 import {BaseRepo} from './base.repo';
 import knex from './knex_config';
-import { Knex } from 'knex';
+import {Knex} from 'knex';
 
 export class ContactRequestRepo extends BaseRepo<ContactRequest> {
   constructor(db: Knex = knex) {

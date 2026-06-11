@@ -1,23 +1,21 @@
-import { Routes } from "@interfaces/routes.interface";
-import { Router } from "express";
+import {Routes} from '@interfaces/routes.interface';
+import {Router} from 'express';
+import {ApiReq} from '@/types/api-types';
 
-import {
-  authenticateJWT,
-  errorHelper,
-  getTargetUserId,
-} from "../utils/auth_utils";
+import {authenticateJWT, errorHelper, getTargetUserId} from '../utils/auth_utils';
 
-import UserService from "@/services/user.service";
+import UserService from '@/services/user.service';
+import LibraryAutoApprovalService from '@/services/library_auto_approval.service';
 
-import { RequestContext } from "@/base/request_context";
-import PluginService from "@/services/plugin.service";
-import * as UserPrefsPaths from "tset-sharedlib/api/UserPrefsPaths";
+import {RequestContext} from '@/base/request_context';
+import PluginService from '@/services/plugin.service';
 
 class UserPrefsRoute implements Routes {
   public router = Router();
 
   private userService = new UserService();
   private pluginService = new PluginService();
+  private libraryAutoApprovalService = new LibraryAutoApprovalService();
 
   constructor() {
     console.info(`Initializing routes ${this.constructor.name}`);
@@ -26,70 +24,74 @@ class UserPrefsRoute implements Routes {
   }
 
   private initializeRoutes() {
-
     // SCH-OK
     this.router.post(
-      UserPrefsPaths.PUBLIC_UPDATE,
+      '/user/public/update',
       authenticateJWT,
-      errorHelper(async (req, res) => {
-        const results = await this.userService.updateUserPublicProfile(
-          RequestContext.instance(req),
-          req.body.data
-        );
+      errorHelper(async (req: ApiReq<'/user/public/update'>, res) => {
+        const results = await this.userService.updateUserPublicProfile(RequestContext.instance(req), req.body.data);
         const result = {
           success: true,
           results: results,
         };
         res.json(result);
-      })
+      }),
     );
 
     // SCH-OK
     this.router.post(
-      UserPrefsPaths.OPTIONS_UPDATE,
+      '/user/options/update',
       authenticateJWT,
-      errorHelper(async (req, res) => {
-        await this.userService.setUserOptions(
-          RequestContext.instance(req),
-          getTargetUserId(req),
-          req.body.options
-        );
+      errorHelper(async (req: ApiReq<'/user/options/update'>, res) => {
+        await this.userService.setUserOptions(RequestContext.instance(req), getTargetUserId(req), req.body.options);
         const result = {
           success: true,
           results: {},
         };
         res.json(result);
-      })
+      }),
     );
 
+    this.router.post(
+      '/user/settings/copy',
+      authenticateJWT,
+      errorHelper(async (req: ApiReq<'/user/settings/copy'>, res) => {
+        const results = await this.userService.copyUserSettings(RequestContext.instance(req), req.body);
+        const result = {
+          success: true,
+          results,
+        };
+        res.json(result);
+      }),
+    );
 
     // SCH-OK
     this.router.post(
-      UserPrefsPaths.PROFILE_IMAGE_UPDATE,
+      '/user/profileImage/update',
       authenticateJWT,
-      errorHelper(async (req, res) => {
+      errorHelper(async (req: ApiReq<'/user/profileImage/update'>, res) => {
         await this.userService.updateProfileImage(
           RequestContext.instance(req),
           getTargetUserId(req),
-          req.body.imageData
+          req.body.imageData,
         );
         const result = {
           success: true,
           results: {},
         };
         res.json(result);
-      })
+      }),
     );
 
     // SCH-OK
     this.router.post(
-      UserPrefsPaths.PROFILE_GET,
+      '/user/profile/get',
       authenticateJWT,
-      errorHelper(async (req, res) => {
+      errorHelper(async (req: ApiReq<'/user/profile/get'>, res) => {
         const profile = await this.userService.getUserProfileById(
           RequestContext.instance(req),
           req.body.viewAsUserId,
-          req.body.userProfileId
+          req.body.userId,
         );
 
         const result = {
@@ -97,18 +99,18 @@ class UserPrefsRoute implements Routes {
           results: profile,
         };
         res.json(result);
-      })
+      }),
     );
 
     // SCH-OK
     this.router.post(
-      UserPrefsPaths.PREFS_GET,
+      '/user/prefs/get',
       authenticateJWT,
-      errorHelper(async (req, res) => {
+      errorHelper(async (req: ApiReq<'/user/prefs/get'>, res) => {
         const prefs = await this.userService.getUserPrefs(
           RequestContext.instance(req),
           getTargetUserId(req),
-          req.body.keys
+          req.body.keys,
         );
 
         const result = {
@@ -116,18 +118,18 @@ class UserPrefsRoute implements Routes {
           results: prefs,
         };
         res.json(result);
-      })
+      }),
     );
 
     // SCH-OK
     this.router.post(
-      UserPrefsPaths.PREFS_GET_VALUE,
+      '/user/prefs/getValue',
       authenticateJWT,
-      errorHelper(async (req, res) => {
+      errorHelper(async (req: ApiReq<'/user/prefs/getValue'>, res) => {
         const prefs = await this.userService.getUserPrefsValue(
           RequestContext.instance(req),
           getTargetUserId(req),
-          req.body.key
+          req.body.key,
         );
 
         const result = {
@@ -135,18 +137,18 @@ class UserPrefsRoute implements Routes {
           results: prefs,
         };
         res.json(result);
-      })
+      }),
     );
 
     // SCH-OK
     this.router.post(
-      UserPrefsPaths.PREFS_DEFAULTS,
+      '/user/prefs/defaultsByKey',
       authenticateJWT,
-      errorHelper(async (req, res) => {
+      errorHelper(async (req: ApiReq<'/user/prefs/defaultsByKey'>, res) => {
         const prefs = await this.userService.getUserPrefsDefaults(
           RequestContext.instance(req),
           getTargetUserId(req),
-          req.body.key
+          req.body.key,
         );
 
         const result = {
@@ -154,18 +156,18 @@ class UserPrefsRoute implements Routes {
           results: prefs,
         };
         res.json(result);
-      })
+      }),
     );
 
     // SCH-OK
     this.router.post(
-      UserPrefsPaths.PREFS_UPDATE,
+      '/user/prefs/update',
       authenticateJWT,
-      errorHelper(async (req, res) => {
+      errorHelper(async (req: ApiReq<'/user/prefs/update'>, res) => {
         const results = await this.userService.updateUserPrefs(
           RequestContext.instance(req),
           getTargetUserId(req),
-          req.body.updates
+          req.body.updates,
         );
 
         const result = {
@@ -173,14 +175,28 @@ class UserPrefsRoute implements Routes {
           results: results,
         };
         res.json(result);
-      })
+      }),
+    );
+
+    this.router.post(
+      '/user/libraryAutoApproval/evaluate',
+      authenticateJWT,
+      errorHelper(async (req: ApiReq<'/user/libraryAutoApproval/evaluate'>, res) => {
+        const results = await this.libraryAutoApprovalService.evaluateAndApply(RequestContext.instance(req), req.body);
+
+        const result = {
+          success: true,
+          results,
+        };
+        res.json(result);
+      }),
     );
 
     // SCH-OK
     this.router.post(
-      UserPrefsPaths.PLUGIN_LIST,
+      '/user/plugin/list',
       authenticateJWT,
-      errorHelper(async (req, res) => {
+      errorHelper(async (req: ApiReq<'/user/plugin/list'>, res) => {
         const userId = getTargetUserId(req);
         const ctx = RequestContext.instance(req);
         await ctx.verifySelfOrAdmin(userId);
@@ -198,25 +214,21 @@ class UserPrefsRoute implements Routes {
           results: items,
         };
         res.json(result);
-      })
+      }),
     );
 
     // SCH-OK
     this.router.post(
-      UserPrefsPaths.PLUGIN_UPDATE,
+      '/user/plugin/update',
       authenticateJWT,
-      errorHelper(async (req, res) => {
-        await this.pluginService.setUserPlugins(
-          RequestContext.instance(req),
-          getTargetUserId(req),
-          req.body.pluginIds
-        );
+      errorHelper(async (req: ApiReq<'/user/plugin/update'>, res) => {
+        await this.pluginService.setUserPlugins(RequestContext.instance(req), getTargetUserId(req), req.body.pluginIds);
         const result = {
           success: true,
           results: {},
         };
         res.json(result);
-      })
+      }),
     );
   }
 }

@@ -1,7 +1,7 @@
-import Friend from '@/schemas/public/Friend';
+import Friend from 'tset-sharedlib/schemas/public/Friend';
 import {BaseRepo} from './base.repo';
 import knex from './knex_config';
-import { Knex } from 'knex';
+import {Knex} from 'knex';
 
 export class FriendRepo extends BaseRepo<Friend> {
   constructor(db: Knex = knex) {
@@ -32,6 +32,6 @@ export class FriendRepo extends BaseRepo<Friend> {
   }
 
   async listFriendIds(targetUserId: string) {
-    return this.query().where({userId: targetUserId, confirmed: true}).select('friendUserId');
+    return this.query().where({userId: targetUserId, confirmed: true});
   }
 }

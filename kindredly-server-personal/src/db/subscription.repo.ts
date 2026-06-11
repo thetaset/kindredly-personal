@@ -1,11 +1,11 @@
 import knex from './knex_config';
-import Subscription from '@/schemas/public/Subscription';
+import Subscription from 'tset-sharedlib/schemas/public/Subscription';
 import {BaseRepo} from './base.repo';
-import { Knex } from 'knex';
+import {Knex} from 'knex';
 
 export class SubscriptionRepo extends BaseRepo<Subscription> {
   constructor(db: Knex = knex) {
-    super('subscription',db);
+    super('subscription', db);
   }
   async findById(_id: string) {
     return await this.where({_id: _id}).first();
@@ -27,15 +27,15 @@ export class SubscriptionRepo extends BaseRepo<Subscription> {
     return await this.query().insert(input);
   }
 
-  async listByUserId(userId: string) {
-    return this.where({userId: userId})
+  async listByUserId(userId: string): Promise<Subscription[]> {
+    return this.where({userId: userId});
   }
 
-  async listWhereUserIdsIn(refId:string,refType:string, userIds: string[]) {
-    return this.query().where({refId, refType}).whereIn('userId', userIds)
+  async listWhereUserIdsIn(refId: string, refType: string, userIds: string[]) {
+    return this.query().where({refId, refType}).whereIn('userId', userIds);
   }
 
   async listByRefId(refId: string, refType: string) {
-    return this.where({refId: refId, refType: refType})
+    return this.where({refId: refId, refType: refType});
   }
 }

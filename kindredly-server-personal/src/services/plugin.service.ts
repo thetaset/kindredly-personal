@@ -1,13 +1,12 @@
-import { SitePluginRepo } from '@/db/site_plugin.repo';
-import { UserRepo } from '@/db/user.repo';
-import { getDefaultPattern } from 'tset-sharedlib/text.utils';
-import { RequestContext } from '../base/request_context';
+import {SitePluginRepo} from '@/db/site_plugin.repo';
+import {UserRepo} from '@/db/user.repo';
+import {getDefaultPattern} from 'tset-sharedlib/text.utils';
+import {RequestContext} from '../base/request_context';
 
 class PluginService {
   private users = new UserRepo();
 
   private sitePlugins = new SitePluginRepo();
-
 
   async initialize() {
     console.log('Initializing Plugins');
@@ -44,7 +43,6 @@ class PluginService {
     await this.loadPluginNoDistractions();
   }
 
-
   async getSitePluginById(id) {
     return await this.sitePlugins.findById(id);
   }
@@ -62,7 +60,7 @@ class PluginService {
   // ROUTE-METHOD
   async setUserPlugins(ctx: RequestContext, userId, pluginIds) {
     await ctx.verifyAdminPermissions(userId);
-    await this.users.updateWithId(userId, { plugins: pluginIds });
+    await this.users.updateWithId(userId, {plugins: pluginIds});
   }
 
   async _addSitePlugin(id, key, name, tags, description, patterns, css, script, version) {

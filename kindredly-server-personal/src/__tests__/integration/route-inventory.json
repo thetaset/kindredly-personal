@@ -1,0 +1,3061 @@
+{
+  "generated": "2025-11-19T20:40:57.814Z",
+  "summary": {
+    "totalRoutes": 216,
+    "serverRoutes": 15,
+    "clientRoutes": 201,
+    "files": 11
+  },
+  "routesByFile": {
+    "activity.bgroute.ts": [
+      {
+        "path": "/client/activityMonitor/update",
+        "method": "POST",
+        "file": "activity.bgroute.ts",
+        "requiresAuth": false,
+        "paramType": "inline"
+      },
+      {
+        "path": "/client/activityMonitor/startFrameEventTrackingForCurrentTab",
+        "method": "POST",
+        "file": "activity.bgroute.ts",
+        "requiresAuth": false,
+        "paramType": "inline"
+      },
+      {
+        "path": "/client/activity/getCurrentUsageSummary",
+        "method": "POST",
+        "file": "activity.bgroute.ts",
+        "requiresAuth": false,
+        "paramType": "inline"
+      },
+      {
+        "path": "/client/activity/clearHistory",
+        "method": "POST",
+        "file": "activity.bgroute.ts",
+        "requiresAuth": false,
+        "paramType": "inline"
+      },
+      {
+        "path": "/client/activity/removeLogEntry",
+        "method": "POST",
+        "file": "activity.bgroute.ts",
+        "requiresAuth": false,
+        "paramType": "inline"
+      },
+      {
+        "path": "/client/activity/syncUsageLog",
+        "method": "POST",
+        "file": "activity.bgroute.ts",
+        "requiresAuth": false,
+        "paramType": "inline"
+      },
+      {
+        "path": "/client/activity/getUsageSince",
+        "method": "POST",
+        "file": "activity.bgroute.ts",
+        "requiresAuth": false,
+        "paramType": "inline"
+      },
+      {
+        "path": "/client/activity/getPipelineSettings",
+        "method": "POST",
+        "file": "activity.bgroute.ts",
+        "requiresAuth": false,
+        "paramType": "inline"
+      },
+      {
+        "path": "/client/content/savePipelineResults",
+        "method": "POST",
+        "file": "activity.bgroute.ts",
+        "requiresAuth": false,
+        "paramType": "inline"
+      },
+      {
+        "path": "/client/content/listPipelineResults",
+        "method": "POST",
+        "file": "activity.bgroute.ts",
+        "requiresAuth": false,
+        "paramType": "inline"
+      },
+      {
+        "path": "/client/content/clearPipelineResults",
+        "method": "POST",
+        "file": "activity.bgroute.ts",
+        "requiresAuth": false,
+        "paramType": "inline"
+      },
+      {
+        "path": "/client/content/getPipelineResultsForId",
+        "method": "POST",
+        "file": "activity.bgroute.ts",
+        "requiresAuth": false,
+        "paramType": "inline"
+      },
+      {
+        "path": "/client/content/getLoggedInfoForURL",
+        "method": "POST",
+        "file": "activity.bgroute.ts",
+        "requiresAuth": false,
+        "paramType": "inline"
+      },
+      {
+        "path": "/client/content/getLoggedBlockingEntry",
+        "method": "POST",
+        "file": "activity.bgroute.ts",
+        "requiresAuth": false,
+        "paramType": "inline"
+      },
+      {
+        "path": "/client/content/getLoggedInfoForLimitRuleId",
+        "method": "POST",
+        "file": "activity.bgroute.ts",
+        "requiresAuth": false,
+        "paramType": "inline"
+      },
+      {
+        "path": "/client/content/getLoggedInfoForItemId",
+        "method": "POST",
+        "file": "activity.bgroute.ts",
+        "requiresAuth": false,
+        "paramType": "inline"
+      },
+      {
+        "path": "/client/logVisit",
+        "method": "POST",
+        "file": "activity.bgroute.ts",
+        "requiresAuth": false,
+        "paramType": "inline"
+      },
+      {
+        "path": "/client/user/activity/logNewVisit",
+        "method": "POST",
+        "file": "activity.bgroute.ts",
+        "requiresAuth": false,
+        "paramType": "inline"
+      },
+      {
+        "path": "/client/user/activity/updateItemVisitHistory",
+        "method": "POST",
+        "file": "activity.bgroute.ts",
+        "requiresAuth": false,
+        "paramType": "inline"
+      },
+      {
+        "path": "/client/activity/list",
+        "method": "POST",
+        "file": "activity.bgroute.ts",
+        "requiresAuth": false,
+        "paramType": "inline"
+      }
+    ],
+    "ai.bgroute.ts": [
+      {
+        "path": "/client/ai/itemSuggestGenerator",
+        "method": "POST",
+        "file": "ai.bgroute.ts",
+        "requiresAuth": false,
+        "paramType": "inline"
+      },
+      {
+        "path": "/client/ai/itemUpdateGenerator",
+        "method": "POST",
+        "file": "ai.bgroute.ts",
+        "requiresAuth": false,
+        "paramType": "inline"
+      },
+      {
+        "path": "/client/ai/textRequest",
+        "method": "POST",
+        "file": "ai.bgroute.ts",
+        "requiresAuth": false,
+        "paramType": "inline"
+      },
+      {
+        "path": "/client/ai/userRequest",
+        "method": "POST",
+        "file": "ai.bgroute.ts",
+        "requiresAuth": false,
+        "paramType": "inline"
+      },
+      {
+        "path": "/client/ai/sendMessage",
+        "method": "POST",
+        "file": "ai.bgroute.ts",
+        "requiresAuth": false,
+        "paramType": "inline"
+      },
+      {
+        "path": "/client/ai/sessionList",
+        "method": "POST",
+        "file": "ai.bgroute.ts",
+        "requiresAuth": false,
+        "paramType": "inline"
+      },
+      {
+        "path": "/client/ai/getSessionById",
+        "method": "POST",
+        "file": "ai.bgroute.ts",
+        "requiresAuth": false,
+        "paramType": "inline"
+      },
+      {
+        "path": "/client/ai/setCurrentSessionId",
+        "method": "POST",
+        "file": "ai.bgroute.ts",
+        "requiresAuth": false,
+        "paramType": "inline"
+      },
+      {
+        "path": "/client/ai/getCurrentSessionId",
+        "method": "POST",
+        "file": "ai.bgroute.ts",
+        "requiresAuth": false,
+        "paramType": "inline"
+      },
+      {
+        "path": "/client/ai/deleteSession",
+        "method": "POST",
+        "file": "ai.bgroute.ts",
+        "requiresAuth": false,
+        "paramType": "inline"
+      },
+      {
+        "path": "/client/ai/sendPageMessage",
+        "method": "POST",
+        "file": "ai.bgroute.ts",
+        "requiresAuth": false,
+        "paramType": "inline"
+      }
+    ],
+    "content.bgroute.ts": [
+      {
+        "path": "/client/content/updateStatus",
+        "method": "POST",
+        "file": "content.bgroute.ts",
+        "requiresAuth": false,
+        "paramType": "inline"
+      },
+      {
+        "path": "/client/content/getTermDict",
+        "method": "POST",
+        "file": "content.bgroute.ts",
+        "requiresAuth": false,
+        "paramType": "inline"
+      },
+      {
+        "path": "/client/content/imageClassify",
+        "method": "POST",
+        "file": "content.bgroute.ts",
+        "requiresAuth": false,
+        "paramType": "inline"
+      },
+      {
+        "path": "/client/content/imageClassifyLegacy",
+        "method": "POST",
+        "file": "content.bgroute.ts",
+        "requiresAuth": false,
+        "paramType": "inline"
+      },
+      {
+        "path": "/client/content/performDeepMetaCheck",
+        "method": "POST",
+        "file": "content.bgroute.ts",
+        "requiresAuth": false,
+        "paramType": "inline"
+      },
+      {
+        "path": "/client/content/performDocClassification",
+        "method": "POST",
+        "file": "content.bgroute.ts",
+        "requiresAuth": false,
+        "paramType": "inline"
+      },
+      {
+        "path": "/client/content/performDeepClassification",
+        "method": "POST",
+        "file": "content.bgroute.ts",
+        "requiresAuth": false,
+        "paramType": "inline"
+      },
+      {
+        "path": "/client/checkIfPermitted",
+        "method": "POST",
+        "file": "content.bgroute.ts",
+        "requiresAuth": false,
+        "paramType": "inline"
+      },
+      {
+        "path": "/client/sentry/processRequestsForBlocking",
+        "method": "POST",
+        "file": "content.bgroute.ts",
+        "requiresAuth": false,
+        "paramType": "inline"
+      },
+      {
+        "path": "/client/sentry/processRequestsForInjection",
+        "method": "POST",
+        "file": "content.bgroute.ts",
+        "requiresAuth": false,
+        "paramType": "inline"
+      },
+      {
+        "path": "/client/checkIfPermittedByPageContent",
+        "method": "POST",
+        "file": "content.bgroute.ts",
+        "requiresAuth": false,
+        "paramType": "inline"
+      },
+      {
+        "path": "/client/sentry/giveTempAccess",
+        "method": "POST",
+        "file": "content.bgroute.ts",
+        "requiresAuth": false,
+        "paramType": "inline"
+      },
+      {
+        "path": "/client/sentry/tempDisableBlocking",
+        "method": "POST",
+        "file": "content.bgroute.ts",
+        "requiresAuth": false,
+        "paramType": "inline"
+      },
+      {
+        "path": "/client/sentry/clearTempDisableBlocking",
+        "method": "POST",
+        "file": "content.bgroute.ts",
+        "requiresAuth": false,
+        "paramType": "inline"
+      },
+      {
+        "path": "/client/sentry/getTempDisableBlockingStatus",
+        "method": "POST",
+        "file": "content.bgroute.ts",
+        "requiresAuth": false,
+        "paramType": "inline"
+      }
+    ],
+    "embedding.bgroute.ts": [
+      {
+        "path": "/client/embedding/generateEmbedding",
+        "method": "POST",
+        "file": "embedding.bgroute.ts",
+        "requiresAuth": false,
+        "paramType": "inline"
+      },
+      {
+        "path": "/client/embedding/batchEmbeddings",
+        "method": "POST",
+        "file": "embedding.bgroute.ts",
+        "requiresAuth": false,
+        "paramType": "inline"
+      },
+      {
+        "path": "/client/embedding/findSimilar",
+        "method": "POST",
+        "file": "embedding.bgroute.ts",
+        "requiresAuth": false,
+        "paramType": "inline"
+      },
+      {
+        "path": "/client/embedding/getStats",
+        "method": "POST",
+        "file": "embedding.bgroute.ts",
+        "requiresAuth": false,
+        "paramType": "inline"
+      },
+      {
+        "path": "/client/embedding/clearCache",
+        "method": "POST",
+        "file": "embedding.bgroute.ts",
+        "requiresAuth": false,
+        "paramType": "inline"
+      },
+      {
+        "path": "/client/embedding/configure",
+        "method": "POST",
+        "file": "embedding.bgroute.ts",
+        "requiresAuth": false,
+        "paramType": "inline"
+      },
+      {
+        "path": "/client/embedding/suggestCollections",
+        "method": "POST",
+        "file": "embedding.bgroute.ts",
+        "requiresAuth": false,
+        "paramType": "inline"
+      },
+      {
+        "path": "/client/embedding/suggestTags",
+        "method": "POST",
+        "file": "embedding.bgroute.ts",
+        "requiresAuth": false,
+        "paramType": "inline"
+      },
+      {
+        "path": "/client/embedding/findSimilarItems",
+        "method": "POST",
+        "file": "embedding.bgroute.ts",
+        "requiresAuth": false,
+        "paramType": "inline"
+      },
+      {
+        "path": "/client/embedding/detectDuplicates",
+        "method": "POST",
+        "file": "embedding.bgroute.ts",
+        "requiresAuth": false,
+        "paramType": "inline"
+      },
+      {
+        "path": "/client/embedding/clusterItems",
+        "method": "POST",
+        "file": "embedding.bgroute.ts",
+        "requiresAuth": false,
+        "paramType": "inline"
+      }
+    ],
+    "encryption.bgroute.ts": [
+      {
+        "path": "/client/encryption/getRecoveryKey",
+        "method": "POST",
+        "file": "encryption.bgroute.ts",
+        "requiresAuth": false,
+        "paramType": "inline"
+      },
+      {
+        "path": "/client/encryption/generateRecoveryKey",
+        "method": "POST",
+        "file": "encryption.bgroute.ts",
+        "requiresAuth": false,
+        "paramType": "inline"
+      },
+      {
+        "path": "/client/encryption/saveRecoveryKeyOnServer",
+        "method": "POST",
+        "file": "encryption.bgroute.ts",
+        "requiresAuth": false,
+        "paramType": "inline"
+      },
+      {
+        "path": "/client/encryption/removeRecoveryKeyFromServer",
+        "method": "POST",
+        "file": "encryption.bgroute.ts",
+        "requiresAuth": false,
+        "paramType": "inline"
+      },
+      {
+        "path": "/client/encryption/recoverUsingKey",
+        "method": "POST",
+        "file": "encryption.bgroute.ts",
+        "requiresAuth": false,
+        "paramType": "inline"
+      },
+      {
+        "path": "/client/encryption/clearCachedEncValues",
+        "method": "POST",
+        "file": "encryption.bgroute.ts",
+        "requiresAuth": false,
+        "paramType": "inline"
+      },
+      {
+        "path": "/client/encryption/status",
+        "method": "POST",
+        "file": "encryption.bgroute.ts",
+        "requiresAuth": false,
+        "paramType": "inline"
+      },
+      {
+        "path": "/client/encryption/enable",
+        "method": "POST",
+        "file": "encryption.bgroute.ts",
+        "requiresAuth": false,
+        "paramType": "inline"
+      },
+      {
+        "path": "/client/encryption/shareAccountKey",
+        "method": "POST",
+        "file": "encryption.bgroute.ts",
+        "requiresAuth": false,
+        "paramType": "inline"
+      },
+      {
+        "path": "/client/encryption/allUserStatuses",
+        "method": "POST",
+        "file": "encryption.bgroute.ts",
+        "requiresAuth": false,
+        "paramType": "inline"
+      },
+      {
+        "path": "/client/encryption/createAccountBackupKey",
+        "method": "POST",
+        "file": "encryption.bgroute.ts",
+        "requiresAuth": false,
+        "paramType": "inline"
+      },
+      {
+        "path": "/client/auth/verifyPassword",
+        "method": "POST",
+        "file": "encryption.bgroute.ts",
+        "requiresAuth": false,
+        "paramType": "inline"
+      },
+      {
+        "path": "/client/auth/setStoredPassword",
+        "method": "POST",
+        "file": "encryption.bgroute.ts",
+        "requiresAuth": false,
+        "paramType": "inline"
+      },
+      {
+        "path": "/client/auth/setStoredRecoveryKey",
+        "method": "POST",
+        "file": "encryption.bgroute.ts",
+        "requiresAuth": false,
+        "paramType": "inline"
+      },
+      {
+        "path": "/client/auth/clearStoredPassword",
+        "method": "POST",
+        "file": "encryption.bgroute.ts",
+        "requiresAuth": false,
+        "paramType": "inline"
+      },
+      {
+        "path": "/client/encryption/encrypt",
+        "method": "POST",
+        "file": "encryption.bgroute.ts",
+        "requiresAuth": false,
+        "paramType": "inline"
+      },
+      {
+        "path": "/client/encryption/decrypt",
+        "method": "POST",
+        "file": "encryption.bgroute.ts",
+        "requiresAuth": false,
+        "paramType": "inline"
+      },
+      {
+        "path": "/client/encryption/listKeys",
+        "method": "POST",
+        "file": "encryption.bgroute.ts",
+        "requiresAuth": false,
+        "paramType": "inline"
+      },
+      {
+        "path": "/client/encryption/listKeysWithStatus",
+        "method": "POST",
+        "file": "encryption.bgroute.ts",
+        "requiresAuth": false,
+        "paramType": "inline"
+      },
+      {
+        "path": "/client/encryption/getKeyBackup",
+        "method": "POST",
+        "file": "encryption.bgroute.ts",
+        "requiresAuth": false,
+        "paramType": "inline"
+      },
+      {
+        "path": "/client/encryption/getKeys",
+        "method": "POST",
+        "file": "encryption.bgroute.ts",
+        "requiresAuth": false,
+        "paramType": "inline"
+      }
+    ],
+    "feed.bgroute.ts": [
+      {
+        "path": "/client/feed/getByPostId",
+        "method": "POST",
+        "file": "feed.bgroute.ts",
+        "requiresAuth": false,
+        "paramType": "inline"
+      },
+      {
+        "path": "/client/feed/list",
+        "method": "POST",
+        "file": "feed.bgroute.ts",
+        "requiresAuth": false,
+        "paramType": "inline"
+      },
+      {
+        "path": "/client/post/create",
+        "method": "POST",
+        "file": "feed.bgroute.ts",
+        "requiresAuth": false,
+        "paramType": "inline"
+      },
+      {
+        "path": "/client/comment/create",
+        "method": "POST",
+        "file": "feed.bgroute.ts",
+        "requiresAuth": false,
+        "paramType": "inline"
+      },
+      {
+        "path": "/client/comment/list",
+        "method": "POST",
+        "file": "feed.bgroute.ts",
+        "requiresAuth": false,
+        "paramType": "inline"
+      }
+    ],
+    "friends.bgroute.ts": [
+      {
+        "path": "/client/user/friend/list",
+        "method": "POST",
+        "file": "friends.bgroute.ts",
+        "requiresAuth": false,
+        "paramType": "inline"
+      },
+      {
+        "path": "/client/user/friend/request",
+        "method": "POST",
+        "file": "friends.bgroute.ts",
+        "requiresAuth": false,
+        "paramType": "inline"
+      },
+      {
+        "path": "/client/user/friend/takeAction",
+        "method": "POST",
+        "file": "friends.bgroute.ts",
+        "requiresAuth": false,
+        "paramType": "inline"
+      },
+      {
+        "path": "/client/following/add",
+        "method": "POST",
+        "file": "friends.bgroute.ts",
+        "requiresAuth": false,
+        "paramType": "inline"
+      },
+      {
+        "path": "/client/following/remove",
+        "method": "POST",
+        "file": "friends.bgroute.ts",
+        "requiresAuth": false,
+        "paramType": "inline"
+      },
+      {
+        "path": "/client/following/listByUserId",
+        "method": "POST",
+        "file": "friends.bgroute.ts",
+        "requiresAuth": false,
+        "paramType": "inline"
+      },
+      {
+        "path": "/client/following/listWithDetailsByUserId",
+        "method": "POST",
+        "file": "friends.bgroute.ts",
+        "requiresAuth": false,
+        "paramType": "inline"
+      }
+    ],
+    "item.bgroute.ts": [
+      {
+        "path": "/client/localstore/saveMetaTemp",
+        "method": "POST",
+        "file": "item.bgroute.ts",
+        "requiresAuth": false,
+        "paramType": "inline"
+      },
+      {
+        "path": "/client/localstore/lookupMetaTemp",
+        "method": "POST",
+        "file": "item.bgroute.ts",
+        "requiresAuth": false,
+        "paramType": "inline"
+      },
+      {
+        "path": "/client/refreshItemMeta",
+        "method": "POST",
+        "file": "item.bgroute.ts",
+        "requiresAuth": false,
+        "paramType": "inline"
+      },
+      {
+        "path": "/client/fetchDataByURL",
+        "method": "POST",
+        "file": "item.bgroute.ts",
+        "requiresAuth": false,
+        "paramType": "inline"
+      },
+      {
+        "path": "/client/fetchMetadata",
+        "method": "POST",
+        "file": "item.bgroute.ts",
+        "requiresAuth": false,
+        "paramType": "inline"
+      },
+      {
+        "path": "/client/resource/fetchInfo",
+        "method": "POST",
+        "file": "item.bgroute.ts",
+        "requiresAuth": false,
+        "paramType": "inline"
+      },
+      {
+        "path": "/client/fetchMetadataAndBanner",
+        "method": "POST",
+        "file": "item.bgroute.ts",
+        "requiresAuth": false,
+        "paramType": "inline"
+      },
+      {
+        "path": "/client/item/update",
+        "method": "POST",
+        "file": "item.bgroute.ts",
+        "requiresAuth": false,
+        "paramType": "inline"
+      },
+      {
+        "path": "/client/item/info",
+        "method": "POST",
+        "file": "item.bgroute.ts",
+        "requiresAuth": false,
+        "paramType": "inline"
+      },
+      {
+        "path": "/client/item/infoById",
+        "method": "POST",
+        "file": "item.bgroute.ts",
+        "requiresAuth": false,
+        "paramType": "inline"
+      },
+      {
+        "path": "/client/collections/items",
+        "method": "POST",
+        "file": "item.bgroute.ts",
+        "requiresAuth": false,
+        "paramType": "inline"
+      },
+      {
+        "path": "/client/collection/getItemRelInfo",
+        "method": "POST",
+        "file": "item.bgroute.ts",
+        "requiresAuth": false,
+        "paramType": "inline"
+      },
+      {
+        "path": "/client/collection/itemDetails/save",
+        "method": "POST",
+        "file": "item.bgroute.ts",
+        "requiresAuth": false,
+        "paramType": "inline"
+      },
+      {
+        "path": "/client/item/parents/bychildid",
+        "method": "POST",
+        "file": "item.bgroute.ts",
+        "requiresAuth": false,
+        "paramType": "inline"
+      },
+      {
+        "path": "/client/collection/encrypt",
+        "method": "POST",
+        "file": "item.bgroute.ts",
+        "requiresAuth": false,
+        "paramType": "inline"
+      },
+      {
+        "path": "/client/collection/decrypt",
+        "method": "POST",
+        "file": "item.bgroute.ts",
+        "requiresAuth": false,
+        "paramType": "inline"
+      },
+      {
+        "path": "/client/library/root",
+        "method": "POST",
+        "file": "item.bgroute.ts",
+        "requiresAuth": false,
+        "paramType": "inline"
+      },
+      {
+        "path": "/client/item/pathtree",
+        "method": "POST",
+        "file": "item.bgroute.ts",
+        "requiresAuth": false,
+        "paramType": "inline"
+      },
+      {
+        "path": "/client/userfile/listFilesByRef",
+        "method": "POST",
+        "file": "item.bgroute.ts",
+        "requiresAuth": false,
+        "paramType": "inline"
+      },
+      {
+        "path": "/client/collection/infoByUser",
+        "method": "POST",
+        "file": "item.bgroute.ts",
+        "requiresAuth": false,
+        "paramType": "inline"
+      },
+      {
+        "path": "/client/collection/listByUser",
+        "method": "POST",
+        "file": "item.bgroute.ts",
+        "requiresAuth": false,
+        "paramType": "inline"
+      },
+      {
+        "path": "/client/collection/listByAccount",
+        "method": "POST",
+        "file": "item.bgroute.ts",
+        "requiresAuth": false,
+        "paramType": "inline"
+      },
+      {
+        "path": "/client/collection/create",
+        "method": "POST",
+        "file": "item.bgroute.ts",
+        "requiresAuth": false,
+        "paramType": "inline"
+      },
+      {
+        "path": "/client/item/permissions/list",
+        "method": "POST",
+        "file": "item.bgroute.ts",
+        "requiresAuth": false,
+        "paramType": "inline"
+      },
+      {
+        "path": "/item/permissionsAndReactions/list",
+        "method": "POST",
+        "file": "item.bgroute.ts",
+        "requiresAuth": true,
+        "paramType": "inline"
+      },
+      {
+        "path": "/comment/list",
+        "method": "POST",
+        "file": "item.bgroute.ts",
+        "requiresAuth": true,
+        "paramType": "inline"
+      },
+      {
+        "path": "/client/item/save",
+        "method": "POST",
+        "file": "item.bgroute.ts",
+        "requiresAuth": false,
+        "paramType": "inline"
+      },
+      {
+        "path": "/client/items/similar",
+        "method": "POST",
+        "file": "item.bgroute.ts",
+        "requiresAuth": false,
+        "paramType": "inline"
+      },
+      {
+        "path": "/client/items/match",
+        "method": "POST",
+        "file": "item.bgroute.ts",
+        "requiresAuth": false,
+        "paramType": "inline"
+      },
+      {
+        "path": "/client/item/matchesForURLs",
+        "method": "POST",
+        "file": "item.bgroute.ts",
+        "requiresAuth": false,
+        "paramType": "inline"
+      },
+      {
+        "path": "/client/item/matchesForPubIds",
+        "method": "POST",
+        "file": "item.bgroute.ts",
+        "requiresAuth": false,
+        "paramType": "inline"
+      },
+      {
+        "path": "/client/item/getByIds",
+        "method": "POST",
+        "file": "item.bgroute.ts",
+        "requiresAuth": false,
+        "paramType": "inline"
+      },
+      {
+        "path": "/searchStatus",
+        "method": "POST",
+        "file": "item.bgroute.ts",
+        "requiresAuth": true,
+        "paramType": "inline"
+      },
+      {
+        "path": "/client/item/createPageSnapshot",
+        "method": "POST",
+        "file": "item.bgroute.ts",
+        "requiresAuth": false,
+        "paramType": "inline"
+      },
+      {
+        "path": "/client/item/listSharedWithUser",
+        "method": "POST",
+        "file": "item.bgroute.ts",
+        "requiresAuth": false,
+        "paramType": "inline"
+      },
+      {
+        "path": "/client/item/listSharedByUser",
+        "method": "POST",
+        "file": "item.bgroute.ts",
+        "requiresAuth": false,
+        "paramType": "inline"
+      },
+      {
+        "path": "/client/item/listByFilter",
+        "method": "POST",
+        "file": "item.bgroute.ts",
+        "requiresAuth": false,
+        "paramType": "inline"
+      },
+      {
+        "path": "/client/item/listWithInfoByUser",
+        "method": "POST",
+        "file": "item.bgroute.ts",
+        "requiresAuth": false,
+        "paramType": "inline"
+      },
+      {
+        "path": "/client/items/listWithFeedback",
+        "method": "POST",
+        "file": "item.bgroute.ts",
+        "requiresAuth": false,
+        "paramType": "inline"
+      },
+      {
+        "path": "/client/library/rediscover",
+        "method": "POST",
+        "file": "item.bgroute.ts",
+        "requiresAuth": false,
+        "paramType": "inline"
+      },
+      {
+        "path": "/client/library/archived",
+        "method": "POST",
+        "file": "item.bgroute.ts",
+        "requiresAuth": false,
+        "paramType": "inline"
+      },
+      {
+        "path": "/client/library/hidden",
+        "method": "POST",
+        "file": "item.bgroute.ts",
+        "requiresAuth": false,
+        "paramType": "inline"
+      },
+      {
+        "path": "/client/library/uncategorized",
+        "method": "POST",
+        "file": "item.bgroute.ts",
+        "requiresAuth": false,
+        "paramType": "inline"
+      },
+      {
+        "path": "/client/search",
+        "method": "POST",
+        "file": "item.bgroute.ts",
+        "requiresAuth": false,
+        "paramType": "inline"
+      },
+      {
+        "path": "/client/getItemsByAttributeValue",
+        "method": "POST",
+        "file": "item.bgroute.ts",
+        "requiresAuth": false,
+        "paramType": "inline"
+      },
+      {
+        "path": "/client/search/terms",
+        "method": "POST",
+        "file": "item.bgroute.ts",
+        "requiresAuth": false,
+        "paramType": "inline"
+      },
+      {
+        "path": "/client/search/autocomplete",
+        "method": "POST",
+        "file": "item.bgroute.ts",
+        "requiresAuth": false,
+        "paramType": "inline"
+      },
+      {
+        "path": "/client/collections/related",
+        "method": "POST",
+        "file": "item.bgroute.ts",
+        "requiresAuth": false,
+        "paramType": "inline"
+      },
+      {
+        "path": "/client/suggestCollections",
+        "method": "POST",
+        "file": "item.bgroute.ts",
+        "requiresAuth": false,
+        "paramType": "inline"
+      },
+      {
+        "path": "/client/collection/suggestions",
+        "method": "POST",
+        "file": "item.bgroute.ts",
+        "requiresAuth": false,
+        "paramType": "inline"
+      },
+      {
+        "path": "/client/collection/recent",
+        "method": "POST",
+        "file": "item.bgroute.ts",
+        "requiresAuth": false,
+        "paramType": "inline"
+      },
+      {
+        "path": "/client/searchEmbedded",
+        "method": "POST",
+        "file": "item.bgroute.ts",
+        "requiresAuth": false,
+        "paramType": "inline"
+      },
+      {
+        "path": "/client/subscription/add",
+        "method": "POST",
+        "file": "item.bgroute.ts",
+        "requiresAuth": false,
+        "paramType": "inline"
+      },
+      {
+        "path": "/client/subscription/edit",
+        "method": "POST",
+        "file": "item.bgroute.ts",
+        "requiresAuth": false,
+        "paramType": "inline"
+      },
+      {
+        "path": "/client/subscription/listForUser",
+        "method": "POST",
+        "file": "item.bgroute.ts",
+        "requiresAuth": false,
+        "paramType": "inline"
+      },
+      {
+        "path": "/client/item/withPubOrSubId",
+        "method": "POST",
+        "file": "item.bgroute.ts",
+        "requiresAuth": false,
+        "paramType": "inline"
+      },
+      {
+        "path": "/client/subscription/listForRef",
+        "method": "POST",
+        "file": "item.bgroute.ts",
+        "requiresAuth": false,
+        "paramType": "inline"
+      },
+      {
+        "path": "/client/item/attachment/add",
+        "method": "POST",
+        "file": "item.bgroute.ts",
+        "requiresAuth": false,
+        "paramType": "inline"
+      },
+      {
+        "path": "/client/item/delete",
+        "method": "POST",
+        "file": "item.bgroute.ts",
+        "requiresAuth": false,
+        "paramType": "inline"
+      },
+      {
+        "path": "/client/item/encryptItems",
+        "method": "POST",
+        "file": "item.bgroute.ts",
+        "requiresAuth": false,
+        "paramType": "inline"
+      },
+      {
+        "path": "/client/item/decryptItems",
+        "method": "POST",
+        "file": "item.bgroute.ts",
+        "requiresAuth": false,
+        "paramType": "inline"
+      },
+      {
+        "path": "/client/published/item/importFromPublished",
+        "method": "POST",
+        "file": "item.bgroute.ts",
+        "requiresAuth": false,
+        "paramType": "inline"
+      },
+      {
+        "path": "/client/published/subscribe",
+        "method": "POST",
+        "file": "item.bgroute.ts",
+        "requiresAuth": false,
+        "paramType": "inline"
+      }
+    ],
+    "misc.bgroute.ts": [
+      {
+        "path": "/version",
+        "method": "POST",
+        "file": "misc.bgroute.ts",
+        "requiresAuth": true,
+        "paramType": "inline"
+      },
+      {
+        "path": "/client/bgcache/reset",
+        "method": "POST",
+        "file": "misc.bgroute.ts",
+        "requiresAuth": false,
+        "paramType": "inline"
+      },
+      {
+        "path": "/client/debugInfo",
+        "method": "POST",
+        "file": "misc.bgroute.ts",
+        "requiresAuth": false,
+        "paramType": "inline"
+      },
+      {
+        "path": "/client/dbtest",
+        "method": "POST",
+        "file": "misc.bgroute.ts",
+        "requiresAuth": false,
+        "paramType": "inline"
+      },
+      {
+        "path": "/client/browser/tabs/query",
+        "method": "POST",
+        "file": "misc.bgroute.ts",
+        "requiresAuth": false,
+        "paramType": "inline"
+      },
+      {
+        "path": "/client/tests",
+        "method": "POST",
+        "file": "misc.bgroute.ts",
+        "requiresAuth": false,
+        "paramType": "inline"
+      },
+      {
+        "path": "/client/feedproxy",
+        "method": "POST",
+        "file": "misc.bgroute.ts",
+        "requiresAuth": false,
+        "paramType": "inline"
+      },
+      {
+        "path": "/client/fetch",
+        "method": "POST",
+        "file": "misc.bgroute.ts",
+        "requiresAuth": false,
+        "paramType": "inline"
+      },
+      {
+        "path": "/client/fetchFile",
+        "method": "POST",
+        "file": "misc.bgroute.ts",
+        "requiresAuth": false,
+        "paramType": "inline"
+      },
+      {
+        "path": "/client/updateIndex",
+        "method": "POST",
+        "file": "misc.bgroute.ts",
+        "requiresAuth": false,
+        "paramType": "inline"
+      },
+      {
+        "path": "/client/hometab",
+        "method": "POST",
+        "file": "misc.bgroute.ts",
+        "requiresAuth": false,
+        "paramType": "inline"
+      },
+      {
+        "path": "/client/widgetStatus",
+        "method": "POST",
+        "file": "misc.bgroute.ts",
+        "requiresAuth": false,
+        "paramType": "inline"
+      },
+      {
+        "path": "/client/extension/viewInfo",
+        "method": "POST",
+        "file": "misc.bgroute.ts",
+        "requiresAuth": false,
+        "paramType": "inline"
+      },
+      {
+        "path": "/client/userfile/getById",
+        "method": "POST",
+        "file": "misc.bgroute.ts",
+        "requiresAuth": false,
+        "paramType": "inline"
+      },
+      {
+        "path": "/client/userfile/upload",
+        "method": "POST",
+        "file": "misc.bgroute.ts",
+        "requiresAuth": false,
+        "paramType": "inline"
+      },
+      {
+        "path": "/client/device/updateInfo",
+        "method": "POST",
+        "file": "misc.bgroute.ts",
+        "requiresAuth": false,
+        "paramType": "inline"
+      },
+      {
+        "path": "/client/nativeMessage",
+        "method": "POST",
+        "file": "misc.bgroute.ts",
+        "requiresAuth": false,
+        "paramType": "inline"
+      },
+      {
+        "path": "/client/nativeClientCheck",
+        "method": "POST",
+        "file": "misc.bgroute.ts",
+        "requiresAuth": false,
+        "paramType": "inline"
+      }
+    ],
+    "sync.bgroute.ts": [
+      {
+        "path": "/sync/getStatus",
+        "method": "POST",
+        "file": "sync.bgroute.ts",
+        "requiresAuth": true,
+        "paramType": "inline"
+      },
+      {
+        "path": "/sync/getPending",
+        "method": "POST",
+        "file": "sync.bgroute.ts",
+        "requiresAuth": true,
+        "paramType": "inline"
+      },
+      {
+        "path": "/sync/trigger",
+        "method": "POST",
+        "file": "sync.bgroute.ts",
+        "requiresAuth": true,
+        "paramType": "inline"
+      },
+      {
+        "path": "/sync/retryFailed",
+        "method": "POST",
+        "file": "sync.bgroute.ts",
+        "requiresAuth": true,
+        "paramType": "inline"
+      },
+      {
+        "path": "/sync/retryOperation",
+        "method": "POST",
+        "file": "sync.bgroute.ts",
+        "requiresAuth": true,
+        "paramType": "inline"
+      },
+      {
+        "path": "/sync/getAllOperations",
+        "method": "POST",
+        "file": "sync.bgroute.ts",
+        "requiresAuth": true,
+        "paramType": "inline"
+      },
+      {
+        "path": "/sync/clearOld",
+        "method": "POST",
+        "file": "sync.bgroute.ts",
+        "requiresAuth": true,
+        "paramType": "inline"
+      },
+      {
+        "path": "/sync/clearAll",
+        "method": "POST",
+        "file": "sync.bgroute.ts",
+        "requiresAuth": true,
+        "paramType": "inline"
+      }
+    ],
+    "user.bgroute.ts": [
+      {
+        "path": "/client/systemStatus",
+        "method": "POST",
+        "file": "user.bgroute.ts",
+        "requiresAuth": false,
+        "paramType": "inline"
+      },
+      {
+        "path": "/client/signin",
+        "method": "POST",
+        "file": "user.bgroute.ts",
+        "requiresAuth": false,
+        "paramType": "inline"
+      },
+      {
+        "path": "/client/signinlocal",
+        "method": "POST",
+        "file": "user.bgroute.ts",
+        "requiresAuth": false,
+        "paramType": "inline"
+      },
+      {
+        "path": "/client/switchUser",
+        "method": "POST",
+        "file": "user.bgroute.ts",
+        "requiresAuth": false,
+        "paramType": "inline"
+      },
+      {
+        "path": "/client/user/miscStats",
+        "method": "POST",
+        "file": "user.bgroute.ts",
+        "requiresAuth": false,
+        "paramType": "inline"
+      },
+      {
+        "path": "/client/user/profile/get",
+        "method": "POST",
+        "file": "user.bgroute.ts",
+        "requiresAuth": false,
+        "paramType": "inline"
+      },
+      {
+        "path": "/client/account/info",
+        "method": "POST",
+        "file": "user.bgroute.ts",
+        "requiresAuth": false,
+        "paramType": "inline"
+      },
+      {
+        "path": "/client/account/users",
+        "method": "POST",
+        "file": "user.bgroute.ts",
+        "requiresAuth": false,
+        "paramType": "inline"
+      },
+      {
+        "path": "/client/user/info",
+        "method": "POST",
+        "file": "user.bgroute.ts",
+        "requiresAuth": false,
+        "paramType": "inline"
+      },
+      {
+        "path": "/client/item/userPermissionLookup",
+        "method": "POST",
+        "file": "user.bgroute.ts",
+        "requiresAuth": false,
+        "paramType": "inline"
+      },
+      {
+        "path": "/client/user/prefs/get",
+        "method": "POST",
+        "file": "user.bgroute.ts",
+        "requiresAuth": false,
+        "paramType": "inline"
+      },
+      {
+        "path": "/client/user/prefs/update",
+        "method": "POST",
+        "file": "user.bgroute.ts",
+        "requiresAuth": false,
+        "paramType": "inline"
+      },
+      {
+        "path": "/client/user/prefs/getValue",
+        "method": "POST",
+        "file": "user.bgroute.ts",
+        "requiresAuth": false,
+        "paramType": "inline"
+      },
+      {
+        "path": "/client/user/prefs/defaults",
+        "method": "POST",
+        "file": "user.bgroute.ts",
+        "requiresAuth": false,
+        "paramType": "inline"
+      },
+      {
+        "path": "/client/register",
+        "method": "POST",
+        "file": "user.bgroute.ts",
+        "requiresAuth": false,
+        "paramType": "inline"
+      },
+      {
+        "path": "/client/tokenLogin",
+        "method": "POST",
+        "file": "user.bgroute.ts",
+        "requiresAuth": false,
+        "paramType": "inline"
+      },
+      {
+        "path": "/client/signout",
+        "method": "POST",
+        "file": "user.bgroute.ts",
+        "requiresAuth": false,
+        "paramType": "inline"
+      },
+      {
+        "path": "/client/resetPassword",
+        "method": "POST",
+        "file": "user.bgroute.ts",
+        "requiresAuth": false,
+        "paramType": "inline"
+      },
+      {
+        "path": "/client/updatePassword",
+        "method": "POST",
+        "file": "user.bgroute.ts",
+        "requiresAuth": false,
+        "paramType": "inline"
+      },
+      {
+        "path": "/client/updatePIN",
+        "method": "POST",
+        "file": "user.bgroute.ts",
+        "requiresAuth": false,
+        "paramType": "inline"
+      },
+      {
+        "path": "/client/auth/permissionOverride",
+        "method": "POST",
+        "file": "user.bgroute.ts",
+        "requiresAuth": false,
+        "paramType": "inline"
+      },
+      {
+        "path": "/authInfo",
+        "method": "POST",
+        "file": "user.bgroute.ts",
+        "requiresAuth": true,
+        "paramType": "inline"
+      },
+      {
+        "path": "/client/authInfo/get",
+        "method": "POST",
+        "file": "user.bgroute.ts",
+        "requiresAuth": false,
+        "paramType": "inline"
+      },
+      {
+        "path": "/client/updatePlugins",
+        "method": "POST",
+        "file": "user.bgroute.ts",
+        "requiresAuth": false,
+        "paramType": "inline"
+      },
+      {
+        "path": "/client/user/plugin/list",
+        "method": "POST",
+        "file": "user.bgroute.ts",
+        "requiresAuth": false,
+        "paramType": "inline"
+      },
+      {
+        "path": "/user/options/get",
+        "method": "POST",
+        "file": "user.bgroute.ts",
+        "requiresAuth": true,
+        "paramType": "inline"
+      },
+      {
+        "path": "/client/currentUser",
+        "method": "POST",
+        "file": "user.bgroute.ts",
+        "requiresAuth": false,
+        "paramType": "inline"
+      },
+      {
+        "path": "/user/currentUser/delete",
+        "method": "POST",
+        "file": "user.bgroute.ts",
+        "requiresAuth": true,
+        "paramType": "inline"
+      },
+      {
+        "path": "/client/user/delete",
+        "method": "POST",
+        "file": "user.bgroute.ts",
+        "requiresAuth": false,
+        "paramType": "inline"
+      },
+      {
+        "path": "/client/user/userType/update",
+        "method": "POST",
+        "file": "user.bgroute.ts",
+        "requiresAuth": false,
+        "paramType": "inline"
+      },
+      {
+        "path": "/client/auth/createUser",
+        "method": "POST",
+        "file": "user.bgroute.ts",
+        "requiresAuth": false,
+        "paramType": "inline"
+      },
+      {
+        "path": "/client/serverSettings/update",
+        "method": "POST",
+        "file": "user.bgroute.ts",
+        "requiresAuth": false,
+        "paramType": "inline"
+      },
+      {
+        "path": "/client/serverSettings/refresh",
+        "method": "POST",
+        "file": "user.bgroute.ts",
+        "requiresAuth": false,
+        "paramType": "inline"
+      },
+      {
+        "path": "/client/serverSettings/get",
+        "method": "POST",
+        "file": "user.bgroute.ts",
+        "requiresAuth": false,
+        "paramType": "inline"
+      },
+      {
+        "path": "/client/user/info/update",
+        "method": "POST",
+        "file": "user.bgroute.ts",
+        "requiresAuth": false,
+        "paramType": "inline"
+      },
+      {
+        "path": "/client/user/info/updateUsername",
+        "method": "POST",
+        "file": "user.bgroute.ts",
+        "requiresAuth": false,
+        "paramType": "inline"
+      },
+      {
+        "path": "/client/user/profileImage/update",
+        "method": "POST",
+        "file": "user.bgroute.ts",
+        "requiresAuth": false,
+        "paramType": "inline"
+      }
+    ]
+  },
+  "serverRoutes": [
+    {
+      "path": "/authInfo",
+      "method": "POST",
+      "file": "user.bgroute.ts",
+      "requiresAuth": true,
+      "paramType": "inline"
+    },
+    {
+      "path": "/comment/list",
+      "method": "POST",
+      "file": "item.bgroute.ts",
+      "requiresAuth": true,
+      "paramType": "inline"
+    },
+    {
+      "path": "/item/permissionsAndReactions/list",
+      "method": "POST",
+      "file": "item.bgroute.ts",
+      "requiresAuth": true,
+      "paramType": "inline"
+    },
+    {
+      "path": "/searchStatus",
+      "method": "POST",
+      "file": "item.bgroute.ts",
+      "requiresAuth": true,
+      "paramType": "inline"
+    },
+    {
+      "path": "/sync/clearAll",
+      "method": "POST",
+      "file": "sync.bgroute.ts",
+      "requiresAuth": true,
+      "paramType": "inline"
+    },
+    {
+      "path": "/sync/clearOld",
+      "method": "POST",
+      "file": "sync.bgroute.ts",
+      "requiresAuth": true,
+      "paramType": "inline"
+    },
+    {
+      "path": "/sync/getAllOperations",
+      "method": "POST",
+      "file": "sync.bgroute.ts",
+      "requiresAuth": true,
+      "paramType": "inline"
+    },
+    {
+      "path": "/sync/getPending",
+      "method": "POST",
+      "file": "sync.bgroute.ts",
+      "requiresAuth": true,
+      "paramType": "inline"
+    },
+    {
+      "path": "/sync/getStatus",
+      "method": "POST",
+      "file": "sync.bgroute.ts",
+      "requiresAuth": true,
+      "paramType": "inline"
+    },
+    {
+      "path": "/sync/retryFailed",
+      "method": "POST",
+      "file": "sync.bgroute.ts",
+      "requiresAuth": true,
+      "paramType": "inline"
+    },
+    {
+      "path": "/sync/retryOperation",
+      "method": "POST",
+      "file": "sync.bgroute.ts",
+      "requiresAuth": true,
+      "paramType": "inline"
+    },
+    {
+      "path": "/sync/trigger",
+      "method": "POST",
+      "file": "sync.bgroute.ts",
+      "requiresAuth": true,
+      "paramType": "inline"
+    },
+    {
+      "path": "/user/currentUser/delete",
+      "method": "POST",
+      "file": "user.bgroute.ts",
+      "requiresAuth": true,
+      "paramType": "inline"
+    },
+    {
+      "path": "/user/options/get",
+      "method": "POST",
+      "file": "user.bgroute.ts",
+      "requiresAuth": true,
+      "paramType": "inline"
+    },
+    {
+      "path": "/version",
+      "method": "POST",
+      "file": "misc.bgroute.ts",
+      "requiresAuth": true,
+      "paramType": "inline"
+    }
+  ],
+  "clientRoutes": [
+    {
+      "path": "/client/account/info",
+      "method": "POST",
+      "file": "user.bgroute.ts",
+      "requiresAuth": false,
+      "paramType": "inline"
+    },
+    {
+      "path": "/client/account/users",
+      "method": "POST",
+      "file": "user.bgroute.ts",
+      "requiresAuth": false,
+      "paramType": "inline"
+    },
+    {
+      "path": "/client/activity/clearHistory",
+      "method": "POST",
+      "file": "activity.bgroute.ts",
+      "requiresAuth": false,
+      "paramType": "inline"
+    },
+    {
+      "path": "/client/activity/getCurrentUsageSummary",
+      "method": "POST",
+      "file": "activity.bgroute.ts",
+      "requiresAuth": false,
+      "paramType": "inline"
+    },
+    {
+      "path": "/client/activity/getPipelineSettings",
+      "method": "POST",
+      "file": "activity.bgroute.ts",
+      "requiresAuth": false,
+      "paramType": "inline"
+    },
+    {
+      "path": "/client/activity/getUsageSince",
+      "method": "POST",
+      "file": "activity.bgroute.ts",
+      "requiresAuth": false,
+      "paramType": "inline"
+    },
+    {
+      "path": "/client/activity/list",
+      "method": "POST",
+      "file": "activity.bgroute.ts",
+      "requiresAuth": false,
+      "paramType": "inline"
+    },
+    {
+      "path": "/client/activity/removeLogEntry",
+      "method": "POST",
+      "file": "activity.bgroute.ts",
+      "requiresAuth": false,
+      "paramType": "inline"
+    },
+    {
+      "path": "/client/activity/syncUsageLog",
+      "method": "POST",
+      "file": "activity.bgroute.ts",
+      "requiresAuth": false,
+      "paramType": "inline"
+    },
+    {
+      "path": "/client/activityMonitor/startFrameEventTrackingForCurrentTab",
+      "method": "POST",
+      "file": "activity.bgroute.ts",
+      "requiresAuth": false,
+      "paramType": "inline"
+    },
+    {
+      "path": "/client/activityMonitor/update",
+      "method": "POST",
+      "file": "activity.bgroute.ts",
+      "requiresAuth": false,
+      "paramType": "inline"
+    },
+    {
+      "path": "/client/ai/deleteSession",
+      "method": "POST",
+      "file": "ai.bgroute.ts",
+      "requiresAuth": false,
+      "paramType": "inline"
+    },
+    {
+      "path": "/client/ai/getCurrentSessionId",
+      "method": "POST",
+      "file": "ai.bgroute.ts",
+      "requiresAuth": false,
+      "paramType": "inline"
+    },
+    {
+      "path": "/client/ai/getSessionById",
+      "method": "POST",
+      "file": "ai.bgroute.ts",
+      "requiresAuth": false,
+      "paramType": "inline"
+    },
+    {
+      "path": "/client/ai/itemSuggestGenerator",
+      "method": "POST",
+      "file": "ai.bgroute.ts",
+      "requiresAuth": false,
+      "paramType": "inline"
+    },
+    {
+      "path": "/client/ai/itemUpdateGenerator",
+      "method": "POST",
+      "file": "ai.bgroute.ts",
+      "requiresAuth": false,
+      "paramType": "inline"
+    },
+    {
+      "path": "/client/ai/sendMessage",
+      "method": "POST",
+      "file": "ai.bgroute.ts",
+      "requiresAuth": false,
+      "paramType": "inline"
+    },
+    {
+      "path": "/client/ai/sendPageMessage",
+      "method": "POST",
+      "file": "ai.bgroute.ts",
+      "requiresAuth": false,
+      "paramType": "inline"
+    },
+    {
+      "path": "/client/ai/sessionList",
+      "method": "POST",
+      "file": "ai.bgroute.ts",
+      "requiresAuth": false,
+      "paramType": "inline"
+    },
+    {
+      "path": "/client/ai/setCurrentSessionId",
+      "method": "POST",
+      "file": "ai.bgroute.ts",
+      "requiresAuth": false,
+      "paramType": "inline"
+    },
+    {
+      "path": "/client/ai/textRequest",
+      "method": "POST",
+      "file": "ai.bgroute.ts",
+      "requiresAuth": false,
+      "paramType": "inline"
+    },
+    {
+      "path": "/client/ai/userRequest",
+      "method": "POST",
+      "file": "ai.bgroute.ts",
+      "requiresAuth": false,
+      "paramType": "inline"
+    },
+    {
+      "path": "/client/auth/clearStoredPassword",
+      "method": "POST",
+      "file": "encryption.bgroute.ts",
+      "requiresAuth": false,
+      "paramType": "inline"
+    },
+    {
+      "path": "/client/auth/createUser",
+      "method": "POST",
+      "file": "user.bgroute.ts",
+      "requiresAuth": false,
+      "paramType": "inline"
+    },
+    {
+      "path": "/client/auth/permissionOverride",
+      "method": "POST",
+      "file": "user.bgroute.ts",
+      "requiresAuth": false,
+      "paramType": "inline"
+    },
+    {
+      "path": "/client/auth/setStoredPassword",
+      "method": "POST",
+      "file": "encryption.bgroute.ts",
+      "requiresAuth": false,
+      "paramType": "inline"
+    },
+    {
+      "path": "/client/auth/setStoredRecoveryKey",
+      "method": "POST",
+      "file": "encryption.bgroute.ts",
+      "requiresAuth": false,
+      "paramType": "inline"
+    },
+    {
+      "path": "/client/auth/verifyPassword",
+      "method": "POST",
+      "file": "encryption.bgroute.ts",
+      "requiresAuth": false,
+      "paramType": "inline"
+    },
+    {
+      "path": "/client/authInfo/get",
+      "method": "POST",
+      "file": "user.bgroute.ts",
+      "requiresAuth": false,
+      "paramType": "inline"
+    },
+    {
+      "path": "/client/bgcache/reset",
+      "method": "POST",
+      "file": "misc.bgroute.ts",
+      "requiresAuth": false,
+      "paramType": "inline"
+    },
+    {
+      "path": "/client/browser/tabs/query",
+      "method": "POST",
+      "file": "misc.bgroute.ts",
+      "requiresAuth": false,
+      "paramType": "inline"
+    },
+    {
+      "path": "/client/checkIfPermitted",
+      "method": "POST",
+      "file": "content.bgroute.ts",
+      "requiresAuth": false,
+      "paramType": "inline"
+    },
+    {
+      "path": "/client/checkIfPermittedByPageContent",
+      "method": "POST",
+      "file": "content.bgroute.ts",
+      "requiresAuth": false,
+      "paramType": "inline"
+    },
+    {
+      "path": "/client/collection/create",
+      "method": "POST",
+      "file": "item.bgroute.ts",
+      "requiresAuth": false,
+      "paramType": "inline"
+    },
+    {
+      "path": "/client/collection/decrypt",
+      "method": "POST",
+      "file": "item.bgroute.ts",
+      "requiresAuth": false,
+      "paramType": "inline"
+    },
+    {
+      "path": "/client/collection/encrypt",
+      "method": "POST",
+      "file": "item.bgroute.ts",
+      "requiresAuth": false,
+      "paramType": "inline"
+    },
+    {
+      "path": "/client/collection/getItemRelInfo",
+      "method": "POST",
+      "file": "item.bgroute.ts",
+      "requiresAuth": false,
+      "paramType": "inline"
+    },
+    {
+      "path": "/client/collection/infoByUser",
+      "method": "POST",
+      "file": "item.bgroute.ts",
+      "requiresAuth": false,
+      "paramType": "inline"
+    },
+    {
+      "path": "/client/collection/itemDetails/save",
+      "method": "POST",
+      "file": "item.bgroute.ts",
+      "requiresAuth": false,
+      "paramType": "inline"
+    },
+    {
+      "path": "/client/collection/listByAccount",
+      "method": "POST",
+      "file": "item.bgroute.ts",
+      "requiresAuth": false,
+      "paramType": "inline"
+    },
+    {
+      "path": "/client/collection/listByUser",
+      "method": "POST",
+      "file": "item.bgroute.ts",
+      "requiresAuth": false,
+      "paramType": "inline"
+    },
+    {
+      "path": "/client/collections/items",
+      "method": "POST",
+      "file": "item.bgroute.ts",
+      "requiresAuth": false,
+      "paramType": "inline"
+    },
+    {
+      "path": "/client/collection/recent",
+      "method": "POST",
+      "file": "item.bgroute.ts",
+      "requiresAuth": false,
+      "paramType": "inline"
+    },
+    {
+      "path": "/client/collection/suggestions",
+      "method": "POST",
+      "file": "item.bgroute.ts",
+      "requiresAuth": false,
+      "paramType": "inline"
+    },
+    {
+      "path": "/client/comment/create",
+      "method": "POST",
+      "file": "feed.bgroute.ts",
+      "requiresAuth": false,
+      "paramType": "inline"
+    },
+    {
+      "path": "/client/comment/list",
+      "method": "POST",
+      "file": "feed.bgroute.ts",
+      "requiresAuth": false,
+      "paramType": "inline"
+    },
+    {
+      "path": "/client/content/clearPipelineResults",
+      "method": "POST",
+      "file": "activity.bgroute.ts",
+      "requiresAuth": false,
+      "paramType": "inline"
+    },
+    {
+      "path": "/client/content/getLoggedBlockingEntry",
+      "method": "POST",
+      "file": "activity.bgroute.ts",
+      "requiresAuth": false,
+      "paramType": "inline"
+    },
+    {
+      "path": "/client/content/getLoggedInfoForItemId",
+      "method": "POST",
+      "file": "activity.bgroute.ts",
+      "requiresAuth": false,
+      "paramType": "inline"
+    },
+    {
+      "path": "/client/content/getLoggedInfoForLimitRuleId",
+      "method": "POST",
+      "file": "activity.bgroute.ts",
+      "requiresAuth": false,
+      "paramType": "inline"
+    },
+    {
+      "path": "/client/content/getLoggedInfoForURL",
+      "method": "POST",
+      "file": "activity.bgroute.ts",
+      "requiresAuth": false,
+      "paramType": "inline"
+    },
+    {
+      "path": "/client/content/getPipelineResultsForId",
+      "method": "POST",
+      "file": "activity.bgroute.ts",
+      "requiresAuth": false,
+      "paramType": "inline"
+    },
+    {
+      "path": "/client/content/getTermDict",
+      "method": "POST",
+      "file": "content.bgroute.ts",
+      "requiresAuth": false,
+      "paramType": "inline"
+    },
+    {
+      "path": "/client/content/imageClassify",
+      "method": "POST",
+      "file": "content.bgroute.ts",
+      "requiresAuth": false,
+      "paramType": "inline"
+    },
+    {
+      "path": "/client/content/imageClassifyLegacy",
+      "method": "POST",
+      "file": "content.bgroute.ts",
+      "requiresAuth": false,
+      "paramType": "inline"
+    },
+    {
+      "path": "/client/content/listPipelineResults",
+      "method": "POST",
+      "file": "activity.bgroute.ts",
+      "requiresAuth": false,
+      "paramType": "inline"
+    },
+    {
+      "path": "/client/content/performDeepClassification",
+      "method": "POST",
+      "file": "content.bgroute.ts",
+      "requiresAuth": false,
+      "paramType": "inline"
+    },
+    {
+      "path": "/client/content/performDeepMetaCheck",
+      "method": "POST",
+      "file": "content.bgroute.ts",
+      "requiresAuth": false,
+      "paramType": "inline"
+    },
+    {
+      "path": "/client/content/performDocClassification",
+      "method": "POST",
+      "file": "content.bgroute.ts",
+      "requiresAuth": false,
+      "paramType": "inline"
+    },
+    {
+      "path": "/client/content/savePipelineResults",
+      "method": "POST",
+      "file": "activity.bgroute.ts",
+      "requiresAuth": false,
+      "paramType": "inline"
+    },
+    {
+      "path": "/client/content/updateStatus",
+      "method": "POST",
+      "file": "content.bgroute.ts",
+      "requiresAuth": false,
+      "paramType": "inline"
+    },
+    {
+      "path": "/client/currentUser",
+      "method": "POST",
+      "file": "user.bgroute.ts",
+      "requiresAuth": false,
+      "paramType": "inline"
+    },
+    {
+      "path": "/client/dbtest",
+      "method": "POST",
+      "file": "misc.bgroute.ts",
+      "requiresAuth": false,
+      "paramType": "inline"
+    },
+    {
+      "path": "/client/debugInfo",
+      "method": "POST",
+      "file": "misc.bgroute.ts",
+      "requiresAuth": false,
+      "paramType": "inline"
+    },
+    {
+      "path": "/client/device/updateInfo",
+      "method": "POST",
+      "file": "misc.bgroute.ts",
+      "requiresAuth": false,
+      "paramType": "inline"
+    },
+    {
+      "path": "/client/embedding/batchEmbeddings",
+      "method": "POST",
+      "file": "embedding.bgroute.ts",
+      "requiresAuth": false,
+      "paramType": "inline"
+    },
+    {
+      "path": "/client/embedding/clearCache",
+      "method": "POST",
+      "file": "embedding.bgroute.ts",
+      "requiresAuth": false,
+      "paramType": "inline"
+    },
+    {
+      "path": "/client/embedding/clusterItems",
+      "method": "POST",
+      "file": "embedding.bgroute.ts",
+      "requiresAuth": false,
+      "paramType": "inline"
+    },
+    {
+      "path": "/client/embedding/configure",
+      "method": "POST",
+      "file": "embedding.bgroute.ts",
+      "requiresAuth": false,
+      "paramType": "inline"
+    },
+    {
+      "path": "/client/embedding/detectDuplicates",
+      "method": "POST",
+      "file": "embedding.bgroute.ts",
+      "requiresAuth": false,
+      "paramType": "inline"
+    },
+    {
+      "path": "/client/embedding/findSimilar",
+      "method": "POST",
+      "file": "embedding.bgroute.ts",
+      "requiresAuth": false,
+      "paramType": "inline"
+    },
+    {
+      "path": "/client/embedding/findSimilarItems",
+      "method": "POST",
+      "file": "embedding.bgroute.ts",
+      "requiresAuth": false,
+      "paramType": "inline"
+    },
+    {
+      "path": "/client/embedding/generateEmbedding",
+      "method": "POST",
+      "file": "embedding.bgroute.ts",
+      "requiresAuth": false,
+      "paramType": "inline"
+    },
+    {
+      "path": "/client/embedding/getStats",
+      "method": "POST",
+      "file": "embedding.bgroute.ts",
+      "requiresAuth": false,
+      "paramType": "inline"
+    },
+    {
+      "path": "/client/embedding/suggestCollections",
+      "method": "POST",
+      "file": "embedding.bgroute.ts",
+      "requiresAuth": false,
+      "paramType": "inline"
+    },
+    {
+      "path": "/client/embedding/suggestTags",
+      "method": "POST",
+      "file": "embedding.bgroute.ts",
+      "requiresAuth": false,
+      "paramType": "inline"
+    },
+    {
+      "path": "/client/encryption/allUserStatuses",
+      "method": "POST",
+      "file": "encryption.bgroute.ts",
+      "requiresAuth": false,
+      "paramType": "inline"
+    },
+    {
+      "path": "/client/encryption/clearCachedEncValues",
+      "method": "POST",
+      "file": "encryption.bgroute.ts",
+      "requiresAuth": false,
+      "paramType": "inline"
+    },
+    {
+      "path": "/client/encryption/createAccountBackupKey",
+      "method": "POST",
+      "file": "encryption.bgroute.ts",
+      "requiresAuth": false,
+      "paramType": "inline"
+    },
+    {
+      "path": "/client/encryption/decrypt",
+      "method": "POST",
+      "file": "encryption.bgroute.ts",
+      "requiresAuth": false,
+      "paramType": "inline"
+    },
+    {
+      "path": "/client/encryption/enable",
+      "method": "POST",
+      "file": "encryption.bgroute.ts",
+      "requiresAuth": false,
+      "paramType": "inline"
+    },
+    {
+      "path": "/client/encryption/encrypt",
+      "method": "POST",
+      "file": "encryption.bgroute.ts",
+      "requiresAuth": false,
+      "paramType": "inline"
+    },
+    {
+      "path": "/client/encryption/generateRecoveryKey",
+      "method": "POST",
+      "file": "encryption.bgroute.ts",
+      "requiresAuth": false,
+      "paramType": "inline"
+    },
+    {
+      "path": "/client/encryption/getKeyBackup",
+      "method": "POST",
+      "file": "encryption.bgroute.ts",
+      "requiresAuth": false,
+      "paramType": "inline"
+    },
+    {
+      "path": "/client/encryption/getKeys",
+      "method": "POST",
+      "file": "encryption.bgroute.ts",
+      "requiresAuth": false,
+      "paramType": "inline"
+    },
+    {
+      "path": "/client/encryption/getRecoveryKey",
+      "method": "POST",
+      "file": "encryption.bgroute.ts",
+      "requiresAuth": false,
+      "paramType": "inline"
+    },
+    {
+      "path": "/client/encryption/listKeys",
+      "method": "POST",
+      "file": "encryption.bgroute.ts",
+      "requiresAuth": false,
+      "paramType": "inline"
+    },
+    {
+      "path": "/client/encryption/listKeysWithStatus",
+      "method": "POST",
+      "file": "encryption.bgroute.ts",
+      "requiresAuth": false,
+      "paramType": "inline"
+    },
+    {
+      "path": "/client/encryption/recoverUsingKey",
+      "method": "POST",
+      "file": "encryption.bgroute.ts",
+      "requiresAuth": false,
+      "paramType": "inline"
+    },
+    {
+      "path": "/client/encryption/removeRecoveryKeyFromServer",
+      "method": "POST",
+      "file": "encryption.bgroute.ts",
+      "requiresAuth": false,
+      "paramType": "inline"
+    },
+    {
+      "path": "/client/encryption/saveRecoveryKeyOnServer",
+      "method": "POST",
+      "file": "encryption.bgroute.ts",
+      "requiresAuth": false,
+      "paramType": "inline"
+    },
+    {
+      "path": "/client/encryption/shareAccountKey",
+      "method": "POST",
+      "file": "encryption.bgroute.ts",
+      "requiresAuth": false,
+      "paramType": "inline"
+    },
+    {
+      "path": "/client/encryption/status",
+      "method": "POST",
+      "file": "encryption.bgroute.ts",
+      "requiresAuth": false,
+      "paramType": "inline"
+    },
+    {
+      "path": "/client/extension/viewInfo",
+      "method": "POST",
+      "file": "misc.bgroute.ts",
+      "requiresAuth": false,
+      "paramType": "inline"
+    },
+    {
+      "path": "/client/feed/getByPostId",
+      "method": "POST",
+      "file": "feed.bgroute.ts",
+      "requiresAuth": false,
+      "paramType": "inline"
+    },
+    {
+      "path": "/client/feed/list",
+      "method": "POST",
+      "file": "feed.bgroute.ts",
+      "requiresAuth": false,
+      "paramType": "inline"
+    },
+    {
+      "path": "/client/feedproxy",
+      "method": "POST",
+      "file": "misc.bgroute.ts",
+      "requiresAuth": false,
+      "paramType": "inline"
+    },
+    {
+      "path": "/client/fetch",
+      "method": "POST",
+      "file": "misc.bgroute.ts",
+      "requiresAuth": false,
+      "paramType": "inline"
+    },
+    {
+      "path": "/client/fetchDataByURL",
+      "method": "POST",
+      "file": "item.bgroute.ts",
+      "requiresAuth": false,
+      "paramType": "inline"
+    },
+    {
+      "path": "/client/fetchFile",
+      "method": "POST",
+      "file": "misc.bgroute.ts",
+      "requiresAuth": false,
+      "paramType": "inline"
+    },
+    {
+      "path": "/client/fetchMetadata",
+      "method": "POST",
+      "file": "item.bgroute.ts",
+      "requiresAuth": false,
+      "paramType": "inline"
+    },
+    {
+      "path": "/client/fetchMetadataAndBanner",
+      "method": "POST",
+      "file": "item.bgroute.ts",
+      "requiresAuth": false,
+      "paramType": "inline"
+    },
+    {
+      "path": "/client/following/add",
+      "method": "POST",
+      "file": "friends.bgroute.ts",
+      "requiresAuth": false,
+      "paramType": "inline"
+    },
+    {
+      "path": "/client/following/listByUserId",
+      "method": "POST",
+      "file": "friends.bgroute.ts",
+      "requiresAuth": false,
+      "paramType": "inline"
+    },
+    {
+      "path": "/client/following/listWithDetailsByUserId",
+      "method": "POST",
+      "file": "friends.bgroute.ts",
+      "requiresAuth": false,
+      "paramType": "inline"
+    },
+    {
+      "path": "/client/following/remove",
+      "method": "POST",
+      "file": "friends.bgroute.ts",
+      "requiresAuth": false,
+      "paramType": "inline"
+    },
+    {
+      "path": "/client/getItemsByAttributeValue",
+      "method": "POST",
+      "file": "item.bgroute.ts",
+      "requiresAuth": false,
+      "paramType": "inline"
+    },
+    {
+      "path": "/client/collections/related",
+      "method": "POST",
+      "file": "item.bgroute.ts",
+      "requiresAuth": false,
+      "paramType": "inline"
+    },
+    {
+      "path": "/client/hometab",
+      "method": "POST",
+      "file": "misc.bgroute.ts",
+      "requiresAuth": false,
+      "paramType": "inline"
+    },
+    {
+      "path": "/client/item/attachment/add",
+      "method": "POST",
+      "file": "item.bgroute.ts",
+      "requiresAuth": false,
+      "paramType": "inline"
+    },
+    {
+      "path": "/client/item/createPageSnapshot",
+      "method": "POST",
+      "file": "item.bgroute.ts",
+      "requiresAuth": false,
+      "paramType": "inline"
+    },
+    {
+      "path": "/client/item/decryptItems",
+      "method": "POST",
+      "file": "item.bgroute.ts",
+      "requiresAuth": false,
+      "paramType": "inline"
+    },
+    {
+      "path": "/client/item/delete",
+      "method": "POST",
+      "file": "item.bgroute.ts",
+      "requiresAuth": false,
+      "paramType": "inline"
+    },
+    {
+      "path": "/client/item/encryptItems",
+      "method": "POST",
+      "file": "item.bgroute.ts",
+      "requiresAuth": false,
+      "paramType": "inline"
+    },
+    {
+      "path": "/client/item/getByIds",
+      "method": "POST",
+      "file": "item.bgroute.ts",
+      "requiresAuth": false,
+      "paramType": "inline"
+    },
+    {
+      "path": "/client/items/match",
+      "method": "POST",
+      "file": "item.bgroute.ts",
+      "requiresAuth": false,
+      "paramType": "inline"
+    },
+    {
+      "path": "/client/item/info",
+      "method": "POST",
+      "file": "item.bgroute.ts",
+      "requiresAuth": false,
+      "paramType": "inline"
+    },
+    {
+      "path": "/client/item/infoById",
+      "method": "POST",
+      "file": "item.bgroute.ts",
+      "requiresAuth": false,
+      "paramType": "inline"
+    },
+    {
+      "path": "/client/item/listByFilter",
+      "method": "POST",
+      "file": "item.bgroute.ts",
+      "requiresAuth": false,
+      "paramType": "inline"
+    },
+    {
+      "path": "/client/item/listSharedByUser",
+      "method": "POST",
+      "file": "item.bgroute.ts",
+      "requiresAuth": false,
+      "paramType": "inline"
+    },
+    {
+      "path": "/client/item/listSharedWithUser",
+      "method": "POST",
+      "file": "item.bgroute.ts",
+      "requiresAuth": false,
+      "paramType": "inline"
+    },
+    {
+      "path": "/client/item/listWithInfoByUser",
+      "method": "POST",
+      "file": "item.bgroute.ts",
+      "requiresAuth": false,
+      "paramType": "inline"
+    },
+    {
+      "path": "/client/item/matchesForPubIds",
+      "method": "POST",
+      "file": "item.bgroute.ts",
+      "requiresAuth": false,
+      "paramType": "inline"
+    },
+    {
+      "path": "/client/item/matchesForURLs",
+      "method": "POST",
+      "file": "item.bgroute.ts",
+      "requiresAuth": false,
+      "paramType": "inline"
+    },
+    {
+      "path": "/client/item/parents/bychildid",
+      "method": "POST",
+      "file": "item.bgroute.ts",
+      "requiresAuth": false,
+      "paramType": "inline"
+    },
+    {
+      "path": "/client/item/pathtree",
+      "method": "POST",
+      "file": "item.bgroute.ts",
+      "requiresAuth": false,
+      "paramType": "inline"
+    },
+    {
+      "path": "/client/item/permissions/list",
+      "method": "POST",
+      "file": "item.bgroute.ts",
+      "requiresAuth": false,
+      "paramType": "inline"
+    },
+    {
+      "path": "/client/item/save",
+      "method": "POST",
+      "file": "item.bgroute.ts",
+      "requiresAuth": false,
+      "paramType": "inline"
+    },
+    {
+      "path": "/client/items/similar",
+      "method": "POST",
+      "file": "item.bgroute.ts",
+      "requiresAuth": false,
+      "paramType": "inline"
+    },
+    {
+      "path": "/client/item/update",
+      "method": "POST",
+      "file": "item.bgroute.ts",
+      "requiresAuth": false,
+      "paramType": "inline"
+    },
+    {
+      "path": "/client/item/userPermissionLookup",
+      "method": "POST",
+      "file": "user.bgroute.ts",
+      "requiresAuth": false,
+      "paramType": "inline"
+    },
+    {
+      "path": "/client/item/withPubOrSubId",
+      "method": "POST",
+      "file": "item.bgroute.ts",
+      "requiresAuth": false,
+      "paramType": "inline"
+    },
+    {
+      "path": "/client/items/listWithFeedback",
+      "method": "POST",
+      "file": "item.bgroute.ts",
+      "requiresAuth": false,
+      "paramType": "inline"
+    },
+    {
+      "path": "/client/library/archived",
+      "method": "POST",
+      "file": "item.bgroute.ts",
+      "requiresAuth": false,
+      "paramType": "inline"
+    },
+    {
+      "path": "/client/library/hidden",
+      "method": "POST",
+      "file": "item.bgroute.ts",
+      "requiresAuth": false,
+      "paramType": "inline"
+    },
+    {
+      "path": "/client/library/rediscover",
+      "method": "POST",
+      "file": "item.bgroute.ts",
+      "requiresAuth": false,
+      "paramType": "inline"
+    },
+    {
+      "path": "/client/library/root",
+      "method": "POST",
+      "file": "item.bgroute.ts",
+      "requiresAuth": false,
+      "paramType": "inline"
+    },
+    {
+      "path": "/client/library/uncategorized",
+      "method": "POST",
+      "file": "item.bgroute.ts",
+      "requiresAuth": false,
+      "paramType": "inline"
+    },
+    {
+      "path": "/client/localstore/lookupMetaTemp",
+      "method": "POST",
+      "file": "item.bgroute.ts",
+      "requiresAuth": false,
+      "paramType": "inline"
+    },
+    {
+      "path": "/client/localstore/saveMetaTemp",
+      "method": "POST",
+      "file": "item.bgroute.ts",
+      "requiresAuth": false,
+      "paramType": "inline"
+    },
+    {
+      "path": "/client/logVisit",
+      "method": "POST",
+      "file": "activity.bgroute.ts",
+      "requiresAuth": false,
+      "paramType": "inline"
+    },
+    {
+      "path": "/client/nativeClientCheck",
+      "method": "POST",
+      "file": "misc.bgroute.ts",
+      "requiresAuth": false,
+      "paramType": "inline"
+    },
+    {
+      "path": "/client/nativeMessage",
+      "method": "POST",
+      "file": "misc.bgroute.ts",
+      "requiresAuth": false,
+      "paramType": "inline"
+    },
+    {
+      "path": "/client/post/create",
+      "method": "POST",
+      "file": "feed.bgroute.ts",
+      "requiresAuth": false,
+      "paramType": "inline"
+    },
+    {
+      "path": "/client/published/item/importFromPublished",
+      "method": "POST",
+      "file": "item.bgroute.ts",
+      "requiresAuth": false,
+      "paramType": "inline"
+    },
+    {
+      "path": "/client/published/subscribe",
+      "method": "POST",
+      "file": "item.bgroute.ts",
+      "requiresAuth": false,
+      "paramType": "inline"
+    },
+    {
+      "path": "/client/refreshItemMeta",
+      "method": "POST",
+      "file": "item.bgroute.ts",
+      "requiresAuth": false,
+      "paramType": "inline"
+    },
+    {
+      "path": "/client/register",
+      "method": "POST",
+      "file": "user.bgroute.ts",
+      "requiresAuth": false,
+      "paramType": "inline"
+    },
+    {
+      "path": "/client/resetPassword",
+      "method": "POST",
+      "file": "user.bgroute.ts",
+      "requiresAuth": false,
+      "paramType": "inline"
+    },
+    {
+      "path": "/client/resource/fetchInfo",
+      "method": "POST",
+      "file": "item.bgroute.ts",
+      "requiresAuth": false,
+      "paramType": "inline"
+    },
+    {
+      "path": "/client/search/autocomplete",
+      "method": "POST",
+      "file": "item.bgroute.ts",
+      "requiresAuth": false,
+      "paramType": "inline"
+    },
+    {
+      "path": "/client/searchEmbedded",
+      "method": "POST",
+      "file": "item.bgroute.ts",
+      "requiresAuth": false,
+      "paramType": "inline"
+    },
+    {
+      "path": "/client/search",
+      "method": "POST",
+      "file": "item.bgroute.ts",
+      "requiresAuth": false,
+      "paramType": "inline"
+    },
+    {
+      "path": "/client/search/terms",
+      "method": "POST",
+      "file": "item.bgroute.ts",
+      "requiresAuth": false,
+      "paramType": "inline"
+    },
+    {
+      "path": "/client/sentry/clearTempDisableBlocking",
+      "method": "POST",
+      "file": "content.bgroute.ts",
+      "requiresAuth": false,
+      "paramType": "inline"
+    },
+    {
+      "path": "/client/sentry/getTempDisableBlockingStatus",
+      "method": "POST",
+      "file": "content.bgroute.ts",
+      "requiresAuth": false,
+      "paramType": "inline"
+    },
+    {
+      "path": "/client/sentry/giveTempAccess",
+      "method": "POST",
+      "file": "content.bgroute.ts",
+      "requiresAuth": false,
+      "paramType": "inline"
+    },
+    {
+      "path": "/client/sentry/processRequestsForBlocking",
+      "method": "POST",
+      "file": "content.bgroute.ts",
+      "requiresAuth": false,
+      "paramType": "inline"
+    },
+    {
+      "path": "/client/sentry/processRequestsForInjection",
+      "method": "POST",
+      "file": "content.bgroute.ts",
+      "requiresAuth": false,
+      "paramType": "inline"
+    },
+    {
+      "path": "/client/sentry/tempDisableBlocking",
+      "method": "POST",
+      "file": "content.bgroute.ts",
+      "requiresAuth": false,
+      "paramType": "inline"
+    },
+    {
+      "path": "/client/serverSettings/get",
+      "method": "POST",
+      "file": "user.bgroute.ts",
+      "requiresAuth": false,
+      "paramType": "inline"
+    },
+    {
+      "path": "/client/serverSettings/refresh",
+      "method": "POST",
+      "file": "user.bgroute.ts",
+      "requiresAuth": false,
+      "paramType": "inline"
+    },
+    {
+      "path": "/client/serverSettings/update",
+      "method": "POST",
+      "file": "user.bgroute.ts",
+      "requiresAuth": false,
+      "paramType": "inline"
+    },
+    {
+      "path": "/client/signin",
+      "method": "POST",
+      "file": "user.bgroute.ts",
+      "requiresAuth": false,
+      "paramType": "inline"
+    },
+    {
+      "path": "/client/signinlocal",
+      "method": "POST",
+      "file": "user.bgroute.ts",
+      "requiresAuth": false,
+      "paramType": "inline"
+    },
+    {
+      "path": "/client/signout",
+      "method": "POST",
+      "file": "user.bgroute.ts",
+      "requiresAuth": false,
+      "paramType": "inline"
+    },
+    {
+      "path": "/client/subscription/add",
+      "method": "POST",
+      "file": "item.bgroute.ts",
+      "requiresAuth": false,
+      "paramType": "inline"
+    },
+    {
+      "path": "/client/subscription/edit",
+      "method": "POST",
+      "file": "item.bgroute.ts",
+      "requiresAuth": false,
+      "paramType": "inline"
+    },
+    {
+      "path": "/client/subscription/listForRef",
+      "method": "POST",
+      "file": "item.bgroute.ts",
+      "requiresAuth": false,
+      "paramType": "inline"
+    },
+    {
+      "path": "/client/subscription/listForUser",
+      "method": "POST",
+      "file": "item.bgroute.ts",
+      "requiresAuth": false,
+      "paramType": "inline"
+    },
+    {
+      "path": "/client/suggestCollections",
+      "method": "POST",
+      "file": "item.bgroute.ts",
+      "requiresAuth": false,
+      "paramType": "inline"
+    },
+    {
+      "path": "/client/switchUser",
+      "method": "POST",
+      "file": "user.bgroute.ts",
+      "requiresAuth": false,
+      "paramType": "inline"
+    },
+    {
+      "path": "/client/systemStatus",
+      "method": "POST",
+      "file": "user.bgroute.ts",
+      "requiresAuth": false,
+      "paramType": "inline"
+    },
+    {
+      "path": "/client/tests",
+      "method": "POST",
+      "file": "misc.bgroute.ts",
+      "requiresAuth": false,
+      "paramType": "inline"
+    },
+    {
+      "path": "/client/tokenLogin",
+      "method": "POST",
+      "file": "user.bgroute.ts",
+      "requiresAuth": false,
+      "paramType": "inline"
+    },
+    {
+      "path": "/client/updateIndex",
+      "method": "POST",
+      "file": "misc.bgroute.ts",
+      "requiresAuth": false,
+      "paramType": "inline"
+    },
+    {
+      "path": "/client/updatePassword",
+      "method": "POST",
+      "file": "user.bgroute.ts",
+      "requiresAuth": false,
+      "paramType": "inline"
+    },
+    {
+      "path": "/client/updatePIN",
+      "method": "POST",
+      "file": "user.bgroute.ts",
+      "requiresAuth": false,
+      "paramType": "inline"
+    },
+    {
+      "path": "/client/updatePlugins",
+      "method": "POST",
+      "file": "user.bgroute.ts",
+      "requiresAuth": false,
+      "paramType": "inline"
+    },
+    {
+      "path": "/client/user/activity/logNewVisit",
+      "method": "POST",
+      "file": "activity.bgroute.ts",
+      "requiresAuth": false,
+      "paramType": "inline"
+    },
+    {
+      "path": "/client/user/activity/updateItemVisitHistory",
+      "method": "POST",
+      "file": "activity.bgroute.ts",
+      "requiresAuth": false,
+      "paramType": "inline"
+    },
+    {
+      "path": "/client/user/delete",
+      "method": "POST",
+      "file": "user.bgroute.ts",
+      "requiresAuth": false,
+      "paramType": "inline"
+    },
+    {
+      "path": "/client/user/friend/list",
+      "method": "POST",
+      "file": "friends.bgroute.ts",
+      "requiresAuth": false,
+      "paramType": "inline"
+    },
+    {
+      "path": "/client/user/friend/request",
+      "method": "POST",
+      "file": "friends.bgroute.ts",
+      "requiresAuth": false,
+      "paramType": "inline"
+    },
+    {
+      "path": "/client/user/friend/takeAction",
+      "method": "POST",
+      "file": "friends.bgroute.ts",
+      "requiresAuth": false,
+      "paramType": "inline"
+    },
+    {
+      "path": "/client/user/info",
+      "method": "POST",
+      "file": "user.bgroute.ts",
+      "requiresAuth": false,
+      "paramType": "inline"
+    },
+    {
+      "path": "/client/user/info/update",
+      "method": "POST",
+      "file": "user.bgroute.ts",
+      "requiresAuth": false,
+      "paramType": "inline"
+    },
+    {
+      "path": "/client/user/info/updateUsername",
+      "method": "POST",
+      "file": "user.bgroute.ts",
+      "requiresAuth": false,
+      "paramType": "inline"
+    },
+    {
+      "path": "/client/user/miscStats",
+      "method": "POST",
+      "file": "user.bgroute.ts",
+      "requiresAuth": false,
+      "paramType": "inline"
+    },
+    {
+      "path": "/client/user/plugin/list",
+      "method": "POST",
+      "file": "user.bgroute.ts",
+      "requiresAuth": false,
+      "paramType": "inline"
+    },
+    {
+      "path": "/client/user/prefs/defaults",
+      "method": "POST",
+      "file": "user.bgroute.ts",
+      "requiresAuth": false,
+      "paramType": "inline"
+    },
+    {
+      "path": "/client/user/prefs/get",
+      "method": "POST",
+      "file": "user.bgroute.ts",
+      "requiresAuth": false,
+      "paramType": "inline"
+    },
+    {
+      "path": "/client/user/prefs/getValue",
+      "method": "POST",
+      "file": "user.bgroute.ts",
+      "requiresAuth": false,
+      "paramType": "inline"
+    },
+    {
+      "path": "/client/user/prefs/update",
+      "method": "POST",
+      "file": "user.bgroute.ts",
+      "requiresAuth": false,
+      "paramType": "inline"
+    },
+    {
+      "path": "/client/user/profile/get",
+      "method": "POST",
+      "file": "user.bgroute.ts",
+      "requiresAuth": false,
+      "paramType": "inline"
+    },
+    {
+      "path": "/client/user/profileImage/update",
+      "method": "POST",
+      "file": "user.bgroute.ts",
+      "requiresAuth": false,
+      "paramType": "inline"
+    },
+    {
+      "path": "/client/user/userType/update",
+      "method": "POST",
+      "file": "user.bgroute.ts",
+      "requiresAuth": false,
+      "paramType": "inline"
+    },
+    {
+      "path": "/client/userfile/getById",
+      "method": "POST",
+      "file": "misc.bgroute.ts",
+      "requiresAuth": false,
+      "paramType": "inline"
+    },
+    {
+      "path": "/client/userfile/listFilesByRef",
+      "method": "POST",
+      "file": "item.bgroute.ts",
+      "requiresAuth": false,
+      "paramType": "inline"
+    },
+    {
+      "path": "/client/userfile/upload",
+      "method": "POST",
+      "file": "misc.bgroute.ts",
+      "requiresAuth": false,
+      "paramType": "inline"
+    },
+    {
+      "path": "/client/widgetStatus",
+      "method": "POST",
+      "file": "misc.bgroute.ts",
+      "requiresAuth": false,
+      "paramType": "inline"
+    }
+  ]
+}

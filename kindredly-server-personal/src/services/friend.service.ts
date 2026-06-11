@@ -1,17 +1,17 @@
-import { config } from '@/config';
+import {config} from '@/config';
 
-import { sendEmail } from '../utils/email_utils';
+import {sendEmail} from '../utils/email_utils';
 import EventAuditService from './record_event.service';
 
-import { MAIN_EMAIL_TEMPLATE, KEY_DIL, friendRequestTemplate } from '@/templates/email.templates';
+import {MAIN_EMAIL_TEMPLATE, KEY_DIL, friendRequestTemplate} from '@/templates/email.templates';
 
 import NotificationService from './notification.service';
-import { FriendRepo } from '@/db/friend.repo';
-import { UserRepo } from '@/db/user.repo';
-import { RequestContext } from '../base/request_context';
-import { EventRecordName, EventRecordType, NotificationType } from '@/typing/enum_strings';
-import { BasicFriendInfo, filterBasicFriendInfo } from "@/utils/user.utils";
-import { container } from '@/inversify.config';
+import {FriendRepo} from '@/db/friend.repo';
+import {UserRepo} from '@/db/user.repo';
+import {RequestContext} from '../base/request_context';
+import {EventRecordName, EventRecordType, NotificationType} from '@/typing/enum_strings';
+import {BasicFriendInfo, filterBasicFriendInfo} from '@/utils/user.utils';
+import {container} from '@/inversify.config';
 
 class FriendService {
   private users = new UserRepo();
@@ -21,20 +21,17 @@ class FriendService {
 
   async checkFriendRequestsForNewAccount(ctx: RequestContext, userId, accountId, email) {
     if (!email) return;
-    const friendsIn = await this.friends.findMany({ friendUserId: email });
+    const friendsIn = await this.friends.findMany({friendUserId: email});
 
     if (friendsIn && friendsIn.length > 0) {
       await this.notificationsService.sendFriendRequestNotification(ctx, userId, accountId);
     }
   }
 
-
-
   private async _getBasicUserInfoLookupByIds(ids: string[]): Promise<Record<string, BasicFriendInfo>> {
     const users = await this.users.findWhereIdIn(ids);
     let friends = filterBasicFriendInfo(users);
     return Object.fromEntries(friends.map((v) => [v.userId, v]));
-
   }
 
   async getFriends(ctx: RequestContext, targetUserId: string) {
@@ -42,25 +39,29 @@ class FriendService {
     await ctx.verifySelfOrAdmin(targetUserId);
     ///TODO: Join with users to get user info
 
-    const friendsOut = await this.friends.findMany({ userId: targetUserId });
+    const friendsOut = await this.friends.findMany({userId: targetUserId});
 
-    const friendsIn = await this.friends.findMany({ friendUserId: targetUserId });
+    const friendsIn = await this.friends.findMany({friendUserId: targetUserId});
 
     if (targetUser.email) {
-      const friendInByEmail = await this.friends.findMany({ friendUserId: targetUser.email });
+      const friendInByEmail = await this.friends.findMany({friendUserId: targetUser.email});
       friendsIn.push(...friendInByEmail);
     }
 
     const requestedOutBound = friendsOut
       .filter((v) => !v.confirmed && v.requester && !v.denied)
       .map((v) => {
-        return { userId: v.friendUserId, createdAt: v.createdAt };
+        return {
+          userId: v.friendUserId,
+          inviteCode: this.createFriendId(targetUserId, v.friendUserId),
+          createdAt: v.createdAt,
+        };
       });
 
     const requestedInBound = friendsIn
       .filter((v) => !v.confirmed && v.requester && !v.denied)
       .map((v) => {
-        return { userId: v.userId, createdAt: v.createdAt };
+        return {userId: v.userId, createdAt: v.createdAt};
       });
 
     //TODO: check if in both out and in bound, if so. confirm as friend
@@ -70,12 +71,12 @@ class FriendService {
         return {
           _id: v.friendUserId,
           userId: v.friendUserId,
-          friendshipCreatedAt: v.createdAt
+          friendshipCreatedAt: v.createdAt,
         };
       });
 
     function combineDicts(d1, d2) {
-      return { ...d1, ...d2 };
+      return {...d1, ...d2};
     }
 
     const lookup = await this._getBasicUserInfoLookupByIds([
@@ -86,10 +87,12 @@ class FriendService {
 
     return {
       friends: friends.map((v) => combineDicts(v, lookup[v.userId])),
-      requestedOutBound: requestedOutBound.map((v) => combineDicts(v, lookup[v.userId])).map(v => {
-        v.profileImage = null
-        return v;
-      }),
+      requestedOutBound: requestedOutBound
+        .map((v) => combineDicts(v, lookup[v.userId]))
+        .map((v) => {
+          v.profileImage = null;
+          return v;
+        }),
       requestedInBound: requestedInBound.map((v) => combineDicts(v, lookup[v.userId])),
     };
   }
@@ -98,7 +101,7 @@ class FriendService {
     return `${userId}${KEY_DIL}${friendUserId}`;
   }
 
-  async getFriendProfile(ctx: RequestContext, targetUserId:string, friendUserId:string) {
+  async getFriendProfile(ctx: RequestContext, targetUserId: string, friendUserId: string) {
     const user = await this.users.findById(targetUserId);
     await ctx.verifySelfOrAdmin(targetUserId);
 
@@ -123,15 +126,13 @@ class FriendService {
     };
   }
 
-  async checkFriendship(userId:string, friendUserId:string) {
+  async checkFriendship(userId: string, friendUserId: string) {
     const id1 = this.createFriendId(userId, friendUserId);
     const id2 = this.createFriendId(friendUserId, userId);
-    const friendRels = await this.friends.findWhereIdIn([id1,id2]);
-    if (friendRels.length == 2){
+    const friendRels = await this.friends.findWhereIdIn([id1, id2]);
+    if (friendRels.length == 2) {
       return friendRels[0].confirmed && friendRels[1].confirmed;
-    }
-    else
-      return false
+    } else return false;
   }
 
   async confirmFriend(ctx: RequestContext, targetUserId: string, friendUserId: string) {
@@ -185,7 +186,7 @@ class FriendService {
       createdAt: nowSt,
     };
     await this.friends.create(info1);
-    await this.friends.updateWithId(id2, { confirmed: true, denied: false });
+    await this.friends.updateWithId(id2, {confirmed: true, denied: false});
   }
 
   async cancelRemoveFriend(ctx: RequestContext, targetUserId, friendUserId) {
@@ -200,7 +201,7 @@ class FriendService {
 
     const id1 = this.createFriendId(friendUserId, targetUserId);
 
-    await this.friends.updateWithId(id1, { denied: true });
+    await this.friends.updateWithId(id1, {denied: true});
   }
 
   async sendFriendRequest(ctx: RequestContext, targetUserId, requestData) {
@@ -221,7 +222,7 @@ class FriendService {
     if (!friendUser) {
       console.log('No user with that email exists.');
       this._createFriendInvite(ctx.currentUserId, ctx.accountId, targetUserId, requestData).catch((e) => {
-        console.log('Error sending friend invite', e)
+        console.log('Error sending friend invite', e);
       });
       const friendId = requestData.email;
       const id1 = this.createFriendId(targetUserId, friendId);
@@ -256,19 +257,25 @@ class FriendService {
       };
 
       //TODO, create friend request notification
-      const { email, inviterName, message } = requestData;
+      const {email, inviterName, message} = requestData;
       const displayedInviterName = inviterName || targetUser.email;
 
-      this.notificationsService.createFriendRequestNotification(displayedInviterName, targetUser, message, id1, targetUserId, ctx, friendUser);
+      this.notificationsService.createFriendRequestNotification(
+        displayedInviterName,
+        targetUser,
+        message,
+        id1,
+        targetUserId,
+        ctx,
+        friendUser,
+      );
 
       await this.friends.create(info1);
     }
   }
 
-
-
   async _createFriendInvite(currentUserId, accountId, userId, inviteData) {
-    const { email, inviterName, message } = inviteData;
+    const {email, inviterName, message} = inviteData;
 
     const accountUser = await this.users.findById(userId);
     this.notificationsService.sendFriendRequestEmail(inviterName, accountUser, email, message);
@@ -281,9 +288,6 @@ class FriendService {
     });
     return true;
   }
-
-
-
 }
 
 export default FriendService;

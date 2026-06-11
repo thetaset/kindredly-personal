@@ -1,0 +1,33 @@
+html {
+  background-color: #f9f9f9;
+  color-scheme: light;
+}
+
+html.knd-pretheme-light {
+  background-color: #f9f9f9;
+  color-scheme: light;
+}
+
+html.knd-pretheme-dark {
+  background-color: #121212;
+  color-scheme: dark;
+}
+
+html.knd-pretheme-light body {
+  background-color: #f9f9f9;
+}
+
+html.knd-pretheme-dark body {
+  background-color: #121212;
+}
+
+@media (prefers-color-scheme: dark) {
+  html {
+    background-color: #121212;
+    color-scheme: dark;
+  }
+}
+
+body {
+  background: transparent;
+}

@@ -1,7 +1,7 @@
-import UserActivityLog from '@/schemas/public/UserActivityLog';
+import UserActivityLog from 'tset-sharedlib/schemas/public/UserActivityLog';
 import {BaseRepo} from './base.repo';
 import knex from './knex_config';
-import { Knex } from 'knex';
+import {Knex} from 'knex';
 
 export class UserActivityLogRepo extends BaseRepo<UserActivityLog> {
   constructor(db: Knex = knex) {
@@ -25,5 +25,10 @@ export class UserActivityLogRepo extends BaseRepo<UserActivityLog> {
 
   async create(input: UserActivityLog) {
     return (await this.query().insert(input).onConflict('_id').merge().returning('*')) as any;
+  }
+
+  async saveMany(inputs: UserActivityLog[]) {
+    if (inputs.length === 0) return [];
+    return (await this.query().insert(inputs).onConflict('_id').merge().returning('*')) as any;
   }
 }

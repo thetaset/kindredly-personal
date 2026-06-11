@@ -1,7 +1,6 @@
-import Verification from "../schemas/public/Verification";
+import Verification from '../../../tset-sharedlib/src/schemas/public/Verification';
 
-
-export const WELCOME_TITLE_MESSAGE = `Welcome to Kindredly (Kindredly.ai)!`
+export const WELCOME_TITLE_MESSAGE = `Welcome to Kindredly (Kindredly.ai)!`;
 
 export function THANK_YOU_FOR_JOINING_MSG(config: {serverHostname: string}) {
   return (
@@ -11,15 +10,13 @@ export function THANK_YOU_FOR_JOINING_MSG(config: {serverHostname: string}) {
   );
 }
 
-
 export const ERROR_MESSAGE: Record<string, string> = {
-    USERNAME_TAKEN: 'User already exists',
-    EMAIL_TAKEN: 'User with this email already registered.',
-}
+  USERNAME_TAKEN: 'User already exists',
+  EMAIL_TAKEN: 'User with this email already registered.',
+};
 
-
-export function RESET_PASSWORD_MSG(user, verification:Verification, config: {serverHostname: string}){
-   return `
+export function RESET_PASSWORD_MSG(user, verification: Verification, config: {serverHostname: string}) {
+  return `
     Password Reset requested for ${user.username}.
     <br/>
     <br/>
@@ -34,19 +31,48 @@ export function RESET_PASSWORD_MSG(user, verification:Verification, config: {ser
     <br/>
     If you did NOT request to reset your password, please click the following like to <a href="${config.serverHostname}/contactUs">Support</a>
     
-    `
+    `;
 }
 
+export function RECOVER_ACCOUNT_ACCESS_MSG(user, verification: Verification, config: {serverHostname: string}) {
+  return `
+    Account Recovery requested for ${user.username}.
+    <br/>
+    <br/>
+    To continue account recovery, enter the verification code below or click <a href="${config.serverHostname}/kindredapp/#/forgotPassword/recovery?verificationCode=${verification._id}">here</a>
+    <br/>
+    <br/>
+    Your Verification Code is: ${verification._id}
+    <br/>
+    <br/>
+    After signing in, go to Encryption Settings and use your saved recovery key to restore encrypted data access.
+    <br/>
+    <br/>
+    This verification email will expire in 10 minutes.
+    <br/>
+    <br/>
+    If you did NOT request account recovery, please click the following like to <a href="${config.serverHostname}/contactUs">Support</a>
+    
+    `;
+}
 
-export function ACCOUNT_INVITE_MSG(accountUser, config, inviteLink: string, inviteCode:string, inviterName: string, message:string){
-  return   `
+export function ACCOUNT_INVITE_MSG(
+  accountUser,
+  config,
+  inviteLink: string,
+  inviteCode: string,
+  inviterName: string,
+  message: string,
+) {
+  return (
+    `
   Greetings! You have been invited to join ${inviterName}'s Kindredly family!
   <br/>
   <br/>
 
   ` +
-  (message || message == 'null' ? `<br/>Invite Message:<br/>${message}` : '') +
-  `
+    (message || message == 'null' ? `<br/>Invite Message:<br/>${message}` : '') +
+    `
   <br/>
   <br/>
   Click <a href="${inviteLink}">here</a> to join ${inviterName}'s family.
@@ -63,13 +89,11 @@ export function ACCOUNT_INVITE_MSG(accountUser, config, inviteLink: string, invi
   <br/>
   Learn more about Kindredly at <a href='${config.serverHostname}'>kindredly.ai</a>
   `
+  );
 }
 
-
-
-
-export function INVITATION_TO_ACCOUNT( config, inviteCode: string, invitedEmail: string){
-  return   `
+export function INVITATION_TO_ACCOUNT(config, inviteCode: string, invitedEmail: string) {
+  return `
   You invited ${invitedEmail} to join your Kindredly family!
   <br/>
   <br/>
@@ -78,5 +102,5 @@ export function INVITATION_TO_ACCOUNT( config, inviteCode: string, invitedEmail:
   <br/>
   <br/>
   Learn more about Kindredly at <a href='${config.serverHostname}'>kindredly.ai</a>
-  `
+  `;
 }

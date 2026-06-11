@@ -1,11 +1,11 @@
 import {Routes} from '@interfaces/routes.interface';
 import {Router} from 'express';
+import {ApiReq} from '@/types/api-types';
 
 import AccessRequestService from '@/services/access_request.service';
 import {authenticateJWT, errorHelper, getTargetUserId} from '../utils/auth_utils';
 import {RequestContext} from '@/base/request_context';
-import { body } from 'express-validator';
-import * as AccessRequestPaths  from 'tset-sharedlib/api/AccessRequestPaths';
+import {body} from 'express-validator';
 
 class AccessRequestRoute implements Routes {
   public router = Router();
@@ -17,12 +17,11 @@ class AccessRequestRoute implements Routes {
   }
 
   private initializeRoutes() {
-
     // SCH-OK
     this.router.post(
-      AccessRequestPaths.ACCESS_REQUEST_LIST_ALL,
+      '/access_request/listall',
       authenticateJWT,
-      errorHelper(async (req, res) => {
+      errorHelper(async (req: ApiReq<'/access_request/listall'>, res) => {
         const results = await this.accessRequestService.listAllAccessRequestsInAccount(RequestContext.instance(req));
         const result = {
           success: true,
@@ -34,9 +33,9 @@ class AccessRequestRoute implements Routes {
 
     // SCH-OK
     this.router.post(
-      AccessRequestPaths.ACCESS_REQUEST_LIST_FOR_USER,
+      '/access_request/listForUser',
       authenticateJWT,
-      errorHelper(async (req, res) => {
+      errorHelper(async (req: ApiReq<'/access_request/listForUser'>, res) => {
         const results = await this.accessRequestService.listAccessRequestsByRequesterId(
           RequestContext.instance(req),
           getTargetUserId(req),
@@ -51,9 +50,9 @@ class AccessRequestRoute implements Routes {
 
     // SCH-OK
     this.router.post(
-      AccessRequestPaths.ACCESS_REQUEST_REMOVE,
+      '/access_request/remove',
       authenticateJWT,
-      errorHelper(async (req, res) => {
+      errorHelper(async (req: ApiReq<'/access_request/remove'>, res) => {
         const id = req.body.id;
         const results = await this.accessRequestService.removeAccessRequestById(RequestContext.instance(req), id);
         const result = {
@@ -67,15 +66,16 @@ class AccessRequestRoute implements Routes {
     // SCH-OK
     // TODO: Needs Support for Encryption on Key
     this.router.post(
-      AccessRequestPaths.ACCESS_REQUEST_ADD,
+      '/access_request/add',
       authenticateJWT,
       body('key').notEmpty().isString(),
       body('message').isString().escape(),
-      errorHelper(async (req, res) => {
+      errorHelper(async (req: ApiReq<'/access_request/add'>, res) => {
         const results = await this.accessRequestService.addAccessRequest(
           RequestContext.instance(req),
           req.body.key,
-          req.body.additionalInfo,
+          req.body.type || 'url',
+          req.body.details,
           req.body.message,
         );
         const result = {
@@ -88,12 +88,12 @@ class AccessRequestRoute implements Routes {
 
     // SCH-OK - uses accountId
     this.router.post(
-      AccessRequestPaths.ACCESS_REQUEST_PROCESS,
+      '/access_request/process',
       authenticateJWT,
       body('id').notEmpty().isString().escape(),
       body('status').isString().escape(),
-      body('approverNote').isString().escape(),
-      errorHelper(async (req, res) => {
+      body('approverNote').optional({nullable: true}).isString().escape(),
+      errorHelper(async (req: ApiReq<'/access_request/process'>, res) => {
         const results = await this.accessRequestService.processAccessRequest(
           RequestContext.instance(req),
           req.body.id,

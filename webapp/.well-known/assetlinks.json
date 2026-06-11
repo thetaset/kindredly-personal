@@ -1,0 +1,16 @@
+[
+  {
+    "relation": [
+      "delegate_permission/common.handle_all_urls",
+      "delegate_permission/common.get_login_creds"
+    ],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.thetaset.kindred",
+      "sha256_cert_fingerprints": [
+        "BB:3A:A4:9B:A5:E5:1D:FF:D0:8B:F8:03:D1:6D:78:BC:E9:B4:7D:0D:47:AD:D5:B6:B7:06:54:F0:6A:75:B1:0A",
+        "EF:DD:1F:99:68:CC:E7:4D:8F:36:B7:33:43:0E:57:DF:EA:95:CD:B9:3C:C2:9D:A3:2C:06:86:73:14:97:5A:66"
+      ]
+    }
+  }
+]

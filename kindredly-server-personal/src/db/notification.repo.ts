@@ -1,14 +1,14 @@
-import Notification from '@/schemas/public/Notification';
-import { BaseRepo } from './base.repo';
+import Notification from 'tset-sharedlib/schemas/public/Notification';
+import {BaseRepo} from './base.repo';
 import knex from './knex_config';
-import { Knex } from 'knex';
+import {Knex} from 'knex';
 
 export class NotificationRepo extends BaseRepo<Notification> {
   constructor(db: Knex = knex) {
     super('notification', db);
   }
   async findById(id: string) {
-    return await this.where({ _id: id }).first();
+    return await this.where({_id: id}).first();
   }
 
   async findWhereIdIn(vals: string[]) {
@@ -16,11 +16,11 @@ export class NotificationRepo extends BaseRepo<Notification> {
   }
 
   async updateWithId(id: string, update: Notification) {
-    return await this.where({ _id: id }).update(update);
+    return await this.where({_id: id}).update(update);
   }
 
   async deleteWithId(id: string) {
-    return await this.where({ _id: id }).delete();
+    return await this.where({_id: id}).delete();
   }
 
   async create(input: Notification) {

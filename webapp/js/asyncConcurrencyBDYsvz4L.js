@@ -1,0 +1,1 @@
+async function i(r,a,e){const l=Math.max(1,Math.min(8,Math.floor(a||1))),t=new Array(r.length);let o=0;async function c(){for(;;){const n=o++;if(n>=r.length)return;t[n]=await e(r[n],n)}}return await Promise.all(new Array(l).fill(null).map(()=>c())),t}export{i as m};

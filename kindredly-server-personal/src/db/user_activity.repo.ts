@@ -1,7 +1,7 @@
-import UserActivity from '@/schemas/public/UserActivity';
+import UserActivity from 'tset-sharedlib/schemas/public/UserActivity';
 import {BaseRepo} from './base.repo';
 import knex from './knex_config';
-import { Knex } from 'knex';
+import {Knex} from 'knex';
 
 export class UserActivityRepo extends BaseRepo<UserActivity> {
   constructor(db: Knex = knex) {

@@ -1,0 +1,39 @@
+
+{
+    "articles":[
+        {
+            "title": "Browser Safety for Kids: 101",
+            "category": "blog_post",
+            "id":"2025-04-21-kid_browser_setup",
+            "image": "/blog/files/kid_browser.jpg",
+            "description": "Browsers are a great tool for learning and exploration, but without proper setup, they can also be a gateway to unwanted content. In this article, we will discuss how to set up a browser for kids, ensuring a safe and educational experience.",
+            "date": "2025-04-21",
+            "author": "Brandyn Kusenda",
+            "tags": ["parenting", "web safety", "kids"],
+            "show": false
+        },
+        {
+            "title": "The Misconception of Kid Safe Content",
+            "category": "blog_post",
+            "id":"save_not_healthy",
+            "image": "/blog/files/safe_not_healthy2.png",
+            "description": "Just because content is labeled kid safe does not mean it is healthy. In this article, we will explore the difference between safe and healthy content for kids, and how to ensure that children are consuming content that is not only safe but also beneficial for their development.",
+            "date": "2025-04-21",
+            "author": "Brandyn Kusenda",
+            "tags": ["parenting", "web safety", "kids"],
+            "show": true
+        },
+        {
+            "title": "Screen time: How much is too much?",
+            "category": "blog_post",
+            "id":"screen_time",
+            "image": "/blog/files/screen_time.png",
+            "description": "Screen time is a hot topic among parents and educators. In this article, we will discuss the recommended screen time for kids, the impact of excessive screen time on their health and development, and tips for managing screen time effectively.",
+            "date": "2025-03-03",
+            "author": "Brandyn Kusenda",
+            "tags": ["parenting", "web safety", "kids"],
+            "show": true
+        }
+ 
+    ]
+}

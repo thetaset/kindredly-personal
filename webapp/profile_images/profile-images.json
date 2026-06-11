@@ -1,0 +1,87 @@
+{
+  "categories": [
+    {
+      "id": "animals-circ",
+      "name": "Animals (Circle)",
+      "images": [
+        { "path": "/profile_images/animals-circ/bee.svg", "name": "bee", "tags": ["insect", "bug"] },
+        { "path": "/profile_images/animals-circ/buffalo.svg", "name": "buffalo", "tags": ["mammal"] },
+        { "path": "/profile_images/animals-circ/bull.svg", "name": "bull", "tags": ["mammal", "cow"] },
+        { "path": "/profile_images/animals-circ/butterfly.svg", "name": "butterfly", "tags": ["insect", "bug"] },
+        { "path": "/profile_images/animals-circ/cow.svg", "name": "cow", "tags": ["mammal", "farm"] },
+        { "path": "/profile_images/animals-circ/dolphin.svg", "name": "dolphin", "tags": ["ocean", "sea", "mammal"] },
+        { "path": "/profile_images/animals-circ/duck.svg", "name": "duck", "tags": ["bird", "farm"] },
+        { "path": "/profile_images/animals-circ/firefly.svg", "name": "firefly", "tags": ["insect", "bug"] },
+        { "path": "/profile_images/animals-circ/fish.svg", "name": "fish", "tags": ["ocean", "sea"] },
+        { "path": "/profile_images/animals-circ/giraffe.svg", "name": "giraffe", "tags": ["mammal", "safari"] },
+        { "path": "/profile_images/animals-circ/horse.svg", "name": "horse", "tags": ["mammal", "farm"] },
+        { "path": "/profile_images/animals-circ/ladybug.svg", "name": "ladybug", "tags": ["insect", "bug"] },
+        { "path": "/profile_images/animals-circ/leopard.svg", "name": "leopard", "tags": ["mammal", "cat", "safari"] },
+        { "path": "/profile_images/animals-circ/lion.svg", "name": "lion", "tags": ["mammal", "cat", "safari"] },
+        { "path": "/profile_images/animals-circ/panther.svg", "name": "panther", "tags": ["mammal", "cat"] },
+        { "path": "/profile_images/animals-circ/squirrel.svg", "name": "squirrel", "tags": ["mammal"] },
+        { "path": "/profile_images/animals-circ/starfish.svg", "name": "starfish", "tags": ["ocean", "sea"] },
+        { "path": "/profile_images/animals-circ/swan.svg", "name": "swan", "tags": ["bird"] },
+        { "path": "/profile_images/animals-circ/tiger.svg", "name": "tiger", "tags": ["mammal", "cat", "safari"] },
+        { "path": "/profile_images/animals-circ/white-tiger.svg", "name": "white tiger", "tags": ["mammal", "cat"] }
+      ]
+    },
+    {
+      "id": "animals-head",
+      "name": "Animals (Head)",
+      "images": [
+        { "path": "/profile_images/animals-head/bear.svg", "name": "bear", "tags": ["mammal"] },
+        { "path": "/profile_images/animals-head/cheetah.svg", "name": "cheetah", "tags": ["mammal", "cat", "safari"] },
+        { "path": "/profile_images/animals-head/chicken.svg", "name": "chicken", "tags": ["bird", "farm"] },
+        { "path": "/profile_images/animals-head/chimp.svg", "name": "chimp", "tags": ["mammal", "primate"] },
+        { "path": "/profile_images/animals-head/cow.svg", "name": "cow", "tags": ["mammal", "farm"] },
+        { "path": "/profile_images/animals-head/deer.svg", "name": "deer", "tags": ["mammal"] },
+        { "path": "/profile_images/animals-head/doe.svg", "name": "doe", "tags": ["mammal", "deer"] },
+        { "path": "/profile_images/animals-head/dog.svg", "name": "dog", "tags": ["mammal", "pet"] },
+        { "path": "/profile_images/animals-head/duck.svg", "name": "duck", "tags": ["bird", "farm"] },
+        { "path": "/profile_images/animals-head/eagle.svg", "name": "eagle", "tags": ["bird"] },
+        { "path": "/profile_images/animals-head/elephant.svg", "name": "elephant", "tags": ["mammal", "safari"] },
+        { "path": "/profile_images/animals-head/fox.svg", "name": "fox", "tags": ["mammal"] },
+        { "path": "/profile_images/animals-head/giraffe.svg", "name": "giraffe", "tags": ["mammal", "safari"] },
+        { "path": "/profile_images/animals-head/gorilla.svg", "name": "gorilla", "tags": ["mammal", "primate"] },
+        { "path": "/profile_images/animals-head/grizzly.svg", "name": "grizzly", "tags": ["mammal", "bear"] },
+        { "path": "/profile_images/animals-head/hippo.svg", "name": "hippo", "tags": ["mammal", "safari"] },
+        { "path": "/profile_images/animals-head/lion.svg", "name": "lion", "tags": ["mammal", "cat", "safari"] },
+        { "path": "/profile_images/animals-head/monkey.svg", "name": "monkey", "tags": ["mammal", "primate"] },
+        { "path": "/profile_images/animals-head/panda.svg", "name": "panda", "tags": ["mammal", "bear"] },
+        { "path": "/profile_images/animals-head/pig.svg", "name": "pig", "tags": ["mammal", "farm"] },
+        { "path": "/profile_images/animals-head/rabbit.svg", "name": "rabbit", "tags": ["mammal", "pet"] },
+        { "path": "/profile_images/animals-head/raindeer.svg", "name": "reindeer", "tags": ["mammal", "deer"] },
+        { "path": "/profile_images/animals-head/tiger.svg", "name": "tiger", "tags": ["mammal", "cat", "safari"] },
+        { "path": "/profile_images/animals-head/wild-fox.svg", "name": "wild fox", "tags": ["mammal", "fox"] },
+        { "path": "/profile_images/animals-head/wolf.svg", "name": "wolf", "tags": ["mammal"] }
+      ]
+    },
+    {
+      "id": "misc",
+      "name": "Miscellaneous",
+      "images": [
+        { "path": "/profile_images/lion-svgrepo-com.svg", "name": "lion", "tags": ["mammal", "cat"] },
+        { "path": "/profile_images/deer-svgrepo-com.svg", "name": "deer", "tags": ["mammal"] },
+        { "path": "/profile_images/eagle-svgrepo-com.svg", "name": "eagle", "tags": ["bird"] },
+        { "path": "/profile_images/bird-svgrepo-com.svg", "name": "bird", "tags": ["bird"] },
+        { "path": "/profile_images/bear-svgrepo-com.svg", "name": "bear", "tags": ["mammal"] },
+        { "path": "/profile_images/haniwa-svgrepo-com.svg", "name": "haniwa", "tags": ["japan", "statue"] },
+        { "path": "/profile_images/mountain-part-2-svgrepo-com.svg", "name": "mountain", "tags": ["nature", "landscape"] },
+        { "path": "/profile_images/moon-svgrepo-com.svg", "name": "moon", "tags": ["space", "night"] },
+        { "path": "/profile_images/ninja-svgrepo-com.svg", "name": "ninja", "tags": ["japan", "person"] },
+        { "path": "/profile_images/mount-fuji-svgrepo-com.svg", "name": "mount fuji", "tags": ["japan", "mountain", "nature"] },
+        { "path": "/profile_images/octopus-svgrepo-com.svg", "name": "octopus", "tags": ["ocean", "sea"] },
+        { "path": "/profile_images/soccer-ball-illustration-svgrepo-com.svg", "name": "soccer ball", "tags": ["sports", "ball"] },
+        { "path": "/profile_images/startup-rocket-svgrepo-com.svg", "name": "rocket", "tags": ["space", "startup"] },
+        { "path": "/profile_images/ufo-part-2-svgrepo-com.svg", "name": "ufo", "tags": ["space", "alien"] },
+        { "path": "/profile_images/ranking-crown-svgrepo-com.svg", "name": "crown", "tags": ["royalty", "king"] },
+        { "path": "/profile_images/basketball-svgrepo-com.svg", "name": "basketball", "tags": ["sports", "ball"] },
+        { "path": "/profile_images/ladybug-svgrepo-com.svg", "name": "ladybug", "tags": ["insect", "bug"] },
+        { "path": "/profile_images/penguin-svgrepo-com.svg", "name": "penguin", "tags": ["bird", "arctic"] },
+        { "path": "/profile_images/squid-svgrepo-com.svg", "name": "squid", "tags": ["ocean", "sea"] },
+        { "path": "/profile_images/person-gear.svg", "name": "settings", "tags": ["person", "gear", "default"] }
+      ]
+    }
+  ]
+}

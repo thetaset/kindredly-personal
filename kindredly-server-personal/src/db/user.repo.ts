@@ -1,7 +1,7 @@
-import User from '@/schemas/public/User';
-import { BaseRepo } from './base.repo';
+import User from 'tset-sharedlib/schemas/public/User';
+import {BaseRepo} from './base.repo';
 import knex from './knex_config';
-import { Knex } from 'knex';
+import {Knex} from 'knex';
 
 export class UserRepo extends BaseRepo<User> {
   public jsonArrayFields = ['plugins', 'pinnedItemIds', 'profileImage', 'encSettings'];
@@ -20,14 +20,11 @@ export class UserRepo extends BaseRepo<User> {
   }
 
   async updateWithId(id: string, update: User) {
-    return await this.where({ _id: id }).update(this._updateInput(update));
+    return await this.where({_id: id}).update(this._updateInput(update));
   }
 
-  async _updateUserWithId(
-    userId: string,
-    data: Record<string, unknown>
-  ) {
-    await this.where({ _id: userId }).update(data);
+  async _updateUserWithId(userId: string, data: Record<string, unknown>) {
+    await this.where({_id: userId}).update(data);
     return null;
   }
 
@@ -45,7 +42,7 @@ export class UserRepo extends BaseRepo<User> {
   }
 
   async findById(id: string) {
-    return await this.where({ _id: id }).first();
+    return await this.where({_id: id}).first();
   }
 
   async findUsersByIds(ids: string[]) {
@@ -53,23 +50,23 @@ export class UserRepo extends BaseRepo<User> {
   }
 
   async findByEmail(email: string) {
-    return await this.where({ email }).first();
+    return await this.where({email}).first();
   }
 
   async findByLoginId(loginId: string) {
-    return await this.where({ loginId }).first();
+    return await this.where({loginId}).first();
   }
 
   async findByUsername(username: string) {
-    return await this.where({ username }).first();
+    return await this.where({username}).first();
   }
 
-  listByAccountId(accountId:string) {
-    return this.query().where({ accountId });
+  listByAccountId(accountId: string) {
+    return this.query().where({accountId});
   }
 
   async deleteWithId(id: string) {
-    return await this.where({ _id: id }).delete();
+    return await this.where({_id: id}).delete();
   }
 
   async findWhereIdIn(vals: string[]) {
@@ -78,40 +75,55 @@ export class UserRepo extends BaseRepo<User> {
 
   async checkSpaceUsageForAccountId(accountId: string) {
     if (!accountId) {
-       throw new Error("No account id provided");
+      throw new Error('No account id provided');
     }
     const users = await this.listByAccountId(accountId);
 
     const userIds = users.map((u) => u._id);
 
-    const results = [];
-    for (const tableName of [
-      "item",
-      "item_feedback",
-      "user_file",
-      "user_activity",
-      "user_feed",
-      "user_change_log",
-      "post",
-      "user_activity_log",
-    ]) {
-      const select = `SELECT sum(pg_column_size(t.*)) as filesize, count(*) as filerow FROM ${tableName} t where "userId" IN (:userIds)`;
-
-      const query = knex.raw(select, { userIds });
-      results.push({ tableName, data: await query });
+    if (userIds.length === 0) {
+      return {
+        tables: [],
+        userFileData: 0,
+        totalUsage: 0,
+      };
     }
 
-    const select = `SELECT sum("fileSize") as filesizesum FROM user_file where "userId" IN (:userIds)`;
+    const results = [];
+    for (const tableName of [
+      'item',
+      'item_feedback',
+      'user_file',
+      'user_activity',
+      'user_feed',
+      'user_change_log',
+      'post',
+      'user_activity_log',
+    ]) {
+      const row = (await knex({t: tableName})
+        .whereIn('t.userId', userIds)
+        .select(knex.raw('COALESCE(sum(pg_column_size(t.*)), 0) as filesize, count(*) as filerow'))
+        .first()) as {filesize?: string | number | null; filerow?: string | number | null} | undefined;
 
-    const query = knex.raw(select, { userIds });
-    const userFileResults = await query;
+      results.push({
+        tableName,
+        filesize: Number(row?.filesize ?? 0),
+        filerow: Number(row?.filerow ?? 0),
+      });
+    }
+
+    const userFileResults = (await knex('user_file')
+      .whereIn('userId', userIds)
+      .sum({filesizesum: 'fileSize'})
+      .first()) as {filesizesum?: string | number | null} | undefined;
+
+    const userFileData = Number(userFileResults?.filesizesum ?? 0);
+    const tableUsage = results.reduce((sum, table) => sum + table.filesize, 0);
 
     return {
       tables: results,
-      userFileData: userFileResults.rows[0].filesizesum,
+      userFileData,
+      totalUsage: tableUsage + userFileData,
     };
-
   }
-
-
 }

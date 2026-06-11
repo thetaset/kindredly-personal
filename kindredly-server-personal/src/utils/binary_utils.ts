@@ -19,7 +19,8 @@ export function dataURItoBlob(dataURI) {
     array.push(binary.toString().charCodeAt(i));
   }
   return new Blob([new Uint8Array(array)], {type: 'image/jpeg'});
-}export async function streamToBase64(stream) {
+}
+export async function streamToBase64(stream) {
   return new Promise((resolve, reject) => {
     const chunks = [];
     stream.on('data', (chunk) => chunks.push(chunk));
@@ -27,4 +28,3 @@ export function dataURItoBlob(dataURI) {
     stream.on('end', () => resolve(Buffer.concat(chunks).toString('base64')));
   });
 }
-

@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Browser Rainbow Icon Preview</title>
+    <style>
+      body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; margin: 24px; }
+      .row { display: flex; gap: 24px; flex-wrap: wrap; align-items: center; }
+      .card { border: 1px solid #e5e5e5; border-radius: 12px; padding: 16px; }
+      .label { font-size: 12px; color: #666; margin-top: 8px; }
+      .swatch { width: 180px; height: 120px; border-radius: 12px; display: grid; place-items: center; }
+      .bg-light { background: #ffffff; }
+      .bg-mid { background: #f2f4f7; }
+      .bg-dark { background: #12161c; }
+      img { display: block; }
+    </style>
+  </head>
+  <body>
+    <h2>browser-rainbow icons</h2>
+
+    <h4>Non-smooth (rotated 45° CCW)</h4>
+    <div class="row">
+      <div class="card">
+        <div class="swatch bg-light"><img src="./browser-rainbow.svg" width="56" height="56" alt="browser rainbow" /></div>
+        <div class="label">Light</div>
+      </div>
+      <div class="card">
+        <div class="swatch bg-mid"><img src="./browser-rainbow.svg" width="56" height="56" alt="browser rainbow" /></div>
+        <div class="label">Mid</div>
+      </div>
+      <div class="card">
+        <div class="swatch bg-dark"><img src="./browser-rainbow.svg" width="56" height="56" alt="browser rainbow" /></div>
+        <div class="label">Dark</div>
+      </div>
+    </div>
+
+    <h4 style="margin-top: 20px;">Smooth + sphere shading (rotated 195°)</h4>
+    <div class="row">
+      <div class="card">
+        <div class="swatch bg-light"><img src="./browser-rainbow-smooth.svg" width="56" height="56" alt="browser rainbow smooth" /></div>
+        <div class="label">Light</div>
+      </div>
+      <div class="card">
+        <div class="swatch bg-mid"><img src="./browser-rainbow-smooth.svg" width="56" height="56" alt="browser rainbow smooth" /></div>
+        <div class="label">Mid</div>
+      </div>
+      <div class="card">
+        <div class="swatch bg-dark"><img src="./browser-rainbow-smooth.svg" width="56" height="56" alt="browser rainbow smooth" /></div>
+        <div class="label">Dark</div>
+      </div>
+    </div>
+  </body>
+</html>

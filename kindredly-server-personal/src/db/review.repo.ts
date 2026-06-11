@@ -1,7 +1,7 @@
-import Review from '@/schemas/public/Review';
+import Review from 'tset-sharedlib/schemas/public/Review';
 import {BaseRepo} from './base.repo';
 import knex from './knex_config';
-import { Knex } from 'knex';
+import {Knex} from 'knex';
 
 export class ReviewRepo extends BaseRepo<Review> {
   constructor(db: Knex = knex) {

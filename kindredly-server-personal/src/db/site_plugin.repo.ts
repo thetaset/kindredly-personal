@@ -1,7 +1,7 @@
-import SitePlugin from '@/schemas/public/SitePlugin';
+import SitePlugin from 'tset-sharedlib/schemas/public/SitePlugin';
 import {BaseRepo} from './base.repo';
 import knex from './knex_config';
-import { Knex } from 'knex';
+import {Knex} from 'knex';
 
 export class SitePluginRepo extends BaseRepo<SitePlugin> {
   public jsonArrayFields = ['scripts', 'css', 'patterns', 'tags'];

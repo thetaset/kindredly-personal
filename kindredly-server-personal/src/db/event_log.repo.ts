@@ -1,7 +1,7 @@
-import EventLog from '@/schemas/public/EventLog';
+import EventLog from 'tset-sharedlib/schemas/public/EventLog';
 import {BaseRepo} from './base.repo';
 import knex from './knex_config';
-import { Knex } from 'knex';
+import {Knex} from 'knex';
 
 export class EventLogRepo extends BaseRepo<EventLog> {
   constructor(db: Knex = knex) {

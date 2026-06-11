@@ -1,7 +1,7 @@
-import UserFile from '@/schemas/public/UserFile';
+import UserFile from 'tset-sharedlib/schemas/public/UserFile';
 import {BaseRepo} from './base.repo';
 import knex from './knex_config';
-import { Knex } from 'knex';
+import {Knex} from 'knex';
 
 export class UserFileRepo extends BaseRepo<UserFile> {
   constructor(db: Knex = knex) {
@@ -41,5 +41,15 @@ export class UserFileRepo extends BaseRepo<UserFile> {
 
   async findWhereIdIn(vals: string[]) {
     return await this.query().whereIn('_id', vals);
+  }
+
+  async getVisibleStorageUsageForAccount(accountId: string) {
+    const row = (await this.query()
+      .where({accountId})
+      .whereNull('deletedAt')
+      .sum({filesizesum: 'fileSize'})
+      .first()) as {filesizesum?: string | number | null} | undefined;
+
+    return Number(row?.filesizesum ?? 0);
   }
 }

@@ -1,7 +1,7 @@
-import ReportProblem from '@/schemas/public/ReportProblem';
+import ReportProblem from 'tset-sharedlib/schemas/public/ReportProblem';
 import {BaseRepo} from './base.repo';
 import knex from './knex_config';
-import { Knex } from 'knex';
+import {Knex} from 'knex';
 
 export class ReportProblemRepo extends BaseRepo<ReportProblem> {
   public jsonArrayFields = []; //['details', 'adminStatusInfo'];
@@ -38,5 +38,21 @@ export class ReportProblemRepo extends BaseRepo<ReportProblem> {
 
   async findWhereIdIn(vals: number[]) {
     return await this.query().whereIn('_id', vals);
+  }
+
+  async findLatestBySource(params: {
+    category: string;
+    sourceType: string;
+    sourceId: string;
+  }): Promise<ReportProblem | null> {
+    return (await this.query()
+      .where({
+        category: params.category,
+        sourceType: params.sourceType,
+        sourceId: params.sourceId,
+      })
+      .orderBy('createdAt', 'desc')
+      .orderBy('_id', 'desc')
+      .first()) as any;
   }
 }

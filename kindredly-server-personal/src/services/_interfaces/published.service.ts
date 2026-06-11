@@ -1,9 +1,3 @@
-
-
-
-
-interface PublishedService {
-
-}
+interface PublishedService {}
 
 export default PublishedService;

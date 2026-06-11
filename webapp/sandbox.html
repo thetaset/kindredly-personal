@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>App Sandbox</title>
+  
+  <!-- Tier 1 Libraries: Available globally in sandbox -->
+  <!-- Pico CSS - Beautiful semantic CSS framework -->
+  <link rel="stylesheet" href="./pico.min.css">
+  
+  <!-- Alpine.js - For reactive UIs -->
+  <script defer src="./alpine.min.js"></script>
+  
+  <!-- Kaboom.js - For game development -->
+  <script src="./kaboom.js"></script>
+  
+  <style>
+    /* background color */
+    html,
+    body {
+      margin: 0;
+      padding: 10px;
+      font-family: sans-serif;
+      background: #1e1e1e;
+      color: #d4d4d4;
+    }
+    .error {
+      color: #f48771;
+      padding: 10px;
+      background: #3b1f1f;
+      border: 1px solid #8b3a3a;
+      margin: 10px 0;
+      border-radius: 4px;
+    }
+  </style>
+</head>
+<body>
+  <div id="app"></div>
+  <script type="module">
+    import * as esbuildModule from './esbuild-wasm.js'
+    import { createKindredlyHostApi } from './sandbox-host-api.js'
+
+    // Track initialization promise to avoid calling initialize multiple times
+    let initPromise = null;
+    let esbuild = esbuildModule;
+    let currentRunId = null;
+    let hostToken = null;
+    let parentOrigin = null;
+
+    const hostApi = createKindredlyHostApi({ createRequestId })
+    hostApi.install()
+
+    function createRequestId() {
+      try {
+        return (crypto && crypto.randomUUID) ? crypto.randomUUID() : String(Date.now()) + '_' + String(Math.random()).slice(2)
+      } catch {
+        return String(Date.now()) + '_' + String(Math.random()).slice(2)
+      }
+    }
+    
+    async function ensureEsbuildReady() {
+      if (!initPromise) {
+        initPromise = (async () => {
+          try {
+            // Use local WASM file
+            await esbuild.initialize({
+              wasmURL: new URL('./esbuild.wasm', import.meta.url).toString(),
+              worker: false
+            });
+            console.log('✅ esbuild initialized in sandbox');
+          } catch (err) {
+            console.error('Failed to initialize esbuild:', err);
+            throw err;
+          }
+        })();
+      }
+      return initPromise;
+    }
+    
+    async function compileCode(source) {
+      await ensureEsbuildReady();
+      try {
+        const result = await esbuild.transform(source, {
+          loader: 'ts',
+          format: 'iife',
+          target: 'es2020',
+        });
+        return result.code;
+      } catch (error) {
+        console.error('Compilation error:', error);
+        throw error;
+      }
+    }
+
+    function safeToString(value) {
+      try {
+        if (typeof value === 'string') return value;
+        if (value instanceof Error) return value.stack || value.message || String(value);
+        return JSON.stringify(value);
+      } catch {
+        try {
+          return String(value);
+        } catch {
+          return '[unserializable]';
+        }
+      }
+    }
+
+    function postToParent(payload) {
+      try {
+        if (window.parent && window.parent !== window) {
+          const targetOrigin = parentOrigin || '*'
+          window.parent.postMessage({ ...payload, runId: currentRunId, token: hostToken }, targetOrigin);
+        }
+      } catch {
+        // ignore
+      }
+    }
+
+    function getEsbuildErrorDetails(err, source) {
+      try {
+        const first = err && err.errors && Array.isArray(err.errors) ? err.errors[0] : null
+        const loc = first && first.location ? first.location : null
+        if (!loc || typeof loc.line !== 'number') return null
+        const lines = String(source || '').split(/\r\n|\r|\n/)
+        const start = Math.max(0, loc.line - 3)
+        const end = Math.min(lines.length, loc.line + 2)
+        const context = []
+        for (let i = start; i < end; i++) {
+          context.push({ line: i + 1, text: lines[i] })
+        }
+        return {
+          text: first && typeof first.text === 'string' ? first.text : undefined,
+          line: loc.line,
+          column: loc.column,
+          lineText: loc.lineText,
+          context,
+        }
+      } catch {
+        return null
+      }
+    }
+
+    // Host API is installed via sandbox-host-api.js
+
+    // Mirror console output to parent for agent verification.
+    (function wrapConsole() {
+      const levels = ['log', 'warn', 'error', 'info', 'debug'];
+      for (const level of levels) {
+        const original = console[level];
+        console[level] = function(...args) {
+          try {
+            postToParent({
+              type: 'sandbox-console',
+              level,
+              args: args.map(a => safeToString(a)).slice(0, 20),
+              ts: Date.now(),
+            });
+          } catch {
+            // ignore
+          }
+          return original.apply(console, args);
+        };
+      }
+    })();
+
+    window.onerror = function(msg, url, line, col, error) {
+      const div = document.createElement('div');
+      div.className = 'error';
+      div.textContent = 'Error: ' + msg;
+      document.body.appendChild(div);
+      postToParent({
+        type: 'sandbox-error',
+        kind: 'runtime',
+        message: String(msg || 'Unknown error'),
+        stack: error && error.stack ? String(error.stack) : undefined,
+        ts: Date.now(),
+      });
+      return false;
+    };
+
+    window.onunhandledrejection = function(event) {
+      const reason = event && event.reason ? event.reason : 'Unhandled rejection';
+      const div = document.createElement('div');
+      div.className = 'error';
+      div.textContent = 'Unhandled Promise Rejection: ' + safeToString(reason);
+      document.body.appendChild(div);
+      postToParent({
+        type: 'sandbox-error',
+        kind: 'unhandledrejection',
+        message: safeToString(reason),
+        ts: Date.now(),
+      });
+      return false;
+    };
+
+    // Initialize esbuild immediately
+    ensureEsbuildReady();
+
+    // Listen for code from parent window
+    window.addEventListener('message', async function(event) {
+      // Only accept commands from our parent, on the same origin.
+      if (window.parent === window) {
+        return;
+      }
+      if (event.source !== window.parent) {
+        return;
+      }
+
+      // If we're running without allow-same-origin, our origin will be opaque ("null").
+      // Capture the parent origin on first message and use a shared token for validation.
+      if (!parentOrigin && typeof event.origin === 'string' && event.origin) {
+        parentOrigin = event.origin
+        hostApi.setParentOrigin(parentOrigin)
+      }
+
+      if (event.data && event.data.type === 'run-code') {
+        // Clear previous content (only when starting a new run)
+        const app = document.getElementById('app');
+        while (app.firstChild) {
+          app.removeChild(app.firstChild);
+        }
+
+        // Remove previous error messages
+        const errors = document.querySelectorAll('.error');
+        errors.forEach(err => err.remove());
+
+        hostToken = event.data.token || hostToken
+        hostApi.setHostToken(hostToken)
+        currentRunId = event.data.runId || null;
+        const runStartedAt = Date.now();
+        try {
+          // Compile the code in the sandbox
+          const compiled = await compileCode(event.data.code);
+          
+          // Execute the compiled code
+          const fn = new Function(compiled);
+          fn();
+
+          postToParent({
+            type: 'sandbox-run-complete',
+            success: true,
+            durationMs: Date.now() - runStartedAt,
+            ts: Date.now(),
+          });
+        } catch (err) {
+          const details = getEsbuildErrorDetails(err, event.data && event.data.code)
+          const detailsText = details && typeof details.line === 'number'
+            ? ` (line ${details.line}, col ${details.column})`
+            : ''
+          const div = document.createElement('div');
+          div.className = 'error';
+          div.textContent = 'Error: ' + safeToString(err) + detailsText;
+          document.body.appendChild(div);
+          console.error(err);
+
+          postToParent({
+            type: 'sandbox-error',
+            kind: 'compile-or-exec',
+            message: err && err.message ? String(err.message) : safeToString(err),
+            stack: err && err.stack ? String(err.stack) : undefined,
+            details,
+            ts: Date.now(),
+          });
+          postToParent({
+            type: 'sandbox-run-complete',
+            success: false,
+            durationMs: Date.now() - runStartedAt,
+            ts: Date.now(),
+          });
+        }
+      }
+    });
+
+    // Signal ready
+    if (window.parent !== window) {
+      // We don't know the parent origin yet; it will be captured on first message.
+      window.parent.postMessage({ type: 'sandbox-ready' }, '*');
+    }
+  </script>
+</body>
+</html>

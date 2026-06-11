@@ -1,0 +1,11 @@
+ytd-masthead #center,
+ytd-searchbox,
+yt-searchbox,
+form#search-form,
+#search-form,
+ytm-searchbox,
+ytm-searchbox-form,
+button[aria-label='Search'],
+button[title='Search'] {
+  display: none !important;
+}

@@ -1,6 +1,6 @@
 import knex from './knex_config';
-import { Knex } from 'knex';
-import UserChangeLog from '@/schemas/public/UserChangeLog';
+import {Knex} from 'knex';
+import UserChangeLog from 'tset-sharedlib/schemas/public/UserChangeLog';
 import {BaseRepo} from './base.repo';
 
 export class UserChangeLogRepo extends BaseRepo<UserChangeLog> {

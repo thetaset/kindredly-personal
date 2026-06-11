@@ -1,16 +1,53 @@
-import jsonwebtoken, { sign } from 'jsonwebtoken';
-import { Request, Response } from 'express';
+import jsonwebtoken, {sign} from 'jsonwebtoken';
+import {Request, Response} from 'express';
 
-import { config } from '@/config';
-import { v4 as uuidv4 } from 'uuid';
-import User from '@/schemas/public/User';
-import { RequestContext } from '@/base/request_context';
+import {config} from '@/config';
+import {HttpException} from '@/exceptions/HttpException';
+import {v4 as uuidv4} from 'uuid';
+import User from 'tset-sharedlib/schemas/public/User';
+import {RequestContext} from '@/base/request_context';
 
-import { promisify } from 'util';
-import { DataStoredInToken, TokenData } from '@/interfaces/auth.interface';
+import {promisify} from 'util';
+import {DataStoredInToken} from '@/interfaces/auth.interface';
+import {SessionService} from '@/services/session.service';
+import {TokenData} from 'tset-sharedlib/api/api-types';
+import {UserView} from 'tset-sharedlib/types';
 
 const jwtAccessTokenSecret = config.jwtAccessTokenSecret;
 const jwtverify = promisify((arg: string, callback) => jsonwebtoken.verify(arg, jwtAccessTokenSecret, callback));
+
+function headerValue(req: any, name: string): string | undefined {
+  const value = req?.headers?.[name];
+  const normalized = Array.isArray(value) ? value[0] : value;
+  return normalized ? String(normalized) : undefined;
+}
+
+export function removeNullFields(obj: any, seen = new WeakSet()): any {
+  if (!obj || typeof obj !== 'object') return obj;
+
+  // Preserve Date objects, RegExp, and other built-in objects
+  if (obj instanceof Date || obj instanceof RegExp || obj instanceof Buffer) {
+    return obj;
+  }
+
+  // Detect circular references
+  if (seen.has(obj)) return obj;
+  seen.add(obj);
+
+  if (Array.isArray(obj)) {
+    return obj.filter((item) => item !== null && item !== undefined).map((item) => removeNullFields(item, seen));
+  }
+
+  // For objects, use faster approach with direct property assignment
+  const result = {};
+  for (const [key, value] of Object.entries(obj)) {
+    if (value !== null && value !== undefined) {
+      result[key] = typeof value === 'object' && value !== null ? removeNullFields(value, seen) : value;
+    }
+  }
+
+  return result;
+}
 
 export interface TRequest extends Request {
   ctx?: RequestContext;
@@ -42,43 +79,23 @@ export const authenticateJWTHelper = (req: TRequest): Promise<TRequest> => {
           resolve(req);
         } catch (e) {
           console.error('AuthUserError:', e);
-          return reject({ message: 'AuthUserError', status: 401 } as TErrorInfo);
+          return reject({message: 'AuthUserError', status: 401} as TErrorInfo);
         }
       })
       .catch((err) => {
         console.error('AuthTokenError:', err);
-        return reject({ message: 'AuthTokenError', status: 401 } as TErrorInfo);
+        return reject({message: 'AuthTokenError', status: 401} as TErrorInfo);
       });
   });
 };
 
-export const setAuthCookie = (req: Request, res: Response, token: string) => {
-  const cookieOptions = {
-    httpOnly: true,
-    signed: true,
-    sameSite: 'none' as 'none',
-  };
-  res.cookie('session', token, cookieOptions);
-};
-
-export const clearAuthCookie = (req: Request, res: Response) => {
-  res.clearCookie('session');
-};
-
 const getTokenFromRequest = (req: TRequest): string => {
-
   const authHeader = req.headers['authorization'];
   if (authHeader) {
     const token = authHeader.split(' ')[1];
     return token;
   }
-
-  const sessionToken = req.cookies['session'];
-  if (sessionToken) {
-    return sessionToken;
-  } else {
-    return null;
-  }
+  return null;
 };
 
 export const authenticateJWTWithToken = (req, res, next, token: string) => {
@@ -86,9 +103,19 @@ export const authenticateJWTWithToken = (req, res, next, token: string) => {
     jsonwebtoken.verify(token, jwtAccessTokenSecret, async (err, authInfo) => {
       if (err) {
         console.error('AuthTokenError:', err);
-        return res.json({ success: false, message: 'AuthTokenError', status: 401 });
+        return res.json({success: false, message: 'AuthTokenError', status: 401});
       }
       req.authInfo = authInfo;
+
+      // Session revocation check (lazily adopts unknown sessions, fails open).
+      const sessionCheck = await SessionService.instance.verifyAuthInfoSession(authInfo as DataStoredInToken, {
+        appType: headerValue(req, 'tsapptype'),
+        clientId: headerValue(req, 'tsclientid'),
+        context: req.path,
+      });
+      if (!sessionCheck.ok) {
+        return res.json({success: false, message: 'AuthTokenError', status: 401});
+      }
 
       try {
         let ctx: RequestContext = RequestContext.instance(req);
@@ -96,20 +123,19 @@ export const authenticateJWTWithToken = (req, res, next, token: string) => {
 
         ctx.logClientActivity().catch((e) => console.error(e));
 
-
         // temp authorization allows for a user to be authorized for a limited time
-        const tempAuthToken = req.body.tempAuthToken as { token: string, expAtSec: number };
+        const tempAuthToken = req.body.tempAuthToken as {token: string; expAtSec: number};
         if (tempAuthToken) {
           try {
-            const tempAuthInfo: any = await jwtverify(tempAuthToken.token) as DataStoredInToken;
+            const tempAuthInfo: any = (await jwtverify(tempAuthToken.token)) as DataStoredInToken;
 
-            if (tempAuthInfo && tempAuthInfo.expAtSec && tempAuthInfo.expAtSec >= (Date.now() / 1000)) {
+            if (tempAuthInfo && tempAuthInfo.expAtSec && tempAuthInfo.expAtSec >= Date.now() / 1000) {
               ctx.setTempAuthUserId(tempAuthInfo.userId);
             } else {
               throw new Error('token corrupted or expired' + tempAuthInfo);
             }
           } catch (e) {
-            console.error('TempAuthTokenError:', req.path, " error:", e);
+            console.error('TempAuthTokenError:', req.path, ' error:', e);
             throw e;
           }
         }
@@ -117,7 +143,7 @@ export const authenticateJWTWithToken = (req, res, next, token: string) => {
         req.ctx = ctx;
       } catch (e) {
         console.error('AuthUserError:', e);
-        return res.json({ success: false, message: 'AuthUserError', status: 401 });
+        return res.json({success: false, message: 'AuthUserError', status: 401});
       }
 
       next();
@@ -126,13 +152,8 @@ export const authenticateJWTWithToken = (req, res, next, token: string) => {
   } else {
     const message = 'AuthError: Not authorized';
     console.error(message, req.path);
-    res.json({ success: false, message, status: 403 });
+    res.json({success: false, message, status: 403});
   }
-};
-
-export const authenticationJWTWithCookie = async (req: TRequest, res: Response, next) => {
-  const sessionToken = req.cookies['session'];
-  return authenticateJWTWithToken(req, res, next, sessionToken);
 };
 
 export const authenticationJWTWithHeader = async (req: TRequest, res: Response, next) => {
@@ -186,13 +207,13 @@ export const errorHelper = (fn) => (req, res, next) => {
     console.error('Error', error);
     const statusCode = error.status || 500;
 
-    res.json({ success: false, message: error.message, statusCode });
+    res.json({success: false, message: error.message, statusCode});
   });
 };
 
 export function getUserAuthDetails(user: User) {
   const token = jsonwebtoken.sign(
-    { userId: user._id, accountId: user.accountId, sessionId: uuidv4() },
+    {userId: user._id, accountId: user.accountId, sessionId: uuidv4()},
     jwtAccessTokenSecret,
   );
 
@@ -205,7 +226,9 @@ export function getUserAuthDetails(user: User) {
 }
 
 export function getAdminAuthDetails() {
-  const token = jsonwebtoken.sign({ isAdmin: true, sessionId: uuidv4() }, jwtAccessTokenSecret);
+  // Admin console tokens are outside the user_session registry (no userId), so
+  // expiry is their only invalidation mechanism — keep them short-lived.
+  const token = jsonwebtoken.sign({isAdmin: true, sessionId: uuidv4()}, jwtAccessTokenSecret, {expiresIn: '12h'});
 
   return {
     success: true,
@@ -236,7 +259,7 @@ export function removeSensitiveInfoFromUser(user: User) {
     console.error(e);
   }
 
-  return user;
+  return user as UserView;
 }
 
 export function removeExtraDetailsFromUser(user: User) {
@@ -249,14 +272,22 @@ export function removeExtraDetailsFromUser(user: User) {
     newUserObj[attr] = user[attr];
   });
 
-
   return newUserObj;
 }
 
 export function getUserProfileInfo(user: User) {
   if (!user) return;
   const newUserObj = {};
-  const profileAttributes = ['_id', 'username', 'fullname', 'profileImage', 'type', 'accountId', 'publicId', 'displayedName'];
+  const profileAttributes = [
+    '_id',
+    'username',
+    'fullname',
+    'profileImage',
+    'type',
+    'accountId',
+    'publicId',
+    'displayedName',
+  ];
   profileAttributes.forEach((attr) => {
     newUserObj[attr] = user[attr];
   });
@@ -264,12 +295,23 @@ export function getUserProfileInfo(user: User) {
 }
 
 export function getTargetUserId(req) {
-  return req.body.userId || req.authInfo.userId;
+  if (!!req.body.userId) {
+    //&& req.body.userId != "null") {
+    return req.body.userId;
+  }
+
+  // Many typed requests use targetUserId instead of userId (e.g. SaveItemRequest).
+  if (!!req.body.targetUserId) {
+    return req.body.targetUserId;
+  }
+
+  return req.authInfo.userId;
 }
 
 export function getAuthUserId(req) {
   return req.authInfo.userId;
-} export function _createToken(user: User): TokenData {
+}
+export function _createToken(user: User): TokenData {
   const dataStoredInToken: DataStoredInToken = {
     userId: user._id,
     accountId: user.accountId,
@@ -278,7 +320,7 @@ export function getAuthUserId(req) {
   };
   const secretKey: string = config.jwtAccessTokenSecret;
 
-  return { expAtSec: null, token: sign(dataStoredInToken, secretKey, {}) };
+  return {expAtSec: null, token: sign(dataStoredInToken, secretKey, {})};
 }
 
 export function _createTempToken(user: User): TokenData {
@@ -292,14 +334,10 @@ export function _createTempToken(user: User): TokenData {
   // date five minutes from now
   const expAtSec: number = dataStoredInToken.expAtSec;
 
-  return { expAtSec, token: sign(dataStoredInToken, secretKey, {}) };
+  return {expAtSec, token: sign(dataStoredInToken, secretKey, {})};
 }
 
-export function _createProviderRegToken(
-  loginType: string,
-  id_token: string,
-  expInMin: number = 5
-): TokenData {
+export function _createProviderRegToken(loginType: string, id_token: string, expInMin: number = 5): TokenData {
   const expAtSec: number = Math.floor(Date.now() / 1000) + 60 * expInMin;
   const dataStoredInToken = {
     loginType: loginType,
@@ -315,11 +353,9 @@ export function _createProviderRegToken(
 }
 export function checkPassword(password) {
   if (!password || password.length < 6) {
-    throw new Error(
-      "Password isn't long enough. Must be at least 6 characters"
-    );
+    throw new HttpException(400, "Password isn't long enough. Must be at least 6 characters");
   } else if (password && password.length > 200) {
-    throw new Error("Password  is too long characters");
+    throw new HttpException(400, 'Password  is too long characters');
   }
   //check password strength
   let strength = 0;
@@ -336,9 +372,7 @@ export function checkPassword(password) {
     strength += 1;
   }
   if (strength < 2) {
-    throw new Error(
-      "Password is too weak. Try adding special characters and numbers."
-    );
+    throw new Error('Password is too weak. Try adding special characters and numbers.');
   }
 }
 
@@ -348,4 +382,3 @@ export interface UserAuthInfo {
   passwordForClient?: string;
   recoveryKeyForClient?: string;
 }
-

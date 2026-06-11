@@ -1,0 +1,8 @@
+#comments,
+#yt-comments,
+#watch-discussion,
+ytd-comments,
+ytd-item-section-renderer#sections > #contents > ytd-comments,
+ytm-comment-section-renderer {
+  display: none !important;
+}

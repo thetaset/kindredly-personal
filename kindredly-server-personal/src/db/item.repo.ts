@@ -1,18 +1,18 @@
-import Item from '@/schemas/public/Item';
+import Item from 'tset-sharedlib/schemas/public/Item';
 import {BaseRepo} from './base.repo';
 import knex from './knex_config';
-import { Knex } from 'knex';
+import {Knex} from 'knex';
 
 export class ItemRepo extends BaseRepo<Item> {
   public jsonArrayFields = ['useCriteria', 'tags', 'patterns', 'categories'];
   constructor(db: Knex = knex) {
     super('item', db);
   }
-  async findById(id: string) :Promise<Item>{
+  async findById(id: string): Promise<Item> {
     return await this.where({_id: id}).first();
   }
 
-  async findWhere(data: Partial<Item>) : Promise<Item> {
+  async findWhere(data: Partial<Item>): Promise<Item> {
     const result = await this.where(data);
     if (result.length == 1) {
       return result[0];
@@ -24,15 +24,14 @@ export class ItemRepo extends BaseRepo<Item> {
   }
 
   async updateWithId(id: string, update: Item) {
-    if (update.userId){
-      
+    if (update.userId) {
       delete update.userId;
     }
     return await this.where({_id: id}).update(this._updateInput(update));
   }
 
   async updateOwner(id: string, ownerUserId: string) {
-    return await this.where({_id: id}).update({userId:ownerUserId, updatedAt: new Date()});
+    return await this.where({_id: id}).update({userId: ownerUserId, updatedAt: new Date()});
   }
 
   async create(input: Item) {
@@ -47,7 +46,7 @@ export class ItemRepo extends BaseRepo<Item> {
     return await this.query().whereIn('_id', vals);
   }
 
-  async findWhereIdInAndInAccount(vals: string[], accountId: string, keyCol = '_id') {
+  async findWhereIdInAndInAccount(vals: string[], accountId: string, keyCol = '_id'): Promise<Item[]> {
     if (!accountId) throw new Error('accountId is required');
     return await this.query().whereIn(keyCol, vals).andWhere({accountId});
   }
@@ -56,5 +55,15 @@ export class ItemRepo extends BaseRepo<Item> {
     if (!ids) return [];
     const results = await this.findWhereIdInAndInAccount(ids, accountId);
     return results;
+  }
+
+  /**
+   * Find all items that reference a specific fileId in their attachments
+   * Used for reference counting before deleting files
+   */
+  async findItemsWithFileId(fileId: string): Promise<Item[]> {
+    // Query items where attachments.entries contains an object with the specified fileId
+    // Using PostgreSQL JSONB operators
+    return await this.query().whereRaw(`attachments->'entries' @> ?::jsonb`, [JSON.stringify([{fileId}])]);
   }
 }

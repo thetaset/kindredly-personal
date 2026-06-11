@@ -1,12 +1,11 @@
 import {Routes} from '@interfaces/routes.interface';
 import {Router} from 'express';
+import {ApiReq} from '@/types/api-types';
 
 import {authenticateJWT, errorHelper, getTargetUserId} from '../utils/auth_utils';
 
-
 import KeyEntryService from '@/services/key_entry.service';
 import {RequestContext} from '@/base/request_context';
-import * as UserEncryptionPaths from 'tset-sharedlib/api/UserEncryptionPaths';
 
 class UserEncryptionRoute implements Routes {
   public router = Router();
@@ -20,11 +19,10 @@ class UserEncryptionRoute implements Routes {
   }
 
   private initializeRoutes() {
-
     this.router.post(
-      UserEncryptionPaths.LIST_KEYS,
+      '/user/encryption/listKeys',
       authenticateJWT,
-      errorHelper(async (req, res) => {
+      errorHelper(async (req: ApiReq<'/user/encryption/listKeys'>, res) => {
         const keys = await this.keyEntryService.listForUser(RequestContext.instance(req), getTargetUserId(req));
 
         const result = {
@@ -36,9 +34,9 @@ class UserEncryptionRoute implements Routes {
     );
 
     this.router.post(
-      UserEncryptionPaths.SAVE_USER_KEYS,
+      '/user/encryption/saveUserKeys',
       authenticateJWT,
-      errorHelper(async (req, res) => {
+      errorHelper(async (req: ApiReq<'/user/encryption/saveUserKeys'>, res) => {
         await this.keyEntryService.saveUserKeys(
           RequestContext.instance(req),
           getTargetUserId(req),
@@ -54,9 +52,9 @@ class UserEncryptionRoute implements Routes {
     );
 
     this.router.post(
-      UserEncryptionPaths.SAVE_ACCOUNT_KEYS,
+      '/user/encryption/saveAccountKeys',
       authenticateJWT,
-      errorHelper(async (req, res) => {
+      errorHelper(async (req: ApiReq<'/user/encryption/saveAccountKeys'>, res) => {
         await this.keyEntryService.saveAccountKeys(RequestContext.instance(req), req.body.keyList);
         const result = {
           success: true,
@@ -67,9 +65,27 @@ class UserEncryptionRoute implements Routes {
     );
 
     this.router.post(
-      UserEncryptionPaths.UPDATE_SETTINGS,
+      '/user/encryption/createKeyEntryForUser',
       authenticateJWT,
-      errorHelper(async (req, res) => {
+      errorHelper(async (req: ApiReq<'/user/encryption/createKeyEntryForUser'>, res) => {
+        const id = await this.keyEntryService.createKeyEntryForUser(
+          RequestContext.instance(req),
+          req.body.targetUserId,
+          req.body.keyEntry as any,
+        );
+
+        const result = {
+          success: true,
+          results: {id},
+        };
+        res.json(result);
+      }),
+    );
+
+    this.router.post(
+      '/encryption/updateSettings',
+      authenticateJWT,
+      errorHelper(async (req: ApiReq<'/encryption/updateSettings'>, res) => {
         await this.keyEntryService.updateUserEncSettings(
           RequestContext.instance(req),
           getTargetUserId(req),
@@ -83,9 +99,9 @@ class UserEncryptionRoute implements Routes {
       }),
     );
     this.router.post(
-      UserEncryptionPaths.REMOVE_KEYS,
+      '/user/encryption/removeKeys',
       authenticateJWT,
-      errorHelper(async (req, res) => {
+      errorHelper(async (req: ApiReq<'/user/encryption/removeKeys'>, res) => {
         await this.keyEntryService.removeUserKeys(
           RequestContext.instance(req),
           getTargetUserId(req),
@@ -99,9 +115,9 @@ class UserEncryptionRoute implements Routes {
       }),
     );
     this.router.post(
-      UserEncryptionPaths.REMOVE_ALL_ACCOUNT_KEYS,
+      '/user/encryption/removeAllAccountKeys',
       authenticateJWT,
-      errorHelper(async (req, res) => {
+      errorHelper(async (req: ApiReq<'/user/encryption/removeAllAccountKeys'>, res) => {
         await this.keyEntryService.removeAllAccountKeys(RequestContext.instance(req));
         const result = {
           success: true,
@@ -112,9 +128,9 @@ class UserEncryptionRoute implements Routes {
     );
 
     this.router.post(
-      UserEncryptionPaths.DELETE_RECOVERY_KEY,
+      '/user/encryption/deleteRecoveryKey',
       authenticateJWT,
-      errorHelper(async (req, res) => {
+      errorHelper(async (req: ApiReq<'/user/encryption/deleteRecoveryKey'>, res) => {
         await this.keyEntryService.deleteRecoveryKey(RequestContext.instance(req), getTargetUserId(req));
         const result = {
           success: true,
@@ -123,7 +139,6 @@ class UserEncryptionRoute implements Routes {
         res.json(result);
       }),
     );
-
   }
 }
 

@@ -1,22 +1,24 @@
-import * as cheerio from 'cheerio';
-import { ItemPageTypes } from './constants';
+import { ItemResourceType } from './constants';
+import { Item } from './shared.types';
 
-function mergeOptions(srcList: string[]) {
-  let value = '';
-  for (let src of srcList) {
-    if (src == undefined) {
+
+
+export function mergeOptions(srcList: Array<string | null | undefined>) {
+  for (const src of srcList) {
+    if (typeof src !== 'string') {
       continue;
     }
 
-    src = src.trim();
-    if (src != undefined && src.length > value.length) {
-      value = src;
+    const trimmed = src.trim();
+    if (trimmed) {
+      return trimmed;
     }
   }
-  return value;
+
+  return '';
 }
 
-function checkIfYTChannel(url: string) {
+export function checkIfYTChannel(url: string) {
   return (
     url.includes('youtube.com/c/') ||
     url.includes('youtube.com/channel/') ||
@@ -25,179 +27,64 @@ function checkIfYTChannel(url: string) {
   );
 }
 
-async function extractPageInfo(meta: Record<string, any>, $: any, url: string, tsExtractedInfo: Record<string, any>) {
-  const isYTChannel = checkIfYTChannel(url);
-  const pageType = isYTChannel ? ItemPageTypes.YOUTUBE_CHANNEL :  ItemPageTypes.YOUTUBE_PAGE;
+const channelFromUrlRegex = /\/(channel|c|user)\/?([^\/?#]+)(?:[/?#].*)?/i;
 
-  tsExtractedInfo.pageType = pageType;
+const channelFromUrlAtRegex = /\/@([^\/?#]+)(?:[/?#].*)?/i;
 
-  const youtubeChannelUrl = $('span[itemprop="author"] link[itemprop="url"]').attr('href');
-  const youtubeChannelId = youtubeChannelUrl != undefined ? await parseChannelIdFromString(youtubeChannelUrl) : null;
-
-  if (youtubeChannelId) {
-    tsExtractedInfo.youtubeChannelIds = [youtubeChannelId];
+export function normalizeYouTubeChannelIdentifier(value: string | null | undefined) {
+  const trimmed = String(value || '').trim();
+  if (!trimmed) {
+    return null;
   }
 
-
-  const externalChannelIds = await findVariableURLs($, 'externalChannelId');
-
-  if (externalChannelIds.length == 1) {
-    tsExtractedInfo.youtubeChannelIds.push(externalChannelIds[0]);
+  if (trimmed.startsWith('@')) {
+    return trimmed.slice(1).toLowerCase();
   }
-  if (isYTChannel) {
-    //'link[rel="alternate"][media="handheld"]'
-    const datamatch = $('link[rel="alternate"][media="handheld"]');
-    if (datamatch.length > 0) {
-      console.error("Multiple matches for link[rel='alternate'][media='handheld']");
-    }
 
-    const youtubeChannelUrl = datamatch.attr('href');
-
-
-    const youtubeChannelId = youtubeChannelUrl != undefined ? await parseChannelIdFromString(youtubeChannelUrl) : null;
-
-    if (youtubeChannelId && tsExtractedInfo.youtubeChannelIds.includes(youtubeChannelId) == false) {
-      tsExtractedInfo.youtubeChannelIds.push(youtubeChannelId);
-    }
+  if (trimmed.startsWith('UC')) {
+    return trimmed;
   }
-  return tsExtractedInfo;
+
+  return trimmed.toLowerCase();
 }
 
-
-export interface TSExtractedInfo {
-  pageType: string | null;
-  youtubeChannelIds: string[];
-  message?: string | null;
-}
-
-export interface TSMeta {
-  url?: string;
-  tsExtractedInfo?: TSExtractedInfo;
-  THETASET_PAGE_TYPE?: string | null;
-  title?: string;
-  description?: string;
-  keywords?: string;
-  siteName?: string;
-  type?: string;
-  imageSrc?: string;
-  locale?: string;
-  favicon?: string;
-  tsManifest?: Record<string, any>;
-}
-//TODO: rename some of this
-async function parseAllMetadata(url: string, data: any) {
-  const metaOrig:Record<string,any> = {};
-  const tsExtractedInfo:TSExtractedInfo = {
-    pageType: null as string | null,
-    youtubeChannelIds: [] as string[],
-    message: null as string | null,
-
-  };
-
-  try {
-    const $ = cheerio.load(data);
-    //get everything, not just meta//
-    const els = $('meta[itemProp],meta[name],meta[property],link[href]').toArray();
-    //
-    //   const els = $("*").toArray();
-
-    for (const el of els) {
-      if ('content' in el.attribs) {
-        let attrName = null;
-        if (el.attribs['itemprop']) {
-          attrName = el.attribs['itemprop'];
-        } else if (el.attribs['name']) {
-          attrName = el.attribs['name'];
-        } else if (el.attribs['property']) {
-          attrName = el.attribs['property'];
-        }
-
-        if (attrName) {
-          metaOrig[attrName] = el.attribs['content'];
-        }
-      }
-    }
-
-    metaOrig.title = $('title').text();
-
-    // does url container youtube.com
-    if (url.includes('youtube.com')) {
-      await extractPageInfo(metaOrig, $, url, tsExtractedInfo);
-      metaOrig['THETASET_PAGE_TYPE'] = tsExtractedInfo.pageType;
-    }
-  } catch (err) {
-    tsExtractedInfo.message = 'ERROR: ' + err;
-  }
-
-  metaOrig.tsExtractedInfo = tsExtractedInfo;
-  return metaOrig;
-}
-
-const channelFromUrlRegex = /\/(channel|c|user)\/?([^\/]+)\/?.*/;
-
-const channelFromUrlAtRegex = /\/@([^\/]+)(\/?.*)/;
-
-async function parseChannelIdFromString(url: string) {
-  let match = url.match(channelFromUrlRegex);
-  let channelId = match ? match[2] : null;
-  if (!channelId) {
-    match = url.match(channelFromUrlAtRegex);
-    channelId = match ? match[1] : null;
-  }
+export function parseChannelIdFromString(url: string) {
+  const match = url.match(channelFromUrlRegex);
+  const channelId = match ? normalizeYouTubeChannelIdentifier(match[2]) : null;
   return channelId;
 }
 
-async function findVariableURLs($: cheerio.CheerioAPI, variable: string = 'canonicalBaseUrl') {
-  const results: Set<string> = new Set();
-  const regex = new RegExp(`"${variable}":"(.*?)"`, 'g');
-  $('script').each(function () {
-    const scriptContent = $(this).html();
-    if (!scriptContent) {
-      return;
-    }
-
-    let match;
-    while ((match = regex.exec(scriptContent)) !== null) {
-      results.add(match[1]);
-    }
-  });
-
-  return Array.from(results);
+export function parseYTVideoIdFromString(url: string) {
+  const videoIdRegex = /(?:v=|\/)([a-zA-Z0-9_-]{11})/;
+  const match = url.match(videoIdRegex);
+  return match ? match[1] : null;
 }
 
-
-
-export async function extractMetadata(url: string, data: string) {
-  const metaOrig = await parseAllMetadata(url, data);
-
-  let meta: TSMeta = {};
-  meta['url'] = url;
-
-  meta.title = mergeOptions([metaOrig['title'], metaOrig['og:title'], metaOrig['og:site_name']]);
-  meta.description = mergeOptions([metaOrig['description'], metaOrig['og:description']]);
-  meta.keywords = mergeOptions([metaOrig['keywords'], metaOrig['og:keywords']]);
-  meta.siteName = mergeOptions([metaOrig['og:site_name']]);
-  meta.type = mergeOptions([metaOrig['og:type']]);
-  meta.locale = mergeOptions([metaOrig['og:locale']]);
-  meta.imageSrc = mergeOptions([metaOrig['og:image']]);
-  meta['THETASET_PAGE_TYPE'] = metaOrig['THETASET_PAGE_TYPE'];
-
-  //favicon
-  meta.favicon = mergeOptions([
-    metaOrig['shortcut icon'],
-    metaOrig['icon'],
-    metaOrig['apple-touch-icon'],
-    metaOrig['apple-touch-icon-precomposed'],
-  ]);
-
-  meta.tsManifest = {
-    version: 2.0,
-  };
-  meta.tsExtractedInfo = metaOrig['tsExtractedInfo'];
-  // meta.origMeta = metaOrig;
-
-  return meta;
+export function parseYTHandleIdFromString(url: string) {
+  const match = url.match(channelFromUrlAtRegex);
+  return match ? normalizeYouTubeChannelIdentifier(match[1]) : null;
 }
+
+export function getYouTubeChannelIdentifiersFromUrl(url: string | null | undefined): string[] {
+  if (!url) {
+    return [];
+  }
+
+  const identifiers = new Set<string>();
+  const channelId = parseChannelIdFromString(url);
+  const handleId = parseYTHandleIdFromString(url);
+
+  if (channelId) {
+    identifiers.add(channelId);
+  }
+
+  if (handleId) {
+    identifiers.add(handleId);
+  }
+
+  return Array.from(identifiers);
+}
+
 
 export function getMetaImagePaths(url: string, meta: Record<string, any>) {
   const urlObj = new URL(url);
@@ -208,10 +95,11 @@ export function getMetaImagePaths(url: string, meta: Record<string, any>) {
 
   let googleFaviconSrcPath: string | null = `https://www.google.com/s2/favicons?sz=256&domain_url=${urlObj.hostname}`;
 
-  return {bannerImageSrcPath, faviconSrcPath, googleFaviconSrcPath};
+  return { bannerImageSrcPath, faviconSrcPath, googleFaviconSrcPath };
 }
 
-export async function fetchImagesFromURL(url: string, meta: Record<string, any>, getImageFromURL: Function) {
+export async function fetchImagesFromURL(url: string, meta: Record<string, any>, 
+  getImageFromURL: Function) {
   console.log('Fetching banner and favicon images', url);
 
   let bannerImageSrcPath = meta.imageSrc;
@@ -245,4 +133,30 @@ export async function fetchImagesFromURL(url: string, meta: Record<string, any>,
   }
 
   return { bannerImageObj, bannerImageSrcPath, faviconObj, faviconSrcPath };
+}
+
+export function itemSchemaUpdater(item: Partial<Item>) {
+
+
+  let hasFeeds = false
+  if (item?.meta?.tsExtractedInfo?.pageType == ItemResourceType.YT_CHANNEL) {
+    hasFeeds = true
+  }
+  else if (item?.info?.feeds && item?.info.feeds.length > 0) {
+    hasFeeds = true
+  }
+  else if (item.type == "col") {
+    hasFeeds = true
+
+  }
+
+  if (!item?.sysInfo) {
+    item.sysInfo = {}
+  }
+
+  item.sysInfo.hasFeeds = hasFeeds;
+  item.sysInfo.v = 1.0;
+  item.sysInfo.updatedAt = new Date();
+
+  return item;
 }

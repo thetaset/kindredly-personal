@@ -1,7 +1,7 @@
-import ItemRelation from '@/schemas/public/ItemRelation';
+import ItemRelation from 'tset-sharedlib/schemas/public/ItemRelation';
 import {BaseRepo} from './base.repo';
 import knex from './knex_config';
-import { Knex } from 'knex';
+import {Knex} from 'knex';
 
 export class ItemRelationRepo extends BaseRepo<ItemRelation> {
   constructor(db: Knex = knex) {

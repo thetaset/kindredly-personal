@@ -1,0 +1,1 @@
+function t(r,u){return!u||!Array.isArray(r)?null:r.find(l=>(l==null?void 0:l.planId)===u)||null}function i(r){if(!(r!=null&&r.success))return null;const u=r.results??r.result;return Array.isArray(u)?u:null}export{t as a,i as r};

@@ -1,7 +1,7 @@
-import PublishedRelation from '@/schemas/public/PublishedRelation';
+import PublishedRelation from 'tset-sharedlib/schemas/public/PublishedRelation';
 import {BaseRepo} from './base.repo';
 import knex from './knex_config';
-import { Knex } from 'knex';
+import {Knex} from 'knex';
 
 export class PublishedRelationRepo extends BaseRepo<PublishedRelation> {
   constructor(db: Knex = knex) {

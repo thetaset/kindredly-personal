@@ -1,10 +1,10 @@
 import {RequestContext} from '@/base/request_context';
 import {Routes} from '@interfaces/routes.interface';
 import {Router} from 'express';
+import {ApiReq} from '@/types/api-types';
 import {authenticateJWT, errorHelper, getTargetUserId} from '../utils/auth_utils';
 import SubscriptionService from '@/services/subscription.service';
-import * as SubscriptionPaths from 'tset-sharedlib/api/SubscriptionPaths';
-import { container } from '@/inversify.config';
+import {container} from '@/inversify.config';
 // SCH-AUDIT-INCOMPLETE
 class SubscriptionRoute implements Routes {
   public router = Router();
@@ -17,12 +17,11 @@ class SubscriptionRoute implements Routes {
   }
 
   private initializeRoutes() {
-
     // SCH-OK
     this.router.post(
-      SubscriptionPaths.SUBSCRIPTION_ADD,
+      '/subscription/add',
       authenticateJWT,
-      errorHelper(async (req, res) => {
+      errorHelper(async (req: ApiReq<'/subscription/add'>, res) => {
         const results = await this.subscriptionService.addEntry(
           RequestContext.instance(req),
           getTargetUserId(req),
@@ -40,12 +39,11 @@ class SubscriptionRoute implements Routes {
       }),
     );
 
-
     // SCH-OK
     this.router.post(
-      SubscriptionPaths.SUBSCRIPTION_REMOVE_BY_ID,
+      '/subscription/removeById',
       authenticateJWT,
-      errorHelper(async (req, res) => {
+      errorHelper(async (req: ApiReq<'/subscription/removeById'>, res) => {
         const results = await this.subscriptionService.removeSubscriptionById(
           RequestContext.instance(req),
           req.body.subscriptionId,
@@ -56,13 +54,13 @@ class SubscriptionRoute implements Routes {
         };
         res.json(result);
       }),
-    );  
+    );
 
     // SCH-OK
     this.router.post(
-      SubscriptionPaths.SUBSCRIPTION_EDIT,
+      '/subscription/edit',
       authenticateJWT,
-      errorHelper(async (req, res) => {
+      errorHelper(async (req: ApiReq<'/subscription/edit'>, res) => {
         const results = await this.subscriptionService.editSubscriptionById(
           RequestContext.instance(req),
           req.body.subscriptionId,
@@ -79,9 +77,9 @@ class SubscriptionRoute implements Routes {
 
     // SCH-OK
     this.router.post(
-      SubscriptionPaths.SUBSCRIPTION_REMOVE,
+      '/subscription/remove',
       authenticateJWT,
-      errorHelper(async (req, res) => {
+      errorHelper(async (req: ApiReq<'/subscription/remove'>, res) => {
         const results = await this.subscriptionService.removeEntry(
           RequestContext.instance(req),
           getTargetUserId(req),
@@ -97,9 +95,9 @@ class SubscriptionRoute implements Routes {
 
     // SCH-OK
     this.router.post(
-      SubscriptionPaths.SUBSCRIPTION_LIST_FOR_USER,
+      '/subscription/listForUser',
       authenticateJWT,
-      errorHelper(async (req, res) => {
+      errorHelper(async (req: ApiReq<'/subscription/listForUser'>, res) => {
         const results = await this.subscriptionService.listWithDetailsByUserId(
           RequestContext.instance(req),
           getTargetUserId(req),
@@ -113,14 +111,13 @@ class SubscriptionRoute implements Routes {
     );
 
     this.router.post(
-      SubscriptionPaths.SUBSCRIPTION_LIST_FOR_REF,
+      '/subscription/listForRef',
       authenticateJWT,
-      errorHelper(async (req, res) => {
+      errorHelper(async (req: ApiReq<'/subscription/listForRef'>, res) => {
         const results = await this.subscriptionService.listWithDetailByRef(
           RequestContext.instance(req),
           req.body.refId,
           req.body.refType,
-
         );
         const result = {
           success: true,

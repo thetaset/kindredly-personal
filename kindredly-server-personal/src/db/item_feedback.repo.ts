@@ -1,7 +1,7 @@
-import ItemFeedback from '@/schemas/public/ItemFeedback';
+import ItemFeedback from 'tset-sharedlib/schemas/public/ItemFeedback';
 import {BaseRepo} from './base.repo';
 import knex from './knex_config';
-import { Knex } from 'knex';
+import {Knex} from 'knex';
 
 export class ItemFeedbackRepo extends BaseRepo<ItemFeedback> {
   constructor(db: Knex = knex) {

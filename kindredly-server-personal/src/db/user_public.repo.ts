@@ -1,7 +1,7 @@
-import UserPublic from '@/schemas/public/UserPublic';
+import UserPublic from 'tset-sharedlib/schemas/public/UserPublic';
 import {BaseRepo} from './base.repo';
 import knex from './knex_config';
-import { Knex } from 'knex';
+import {Knex} from 'knex';
 
 export class UserPublicRepo extends BaseRepo<UserPublic> {
   constructor(db: Knex = knex) {

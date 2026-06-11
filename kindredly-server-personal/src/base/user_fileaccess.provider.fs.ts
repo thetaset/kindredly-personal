@@ -1,11 +1,10 @@
-import { config } from "@/config";
-import fs from "fs";
-import path from "path";
-import { saveURLDatatoFile } from "../utils/binary_utils";
-import { UserFileAccessProvider } from "./user_fileaccess.provider";
+import {config} from '@/config';
+import fs from 'fs';
+import path from 'path';
+import {saveURLDatatoFile} from '../utils/binary_utils';
+import {UserFileAccessProvider} from './user_fileaccess.provider';
 
 export class UserFileAccessProviderFS implements UserFileAccessProvider {
- 
   async uploadImageDirect(imageData, filename, prefix) {
     const rootpath = String(config.imageStorage.path);
 
@@ -13,38 +12,46 @@ export class UserFileAccessProviderFS implements UserFileAccessProvider {
     if (prefix) fpath = path.join(rootpath, prefix);
     else fpath = rootpath;
 
-    await fs.promises.mkdir(fpath, { recursive: true }); //fs.mkdirSync
+    await fs.promises.mkdir(fpath, {recursive: true}); //fs.mkdirSync
     const fullpath = path.join(fpath, filename);
-    console.log("Saving file to ", fullpath);
+    console.log('Saving file to ', fullpath);
 
-    if (imageData.startsWith("data:")) {
-      imageData = imageData.split(",")[1];
+    if (imageData.startsWith('data:')) {
+      imageData = imageData.split(',')[1];
     }
 
     saveURLDatatoFile(imageData, fullpath);
     return filename;
   }
 
-  async uploadUserFileData(
-    data: any,
-    refType: string,
-    refId: string,
-    filename: string
-  ) {
+  async uploadUserFileData(data: any, refType: string, refId: string, filename: string) {
     let fpath: string;
     fpath = path.join(String(config.userStorage.path), refType, refId);
 
-    await fs.promises.mkdir(fpath, { recursive: true });
+    await fs.promises.mkdir(fpath, {recursive: true});
     const fullpath = path.join(fpath, filename);
 
     // clean data
-    if (typeof data === "string") {
-      data = data.replace(/^data:image\/\w+;base64,/, "");
+    if (typeof data === 'string') {
+      data = data.replace(/^data:image\/\w+;base64,/, '');
     }
-    console.log("Saving user file to ", fullpath);
+    console.log('Saving user file to ', fullpath);
 
-    const buffer = Buffer.from(data, "base64");
+    const buffer = Buffer.from(data, 'base64');
     fs.writeFileSync(fullpath, new Uint8Array(buffer));
+    return filename;
+  }
+
+  async uploadUserFileBytes(data: Buffer | Uint8Array, refType: string, refId: string, filename: string) {
+    let fpath: string;
+    fpath = path.join(String(config.userStorage.path), refType, refId);
+
+    await fs.promises.mkdir(fpath, {recursive: true});
+    const fullpath = path.join(fpath, filename);
+    console.log('Saving user file (bytes) to ', fullpath);
+
+    const buff = Buffer.isBuffer(data) ? data : Buffer.from(data);
+    fs.writeFileSync(fullpath, buff);
     return filename;
   }
 

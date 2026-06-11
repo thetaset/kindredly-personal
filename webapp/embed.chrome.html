@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="referrer" content="strict-origin-when-cross-origin">
+  <title>Video Player</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body { width: 100%; height: 100%; overflow: hidden; background: #000; }
+    #player { width: 100%; height: 100%; }
+    iframe { width: 100%; height: 100%; border: 0; }
+    .ytp-error { color: #fff; text-align: center; padding: 20px; font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; }
+  </style>
+</head>
+<body>
+  <div id="player"></div>
+
+  <script>
+    const queryParams = new URLSearchParams(window.location.search);
+    const videoId = queryParams.get('v');
+    const hostWidgetId = queryParams.get('widgetid');
+    const expectedHostOrigin = queryParams.get('origin');
+    const debugEnabled = queryParams.get('dbg') === '1' || queryParams.get('debug') === '1';
+
+    function dbgLog() {
+      if (!debugEnabled) return;
+      try {
+        const args = Array.prototype.slice.call(arguments);
+        args.unshift('YTE-embed-chrome');
+        console.log.apply(console, args);
+      } catch (_) {
+        // ignore
+      }
+    }
+
+    if (debugEnabled) {
+      dbgLog('boot', {
+        href: window.location.href,
+        origin: window.location.origin,
+        referrer: document.referrer,
+        expectedHostOrigin,
+        videoId,
+        userAgent: navigator.userAgent,
+      });
+
+      window.addEventListener('error', (e) => {
+        dbgLog('window.error', {
+          message: e && e.message,
+          filename: e && e.filename,
+          lineno: e && e.lineno,
+          colno: e && e.colno,
+        });
+      });
+
+      window.addEventListener('unhandledrejection', (e) => {
+        dbgLog('unhandledrejection', {
+          reason: e && e.reason,
+        });
+      });
+    }
+
+    const excludeParams = ['v', 'widgetid', 'origin', 'dbg', 'debug'];
+    const playerVars = new URLSearchParams();
+    queryParams.forEach((value, key) => {
+      if (!excludeParams.includes(key)) {
+        playerVars.set(key, value);
+      }
+    });
+    playerVars.set('playsinline', '1');
+
+    function renderError(message) {
+      document.body.innerHTML = '<div class="ytp-error"></div>';
+      const errorEl = document.querySelector('.ytp-error');
+      if (errorEl) {
+        errorEl.textContent = message;
+      }
+    }
+
+    function createYouTubeIframe() {
+      if (!videoId) {
+        renderError('No video ID provided');
+        return null;
+      }
+
+      const iframe = document.createElement('iframe');
+      iframe.src = 'https://www.youtube.com/embed/' + encodeURIComponent(videoId) + '?' + playerVars.toString();
+      iframe.title = 'YouTube video player';
+      iframe.allow = 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share';
+      iframe.allowFullscreen = true;
+      iframe.referrerPolicy = 'strict-origin-when-cross-origin';
+
+      iframe.addEventListener('load', () => {
+        dbgLog('iframe.load', {
+          src: iframe.src,
+        });
+      });
+
+      iframe.addEventListener('error', () => {
+        dbgLog('iframe.error', {
+          src: iframe.src,
+        });
+      });
+
+      const player = document.getElementById('player');
+      if (!player) {
+        renderError('Player container missing');
+        return null;
+      }
+
+      player.innerHTML = '';
+      player.appendChild(iframe);
+
+      dbgLog('iframe.created', {
+        videoId,
+        src: iframe.src,
+      });
+
+      return iframe;
+    }
+
+    const youtubeIframe = createYouTubeIframe();
+
+    function proxyMessageEvents(event) {
+      if (event.origin !== 'https://www.youtube.com') {
+        if (expectedHostOrigin && event.origin !== expectedHostOrigin) {
+          return;
+        }
+        if (debugEnabled) {
+          dbgLog('message host->yt', {
+            origin: event.origin,
+            expectedHostOrigin,
+            type: typeof event.data,
+          });
+        }
+        if (youtubeIframe && youtubeIframe.contentWindow) {
+          youtubeIframe.contentWindow.postMessage(event.data, 'https://www.youtube.com');
+        }
+        return;
+      }
+
+      let parsed = null;
+      try {
+        parsed = JSON.parse(event.data);
+      } catch (_) {
+        return;
+      }
+
+      if (debugEnabled) {
+        dbgLog('message yt->host', {
+          id: parsed && parsed.id,
+          event: parsed && parsed.event,
+          info: parsed && parsed.info,
+        });
+      }
+
+      if (parsed && hostWidgetId) {
+        parsed.id = hostWidgetId;
+      }
+
+      const targetOrigin = queryParams.get('origin') || '*';
+      window.parent.postMessage(JSON.stringify(parsed), targetOrigin);
+    }
+
+    window.addEventListener('message', proxyMessageEvents);
+  </script>
+</body>
+</html>

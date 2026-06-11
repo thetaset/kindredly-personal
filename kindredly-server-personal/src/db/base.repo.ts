@@ -1,15 +1,16 @@
-import { Knex } from 'knex';
-
+import {Knex} from 'knex';
 
 export class BaseRepo<TModel> {
   public tbl: string;
   public jsonArrayFields: string[] = [];
   protected db: Knex<TModel, TModel[]>;
   protected trx: Knex.Transaction;
+  public knex: Knex<TModel, TModel[]>; // Add this property
 
   constructor(tbl: string, db: Knex) {
     this.tbl = tbl;
     this.db = db;
+    this.knex = db; // Initialize knex property
   }
 
   _knex() {
@@ -37,7 +38,7 @@ export class BaseRepo<TModel> {
   }
 
   _updateInput(data: TModel) {
-    const updatedData = { ...data } as any;
+    const updatedData = {...data} as any;
     for (const fieldName of this.jsonArrayFields) {
       if (fieldName in updatedData && updatedData[fieldName]) {
         updatedData[fieldName] = JSON.stringify(updatedData[fieldName]);
@@ -47,22 +48,20 @@ export class BaseRepo<TModel> {
   }
 
   query() {
-    return this.db<TModel>(this.tbl);
+    return this.knex<TModel>(this.tbl);
   }
 
   where(input: TModel) {
-    return this.db<TModel>(this.tbl).where(input);
+    return this.knex<TModel>(this.tbl).where(input);
   }
 
-
-  findMany(input: TModel)  {
+  findMany(input: TModel) {
     return this.where(input);
   }
 
-  findAll(){
+  findAll() {
     return this.query().select();
   }
-
 
   findWhereIn(col, vals: any[]) {
     return this.query().whereIn(col, vals);
@@ -88,4 +87,7 @@ export class BaseRepo<TModel> {
     return await this.query().whereIn(key, vals).delete();
   }
 
+  async deleteBefore(column: string, date: Date) {
+    return await this.query().where(column, '<', date).delete();
+  }
 }

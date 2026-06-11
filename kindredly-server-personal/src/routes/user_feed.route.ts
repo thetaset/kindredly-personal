@@ -1,14 +1,16 @@
 import {RequestContext} from '@/base/request_context';
 import UserFeedService from '@/services/user_feed.service';
+import {SharedFeedbackFeedService} from '@/services/shared_feedback_feed.service';
 import {Routes} from '@interfaces/routes.interface';
 import {Router} from 'express';
+import {ApiReq} from '@/types/api-types';
 import {authenticateJWT, errorHelper, getTargetUserId} from '../utils/auth_utils';
-import * as UserFeedPaths from 'tset-sharedlib/api/UserFeedPaths';
 
 class UserFeedRoute implements Routes {
   public router = Router();
 
   private feedService = new UserFeedService();
+  private sharedFeedbackFeedService = new SharedFeedbackFeedService();
 
   constructor() {
     console.info(`Initializing routes ${this.constructor.name}`);
@@ -18,14 +20,15 @@ class UserFeedRoute implements Routes {
 
   private initializeRoutes() {
     this.router.post(
-      UserFeedPaths.FEED_LIST,
+      '/feed/list',
       authenticateJWT,
-      errorHelper(async (req, res) => {
+      errorHelper(async (req: ApiReq<'/feed/list'>, res) => {
         const results = await this.feedService.listByUserId(
           RequestContext.instance(req),
           getTargetUserId(req),
           req.body.pageInfo,
           req.body.includeComments,
+          true,
           req.body.newOnly,
         );
         const result = {
@@ -37,13 +40,50 @@ class UserFeedRoute implements Routes {
     );
 
     this.router.post(
-      UserFeedPaths.GET_BY_POST_ID,
+      '/feed/searchPosts',
       authenticateJWT,
-      errorHelper(async (req, res) => {
+      errorHelper(async (req: ApiReq<'/feed/searchPosts'>, res) => {
+        const results = await this.feedService.searchPostsByUserId(
+          RequestContext.instance(req),
+          getTargetUserId(req),
+          req.body,
+        );
+        res.json({success: true, results});
+      }),
+    );
+
+    this.router.post(
+      '/feed/sharedFeedback/list',
+      authenticateJWT,
+      errorHelper(async (req: ApiReq<'/feed/sharedFeedback/list'>, res) => {
+        const ctx = RequestContext.instance(req);
+        const userId = getTargetUserId(req);
+
+        const results = await this.sharedFeedbackFeedService.list(ctx, userId, req.body);
+        res.json({success: true, results});
+      }),
+    );
+
+    this.router.post(
+      '/feed/sharedFeedback/markSeen',
+      authenticateJWT,
+      errorHelper(async (req: ApiReq<'/feed/sharedFeedback/markSeen'>, res) => {
+        const ctx = RequestContext.instance(req);
+        const userId = getTargetUserId(req);
+
+        const results = await this.sharedFeedbackFeedService.markSeen(ctx, userId, req.body);
+        res.json({success: true, results});
+      }),
+    );
+
+    this.router.post(
+      '/feed/getByPostId',
+      authenticateJWT,
+      errorHelper(async (req: ApiReq<'/feed/getByPostId'>, res) => {
         const results = await this.feedService.getByPostId(
           RequestContext.instance(req),
           getTargetUserId(req),
-          req.body.id,
+          req.body.postId,
         );
         const result = {
           success: true,
@@ -54,9 +94,9 @@ class UserFeedRoute implements Routes {
     );
 
     this.router.post(
-      UserFeedPaths.REMOVE_BY_ID,
+      '/feed/removeById',
       authenticateJWT,
-      errorHelper(async (req, res) => {
+      errorHelper(async (req: ApiReq<'/feed/removeById'>, res) => {
         const results = await this.feedService.removeById(RequestContext.instance(req), req.body.feedId);
         const result = {
           success: true,
@@ -66,12 +106,11 @@ class UserFeedRoute implements Routes {
       }),
     );
 
-
     // SCH-OK
     this.router.post(
-      UserFeedPaths.REMOVE_POST,
+      '/feed/removePost',
       authenticateJWT,
-      errorHelper(async (req, res) => {
+      errorHelper(async (req: ApiReq<'/feed/removePost'>, res) => {
         const results = await this.feedService.removeByPostId(
           RequestContext.instance(req),
           getTargetUserId(req),
@@ -87,9 +126,9 @@ class UserFeedRoute implements Routes {
 
     // SCH-OK
     this.router.post(
-      UserFeedPaths.UPDATE_READ_STATUS,
+      '/feed/updateReadStatus',
       authenticateJWT,
-      errorHelper(async (req, res) => {
+      errorHelper(async (req: ApiReq<'/feed/updateReadStatus'>, res) => {
         const results = await this.feedService.updateReadStatus(
           RequestContext.instance(req),
           req.body.postId,
@@ -106,9 +145,9 @@ class UserFeedRoute implements Routes {
 
     // SCH-OK
     this.router.post(
-      UserFeedPaths.UPDATE_READ_STATUS_MULTIPLE,
+      '/feed/updateReadStatusForMultipleEntries',
       authenticateJWT,
-      errorHelper(async (req, res) => {
+      errorHelper(async (req: ApiReq<'/feed/updateReadStatusForMultipleEntries'>, res) => {
         const results = await this.feedService.updateReadStatusForMultipleEntries(
           RequestContext.instance(req),
           req.body.ids,

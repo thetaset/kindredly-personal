@@ -1,0 +1,15 @@
+#secondary,
+#watch7-sidebar,
+#watch7-sidebar-ads,
+#related,
+#related ytd-compact-video-renderer,
+#related ytd-radio-renderer,
+#related ytd-promoted-sparkles-text-search-renderer,
+#related ytd-promoted-sparkles-web-renderer,
+ytd-banner-promo-renderer-background,
+.ytp-autonav-overlay,
+.ytp-autonav-endscreen-upnext-thumbnail,
+.ytp-autonav-endscreen-countdown-container,
+.ytp-endscreen-content {
+  display: none !important;
+}

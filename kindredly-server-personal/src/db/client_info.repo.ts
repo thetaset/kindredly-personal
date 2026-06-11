@@ -1,13 +1,13 @@
 import knex from './knex_config';
-import { Knex } from 'knex';
-import ClientInfo  from '@/schemas/public/ClientInfo';
+import {Knex} from 'knex';
+import ClientInfo from 'tset-sharedlib/schemas/public/ClientInfo';
 import {BaseRepo} from './base.repo';
 
 export class ClientInfoRepo extends BaseRepo<ClientInfo> {
   constructor(db: Knex = knex) {
     super('client_info', db);
   }
-  createId(userId:string, clientId:string) {
+  createId(userId: string, clientId: string) {
     return `${userId}:${clientId}`;
   }
   async findById(_id: string): Promise<ClientInfo> {
@@ -27,7 +27,6 @@ export class ClientInfoRepo extends BaseRepo<ClientInfo> {
   }
 
   async listByUserId(userId: string) {
-    return this.where({userId: userId}).orderBy('lastSeen','desc')
+    return this.where({userId: userId}).orderBy('lastSeen', 'desc');
   }
-
 }

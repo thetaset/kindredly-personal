@@ -1,11 +1,16 @@
 {
   "name": "tset-sharedlib",
-  "version": "0.5.1",
+  "version": "3.0.0",
   "description": "",
   "scripts": {
     "build": "tsc",
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "dev": "tsc -w"
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "dev": "tsc -w",
+    "check-api-types": "node scripts/check-api-types.js",
+    "verify-types": "tsx scripts/verify-api-types.ts",
+    "route-report": "node scripts/generate-route-report.js",
+    "generate-api-docs": "node scripts/generate-api-route-docs.js"
   },
   "files": [
     "/dist/"
@@ -14,6 +19,9 @@
   "author": "",
   "license": "NA",
   "devDependencies": {
+    "@types/jest": "^29.5.14",
+    "jest": "^29.7.0",
+    "ts-jest": "^29.3.4",
     "tslib": "^2.6.2",
     "typescript": "^5.4.2"
   },

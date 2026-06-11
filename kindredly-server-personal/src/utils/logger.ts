@@ -60,11 +60,16 @@ logger.add(
   }),
 );
 
+// Auth tokens can appear in request URLs (e.g. legacy SSE ?token=...).
+// Never let them reach the logs.
+function redactTokens(message: string): string {
+  return message.replace(/([?&](?:token|ticket)=)[^&\s"]+/gi, '$1[REDACTED]');
+}
+
 const stream = {
   write: (message: string) => {
-    logger.info(message.substring(0, message.lastIndexOf('\n')));
+    logger.info(redactTokens(message.substring(0, message.lastIndexOf('\n'))));
   },
 };
 
-
-export {logger, stream};
+export {logger, stream, redactTokens};
