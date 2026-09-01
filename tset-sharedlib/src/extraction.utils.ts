@@ -209,7 +209,7 @@ function getFeedTypeFromText(value?: string | null): 'rss' | 'atom' | 'json' | n
   return null;
 }
 
-function getFeedTypeFromUrl(value?: string | null): 'rss' | 'atom' | 'json' | null {
+export function getFeedTypeFromUrl(value?: string | null): 'rss' | 'atom' | 'json' | null {
   const normalized = normalizeTextSnippet(value)?.toLowerCase();
   if (!normalized) {
     return null;
@@ -241,6 +241,97 @@ function hasStrongFeedUrlCue(value?: string | null): boolean {
     || /(?:^|\/)(?:podcast|podcasts)(?:[/?._-]|$)/.test(normalized);
 }
 
+const FEED_FILE_EXTENSION_RE = /\.(rss|atom)$/;
+const FEED_FILE_NAME_RE = /^(feed|feeds|rss|rss2|atom|index|podcast|episodes)\.(xml|rss|atom|json)$/;
+const FEED_DATA_EXTENSION_RE = /\.(xml|json|rss|atom)$/;
+const FEED_PATH_SEGMENTS = new Set(['feed', 'feeds', 'rss', 'atom']);
+// `feeds.npr.org/510355/podcast.xml`, `rss.example.com/show.xml` — a feed-hosting
+// subdomain plus a data file. The subdomain alone is not enough (`feeds.example.com/about`).
+const FEED_HOST_LABELS = new Set(['feed', 'feeds', 'rss', 'podcasts']);
+const FEED_FORMAT_QUERY_KEYS = ['format', 'output', 'feed', 'alt', 'type'];
+const FEED_FORMAT_QUERY_VALUE_RE = /^(rss|rss2|atom|feed|json)$/i;
+
+/**
+ * Strict "this URL is a feed" test, for deciding whether to *act* on a URL —
+ * prefiltering navigations in the extension, and intercepting them in the native
+ * in-app browsers. Deliberately much narrower than `hasStrongFeedUrlCue`, which is
+ * tuned for scoring anchor candidates alongside a text cue and happily matches
+ * `/podcasts/the-daily` or any `.xml`. Acting on those would hijack ordinary page
+ * loads and sitemaps, so this requires a real feed filename, a feed path segment,
+ * or an explicit feed format in the query string.
+ */
+export function isLikelyFeedUrl(value?: string | null): boolean {
+  const normalized = normalizeTextSnippet(value);
+  if (!normalized) {
+    return false;
+  }
+
+  let parsed: URL;
+  try {
+    parsed = new URL(normalized);
+  } catch {
+    return false;
+  }
+
+  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+    return false;
+  }
+
+  const segments = parsed.pathname.toLowerCase().split('/').filter(Boolean);
+  const lastSegment = segments[segments.length - 1] || '';
+
+  // `/whatever.rss`, `/whatever.atom` — the extension alone is conclusive.
+  if (FEED_FILE_EXTENSION_RE.test(lastSegment)) {
+    return true;
+  }
+
+  // `/feed.xml`, `/rss.xml`, `/atom.xml`, `/index.xml` (Hugo), `/feed.json`, `/podcast.xml`.
+  if (FEED_FILE_NAME_RE.test(lastSegment)) {
+    return true;
+  }
+
+  // `feeds.npr.org/510355/podcast.xml` — feed-hosting subdomain + a data file.
+  const firstHostLabel = parsed.hostname.toLowerCase().split('.')[0] || '';
+  if (FEED_HOST_LABELS.has(firstHostLabel) && FEED_DATA_EXTENSION_RE.test(lastSegment)) {
+    return true;
+  }
+
+  // A `feed`/`feeds`/`rss`/`atom` path segment, but only when the URL also ends in
+  // something feed-shaped: the segment itself (`/blog/feed`, `/rss/`), a data file
+  // (`/feeds/videos.xml` on YouTube), or Blogger's `/feeds/posts/default`.
+  if (segments.some((segment) => FEED_PATH_SEGMENTS.has(segment))) {
+    if (
+      FEED_PATH_SEGMENTS.has(lastSegment) ||
+      FEED_DATA_EXTENSION_RE.test(lastSegment) ||
+      lastSegment === 'default'
+    ) {
+      return true;
+    }
+  }
+
+  // `?format=rss`, `?feed=atom`, `?alt=rss`, …
+  for (const key of FEED_FORMAT_QUERY_KEYS) {
+    const queryValue = parsed.searchParams.get(key);
+    if (queryValue && FEED_FORMAT_QUERY_VALUE_RE.test(queryValue.trim())) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+const FEED_CONTENT_TYPE_RE = /(rss\+xml|atom\+xml|feed\+json|rdf\+xml)/;
+
+/**
+ * True when a response `Content-Type` names a feed outright. This is the signal that
+ * makes a browser download a feed link instead of rendering it, so it is also the
+ * most reliable way to recognise one — no body parsing required.
+ */
+export function isFeedContentType(value?: string | null): boolean {
+  const normalized = normalizeTextSnippet(value)?.toLowerCase();
+  return !!normalized && FEED_CONTENT_TYPE_RE.test(normalized);
+}
+
 function hasGenericFeedAnchorCue(value?: string | null): boolean {
   const normalized = normalizeTextSnippet(value)?.toLowerCase();
   if (!normalized) {
@@ -256,6 +347,7 @@ function addFeedLink(
   feedLinks: NonNullable<ItemMetaExtracted['discoveredFeedLinks']>,
   entry: { href?: string | null; title?: string | null; text?: string | null },
   feedType: 'rss' | 'atom' | 'json' | null,
+  source: 'head' | 'anchor',
 ) {
   const href = resolveAbsoluteUrl(baseUrl, entry.href);
   if (!href || !feedType) {
@@ -280,6 +372,7 @@ function addFeedLink(
     url: href,
     title: normalizeTextSnippet(entry.title) || normalizeTextSnippet(entry.text),
     type: feedType,
+    source,
   });
 }
 
@@ -302,7 +395,7 @@ function extractFeedLinksFromEntries(
 
     if (!relLooksRelevant || !feedType) continue;
 
-    addFeedLink(baseUrl, seen, feedLinks, { href, title }, feedType);
+    addFeedLink(baseUrl, seen, feedLinks, { href, title }, feedType, 'head');
   }
 
   return feedLinks;
@@ -335,6 +428,7 @@ function extractFeedLinksFromAnchors(
       feedLinks,
       entry,
       hrefType || textType || 'rss',
+      'anchor',
     );
   }
 
@@ -621,7 +715,87 @@ export function convertRedditUrlToJson(url: string): string {
 }
 
 
+/**
+ * Cheap sniff for an RSS/Atom feed body. Podcasts (and other feeds) store the
+ * feed URL as their primary URL, so the generic HTML/og:image extractor never
+ * sees the artwork (it lives in <itunes:image> / the channel <image>) and
+ * mangles the title by concatenating every <title>. Detect feeds up front and
+ * parse them properly instead.
+ *
+ * Regex-only on purpose — no `DOMParser`, no cheerio — so it also runs in the MV3
+ * background service worker, where the extension sniffs feed responses.
+ */
+export function looksLikeXmlFeed(data: string): boolean {
+  if (!data) return false;
+  const head = data.slice(0, 1500).toLowerCase().trimStart();
+  if (head.startsWith('<!doctype html') || head.startsWith('<html')) return false;
+  return /<rss[\s>]/.test(head) || /<feed[\s>]/.test(head) || (head.startsWith('<?xml') && head.includes('<channel'));
+}
+
+/** Text of a namespaced channel-level tag (e.g. "itunes:summary"), direct children only. */
+function feedNsText(root: any, tag: string): string {
+  return root.children(tag.replace(':', '\\:')).first().text().trim();
+}
+
+/** Attribute of a namespaced channel-level tag (e.g. "itunes:image" href), direct children only. */
+function feedNsAttr(root: any, tag: string, attr: string): string | undefined {
+  return root.children(tag.replace(':', '\\:')).first().attr(attr) || undefined;
+}
+
+/**
+ * Channel-level metadata from an RSS/Atom feed: title, description, artwork,
+ * author. Mirrors the importer's feed parser (content_source.service.parseFeed)
+ * so a podcast/feed URL resolves its real cover image and title — which is what
+ * makes admin "refresh from source" work for podcasts.
+ */
+export function extractFeedChannelMeta(url: string, data: string): ItemMeta {
+  const $ = cheerio.load(data, { xmlMode: true });
+  const channel = $('channel').first();
+  const isAtom = channel.length === 0 && $('feed').first().length > 0;
+  const root = isAtom ? $('feed').first() : channel;
+
+  const pick = (sel: string) => root.children(sel).first().text().trim();
+  // Atom: prefer the human page (rel="alternate" / no rel) over the feed's own rel="self".
+  const atomLink = (): string => {
+    let alt = '', noRel = '', other = '';
+    root.children('link').each((_i: number, el: any) => {
+      const rel = String($(el).attr('rel') || '').toLowerCase();
+      const href = $(el).attr('href') || '';
+      if (!href) return;
+      if (rel === 'alternate' && !alt) alt = href;
+      else if (!rel && !noRel) noRel = href;
+      else if (rel !== 'self' && !other) other = href;
+    });
+    return alt || noRel || other || root.children('link').first().attr('href') || '';
+  };
+
+  const title = pick('title') || $('title').first().text().trim();
+  const link = (isAtom ? atomLink() : pick('link')) || url;
+  const description = pick('description') || feedNsText(root, 'itunes:summary') || feedNsText(root, 'subtitle');
+  const imageSrc =
+    root.children('image').children('url').first().text().trim() ||
+    feedNsAttr(root, 'itunes:image', 'href') ||
+    feedNsAttr(root, 'logo', 'href') ||
+    '';
+
+  const meta: ItemMeta = {
+    url,
+    title: title || undefined,
+    description: description || undefined,
+    siteName: feedNsText(root, 'itunes:author') || pick('managingEditor') || undefined,
+    imageSrc: imageSrc || '',
+    tsManifest: { version: 2.0 },
+  };
+  return normalizeItemMetaImageUrls(link, meta) || meta;
+}
+
 export async function extractMetadata(url: string, data: string) {
+  // Feeds (podcasts especially) need feed-aware parsing — the HTML extractor
+  // below would return no image and a garbled, concatenated title.
+  if (looksLikeXmlFeed(data)) {
+    return extractFeedChannelMeta(url, data);
+  }
+
   const metaOrig = await parseAllMetadata(url, data);
 
   let meta: ItemMeta = {};
@@ -879,12 +1053,17 @@ async function extractYTPageInfoFromMeta(meta: Record<string, any>, $: any, url:
 
     const externalChannelIds = await findVariableURLs($, 'externalChannelId');
 
-    if (externalChannelIds.length == 1 && !tsExtractedInfo.handleId && !!externalChannelIds[0]) {
+    // Capture the canonical UC channel id even when a handle is already known.
+    // Channel grants match by UC id, so a handle-only channel can't be matched
+    // against a video that resolves to its UC id.
+    if (externalChannelIds.length == 1 && !!externalChannelIds[0]) {
       const normalizedExternalChannelId = normalizeYouTubeChannelIdentifier(externalChannelIds[0]);
-      if (normalizedExternalChannelId && !tsExtractedInfo.youtubeChannelIds.includes(normalizedExternalChannelId)) {
-        tsExtractedInfo.youtubeChannelIds.push(normalizedExternalChannelId);
+      if (normalizedExternalChannelId) {
+        if (!tsExtractedInfo.youtubeChannelIds.includes(normalizedExternalChannelId)) {
+          tsExtractedInfo.youtubeChannelIds.push(normalizedExternalChannelId);
+        }
+        tsExtractedInfo.channelId = normalizedExternalChannelId;
       }
-      tsExtractedInfo.channelId = normalizedExternalChannelId;
     }
 
     if (isYTVideo) {

@@ -24,8 +24,26 @@ export type ApiResponse<Path extends keyof ApiRouteMap> = ApiRouteMap[Path]['res
  * Typed Express Request that infers request/response types from UnifiedApiRouteMap
  * Shorthand for use in inline handler definitions
  * @template Path - The API route path (e.g., '/auth/switchUser')
+ *
+ * NOTE: the second type argument is `Request`'s own `ResBody` slot. It does NOT constrain the
+ * `res` object a handler is given — that is a separate `Response` type — so declaring only
+ * `req: ApiReq<Path>` leaves every `res.json(...)` completely unchecked. Pair it with
+ * `res: ApiRes<Path>` to actually enforce the response half of the contract.
  */
 export type ApiReq<Path extends keyof ApiRouteMap> = Request<{}, ApiResponse<Path>, ApiRequest<Path>>;
+
+/**
+ * Typed Express Response for a given API path, so `res.json(...)` is checked against the
+ * response type declared in the route map.
+ *
+ * Usage:
+ * ```typescript
+ * errorHelper(async (req: ApiReq<'/auth/switchUser'>, res: ApiRes<'/auth/switchUser'>) => {
+ *   res.json({ ... }); // ✅ checked against ApiRouteMap['/auth/switchUser']['response']
+ * })
+ * ```
+ */
+export type ApiRes<Path extends keyof ApiRouteMap> = Response<ApiResponse<Path>>;
 
 /**
  * Helper to create typed handlers - just for better type inference in some editors

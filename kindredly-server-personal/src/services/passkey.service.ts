@@ -13,7 +13,7 @@ import {
   type PasskeyChallengeRequest,
 } from 'tset-sharedlib/api';
 import * as crypto from 'crypto';
-import {getRedisClient} from '@/base/redis_client';
+import {getKeyValueStore} from '@/base/runtime.factory';
 import {_createToken, removeSensitiveInfoFromUser} from '@/utils/auth_utils';
 import {UserRepo} from '@/db/user.repo';
 import {decryptPassword} from '@/utils/crypto_util';
@@ -25,7 +25,7 @@ const CHALLENGE_TTL_SECONDS = 300; // 5 minutes
 class PasskeyService {
   private passkeyRepo = new PasskeyCredentialRepo();
   private userRepo = new UserRepo();
-  private redis = getRedisClient();
+  private redis = getKeyValueStore();
 
   /**
    * Store a challenge in Redis with TTL
@@ -151,6 +151,12 @@ class PasskeyService {
         }
       }
 
+      // A credential with no public key can never have its assertions verified, so registering one
+      // would create an account that cannot use the passkey it just set up.
+      if (!credential.publicKey) {
+        throw new HttpException(400, 'This browser did not provide a passkey public key');
+      }
+
       // Check if credential already exists
       const existingCredential = await this.passkeyRepo.findByCredentialId(credential.credentialId);
       if (existingCredential) {
@@ -232,12 +238,16 @@ class PasskeyService {
         throw new HttpException(403, 'Passkey challenge user mismatch');
       }
 
-      // In a full implementation, we would verify the signature here using the stored public key
-      // For now, we trust the WebAuthn API's verification on the client side
-      // TODO: Implement full server-side signature verification
+      // Verify the assertion signature against the public key captured at registration.
+      //
+      // Without this, holding a credentialId is enough to authenticate as its owner: the challenge
+      // endpoint is unauthenticated and hands back the credentialIds for any username or email, so
+      // a forged signature would have been accepted. The signature is the only part of a WebAuthn
+      // assertion an attacker cannot produce.
+      const authDataBuffer = Buffer.from(this.base64URLDecode(authenticatorData));
+      this.verifyAssertionSignature(credential, authDataBuffer, clientDataJSON, signature);
 
       // Parse authenticator data to get sign count
-      const authDataBuffer = Buffer.from(this.base64URLDecode(authenticatorData));
       const signCount = authDataBuffer.readUInt32BE(33); // Sign count is at bytes 33-36
 
       // Verify sign count to prevent replay attacks
@@ -334,6 +344,73 @@ class PasskeyService {
   }
 
   // Helper methods
+
+  /**
+   * Verify a WebAuthn assertion signature.
+   *
+   * The authenticator signs `authenticatorData || SHA-256(clientDataJSON)` with the private key
+   * that never leaves the device. The matching public key was captured at registration via
+   * `getPublicKey()`, which returns SPKI DER, so Node can verify it directly.
+   *
+   * Throws rather than returning a boolean: every failure here means the assertion did not come
+   * from the registered authenticator, and no caller has a reason to continue.
+   */
+  private verifyAssertionSignature(
+    credential: {credentialId: string; publicKey?: string},
+    authDataBuffer: Buffer,
+    clientDataJSON: string,
+    signature: string,
+  ): void {
+    if (!credential.publicKey) {
+      // Registered on a browser without getPublicKey() (pre-Safari 16.4 / pre-Firefox 119), so an
+      // empty key was stored and there is nothing to check against. Reject: the user still has
+      // password sign-in and can re-register the passkey.
+      if (config.passkeyAllowUnverifiableCredentials) {
+        logger.warn(`Passkey ${credential.credentialId} has no stored public key; allowed by config override`);
+        return;
+      }
+      logger.error(`Passkey ${credential.credentialId} has no stored public key; cannot verify assertion`);
+      throw new HttpException(401, 'This passkey must be registered again before it can be used to sign in');
+    }
+
+    const signedData = Buffer.concat([
+      authDataBuffer,
+      crypto.createHash('sha256').update(this.base64URLDecode(clientDataJSON)).digest(),
+    ]);
+
+    let verified = false;
+    try {
+      const keyObject = crypto.createPublicKey({
+        key: this.base64URLDecode(credential.publicKey),
+        format: 'der',
+        type: 'spki',
+      });
+      const signatureBuffer = this.base64URLDecode(signature);
+
+      if (keyObject.asymmetricKeyType === 'ed25519') {
+        // Ed25519 hashes internally, so the digest algorithm must be null.
+        verified = crypto.verify(null, signedData, keyObject, signatureBuffer);
+      } else if (keyObject.asymmetricKeyType === 'rsa') {
+        verified = crypto.verify(
+          'sha256',
+          signedData,
+          {key: keyObject, padding: crypto.constants.RSA_PKCS1_PADDING},
+          signatureBuffer,
+        );
+      } else {
+        // ES256 and friends: DER-encoded ECDSA over SHA-256.
+        verified = crypto.verify('sha256', signedData, keyObject, signatureBuffer);
+      }
+    } catch (e) {
+      logger.error(`Passkey signature verification errored for credential ${credential.credentialId}:`, e);
+      verified = false;
+    }
+
+    if (!verified) {
+      logger.warn(`Passkey signature verification failed for credential ${credential.credentialId}`);
+      throw new HttpException(401, 'Passkey verification failed');
+    }
+  }
 
   private base64URLEncode(buffer: Buffer): string {
     return buffer.toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');

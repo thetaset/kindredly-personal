@@ -52,6 +52,21 @@ class UserPrefsRoute implements Routes {
       }),
     );
 
+    // The one access-control write a restricted user may make for themselves.
+    // Takes no userId on purpose — see UserService.clearOwnCheckpoint.
+    this.router.post(
+      '/user/checkpoint/clear',
+      authenticateJWT,
+      errorHelper(async (req: ApiReq<'/user/checkpoint/clear'>, res) => {
+        const results = await this.userService.clearOwnCheckpoint(RequestContext.instance(req));
+        const result = {
+          success: true,
+          results,
+        };
+        res.json(result);
+      }),
+    );
+
     this.router.post(
       '/user/settings/copy',
       authenticateJWT,

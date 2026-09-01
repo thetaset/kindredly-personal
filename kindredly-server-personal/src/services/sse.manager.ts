@@ -1,6 +1,8 @@
-import type Redis from 'ioredis';
 import {Response} from 'express';
-import {getRedisClient, createRedisPubSubClient} from '@/base/redis_client';
+import {KeyValueStore} from '@/base/kv_store';
+import {EventBus} from '@/base/event_bus';
+import {getKeyValueStore, getEventBus} from '@/base/runtime.factory';
+import {config} from '@/config';
 
 interface SSEConnection {
   clientId: string;
@@ -16,11 +18,21 @@ interface SSEMessage {
   targetClientId?: string; // specific client targeting
 }
 
+// Max bytes a connection may hold un-drained in its socket write buffer before
+// we disconnect it. SSE payloads are small; a buffer this deep means the
+// client is stalled (backgrounded tab, dead NAT path), and without a cap every
+// broadcast + heartbeat accumulates in this process's heap indefinitely.
+export const SSE_MAX_BUFFERED_BYTES = 1024 * 1024;
+
 class SSEManager {
   private static instance: SSEManager;
-  private redis: Redis;
-  private pubClient: Redis;
-  private subClient: Redis;
+  private redis: KeyValueStore;
+  /**
+   * Cross-process fan-out. Was two dedicated ioredis pub/sub connections held
+   * here; the bus owns that pairing now, and in `lite` it is in-process
+   * delivery with no Redis at all.
+   */
+  private bus: EventBus;
   private localConnections = new Map<string, Response>();
   private serverId: string;
   private channelName = 'sse_broadcasts';
@@ -29,15 +41,8 @@ class SSEManager {
   private constructor() {
     this.serverId = `server_${process.env.HOSTNAME || 'unknown'}_${Date.now()}`;
 
-    // Use shared Redis clients from factory
-    this.redis = getRedisClient();
-    if (process.env.NODE_ENV === 'test') {
-      this.pubClient = this.redis;
-      this.subClient = this.redis;
-    } else {
-      this.pubClient = createRedisPubSubClient();
-      this.subClient = createRedisPubSubClient();
-    }
+    this.redis = getKeyValueStore();
+    this.bus = getEventBus();
 
     // Subscribe to SSE broadcast channel (skip in test to avoid flaky external dependency)
     if (process.env.NODE_ENV !== 'test') {
@@ -71,26 +76,85 @@ class SSEManager {
 
     console.info('Starting SSEManager periodic systems');
     this.startPeriodicCleanup();
+    this.startLocalHeartbeat();
     this.systemsInitialized = true;
   }
 
-  private setupRedisSubscription(): void {
-    this.subClient.subscribe(this.channelName);
+  /**
+   * Keep idle SSE connections alive by writing a lightweight comment ping to
+   * every local connection on an interval shorter than the 60s ALB/nginx idle
+   * timeout. A `:`-prefixed comment line is ignored by EventSource, so it keeps
+   * the socket non-idle without any client-side handling. This prevents the
+   * idle-timeout drops that were triggering client reconnects.
+   */
+  private startLocalHeartbeat(): void {
+    if (process.env.NODE_ENV === 'test') {
+      return;
+    }
 
-    this.subClient.on('message', (channel: string, message: string) => {
-      if (channel === this.channelName) {
+    const intervalMs = config.sse.heartbeatIntervalMs;
+    const timer = setInterval(() => this.sendLocalHeartbeat(), intervalMs);
+    timer.unref?.();
+    console.info(`SSE local heartbeat started (${intervalMs}ms)`);
+  }
+
+  /**
+   * Write a single keep-alive comment ping to every local connection. One bad
+   * connection (closed socket) must not break the loop for the others.
+   */
+  sendLocalHeartbeat(): void {
+    this.localConnections.forEach((res, clientId) => {
+      // Belt-and-braces reaper: an entry whose socket died without its 'close'
+      // listener running (e.g. a disconnect that raced registration) would
+      // otherwise sit in the map forever, fed by this very heartbeat.
+      if (res.destroyed || res.writableEnded) {
+        this.removeConnection(clientId, res).catch(() => {});
+        return;
+      }
+      if (this.evictIfOverBuffered(res, clientId)) {
+        return;
+      }
+      try {
+        res.write(': keepalive\n\n');
+        res.flush?.();
+      } catch (e) {
+        // Socket is gone; req.on('close') will remove it. Keep iterating.
+        console.warn(`SSE heartbeat write failed for ${clientId}:`, (e as any)?.message || e);
+      }
+    });
+  }
+
+  /**
+   * Record a connection attempt for a clientId and return the running count in
+   * the current window. Used to throttle clients that reconnect abusively fast
+   * (e.g. a buggy client storm) so a single client can't hammer /sync/events.
+   */
+  async registerConnectAttempt(clientId: string): Promise<number> {
+    const key = `sse_conn_rate:${clientId}`;
+    // Atomic INCR + EXPIRE in a MULTI so the key ALWAYS has a TTL. A non-atomic
+    // incr-then-expire could leave the key with no TTL (if expire fails or the
+    // process dies in between), permanently throttling that client. Refreshing
+    // the TTL on every attempt also gives a sliding window, which is the desired
+    // behaviour for abuse throttling (a sustained storm stays throttled).
+    const results = await this.redis.multi().incr(key).expire(key, config.sse.connectWindowSec).exec();
+    const count = Number(results?.[0]?.[1] ?? 0);
+    return count;
+  }
+
+  private setupRedisSubscription(): void {
+    // The bus delivers only this channel's messages and logs a throwing handler,
+    // so the channel guard and the 'error' listener that used to live here have
+    // moved into the two implementations.
+    this.bus
+      .subscribe(this.channelName, (message: string) => {
         try {
           const sseMessage: SSEMessage = JSON.parse(message);
           this.handleIncomingBroadcast(sseMessage);
         } catch (error) {
-          console.error('Error parsing SSE message from Redis:', error);
+          console.error('Error parsing SSE broadcast message:', error);
         }
-      }
-    });
-
-    this.subClient.on('error', (error) => {
-      console.error('Redis subscription error:', error);
-    });
+      })
+      .catch((error) => console.error('SSE broadcast subscription failed:', error));
   }
 
   private handleIncomingBroadcast(message: SSEMessage): void {
@@ -99,7 +163,7 @@ class SSEManager {
       // Specific client targeting
       const connection = this.localConnections.get(message.targetClientId);
       if (connection) {
-        this.sendSSEMessage(connection, message.event, message.data);
+        this.sendSSEMessage(connection, message.event, message.data, true, message.targetClientId);
       }
     } else if (message.targetUserId) {
       // User-specific broadcast
@@ -107,21 +171,38 @@ class SSEManager {
         console.log('Checking clientId:', clientId, 'for userId:', message.targetUserId);
         if (clientId.startsWith(`${message.targetUserId}-`)) {
           console.log(`Sending event '${message.event}' to user ${message.targetUserId} on client ${clientId}`);
-          this.sendSSEMessage(res, message.event, message.data);
+          this.sendSSEMessage(res, message.event, message.data, true, clientId);
         }
       });
     } else {
       // Broadcast to all local connections
-      this.localConnections.forEach((res) => {
-        this.sendSSEMessage(res, message.event, message.data);
+      this.localConnections.forEach((res, clientId) => {
+        this.sendSSEMessage(res, message.event, message.data, true, clientId);
       });
     }
   }
 
   /**
-   * Register a new SSE connection
+   * Register a new SSE connection. Private: callers must go through
+   * registerConnection, which wires disconnect cleanup BEFORE this method's
+   * Redis awaits — calling this directly reintroduces the Response leak that
+   * registerConnection exists to close.
    */
-  async addConnection(clientId: string, userId: string, res: Response): Promise<void> {
+  private async addConnection(clientId: string, userId: string, res: Response): Promise<void> {
+    // clientId is stable per device install, so a fast reconnect reuses the id
+    // while the old socket may still be half-open. Destroy the superseded
+    // connection so its eventual 'close' can't linger, and let the
+    // owner-guard in removeConnection keep that late cleanup from evicting
+    // this new entry.
+    const existing = this.localConnections.get(clientId);
+    if (existing && existing !== res) {
+      try {
+        existing.destroy();
+      } catch (_e) {
+        // Already torn down; nothing to do.
+      }
+    }
+
     // Store locally
     this.localConnections.set(clientId, res);
 
@@ -147,9 +228,67 @@ class SSEManager {
   }
 
   /**
-   * Remove SSE connection
+   * Register a connection with disconnect cleanup wired BEFORE the async
+   * registration work. addConnection awaits three Redis calls; a client that
+   * hangs up during that window fires 'close' before a later-attached listener
+   * exists, permanently leaking the Response in localConnections (and the 20s
+   * heartbeat would keep writing to it forever). Listeners-first plus a
+   * post-add re-check closes both sides of the race.
+   *
+   * Returns false when the client was already gone by the time registration
+   * completed — the caller should stop and not write to res.
    */
-  async removeConnection(clientId: string): Promise<void> {
+  async registerConnection(
+    clientId: string,
+    userId: string,
+    req: {on(event: string, listener: (...args: any[]) => void): unknown},
+    res: Response,
+  ): Promise<boolean> {
+    let closed = false;
+    const cleanup = () => {
+      if (closed) return;
+      closed = true;
+      this.removeConnection(clientId, res).catch((e) => console.error(`Error during SSE cleanup for ${clientId}:`, e));
+    };
+    req.on('close', () => {
+      cleanup();
+      console.debug(`SSE client disconnected: ${clientId}`);
+    });
+    req.on('error', (err: any) => {
+      // Only log actual errors, not normal disconnects
+      if (!['ECONNRESET', 'EPIPE'].includes(err?.code) && !String(err?.message || '').includes('aborted')) {
+        console.error(`SSE client error for ${clientId}:`, err);
+      }
+      cleanup();
+    });
+
+    await this.addConnection(clientId, userId, res);
+    if (closed) {
+      // 'close' fired mid-registration, before localConnections held the entry.
+      await this.removeConnection(clientId, res);
+      return false;
+    }
+    return true;
+  }
+
+  /**
+   * Remove SSE connection.
+   *
+   * `owner` guards against the reconnect race: clientId is stable per device
+   * install, so when a client reconnects, the OLD socket's late 'close' would
+   * otherwise evict the NEW live connection from the map and Redis, silently
+   * dropping pushes until the proxy idle timeout forces another reconnect.
+   * When the map holds a different Response than the caller's, the caller's
+   * connection was superseded — skip the teardown entirely.
+   */
+  async removeConnection(clientId: string, owner?: Response): Promise<void> {
+    if (owner) {
+      const current = this.localConnections.get(clientId);
+      if (current && current !== owner) {
+        return;
+      }
+    }
+
     // Remove locally
     this.localConnections.delete(clientId);
 
@@ -177,7 +316,7 @@ class SSEManager {
       targetUserId: userId,
     };
 
-    await this.pubClient.publish(this.channelName, JSON.stringify(message));
+    await this.bus.publish(this.channelName, JSON.stringify(message));
 
     // Get connection count for logging
     const connectionCount = await this.getUserConnectionCount(userId);
@@ -195,7 +334,7 @@ class SSEManager {
       data,
     };
 
-    await this.pubClient.publish(this.channelName, JSON.stringify(message));
+    await this.bus.publish(this.channelName, JSON.stringify(message));
 
     const totalConnections = await this.getTotalConnectionCount();
     console.info(`Broadcasted '${event}' event to all clients (${totalConnections} connections across cluster)`);
@@ -211,7 +350,7 @@ class SSEManager {
       targetClientId: clientId,
     };
 
-    await this.pubClient.publish(this.channelName, JSON.stringify(message));
+    await this.bus.publish(this.channelName, JSON.stringify(message));
   }
 
   /**
@@ -333,9 +472,24 @@ class SSEManager {
   }
 
   /**
+   * Single eviction rule for over-buffered connections: a connection that
+   * stops draining accumulates every write in heap; past the cap, disconnect
+   * it (the extension auto-reconnects — retry: 15000 is sent at connect).
+   * Shared by the heartbeat and the send path so the two can't diverge.
+   */
+  private evictIfOverBuffered(res: Response, clientId?: string): boolean {
+    if (res.writableLength > SSE_MAX_BUFFERED_BYTES) {
+      console.warn(`SSE ${clientId ?? 'connection'} over write-buffer limit (${res.writableLength}B); destroying`);
+      res.destroy();
+      return true;
+    }
+    return false;
+  }
+
+  /**
    * Send SSE message to response object
    */
-  sendSSEMessage(res: Response, event: string, data: any, shouldFlush: boolean = true): void {
+  sendSSEMessage(res: Response, event: string, data: any, shouldFlush: boolean = true, clientId?: string): void {
     const message = `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
     // console.log(`📤 Sending SSE event '${event}' to client:`, {
     //   event,
@@ -349,6 +503,9 @@ class SSEManager {
       if (shouldFlush) {
         res.flush?.();
       }
+      // Backpressure: broadcasts fan out to every local connection, so we never
+      // block on one slow client.
+      this.evictIfOverBuffered(res, clientId);
       // console.log(`✅ SSE event '${event}' sent successfully`);
     } catch (error) {
       console.error(`❌ Error sending SSE event '${event}':`, error);
@@ -647,9 +804,12 @@ class SSEManager {
       await this.redis.del(...serverConnections);
     }
 
-    // Close pub/sub Redis connections (shared client is managed by factory)
-    await this.pubClient.quit();
-    await this.subClient.quit();
+    // The bus is deliberately NOT closed here. It used to be two ioredis
+    // connections this class created and owned; it is now a process-wide
+    // singleton from the runtime factory, and closing it would clear every
+    // subscriber's handler - not just this one's. `closeRuntime()` owns its
+    // lifecycle. Shutting down SSE means dropping SSE connections, not taking
+    // the transport away from whoever else is on it.
 
     console.info(`SSEManager shutdown complete for ${this.serverId}`);
   }

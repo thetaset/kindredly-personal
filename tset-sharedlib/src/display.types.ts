@@ -13,6 +13,7 @@ import {
 } from './shared.types';
 import {
   ItemExperienceCapability,
+  ItemExperienceKind,
   ItemExperienceViewMode,
   ItemTypePrimary,
   ItemTypeSecondary,
@@ -38,6 +39,7 @@ export interface LibraryDisplayItem extends BaseDisplayItem {
   type: ItemType;
   subType?: ItemTypeSecondary;
   contractId?: string;
+  experienceKind?: ItemExperienceKind;
   defaultViewMode?: ItemExperienceViewMode;
   capabilityFlags?: ItemExperienceCapability[];
   provider?: string;
@@ -49,6 +51,8 @@ export interface LibraryDisplayItem extends BaseDisplayItem {
   visibility?: string;
   categories?: string[];
   tags?: string[];
+  /** Semantic slot assignments — see kinds/kindRegistry.ts */
+  kinds?: string[];
   useCriteria?: string[];
   eduValue?: string;
   patterns?: string[];
@@ -115,7 +119,9 @@ export interface LibraryDisplayItem extends BaseDisplayItem {
 export interface PublishedDisplayItem extends Omit<LibraryDisplayItem, 'baseType'> {
   baseType: 'published';
   pubItem: true;
-  
+
+  /** Raw published data (server-side plaintext) — carries authored feed defaults like defaultConsumeSettings. */
+  data?: any;
   easyId?: string;
   username?: string;
   publicUserId?: string;

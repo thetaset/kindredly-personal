@@ -1,6 +1,7 @@
 import {RequestContext} from '@/base/request_context';
 import UserFileService from '@/services/user_file.service';
 import {streamToBase64} from '@/utils/binary_utils';
+import {awaitWritableDrain} from '@/utils/stream_utils';
 import {Routes} from '@interfaces/routes.interface';
 import express, {Router} from 'express';
 import {ApiReq} from '@/types/api-types';
@@ -68,7 +69,13 @@ class UserFileDataRoute implements Routes {
             next();
           });
           res.set('Content-Type', 'image/jpeg');
-          res.set('Cache-Control', 'public, max-age=31557600');
+          // Mutable images are overwritten in place — curated banners (banner-*) on
+          // regenerate, and published item images ({pubId}_banner) on replace/enhance —
+          // so they use a short revalidating cache; everything else is immutable. Admin
+          // edit surfaces also cache-bust with ?v= for immediate freshness.
+          const fn = req.params.filename;
+          const isMutable = fn.startsWith('banner-') || fn.endsWith('_banner');
+          res.set('Cache-Control', isMutable ? 'public, max-age=3600, must-revalidate' : 'public, max-age=31557600');
           s.pipe(res);
         } catch (error) {
           console.error('Error unable to get image', error);
@@ -258,6 +265,31 @@ class UserFileDataRoute implements Routes {
     );
 
     // SCH-OK
+    // Attach a thumbnail to a file that was already uploaded.
+    //
+    // The binary and chunked upload routes carry their metadata in an x-userfile-info header,
+    // and a base64 JPEG does not fit in Node's 16KB default header limit — so previews get
+    // their own small JSON route. Written under the same `<filename>_preview_<id>` name
+    // _upload uses, so readers (EImage previewId="0") are unchanged.
+    this.router.post(
+      '/userfile/uploadPreview',
+      express.json({limit: '5mb'}),
+      authenticateJWT,
+      errorHelper(async (req, res) => {
+        const results = await this.userFileService.uploadPreview(RequestContext.instance(req), {
+          fileId: req.body?.fileId,
+          previewId: req.body?.previewId,
+          data: req.body?.data,
+          iv: req.body?.iv,
+        });
+        res.json({
+          success: true,
+          results,
+        });
+      }),
+    );
+
+    // SCH-OK
     // Chunked upload init: creates/updates the UserFile record and stores chunking metadata.
     // Actual ciphertext chunks are uploaded separately via /userfile/uploadChunk.
     this.router.post(
@@ -329,6 +361,10 @@ class UserFileDataRoute implements Routes {
           res.set('Content-Type', 'application/octet-stream');
 
           for (let i = 0; i < chunkCount; i++) {
+            // Stop if the client already went away — otherwise we keep opening
+            // per-chunk DB streams for a response nobody is reading.
+            if (res.writableEnded || res.destroyed) return;
+
             const idx = startChunk + i;
             const {stream} = await this.userFileService.getUserFileChunkStreamById(
               RequestContext.instance(req),
@@ -343,10 +379,14 @@ class UserFileDataRoute implements Routes {
             const len = Buffer.alloc(4);
             len.writeUInt32BE(buf.length, 0);
             res.write(len);
-            res.write(buf);
+            // Respect backpressure: without this, a slow client makes res.write
+            // buffer every chunk in memory (up to 256 x chunkSize per request).
+            if (!res.write(buf)) {
+              await awaitWritableDrain(res);
+            }
           }
 
-          res.end();
+          if (!res.writableEnded && !res.destroyed) res.end();
         } catch (error) {
           console.error('Error streaming ciphertext chunk range', error);
           throw error;
@@ -357,6 +397,10 @@ class UserFileDataRoute implements Routes {
     // SCH-OK
     this.router.post(
       '/userfile/upload',
+      // This path is excluded from the app-level parsers (see app.ts bigBodyPaths):
+      // base64 fileData inflates payloads, so it gets its own larger limits here.
+      // Modern clients send JSON; urlencoded kept for older clients.
+      express.json({limit: '70mb'}),
       express.urlencoded({
         limit: '70mb',
         extended: true,

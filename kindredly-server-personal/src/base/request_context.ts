@@ -18,10 +18,41 @@ export class RequestContext {
   public appId?: string;
   public appVersion?: string;
   public clientVersion?: string;
+  /**
+   * The physical machine this client runs on, when the agent can actually know it. Only the desktop
+   * Companion and Android Guard report these; a browser has no way to read a hostname, so a device
+   * list built from `client_info` can name a computer running the Companion and cannot name a
+   * browser-only install. That limit is real and belongs on screen, not papered over here.
+   */
+  public deviceId?: string;
+  public deviceName?: string;
+  public deviceType?: string;
 
   public tempAuthUserId?: string;
 
   public inNetworkUserSet?: Set<string>;
+
+  /**
+   * Which authorization checks ran during this request.
+   *
+   * Authorization here is convention, not structure: a route hands `getTargetUserId(req)` — a user
+   * id the *caller* named — to a service, and safety depends on that service happening to call one
+   * of the verify primitives below. Nothing enforces it, so a route that forgets fails open with
+   * no compile error, no failing test and no log.
+   *
+   * This makes it observable. `authorization_observer.middleware.ts` reads it after the response
+   * and reports requests that named a user other than the caller and checked nothing. Recording
+   * only — it changes no behavior.
+   *
+   * Deliberately NOT recorded: `verifyUserExists`, which is authentication and runs on every
+   * authenticated request. Counting it would mark everything as checked.
+   */
+  public authChecks: Set<string> = new Set();
+
+  /** Note that an authorization check ran. Safe to call more than once per request. */
+  recordAuthCheck(name: string) {
+    this.authChecks.add(name);
+  }
 
   private users = new UserRepo();
   private friends = new FriendRepo();
@@ -71,6 +102,13 @@ export class RequestContext {
     this.appId = this.getHeaderValue('tsappid');
     this.appVersion = this.getHeaderValue('tsappversion');
     this.clientVersion = this.getHeaderValue('tsclientversion');
+    // Machine identity, reported by agents that genuinely have one. A browser cannot read a
+    // hostname, so these stay undefined for the extension and the webapp — and an undefined value
+    // never overwrites a stored one below, so a row named by a Companion keeps its name when the
+    // same account's browser checks in.
+    this.deviceId = this.getHeaderValue('tsdeviceid');
+    this.deviceName = this.getHeaderValue('tsdevicename');
+    this.deviceType = this.getHeaderValue('tsdevicetype');
   }
 
   private getHeaderValue(name: string): string | undefined {
@@ -82,6 +120,23 @@ export class RequestContext {
 
   isAuthenticated() {
     return this.currentUserId != null;
+  }
+
+  /**
+   * True for an admin-console token specifically.
+   *
+   * These are minted by getAdminAuthDetails with `{isAdmin: true}` and **no userId** — deliberately,
+   * since they sit outside the user_session registry and expiry is their only invalidation. The
+   * consequence is that `isAuthenticated()` is false for them, and `isAdmin()` is too (it resolves a
+   * user row, and there is no user). Any check written as "authenticated, and therefore allowed"
+   * silently excludes the admin console: that is why an admin asking published search for both
+   * catalogs got Kindredly's only (agent-observations #61).
+   *
+   * Narrow on purpose — this reports how the caller authenticated, nothing about a user's role.
+   * For "is this person an admin", use `isAdmin()`.
+   */
+  isAdminConsoleToken() {
+    return this.request?.authInfo?.isAdmin === true;
   }
 
   getIPAddress() {
@@ -136,6 +191,9 @@ export class RequestContext {
         appId: this.appId || clientInfo.appId,
         appVersion: this.appVersion || clientInfo.appVersion,
         clientVersion: this.clientVersion || clientInfo.clientVersion,
+        deviceId: this.deviceId || clientInfo.deviceId,
+        deviceName: this.deviceName || clientInfo.deviceName,
+        deviceType: this.deviceType || clientInfo.deviceType,
       });
     } else {
       if (this.currentUserId && this.clientId && this.clientId != 'CLID_UNKNOWNIP') {
@@ -155,6 +213,9 @@ export class RequestContext {
           appId: this.appId,
           appVersion: this.appVersion,
           clientVersion: this.clientVersion,
+          deviceId: this.deviceId,
+          deviceName: this.deviceName,
+          deviceType: this.deviceType,
           userId: this.currentUserId,
           _id,
         };
@@ -186,6 +247,7 @@ export class RequestContext {
   }
 
   async verifyInAccount(userId: string, message = 'User auth error') {
+    this.recordAuthCheck('verifyInAccount');
     if (userId != this.currentUserId) {
       const targetUser = await this.getUserById(userId);
       if (targetUser.accountId != this.accountId) {
@@ -195,6 +257,7 @@ export class RequestContext {
   }
 
   async isSelfOrAdmin(userId: string) {
+    this.recordAuthCheck('isSelfOrAdmin');
     if (userId == this.currentUserId) {
       return true;
     }
@@ -204,6 +267,7 @@ export class RequestContext {
   }
 
   async verifySelfOrAdmin(userId: string, message = 'User auth error') {
+    this.recordAuthCheck('verifySelfOrAdmin');
     let selforadmin = await this.isSelfOrAdmin(userId);
     if (!selforadmin) {
       throw new Error(message);
@@ -211,6 +275,7 @@ export class RequestContext {
   }
 
   async isSelfOrAdminOfUser(userId: string) {
+    this.recordAuthCheck('isSelfOrAdminOfUser');
     if (userId == this.currentUserId) {
       return true;
     }
@@ -222,6 +287,7 @@ export class RequestContext {
   }
 
   async verifySelfOrAdminOverUser(userId: string, message = 'User auth error') {
+    this.recordAuthCheck('verifySelfOrAdminOverUser');
     let selforadminofuser = await this.isSelfOrAdminOfUser(userId);
     if (!selforadminofuser) {
       throw new Error(message);
@@ -229,6 +295,7 @@ export class RequestContext {
   }
 
   async verifyAdminOverUser(userId: string, message = 'User auth error') {
+    this.recordAuthCheck('verifyAdminOverUser');
     const targetUser = await this.getUserById(userId);
     if (!(await this.isAdmin()) || targetUser.accountId != this.accountId || targetUser.type == UserType.admin) {
       throw new Error(message);
@@ -236,12 +303,14 @@ export class RequestContext {
   }
 
   async verifyCurrentUserIsAdmin() {
+    this.recordAuthCheck('verifyCurrentUserIsAdmin');
     if (!(await this.isAdmin())) {
       throw new Error('You must be an admin');
     }
   }
 
   async verifyAdminPermissions(userId: string = null) {
+    this.recordAuthCheck('verifyAdminPermissions');
     if (!(await this.isAdmin())) {
       throw new Error('You must be an admin');
     }
@@ -249,6 +318,7 @@ export class RequestContext {
   }
 
   async verifyInNetwork(userIds: string[]) {
+    this.recordAuthCheck('verifyInNetwork');
     if (!this.inNetworkUserSet) {
       await this.loadInNetwork();
     }
@@ -277,6 +347,14 @@ export class RequestContext {
 
   getTempAuthUserId() {
     return this.tempAuthUserId;
+  }
+
+  /**
+   * The device this token was minted for, from the TOKEN — not the `tsdeviceid` header,
+   * which any caller can set. Only a Companion (device-agent) token carries one.
+   */
+  getTokenDeviceId(): string | null {
+    return (this.request as any)?.authInfo?.deviceId || null;
   }
 
   isOverrideActive() {

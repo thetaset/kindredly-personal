@@ -1,3 +1,7 @@
+import {HttpException} from '@/exceptions/HttpException';
+import {UserChangeLogRepo} from '@/db/user_changelog.repo';
+import type {DeviceGrant} from 'tset-sharedlib/restrictions/deviceGrants';
+import {buildDeviceGrants} from '@/services/deviceGrantBuilder';
 import {config} from '@/config';
 import {AccountRepo} from '@/db/account.repo';
 import {ItemFeedbackRepo} from '@/db/item_feedback.repo';
@@ -21,9 +25,13 @@ import {
   OFFICIAL_PUBLISHER_USERNAME,
 } from 'tset-sharedlib/constants';
 import {UserType, VerificationType} from 'tset-sharedlib/shared.types';
+import {isGuardianOnlyPrefKey} from 'tset-sharedlib/types/client.types';
 import {UpdatePublicProfileRequest} from 'tset-sharedlib/api';
 import type {CopyUserSettingsRequest, CopyUserSettingsResponse, UserSettingsCopyGroup} from 'tset-sharedlib/api';
 import {isUnderAge} from 'tset-sharedlib/date.utils';
+import {buildCheckpointRelease, resolveCheckpointMode} from 'tset-sharedlib/restrictions/checkpoint';
+import type {AccessControlSettings, CheckpointRelease} from 'tset-sharedlib/types';
+import {isAppCapabilityId} from 'tset-sharedlib/types/item.types';
 import type UserPublic from 'tset-sharedlib/schemas/public/UserPublic';
 import {
   buildContentFilteringCopySnapshot,
@@ -40,6 +48,7 @@ import UserFileService from './user_file.service';
 import VerificationService from './verification.service';
 import {container} from '@/inversify.config';
 import SSEManager from './sse.manager';
+import NotificationService from './notification.service';
 
 const publicAttributes = ['username', 'fullName', 'enabled', 'about', 'profileImage'];
 
@@ -51,8 +60,31 @@ const ALLOWED_USER_SETTINGS_COPY_GROUPS: UserSettingsCopyGroup[] = [
 
 const OFFICIAL_PUBLISHER_CREATED_AT = new Date('2023-01-01T00:00:00.000Z');
 
+/** Bounds on the app device-capability grant map — see _sanitizeAppCapabilityGrants. */
+const MAX_APP_CAPABILITY_GRANT_APPS = 200;
+const MAX_APP_CAPABILITY_REF_ID_LENGTH = 200;
+const MAX_EMAIL_ALLOWED_SENDERS = 500;
+const MAX_EMAIL_ADDRESS_LENGTH = 254;
+
+/**
+ * Whether an options write can change what a child's PHONE enforces.
+ *
+ * Only these three feed the device rule compiler. Pushing on every options write would wake a
+ * child's device for a display preference; not pushing on these would leave the phone on its
+ * 15-minute backstop for the one thing a parent expects to be immediate (UX-019).
+ *
+ * Errs toward sending: an unrecognised shape returns false, but each key is checked for
+ * PRESENCE rather than for having changed, so re-saving the same limits still pushes. An extra
+ * push costs one authenticated fetch of identical rules, which Guard then declines to re-seal.
+ */
+function touchesDeviceRules(options: any): boolean {
+  if (!options || typeof options !== 'object') return false;
+  return 'usageLimitsData' in options || 'accessControlSettings' in options || 'ruleOverrideSettings' in options;
+}
+
 class UserService {
   private userRepo = new UserRepo();
+  private changeLogRepo = new UserChangeLogRepo();
   private usersPublic = new UserPublicRepo();
   private userShowcaseRepo = new UserShowcaseRepo();
   private publishedRepo = new PublishedRepo();
@@ -67,6 +99,7 @@ class UserService {
   private fileService = container.resolve(UserFileService);
 
   private verficationService = new VerificationService();
+  private notificationService = container.resolve(NotificationService);
 
   private buildOfficialPublisherProfile(): UserPublic {
     return {
@@ -112,7 +145,7 @@ class UserService {
     await ctx.verifySelfOrAdmin(viewAsUserId);
 
     const user = await this.getUserById(userId);
-    if (!user) throw new Error('User not found');
+    if (!user) throw new HttpException(404, 'User not found');
     // same account?
     const viewingUser = await ctx.getUserById(viewAsUserId);
     let relationship = null;
@@ -127,7 +160,9 @@ class UserService {
     }
 
     if (!relationship) {
-      throw new Error('User not found');
+      // Deliberately the same 404 and message as a genuinely absent user: a stranger must not be
+      // able to tell "no such user" from "exists, but you may not see them".
+      throw new HttpException(404, 'User not found');
     }
     const userProfile = getUserProfileInfo(user);
     return {...userProfile, relationship};
@@ -409,6 +444,11 @@ class UserService {
     for (const user of users) {
       user['hasPassword'] = !!user['password'];
       user['hasPin'] = !!user['pin'];
+      // "Which members still have key material on our servers" (D5) needs these as a
+      // batch. prepUserForTransport emits them for a single user; this path deliberately
+      // does not call it, so set them here rather than doing N round-trips.
+      user['hasPasswordCopy'] = !!user['passwordCopy'];
+      user['hasRecoveryKeyStored'] = !!user['recoveryKey'];
       removeSensitiveInfoFromUser(user);
     }
     return users;
@@ -428,7 +468,18 @@ class UserService {
     }
 
     this.updateLastActiveAt(ctx);
-    return user;
+
+    // SYNC-6. This replaces `UPDATE user SET updatedAt` on every change to anything
+    // this user can see -- a single hot row per user, written once per change, purely
+    // so the client could tell whether it was behind.
+    //
+    // Computed on read instead of written on change. Reads of the user record are far
+    // rarer than changes to a family's library, and (userId, id) makes this an
+    // index-only backward scan of one entry. The client compares it against the
+    // revision it last synced to and skips the request when they match, exactly as it
+    // used to compare dates -- but without a write on the hot path, and without
+    // depending on an SSE connection being up.
+    return {...user, syncRevision: await this.changeLogRepo.maxRevisionForUser(user._id)};
   }
 
   updateLastActiveAt(ctx: RequestContext) {
@@ -477,11 +528,33 @@ class UserService {
   }
 
   // ROUTE-METHOD
+  /**
+   * A parent's approvals for the calling device, in the grant vocabulary.
+   *
+   * Called from the Companion's heartbeat, so it must never throw: a check-in that fails takes the
+   * tamper reporting and the liveness signal down with it, and a missing grant only means a block
+   * lifts on the next check-in instead of this one.
+   *
+   * Day scoping travels with the grant rather than being resolved here — this process is on UTC
+   * and only the device knows the family's timezone.
+   */
+  async getDeviceGrantsForCurrentUser(ctx: RequestContext): Promise<DeviceGrant[]> {
+    try {
+      const user = await ctx.getCurrentUser();
+      const options = (user?.options || {}) as Record<string, any>;
+      const overrides = options?.ruleOverrideSettings?.ruleOverrides;
+      return buildDeviceGrants(overrides, Date.now());
+    } catch (error) {
+      console.error('[UserService] getDeviceGrantsForCurrentUser failed', error);
+      return [];
+    }
+  }
+
   async setUserOptions(ctx: RequestContext, targetUserId: string, options: any) {
     await ctx.verifyAdminPermissions(targetUserId);
     const targetUser = await ctx.getUserById(targetUserId);
     if (!targetUser || targetUser.deleted) {
-      throw new Error('User not found');
+      throw new HttpException(404, 'User not found');
     }
 
     const updatedOptions = this._mergeUserOptions(targetUser, options);
@@ -493,7 +566,72 @@ class UserService {
       source: 'options-update',
     });
 
+    // Only when the change can actually change what the phone enforces. Pushing on every
+    // options write would wake a child's device for things like a display preference.
+    if (touchesDeviceRules(options)) {
+      // Fire-and-forget on purpose: the parent's save must not fail, or appear to fail,
+      // because a push provider was slow. Guard's 15-minute pull is the backstop if it
+      // never lands (UX-019).
+      void this.notificationService
+        .sendSilentDeviceRuleSync(targetUserId)
+        .catch((e) => console.error('device rule sync push failed', e?.message || e));
+    }
+
     return null;
+  }
+
+  /**
+   * Mark the CURRENT user's own daily check-in done for today.
+   *
+   * This is the only write into `accessControlSettings` a restricted user may
+   * make, so it is deliberately narrow rather than a relaxation of
+   * `setUserOptions`:
+   *  - no target user — it always acts on ctx.currentUserId
+   *  - it writes `checkpointRelease` and nothing else, onto a freshly read
+   *    record, so it can never drop a sibling setting or flip a restriction
+   *  - it refuses in guardian mode, which is the mode that means "only an
+   *    admin may clear this"
+   *
+   * Admins clearing a child's guardian gate still go through setUserOptions.
+   */
+  // ROUTE-METHOD
+  async clearOwnCheckpoint(ctx: RequestContext): Promise<{release: CheckpointRelease}> {
+    const userId = ctx.getCurrentUserId();
+    if (!userId) {
+      throw new Error('You must be signed in');
+    }
+
+    const user = await this.userRepo.findById(userId);
+    if (!user || user.deleted) {
+      throw new HttpException(404, 'User not found');
+    }
+
+    const options = (user.options || {}) as any;
+    const accessControlSettings = (options.accessControlSettings || {}) as AccessControlSettings;
+    const checkpointSettings = accessControlSettings.checkpointSettings;
+
+    if (checkpointSettings?.enabled !== true) {
+      throw new Error('No daily check-in is set up');
+    }
+    if (resolveCheckpointMode(checkpointSettings) === 'guardian') {
+      throw new Error('Only an adult can clear this check-in');
+    }
+
+    const release = buildCheckpointRelease(Date.now(), checkpointSettings, userId, true);
+
+    await this._updateUserWithId(userId, {
+      options: {
+        ...options,
+        accessControlSettings: {...accessControlSettings, checkpointRelease: release},
+      },
+    });
+    this.broadcastUserSettingsRefresh(userId, {
+      refreshCurrentUser: true,
+      refreshUserPrefs: false,
+      source: 'options-update',
+    });
+
+    return {release};
   }
 
   async copyUserSettings(ctx: RequestContext, input: CopyUserSettingsRequest): Promise<CopyUserSettingsResponse> {
@@ -625,7 +763,7 @@ class UserService {
     await ctx.verifyAdminPermissions(targetUserId);
     const targetUser = await ctx.getUserById(targetUserId);
     if (!targetUser || targetUser.deleted) {
-      throw new Error('User not found');
+      throw new HttpException(404, 'User not found');
     }
 
     await this.userRepo.updateWithId(targetUserId, {canPublishPublicly});
@@ -678,6 +816,8 @@ class UserService {
       contentFilteringEnabled: false,
       logActivity: false,
       aiChatEnabled: false,
+      appEditorEnabled: false,
+      explorePublishedEnabled: false,
       accessControlSettings: null,
       usageLimitsData: null,
       ruleOverrideSettings: null,
@@ -698,8 +838,17 @@ class UserService {
       if ('logActivity' in options) {
         updatedOptions.logActivity = !!options.logActivity;
       }
+      if ('containLinksInternally' in options) {
+        updatedOptions.containLinksInternally = !!options.containLinksInternally;
+      }
       if ('aiChatEnabled' in options) {
         updatedOptions.aiChatEnabled = !!options.aiChatEnabled;
+      }
+      if ('appEditorEnabled' in options) {
+        updatedOptions.appEditorEnabled = !!options.appEditorEnabled;
+      }
+      if ('explorePublishedEnabled' in options) {
+        updatedOptions.explorePublishedEnabled = !!options.explorePublishedEnabled;
       }
       if ('accessControlSettings' in options) {
         updatedOptions.accessControlSettings = options.accessControlSettings;
@@ -709,6 +858,12 @@ class UserService {
       }
       if ('ruleOverrideSettings' in options) {
         updatedOptions.ruleOverrideSettings = options.ruleOverrideSettings;
+      }
+      if ('appCapabilityGrants' in options) {
+        updatedOptions.appCapabilityGrants = this._sanitizeAppCapabilityGrants(options.appCapabilityGrants);
+      }
+      if ('emailAllowedSenders' in options) {
+        updatedOptions.emailAllowedSenders = this._sanitizeEmailAllowedSenders(options.emailAllowedSenders);
       }
     }
 
@@ -721,6 +876,78 @@ class UserService {
     }
 
     return updatedOptions;
+  }
+
+  /**
+   * App device-capability grants, written whole by a guardian approving an 'appCapability'
+   * access request. The client read-merge-writes the entire map, so this is a full replace —
+   * which is exactly why it is shape-checked here: a malformed or unbounded map would
+   * otherwise be persisted verbatim and read back by every client on every refresh.
+   */
+  private _sanitizeAppCapabilityGrants(raw: unknown): Record<string, Record<string, unknown>> {
+    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return {};
+
+    const out: Record<string, Record<string, unknown>> = {};
+    let appCount = 0;
+
+    for (const [refId, capMap] of Object.entries(raw as Record<string, unknown>)) {
+      if (appCount >= MAX_APP_CAPABILITY_GRANT_APPS) break;
+      if (!refId || refId.length > MAX_APP_CAPABILITY_REF_ID_LENGTH) continue;
+      if (!capMap || typeof capMap !== 'object' || Array.isArray(capMap)) continue;
+
+      const caps: Record<string, unknown> = {};
+      for (const [capability, grant] of Object.entries(capMap as Record<string, unknown>)) {
+        if (!isAppCapabilityId(capability)) continue;
+        if (!grant || typeof grant !== 'object' || Array.isArray(grant)) continue;
+
+        const {grantedBy, grantedAt, expiresAtMs} = grant as Record<string, unknown>;
+        if (typeof grantedBy !== 'string' || !grantedBy) continue;
+        if (typeof grantedAt !== 'number' || !Number.isFinite(grantedAt)) continue;
+
+        caps[capability] = {
+          grantedBy: grantedBy.slice(0, MAX_APP_CAPABILITY_REF_ID_LENGTH),
+          grantedAt,
+          ...(typeof expiresAtMs === 'number' && Number.isFinite(expiresAtMs) ? {expiresAtMs} : {}),
+        };
+      }
+
+      if (Object.keys(caps).length) {
+        out[refId] = caps;
+        appCount++;
+      }
+    }
+
+    return out;
+  }
+
+  /**
+   * The addresses a restricted user may correspond with. Written whole by a guardian, so
+   * this is a full replace and has to be shape-checked here — the client read-merge-writes
+   * the array, and an unbounded or malformed one would be persisted verbatim and read back
+   * by every client on every refresh. Normalized to lowercase so the client's own
+   * comparisons (which lowercase everything) cannot miss a match on casing alone.
+   */
+  private _sanitizeEmailAllowedSenders(raw: unknown): string[] {
+    if (!Array.isArray(raw)) return [];
+
+    const out: string[] = [];
+    const seen = new Set<string>();
+
+    for (const entry of raw) {
+      if (out.length >= MAX_EMAIL_ALLOWED_SENDERS) break;
+      if (typeof entry !== 'string') continue;
+
+      const email = entry.trim().toLowerCase();
+      if (!email || email.length > MAX_EMAIL_ADDRESS_LENGTH) continue;
+      // Deliberately permissive but structural: one @, no spaces, a dot in the domain.
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) continue;
+      if (seen.has(email)) continue;
+
+      seen.add(email);
+      out.push(email);
+    }
+
+    return out;
   }
 
   private _buildUserSettingsCopyGroupSnapshot(
@@ -795,7 +1022,7 @@ class UserService {
   async sendEmailVerification(ctx: RequestContext, targetUserId: string) {
     await ctx.verifySelfOrAdmin(targetUserId);
     const user = await this.getUserById(targetUserId);
-    if (!user) throw new Error('User not found');
+    if (!user) throw new HttpException(404, 'User not found');
     if (!user.email) throw new Error('User has no email address');
     if (user.verified) throw new Error('Email already verified');
 
@@ -826,6 +1053,42 @@ class UserService {
     }
 
     await this._updateUserWithId(targetUserId, {displayedName});
+  }
+
+  /**
+   * Give a user a date of birth after their account already exists.
+   *
+   * Admin only, unlike `setDisplayedName` beside it: `dob` decides age-based restrictions
+   * (`isUnderAge` below, and the recommended screen-time tier), so a restricted user allowed
+   * to write their own would be choosing their own limits. Nothing else on this route has
+   * that property, which is why it does not share the route's `verifySelfOrAdmin`.
+   *
+   * Only reachable because children created before SL-169 have `dob = NULL` and there was no
+   * way to give them one (UX-028); on create the same value is built from `otherSettings`
+   * in `auth.service.ts`.
+   */
+  // ROUTE-METHOD
+  async setDateOfBirth(ctx: RequestContext, targetUserId: string, dob: {y?: number; m?: number; d?: number}) {
+    await ctx.verifyAdminPermissions(targetUserId);
+
+    const year = Number(dob?.y);
+    // `dob?.m || 1` would turn an explicit month 0 into January — a 0-indexed month sent by
+    // mistake would be silently accepted as a real one. Default only when it is genuinely
+    // absent; an out-of-range month is a typo and gets refused below.
+    const month = dob?.m === undefined || dob?.m === null ? 1 : Number(dob.m);
+    const currentYear = new Date().getFullYear();
+
+    // A year outside this range is a typo, not a person. Rejecting it matters more than it
+    // looks: a year in the future reads as a negative age, and `calculateAge` returning a
+    // nonsense number silently re-tiers every limit this child has.
+    if (!Number.isInteger(year) || year < currentYear - 120 || year > currentYear) {
+      throw new Error('Enter a valid birth year');
+    }
+    if (!Number.isInteger(month) || month < 1 || month > 12) {
+      throw new Error('Enter a valid birth month');
+    }
+
+    await this._updateUserWithId(targetUserId, {dob: {y: year, m: month}} as any);
   }
 
   // ROUTE-METHOD
@@ -933,6 +1196,13 @@ class UserService {
     await ctx.verifySelfOrAdmin(targetUserId);
 
     const updateKeys = Object.keys(updates || {});
+
+    // `verifySelfOrAdmin` counts a restricted user editing their own prefs as "self",
+    // so without this a child could lift any restriction stored as one of their prefs
+    // by calling this route directly. Disabling the control in the UI is not a check.
+    if (updateKeys.some(isGuardianOnlyPrefKey)) {
+      await ctx.verifyAdminPermissions(targetUserId);
+    }
 
     for (const key of updateKeys) {
       const value = updates[key];

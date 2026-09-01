@@ -33,6 +33,14 @@ export default interface Item {
 
   useCriteria?: Array<string> | null;
 
+  /**
+   * Semantic slot assignments ("health.provider.dentist", "apps.email") — see
+   * kinds/kindRegistry.ts. E2E-encrypted client-side from introduction (like `tags`),
+   * so the server never reads real values for encrypted accounts.
+   * (Mirrors the `kinds` column added in migration 20260709120000; kanel-regenerable.)
+   */
+  kinds?: Array<string> | null;
+
   url?: string | null;
 
   patterns?: Array<string> | null;
@@ -50,6 +58,13 @@ export default interface Item {
   published?: boolean | null;
 
   publishId?: string | null;
+
+  /**
+   * Per-account blind index of `publishId` (HMAC). Lets the server dedup/lookup imported items by
+   * published source without learning which published item a row is. Populated on sv:2 writes.
+   * (Mirrors the `publishIdBlindKey` column added in migration 20260629130000; kanel-regenerable.)
+   */
+  publishIdBlindKey?: string | null;
 
   publishName?: string | null;
 

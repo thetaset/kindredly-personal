@@ -1,126 +1,149 @@
 import type { CategorySet } from './types/categoryExplorer.types'
 
+// General's canonical structure is nested (groups → topics). The Category Explorer
+// renders it as a flat A–Z grid by default, and a UI toggle reveals these top-level
+// groups for drill-down. Leaf ids are stable so cached embeddings/assignments carry over.
 const generalSet: CategorySet = {
   id: 'general',
   name: 'General',
-  description: 'A broad set of categories covering most everyday content.',
+  description: 'A broad set of topics — browse them flat, or group them with one tap.',
   nodes: [
     {
-      id: 'gen_learning',
-      label: 'Learning',
-      description: 'Educational material for building knowledge and skills.',
-      tags: ['learning', 'education'],
+      id: 'gen_grp_learning',
+      label: 'Learning & School',
+      description: 'Core school subjects and how-to learning.',
+      tags: ['learning', 'school', 'education'],
       icon: 'mortarboard',
       children: [
-        { id: 'gen_education', label: 'Education', description: 'Tutorials, courses, lessons, and instructional material.', tags: ['tutorial', 'lesson', 'course', 'how-to'], icon: 'book' },
-        { id: 'gen_science', label: 'Science & Nature', description: 'The natural world, experiments, biology, physics, and the environment.', tags: ['science', 'nature', 'biology', 'physics', 'environment'], icon: 'flask' },
-        { id: 'gen_math', label: 'Math', description: 'Arithmetic, algebra, geometry, and other mathematical topics.', tags: ['math', 'mathematics', 'algebra', 'geometry'], icon: 'calculator' },
-        { id: 'gen_history', label: 'History & Culture', description: 'Historical events, civilizations, traditions, and cultures.', tags: ['history', 'culture', 'civilization'], icon: 'clock-history' },
-        { id: 'gen_language', label: 'Language & Literature', description: 'Reading, writing, books, languages, and storytelling.', tags: ['books', 'reading', 'writing', 'language', 'literature'], icon: 'translate' },
+        { id: 'gen_education', label: 'How-To & Learning', description: 'Tutorials, courses, lessons, and step-by-step guides on any subject.', tags: ['tutorial', 'lesson', 'course', 'how-to', 'learning', 'education', 'guide'], icon: 'mortarboard' },
+        { id: 'gen_math', label: 'Math', description: 'Numbers, arithmetic, algebra, geometry, and problem solving.', tags: ['math', 'mathematics', 'algebra', 'geometry', 'arithmetic', 'numbers'], icon: 'calculator' },
+        { id: 'gen_language', label: 'Reading & Writing', description: 'Books, stories, reading, writing, and languages.', tags: ['reading', 'writing', 'books', 'literature', 'language', 'story', 'grammar'], icon: 'book' },
+        { id: 'gen_critical_thinking', label: 'Critical Thinking', description: 'Logic, reasoning, spotting bias, evaluating evidence, media literacy, and thinking clearly about claims and data.', tags: ['critical thinking', 'logic', 'reasoning', 'media literacy', 'bias', 'evidence', 'fallacy', 'skepticism', 'data literacy'], icon: 'signpost-split' },
       ],
     },
     {
-      id: 'gen_creative',
-      label: 'Creative',
-      description: 'Making and enjoying art, music, and hands-on projects.',
-      tags: ['creative', 'art'],
+      id: 'gen_grp_science',
+      label: 'Science & Tech',
+      description: 'Science, nature, space, and how technology works.',
+      tags: ['science', 'technology', 'nature'],
+      icon: 'cpu',
+      children: [
+        { id: 'gen_science', label: 'Science', description: 'Biology, chemistry, physics, experiments, and how the world works.', tags: ['science', 'biology', 'chemistry', 'physics', 'experiment', 'scientist'], icon: 'flask' },
+        { id: 'gen_space', label: 'Space & Astronomy', description: 'Planets, stars, galaxies, rockets, and space exploration.', tags: ['space', 'astronomy', 'planet', 'star', 'galaxy', 'rocket', 'solar system'], icon: 'stars' },
+        { id: 'gen_nature', label: 'Nature & Environment', description: 'Plants, ecosystems, conservation, and the natural world.', tags: ['nature', 'environment', 'ecosystem', 'conservation', 'plants', 'earth'], icon: 'tree' },
+        { id: 'gen_animals', label: 'Animals & Wildlife', description: 'Animals, wildlife, insects, dinosaurs, and life on land and in the air.', tags: ['animal', 'wildlife', 'insect', 'bug', 'mammal', 'reptile', 'bird', 'dinosaur'], icon: 'bug' },
+        { id: 'gen_ocean', label: 'Oceans & Sea Life', description: 'Oceans, marine life, fish, and underwater worlds.', tags: ['ocean', 'sea', 'marine', 'fish', 'underwater', 'coral', 'whale'], icon: 'water' },
+        { id: 'gen_weather', label: 'Weather & Climate', description: 'Weather, seasons, storms, and the climate.', tags: ['weather', 'climate', 'storm', 'season', 'rain', 'temperature', 'forecast'], icon: 'cloud-sun' },
+        { id: 'gen_coding', label: 'Coding & Computers', description: 'Programming, software, and learning to build with code.', tags: ['coding', 'programming', 'software', 'developer', 'computer science', 'app'], icon: 'code-slash' },
+        { id: 'gen_ai', label: 'AI & Machine Learning', description: 'Artificial intelligence, machine learning, and how smart tech works.', tags: ['ai', 'artificial intelligence', 'machine learning', 'chatbot', 'neural network', 'llm'], icon: 'robot' },
+        { id: 'gen_technology', label: 'Technology & Gadgets', description: 'Devices, gadgets, the internet, and how technology works.', tags: ['technology', 'gadget', 'device', 'internet', 'tech', 'hardware'], icon: 'cpu' },
+        { id: 'gen_engineering', label: 'Engineering', description: 'Machines, structures, robotics, and how things are built.', tags: ['engineering', 'robotics', 'machine', 'build', 'mechanical', 'structure'], icon: 'gear' },
+        { id: 'gen_inventions', label: 'Inventions & Discovery', description: 'Inventors, breakthroughs, and the discoveries that shaped the world.', tags: ['invention', 'inventor', 'discovery', 'breakthrough', 'innovation'], icon: 'lightbulb' },
+      ],
+    },
+    {
+      id: 'gen_grp_people',
+      label: 'People & History',
+      description: 'History, places, cultures, beliefs, and current events.',
+      tags: ['history', 'culture', 'people'],
+      icon: 'globe2',
+      children: [
+        { id: 'gen_history', label: 'History', description: 'Historical events, people, civilizations, and the past.', tags: ['history', 'historical', 'civilization', 'ancient', 'war', 'past'], icon: 'clock-history' },
+        { id: 'gen_civics', label: 'Civics & Government', description: 'How government and society work — constitutions, elections, rights, laws, and how decisions get made. Studied and compared, not advocated.', tags: ['civics', 'government', 'politics', 'democracy', 'election', 'constitution', 'law', 'citizenship', 'rights'], icon: 'bank' },
+        { id: 'gen_geography', label: 'Geography & Maps', description: 'Countries, maps, landforms, and places around the globe.', tags: ['geography', 'map', 'country', 'continent', 'landform', 'place'], icon: 'globe-americas' },
+        { id: 'gen_world_cultures', label: 'World Cultures', description: 'Traditions, languages, food, and ways of life around the world.', tags: ['culture', 'tradition', 'world', 'people', 'heritage', 'custom'], icon: 'globe2' },
+        { id: 'gen_mythology', label: 'Myths & Legends', description: 'Myths, legends, folklore, and tales from around the world.', tags: ['mythology', 'myth', 'legend', 'folklore', 'tale', 'gods'], icon: 'book-half' },
+        { id: 'gen_religion_philosophy', label: 'Religion & Philosophy', description: 'World religions, beliefs, ethics, and big questions.', tags: ['religion', 'philosophy', 'belief', 'ethics', 'faith', 'spirituality'], icon: 'yin-yang' },
+        { id: 'gen_news', label: 'News & Current Events', description: 'Current events, headlines, and news coverage.', tags: ['news', 'current events', 'headline', 'world'], icon: 'newspaper' },
+      ],
+    },
+    {
+      id: 'gen_grp_arts',
+      label: 'Arts & Media',
+      description: 'Making art and music, plus movies and games.',
+      tags: ['art', 'music', 'entertainment'],
       icon: 'palette',
       children: [
-        { id: 'gen_art', label: 'Art', description: 'Drawing, painting, design, and visual art.', tags: ['art', 'drawing', 'painting', 'design'], icon: 'brush' },
-        { id: 'gen_music', label: 'Music', description: 'Songs, instruments, music theory, and performances.', tags: ['music', 'song', 'instrument', 'band'], icon: 'music-note-beamed' },
-        { id: 'gen_diy', label: 'DIY & Crafts', description: 'Hands-on projects, crafts, and do-it-yourself guides.', tags: ['diy', 'craft', 'project', 'handmade'], icon: 'tools' },
+        { id: 'gen_art', label: 'Art & Drawing', description: 'Drawing, painting, design, and visual art.', tags: ['art', 'drawing', 'painting', 'design', 'illustration', 'visual'], icon: 'brush' },
+        { id: 'gen_music', label: 'Music', description: 'Songs, instruments, music theory, and performances.', tags: ['music', 'song', 'instrument', 'band', 'melody', 'singing'], icon: 'music-note-beamed' },
+        { id: 'gen_diy', label: 'DIY & Crafts', description: 'Hands-on projects, crafts, and do-it-yourself guides.', tags: ['diy', 'craft', 'project', 'handmade', 'maker', 'build'], icon: 'tools' },
+        { id: 'gen_photography', label: 'Photography & Film', description: 'Photography, video, filmmaking, and editing.', tags: ['photography', 'photo', 'camera', 'film', 'video', 'editing'], icon: 'camera' },
+        { id: 'gen_entertainment_leaf', label: 'Movies & Shows', description: 'Movies, TV shows, and fun video content for downtime.', tags: ['movie', 'show', 'tv', 'film', 'streaming', 'entertainment'], icon: 'film' },
+        { id: 'gen_gaming', label: 'Games & Gaming', description: 'Video games, walkthroughs, board games, and gaming culture.', tags: ['gaming', 'video game', 'game', 'walkthrough', 'board game', 'esports'], icon: 'controller' },
       ],
     },
     {
-      id: 'gen_entertainment',
-      label: 'Entertainment & News',
-      description: 'Shows, games, current events, and sports.',
-      tags: ['entertainment', 'news'],
-      icon: 'controller',
+      id: 'gen_grp_health',
+      label: 'Health & Wellbeing',
+      description: 'Fitness, mental wellbeing, and sports.',
+      tags: ['health', 'wellbeing', 'fitness'],
+      icon: 'heart-pulse',
       children: [
-        { id: 'gen_entertainment_leaf', label: 'Entertainment', description: 'Movies, shows, games, and fun content for downtime.', tags: ['entertainment', 'movie', 'show', 'game', 'fun'], icon: 'film' },
-        { id: 'gen_news', label: 'News', description: 'Current events and news coverage.', tags: ['news', 'current events'], icon: 'newspaper' },
-        { id: 'gen_sports', label: 'Sports', description: 'Sports news, highlights, and how-to content.', tags: ['sports', 'team', 'athlete'], icon: 'trophy' },
+        { id: 'gen_health', label: 'Health & Fitness', description: 'Exercise, nutrition, wellness, and healthy habits.', tags: ['health', 'fitness', 'exercise', 'wellness', 'nutrition', 'workout'], icon: 'heart-pulse' },
+        { id: 'gen_mindfulness', label: 'Mindfulness & Wellbeing', description: 'Mindfulness, mental health, emotions, and relaxation.', tags: ['mindfulness', 'mental health', 'wellbeing', 'meditation', 'emotions', 'calm'], icon: 'peace' },
+        { id: 'gen_sports', label: 'Sports', description: 'Sports news, highlights, training, and how-to content.', tags: ['sports', 'team', 'athlete', 'training', 'game', 'fitness'], icon: 'trophy' },
       ],
     },
     {
-      id: 'gen_life',
-      label: 'Life & Home',
-      description: 'Everyday topics: health, money, food, productivity, and tech.',
-      tags: ['life', 'home'],
+      id: 'gen_grp_life',
+      label: 'Everyday Life',
+      description: 'Food, money, home, travel, and getting things done.',
+      tags: ['life', 'home', 'everyday'],
       icon: 'house-heart',
       children: [
-        { id: 'gen_health', label: 'Health & Exercise', description: 'Fitness, wellness, exercise, and healthy habits.', tags: ['health', 'exercise', 'fitness', 'wellness'], icon: 'heart-pulse' },
-        { id: 'gen_food', label: 'Food & Diet', description: 'Recipes, cooking, nutrition, and diet.', tags: ['food', 'recipe', 'cooking', 'diet', 'nutrition'], icon: 'cup-hot' },
-        { id: 'gen_finance', label: 'Finance', description: 'Money management, budgeting, saving, and investing.', tags: ['finance', 'money', 'budget', 'saving', 'investing'], icon: 'piggy-bank' },
-        { id: 'gen_productivity', label: 'Productivity', description: 'Tools and techniques for getting things done and staying organized.', tags: ['productivity', 'organization', 'tools', 'planning'], icon: 'check2-square' },
-        { id: 'gen_technology', label: 'Technology', description: 'Computers, software, gadgets, and how tech works.', tags: ['technology', 'computer', 'software', 'gadget'], icon: 'cpu' },
-        { id: 'gen_shopping', label: 'Shopping', description: 'Product reviews, deals, and shopping guides.', tags: ['shopping', 'product', 'review', 'deal'], icon: 'bag' },
+        { id: 'gen_food', label: 'Food & Cooking', description: 'Recipes, cooking, baking, nutrition, and diet.', tags: ['food', 'recipe', 'cooking', 'baking', 'diet', 'nutrition', 'meal'], icon: 'cup-hot' },
+        { id: 'gen_finance', label: 'Money & Finance', description: 'Budgeting, saving, investing, and understanding money.', tags: ['finance', 'money', 'budget', 'saving', 'investing', 'economy'], icon: 'piggy-bank' },
+        { id: 'gen_productivity', label: 'Productivity', description: 'Organization, planning, study skills, and getting things done.', tags: ['productivity', 'organization', 'planning', 'tools', 'study', 'focus'], icon: 'check2-square' },
+        { id: 'gen_life_skills', label: 'Life Skills', description: 'Practical everyday skills for becoming more independent.', tags: ['life skills', 'independence', 'practical', 'everyday', 'self-care'], icon: 'house-heart' },
+        { id: 'gen_gardening', label: 'Plants & Gardening', description: 'Gardening, growing food, flowers, and houseplants.', tags: ['gardening', 'garden', 'plants', 'flowers', 'growing', 'botany'], icon: 'flower1' },
+        { id: 'gen_pets', label: 'Pets & Animal Care', description: 'Caring for pets, training, and animal companionship.', tags: ['pets', 'pet', 'dog', 'cat', 'animal care', 'training'], icon: 'heart' },
+        { id: 'gen_travel', label: 'Travel & Places', description: 'Travel, destinations, landmarks, and exploring places.', tags: ['travel', 'destination', 'landmark', 'trip', 'vacation', 'explore'], icon: 'geo-alt' },
+        { id: 'gen_cars', label: 'Cars & Vehicles', description: 'Cars, vehicles, engines, and how they work.', tags: ['car', 'vehicle', 'engine', 'automobile', 'motor', 'transport'], icon: 'car-front' },
+        { id: 'gen_shopping', label: 'Shopping & Reviews', description: 'Product reviews, deals, and shopping guides.', tags: ['shopping', 'product', 'review', 'deal', 'buying'], icon: 'bag' },
       ],
     },
   ],
 }
 
+// Kids covers everyone 12 and under — it is the only age set, so it has to work for a
+// pre-schooler and a sixth-grader alike. Kept deliberately FLAT (no groups): a young child
+// browsing a two-level tree is one level too many, and `setHasGroups` would otherwise put a
+// flat/grouped toggle in the toolbar with nothing useful to toggle.
 const kidsSet: CategorySet = {
   id: 'kids',
   name: 'Kids',
-  description: 'Simple, friendly categories for younger children.',
-  minAgeGroups: ['minage_prek', 'minage_kids'],
+  description: 'Simple, friendly categories for kids 12 and under.',
+  minAgeGroups: ['minage_prek', 'minage_kids', 'minage_preteen'],
   nodes: [
-    { id: 'kid_stories', label: 'Stories & Books', description: 'Picture books, read-alongs, and storytelling for kids.', tags: ['story', 'book', 'reading', 'read-aloud'], icon: 'book' },
-    { id: 'kid_learning', label: 'Letters & Numbers', description: 'Learning the alphabet, counting, shapes, and colors.', tags: ['abc', 'alphabet', 'numbers', 'counting', 'shapes', 'colors'], icon: 'alphabet' },
-    { id: 'kid_songs', label: 'Music & Songs', description: 'Sing-along songs, nursery rhymes, and music for kids.', tags: ['song', 'music', 'nursery rhyme', 'sing-along'], icon: 'music-note-beamed' },
-    { id: 'kid_art', label: 'Art & Crafts', description: 'Coloring, drawing, and simple craft projects.', tags: ['art', 'craft', 'coloring', 'drawing'], icon: 'palette' },
-    { id: 'kid_animals', label: 'Animals & Nature', description: 'Animals, plants, and the natural world.', tags: ['animal', 'nature', 'plant', 'pet', 'zoo'], icon: 'tree' },
-    { id: 'kid_play', label: 'Games & Fun', description: 'Games, cartoons, and playful entertainment for kids.', tags: ['game', 'cartoon', 'play', 'fun'], icon: 'joystick' },
+    { id: 'kid_stories', label: 'Stories & Books', description: 'Picture books, read-alongs, and storytelling for kids.', tags: ['story', 'book', 'reading', 'read-aloud'], icon: 'book', sourceCategoryIds: ['gen_language'] },
+    { id: 'kid_learning', label: 'Letters & Numbers', description: 'Learning the alphabet, counting, shapes, and colors.', tags: ['abc', 'alphabet', 'numbers', 'counting', 'shapes', 'colors'], icon: 'alphabet', sourceCategoryIds: ['gen_education', 'gen_math', 'gen_language'] },
+    { id: 'kid_songs', label: 'Music & Songs', description: 'Sing-along songs, nursery rhymes, and music for kids.', tags: ['song', 'music', 'nursery rhyme', 'sing-along'], icon: 'music-note-beamed', sourceCategoryIds: ['gen_music'] },
+    { id: 'kid_art', label: 'Art & Crafts', description: 'Coloring, drawing, and simple craft projects.', tags: ['art', 'craft', 'coloring', 'drawing'], icon: 'palette', sourceCategoryIds: ['gen_art', 'gen_diy'] },
+    { id: 'kid_animals', label: 'Animals & Nature', description: 'Animals, plants, and the natural world.', tags: ['animal', 'nature', 'plant', 'pet', 'zoo'], icon: 'tree', sourceCategoryIds: ['gen_animals', 'gen_nature', 'gen_pets'] },
+    { id: 'kid_play', label: 'Games & Fun', description: 'Games, cartoons, and playful entertainment for kids.', tags: ['game', 'cartoon', 'play', 'fun'], icon: 'joystick', sourceCategoryIds: ['gen_gaming', 'gen_entertainment_leaf'] },
+    // Carried over from the retired Teens set so 10-12 year olds aren't left with a taxonomy
+    // written for under-5s. Gaming isn't repeated here — `kid_play` above already maps to it.
+    { id: 'kid_school', label: 'School & Homework', description: 'Subjects and study help for school.', tags: ['school', 'homework', 'study', 'science', 'history', 'geography'], icon: 'mortarboard', sourceCategoryIds: ['gen_math', 'gen_science', 'gen_language', 'gen_history', 'gen_civics', 'gen_geography'] },
+    { id: 'kid_sports', label: 'Sports', description: 'Sports, teams, training tips, and athletes.', tags: ['sports', 'team', 'training', 'athlete'], icon: 'trophy', sourceCategoryIds: ['gen_sports'] },
+    { id: 'kid_tech', label: 'Tech & Coding', description: 'Programming, apps, and how technology works.', tags: ['tech', 'coding', 'programming', 'app', 'computer'], icon: 'laptop', sourceCategoryIds: ['gen_coding', 'gen_technology'] },
   ],
 }
 
-const teensSet: CategorySet = {
-  id: 'teens',
-  name: 'Teens',
-  description: 'Categories tailored to pre-teens and teenagers.',
-  minAgeGroups: ['minage_preteen', 'minage_teen'],
-  nodes: [
-    {
-      id: 'teen_school',
-      label: 'School & Homework',
-      description: 'Subjects and study help for school.',
-      tags: ['school', 'homework', 'study'],
-      icon: 'mortarboard',
-      children: [
-        { id: 'teen_math_science', label: 'Math & Science', description: 'Math, biology, chemistry, and physics help.', tags: ['math', 'science', 'biology', 'chemistry', 'physics'], icon: 'flask' },
-        { id: 'teen_writing', label: 'Writing & Literature', description: 'Essays, books, grammar, and literary analysis.', tags: ['writing', 'literature', 'essay', 'grammar', 'book'], icon: 'pencil' },
-        { id: 'teen_social_studies', label: 'History & Social Studies', description: 'History, geography, civics, and current events for school.', tags: ['history', 'geography', 'civics', 'social studies'], icon: 'globe2' },
-      ],
-    },
-    {
-      id: 'teen_hobbies',
-      label: 'Hobbies & Interests',
-      description: 'Gaming, music, sports, and creative pursuits.',
-      tags: ['hobby', 'interest'],
-      icon: 'controller',
-      children: [
-        { id: 'teen_gaming', label: 'Gaming', description: 'Video games, walkthroughs, and gaming culture.', tags: ['gaming', 'video game', 'walkthrough', 'esports'], icon: 'joystick' },
-        { id: 'teen_music', label: 'Music', description: 'Artists, playlists, and learning instruments.', tags: ['music', 'artist', 'playlist', 'instrument'], icon: 'music-note-beamed' },
-        { id: 'teen_sports', label: 'Sports', description: 'Sports highlights, training tips, and fandom.', tags: ['sports', 'training', 'team', 'athlete'], icon: 'trophy' },
-        { id: 'teen_art_design', label: 'Art & Design', description: 'Drawing, digital art, fashion, and design.', tags: ['art', 'design', 'drawing', 'fashion'], icon: 'palette' },
-      ],
-    },
-    {
-      id: 'teen_life_skills',
-      label: 'Life Skills',
-      description: 'Practical skills for becoming more independent.',
-      tags: ['life skills'],
-      icon: 'house-heart',
-      children: [
-        { id: 'teen_finance', label: 'Money & Finance', description: 'Budgeting, saving, and understanding money.', tags: ['money', 'finance', 'budget', 'saving'], icon: 'wallet2' },
-        { id: 'teen_health', label: 'Health & Fitness', description: 'Exercise, nutrition, and mental wellness.', tags: ['health', 'fitness', 'exercise', 'nutrition', 'wellness'], icon: 'heart-pulse' },
-        { id: 'teen_tech', label: 'Tech & Coding', description: 'Programming, apps, and how technology works.', tags: ['tech', 'coding', 'programming', 'app', 'computer'], icon: 'laptop' },
-      ],
-    },
-    { id: 'teen_news_culture', label: 'News & Culture', description: 'Current events, trends, and pop culture.', tags: ['news', 'culture', 'trend', 'pop culture'], icon: 'newspaper' },
-  ],
-}
+export const DefaultCategorySets: CategorySet[] = [generalSet, kidsSet]
 
-export const DefaultCategorySets: CategorySet[] = [generalSet, kidsSet, teensSet]
+/**
+ * Sets that used to ship and must not come back. The admin overlay merges the seed
+ * additively (`reconcileWithSeed` never removes), so dropping a set from the seed alone
+ * leaves it live for any server that has already saved an overlay. Everything that reads
+ * effective sets filters these out.
+ *
+ * `teens` was retired when browsing collapsed to General + Kids: its best topics moved into
+ * Kids (which now covers everyone 12 and under) and teenagers browse General with an
+ * age-appropriate filter instead of a separate taxonomy.
+ */
+export const RETIRED_CATEGORY_SET_IDS: readonly string[] = ['teens']
+
+/** Drop retired sets from a seed/overlay/server list. Safe on any list, in any order. */
+export function withoutRetiredSets(sets: CategorySet[]): CategorySet[] {
+  return sets.filter((set) => !RETIRED_CATEGORY_SET_IDS.includes(set.id))
+}

@@ -22,8 +22,6 @@ export const USER_SETTINGS_COPY_WEBSITE_PREF_KEYS = [
 
 type ResolvedContentFilters = {
   blockAdult: boolean;
-  blockViolence: boolean;
-  blockExtremism: boolean;
   safeSearch: boolean;
   blurThumbnails: boolean;
   imageFlagging: boolean;
@@ -74,8 +72,6 @@ const STRICTNESS_INDEPENDENT_FILTER_KEYS: Array<keyof ResolvedContentFilters> = 
 
 const DEFAULT_FILTERS: ResolvedContentFilters = {
   blockAdult: true,
-  blockViolence: true,
-  blockExtremism: false,
   safeSearch: true,
   blurThumbnails: false,
   imageFlagging: true,
@@ -285,8 +281,6 @@ function resolveContentFilters(
 
   const resolved: ResolvedContentFilters = {
     blockAdult: toBoolean(filters.blockAdult, defaults.blockAdult),
-    blockViolence: toBoolean(filters.blockViolence, defaults.blockViolence),
-    blockExtremism: toBoolean(filters.blockExtremism, defaults.blockExtremism),
     safeSearch: toBoolean(filters.safeSearch, defaults.safeSearch),
     blurThumbnails: toBoolean(filters.blurThumbnails, defaults.blurThumbnails),
     imageFlagging: toBoolean(filters.imageFlagging, defaults.imageFlagging),
@@ -399,6 +393,7 @@ export function sanitizeUsageLimitsAccessControlSettings(raw: Record<string, unk
   delete next.restrictAllExpires;
   delete next.restrictAllTimeStamp;
   delete next.remoteActionSettings;
+  delete next.liveViewSettings;
 
   return Object.keys(next).length > 0 ? next : null;
 }

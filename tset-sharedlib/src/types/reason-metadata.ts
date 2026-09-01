@@ -10,12 +10,14 @@ export const REASON_LABELS: Partial<Record<ReasonCode, string>> = {
   extremism: 'Extremism',
   'adult-content': 'Adult content',
   inappropriate: 'Inappropriate',
-  'no-time-given': 'No time given today',
-  'time-exceeded': 'Out of time',
-  'out-of-time-range': 'Outside allowed time',
+  'no-time-given': 'No time set today',
+  'time-exceeded': 'No time left',
+  'out-of-time-range': 'Outside allowed hours',
   'no-matching-rule': 'No time allowed',
   'reqs-not-met': 'Requirements not met',
+  'checkpoint-pending': 'Daily Check-in',
   'not-in-library': 'Not in library',
+  'library-syncing': 'Library syncing',
   'restrict-all': 'Restricted',
   other: 'Blocked',
 }
@@ -82,14 +84,14 @@ export const REASON_UI_COPY: Partial<Record<ReasonCode, ReasonUICopy>> = {
       'This URL matches a custom blocked pattern configured in filter settings.',
   },
   'no-time-given': {
-    title: 'No time is set for today.',
-    detailTitle: 'No time given today',
+    title: 'No time set for today.',
+    detailTitle: 'No time set today',
     detailBody:
       'No usage time is configured today for this usage type. Ask a parent to add time in Schedule, or request time below.',
   },
   'time-exceeded': {
-    title: 'You are out of time.',
-    detailTitle: 'You are out of time',
+    title: 'No time left.',
+    detailTitle: 'No time left',
     detailBody: 'Your daily time allowance for this category has been used up.',
   },
   'reqs-not-met': {
@@ -98,9 +100,15 @@ export const REASON_UI_COPY: Partial<Record<ReasonCode, ReasonUICopy>> = {
     detailBody:
       'This content requires certain conditions to be met before it can be accessed.',
   },
+  'checkpoint-pending': {
+    title: 'Ask a parent before you get online.',
+    detailTitle: 'Daily Check-in',
+    detailBody:
+      'A parent has to unblock you before you can get online today. Ask them below, or ask them in person.',
+  },
   'out-of-time-range': {
-    title: 'Access not allowed at this time.',
-    detailTitle: 'Not allowed right now',
+    title: 'Outside allowed hours.',
+    detailTitle: 'Outside allowed hours',
     detailBody: 'This content is only allowed during certain times of day.',
   },
   'not-in-library': {
@@ -108,6 +116,12 @@ export const REASON_UI_COPY: Partial<Record<ReasonCode, ReasonUICopy>> = {
     detailTitle: 'Not in your library',
     detailBody:
       'This content is not in your approved library. Try Search Library, or request to add it.',
+  },
+  'library-syncing': {
+    title: 'Your library is still syncing.',
+    detailTitle: 'Library still syncing',
+    detailBody:
+      "This device hasn't finished downloading your library yet, so we can't tell whether this page is approved. Try again in a moment.",
   },
   'restrict-all': {
     title: 'Access to this content is restricted.',
@@ -119,4 +133,25 @@ export const REASON_UI_COPY: Partial<Record<ReasonCode, ReasonUICopy>> = {
 export function getReasonUICopy(code: ReasonCode | null | undefined): ReasonUICopy | null {
   if (!code) return null
   return REASON_UI_COPY[code] || null
+}
+
+/**
+ * Why a save was refused, for a save surface.
+ *
+ * Saving is gated on library membership, not on access, so only a few reasons
+ * can reach here. Anything else — including a failed check — falls back to a
+ * plain failure rather than blaming the library, which would be wrong for an
+ * adult whose network merely blipped.
+ */
+export function getSaveBlockedMessage(code: ReasonCode | null | undefined): string {
+  switch (code) {
+    case 'library-syncing':
+      return 'Your library is still syncing. Try again in a moment.'
+    case 'custom-blocked-url':
+      return "This site is blocked, so it can't be saved."
+    case 'not-in-library':
+      return "This page isn't in your library. Ask a guardian to add it."
+    default:
+      return "Couldn't save this page."
+  }
 }

@@ -8,6 +8,11 @@ import {feedbackFieldNaming, getFeedbackData, isValidFeedbackField} from '@/util
 import {ItemQueryRequest, ItemQueryResponse, ItemQueryFilters, ItemQueryIncludes} from 'tset-sharedlib/api';
 import {ItemInfoView, PermissionType} from 'tset-sharedlib/shared.types';
 import {Knex} from 'knex';
+import {clampOffset, clampPerPage} from '@/utils/pagination_utils';
+
+// Hard ceiling on a single /item/query page. The route used to materialize the
+// entire library and slice in JS — the same shape as the 2026-07-05 sync OOM.
+export const ITEM_QUERY_MAX_LIMIT = 500;
 
 export default class ItemQueryService {
   private itemRepo = new ItemRepo();
@@ -31,24 +36,29 @@ export default class ItemQueryService {
       return {items: [], total: 0, hasMore: false};
     }
 
-    // Build and execute query
+    // Build query. applyFilters includes the default archived/hidden drop
+    // rules (previously applied in JS after materializing everything), so
+    // pagination can run in SQL without changing which items a page contains.
     let query = this.buildBaseQuery(targetUserId, filters, includes);
-    query = this.applyFilters(query, targetUserId, filters);
-    query = this.applySorting(query, sort);
+    query = this.applyFilters(query, targetUserId, filters, includes);
 
-    const items = await query;
-    const processedItems = await this.postProcessItems(items, targetUserId, includes, filters);
-
-    // Apply pagination
     const {limit = 50, offset = 0} = pagination;
-    const total = processedItems.length;
-    const paginatedItems = processedItems.slice(offset, offset + limit);
-    const hasMore = offset + limit < total;
+    const safeLimit = clampPerPage(limit, 50, ITEM_QUERY_MAX_LIMIT);
+    const safeOffset = clampOffset(offset);
+
+    // `total` keeps its historical meaning: the full post-filter count. Clone
+    // before sorting so the count query carries no ORDER BY.
+    const countRow = await query.clone().clearSelect().count({count: 'item._id'}).first();
+    const total = Number(countRow?.count ?? 0);
+
+    const feedbackJoinActive = this.isFeedbackJoinActive(filters, includes);
+    const items = await this.applySorting(query, sort, feedbackJoinActive).limit(safeLimit).offset(safeOffset);
+    const processedItems = await this.postProcessItems(items, targetUserId, includes);
 
     return {
-      items: paginatedItems,
+      items: processedItems,
       total,
-      hasMore,
+      hasMore: safeOffset + safeLimit < total,
     };
   }
 
@@ -59,11 +69,20 @@ export default class ItemQueryService {
   /**
    * Build the base Knex query with joins
    */
+  // Single source of truth for when the item_feedback join is present on the
+  // query — buildBaseQuery, the hidden-filter default, and the visited sort
+  // must all agree or SQL references an unjoined table.
+  private isFeedbackJoinActive(filters: ItemQueryFilters, includes: ItemQueryIncludes): boolean {
+    return Boolean(
+      includes.feedback || filters.feedbackTypes || filters.archived !== undefined || filters.hidden !== undefined,
+    );
+  }
+
   private buildBaseQuery(userId: string, filters: ItemQueryFilters, includes: ItemQueryIncludes): Knex.QueryBuilder {
     let query = knex('item').select('item.*');
 
     // Always include feedback if requested or if filtering by feedback
-    if (includes.feedback || filters.feedbackTypes || filters.archived !== undefined || filters.hidden !== undefined) {
+    if (this.isFeedbackJoinActive(filters, includes)) {
       query = query
         .leftJoin('item_feedback', function () {
           this.on('item_feedback.itemId', '=', 'item._id').andOn('item_feedback.userId', '=', knex.raw('?', [userId]));
@@ -79,7 +98,12 @@ export default class ItemQueryService {
   /**
    * Apply filters to the query
    */
-  private applyFilters(query: Knex.QueryBuilder, userId: string, filters: ItemQueryFilters): Knex.QueryBuilder {
+  private applyFilters(
+    query: Knex.QueryBuilder,
+    userId: string,
+    filters: ItemQueryFilters,
+    includes: ItemQueryIncludes = {},
+  ): Knex.QueryBuilder {
     // User filter (always apply for standard mode)
     query = query.where('item.userId', userId);
 
@@ -88,7 +112,9 @@ export default class ItemQueryService {
       query = query.whereIn('item._id', filters.ids);
     }
 
-    // Archived filter
+    // Archived filter. When the filter is absent, archived items are excluded
+    // by default — this used to happen in a JS pass after materializing every
+    // row; it lives in SQL now so pagination sees the same set.
     if (filters.archived !== undefined) {
       if (filters.archived) {
         query = query.where('item.archived', true);
@@ -97,9 +123,17 @@ export default class ItemQueryService {
           this.where('item.archived', false).orWhereNull('item.archived');
         });
       }
+    } else {
+      query = query.where(function () {
+        this.where('item.archived', false).orWhereNull('item.archived');
+      });
     }
 
-    // Hidden filter
+    // Hidden filter. Same default-exclusion move as archived, with one parity
+    // subtlety: the old JS pass could only see isHidden when the feedback join
+    // was active, so the default exclusion applies only under that condition —
+    // adding the join just for this would change results.
+    const feedbackJoinActive = this.isFeedbackJoinActive(filters, includes);
     if (filters.hidden !== undefined) {
       if (filters.hidden) {
         query = query.where('item_feedback.isHidden', true);
@@ -108,12 +142,22 @@ export default class ItemQueryService {
           this.where('item_feedback.isHidden', false).orWhereNull('item_feedback.isHidden');
         });
       }
+    } else if (feedbackJoinActive && !filters.feedbackTypes?.includes('isHidden')) {
+      query = query.where(function () {
+        this.where('item_feedback.isHidden', false).orWhereNull('item_feedback.isHidden');
+      });
     }
 
     // Uncategorized filter (no parent collections)
     if (filters.uncategorized) {
       query = query.whereNotExists(function () {
-        this.select('*').from('item_relation').whereRaw('item_relation.itemId = item._id');
+        // "itemId" MUST stay quoted. Unquoted, Postgres folds it to `itemid`,
+        // which does not exist - knex created the column camelCase - and the
+        // whole query 500s. This filter is reachable from the library's
+        // "Uncategorized" menu entry, so that was a live error for anyone who
+        // clicked it. Same for the inCollections subquery below, and see
+        // item.list.service.ts for the sibling that always had it right.
+        this.select('*').from('item_relation').whereRaw('item_relation."itemId" = item._id');
       });
     }
 
@@ -131,7 +175,7 @@ export default class ItemQueryService {
       query = query.whereExists(function () {
         this.select('*')
           .from('item_relation')
-          .whereRaw('item_relation.itemId = item._id')
+          .whereRaw('item_relation."itemId" = item._id')
           .whereIn('item_relation.collectionId', filters.inCollections!);
       });
     }
@@ -160,13 +204,30 @@ export default class ItemQueryService {
       console.warn('Attribute filters not yet implemented in server query');
     }
 
+    // These resolve from meta/feeds/useCriteria, which are encrypted blobs here — the
+    // server cannot evaluate them. Client-local only; the client throws rather than route
+    // such a query here, so reaching this is a bug worth seeing.
+    if ((filters as any).effectiveTypes?.length) {
+      console.warn('effectiveTypes filter is client-local only and is ignored server-side');
+    }
+    if ((filters as any).eduValues?.length) {
+      console.warn('eduValues filter is client-local only and is ignored server-side');
+    }
+    if ((filters as any).tags?.length) {
+      console.warn('tags filter is client-local only and is ignored server-side');
+    }
+
     return query;
   }
 
   /**
    * Apply sorting to the query
    */
-  private applySorting(query: Knex.QueryBuilder, sort: {field?: string; order?: string}): Knex.QueryBuilder {
+  private applySorting(
+    query: Knex.QueryBuilder,
+    sort: {field?: string; order?: string},
+    feedbackJoinActive: boolean = true,
+  ): Knex.QueryBuilder {
     const {field = 'created', order = 'desc'} = sort;
 
     switch (field) {
@@ -177,7 +238,13 @@ export default class ItemQueryService {
         query = query.orderBy('item.updatedAt', order as any);
         break;
       case 'visited':
-        query = query.orderBy('item_feedback.lastVisit', order as any);
+        // lastVisit lives on item_feedback, which is only joined when feedback
+        // is referenced elsewhere in the request. Without the join the ORDER BY
+        // would reference an unjoined table (Postgres missing-FROM 500), so
+        // fall back to the default sort.
+        query = feedbackJoinActive
+          ? query.orderBy('item_feedback.lastVisit', order as any)
+          : query.orderBy('item.createdAt', order as any);
         break;
       case 'title':
       case 'name':
@@ -187,23 +254,18 @@ export default class ItemQueryService {
         query = query.orderBy('item.createdAt', 'desc');
     }
 
-    return query;
+    // Tiebreaker: every sortable column above is non-unique, and SQL
+    // LIMIT/OFFSET gives no stable order among equal keys — without this,
+    // offset-paged sweeps can duplicate or drop rows on timestamp ties.
+    return query.orderBy('item._id', 'asc');
   }
 
   /**
    * Post-process items to add additional data
    * Returns ItemInfoView in same format as other query modes
    */
-  private async postProcessItems(
-    items: any[],
-    userId: string,
-    includes: ItemQueryIncludes,
-    filters: ItemQueryFilters,
-  ): Promise<ItemInfoView[]> {
+  private async postProcessItems(items: any[], userId: string, includes: ItemQueryIncludes): Promise<ItemInfoView[]> {
     if (items.length === 0) return [];
-
-    const includeArchived = filters.archived === true;
-    const includeHidden = filters.hidden === true || !!filters.feedbackTypes?.includes('isHidden');
 
     const itemIds = items.map((item) => item._id);
 
@@ -248,36 +310,33 @@ export default class ItemQueryService {
       }
     }
 
-    // Build results in same format as other query modes
-    return items
-      .filter((v) => {
-        if (!includeArchived && v.archived === true) return false;
-        if (!includeHidden && v.isHidden === true) return false;
-        return true;
-      })
-      .map((v) => {
-        const result: any = {
-          itemId: v._id,
-          details: v,
-          feedback: includes.feedback ? getFeedbackData(v) : undefined,
-        };
+    // Build results in same format as other query modes. The archived/hidden
+    // default exclusions moved into applyFilters (SQL) so pagination is exact;
+    // re-filtering here would silently shrink pages if the two ever drifted —
+    // the integration parity tests own that invariant instead.
+    return items.map((v) => {
+      const result: any = {
+        itemId: v._id,
+        details: v,
+        feedback: includes.feedback ? getFeedbackData(v) : undefined,
+      };
 
-        if (includes.permissions) {
-          // Always include owner from item.userId
-          result.permissions = [{userId: v.userId, permission: PermissionType.owner}];
-          if (permissionsByItem[v._id]) {
-            result.permissions = [...permissionsByItem[v._id], ...result.permissions];
-          }
+      if (includes.permissions) {
+        // Always include owner from item.userId
+        result.permissions = [{userId: v.userId, permission: PermissionType.owner}];
+        if (permissionsByItem[v._id]) {
+          result.permissions = [...permissionsByItem[v._id], ...result.permissions];
         }
+      }
 
-        if (includes.allCollections || includes.parents || includes.parentCollectionIds) {
-          const relations = relationsByItem[v._id] || [];
-          result.collectionRelations = relations;
-          // Backwards compatibility - derive collectionIds from collectionRelations
-          result.collectionIds = relations.map((r) => r.collectionId);
-        }
+      if (includes.allCollections || includes.parents || includes.parentCollectionIds) {
+        const relations = relationsByItem[v._id] || [];
+        result.collectionRelations = relations;
+        // Backwards compatibility - derive collectionIds from collectionRelations
+        result.collectionIds = relations.map((r) => r.collectionId);
+      }
 
-        return result;
-      });
+      return result;
+    });
   }
 }

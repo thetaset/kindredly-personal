@@ -5,7 +5,6 @@ import {ItemRepo} from '@/db/item.repo';
 import {ItemFeedbackRepo} from '@/db/item_feedback.repo';
 import {ItemRelationRepo} from '@/db/item_relation.repo';
 import {UserRepo} from '@/db/user.repo';
-import {UserChangeLogRepo} from '@/db/user_changelog.repo';
 import {UserPermRepo} from '@/db/user_perm.repo';
 import Item from 'tset-sharedlib/schemas/public/Item';
 import User from 'tset-sharedlib/schemas/public/User';
@@ -20,6 +19,7 @@ import {
   UserType,
   UserPermissionRecord,
 } from 'tset-sharedlib/shared.types';
+import ChangeLogService from './change_log.service';
 import NotificationService from './notification.service';
 import {RequestContext} from '../base/request_context';
 import {container} from '@/inversify.config';
@@ -54,7 +54,21 @@ export interface UserPermWithDetails {
 }
 
 class PermissionService {
-  private changeLog = new UserChangeLogRepo();
+  private _changeLog: ChangeLogService | null = null;
+
+  /**
+   * Lazy on purpose. `ChangeLogService` constructs a `PermissionService` of its own
+   * (it needs one to resolve recipients), so a plain field here makes the two build
+   * each other forever -- a stack overflow at first construction, not a subtle bug.
+   * The setter keeps `(service as any).changeLog = mock` working in tests.
+   */
+  private get changeLog(): ChangeLogService {
+    return (this._changeLog ??= new ChangeLogService());
+  }
+
+  private set changeLog(value: ChangeLogService) {
+    this._changeLog = value;
+  }
   private itemRelations = new ItemRelationRepo();
   private itemRepo = new ItemRepo();
   private notificationsService = container.resolve(NotificationService);
@@ -508,6 +522,11 @@ class PermissionService {
     validPermissions: PermissionType[],
     includeOutsideLibrary = true,
   ): Promise<boolean> {
+    // Item-level authorization counts as an authorization check. Without this, a route that
+    // correctly gates on item permissions rather than on a user-level verify primitive would be
+    // reported as unchecked by the authorization observer.
+    ctx.recordAuthCheck('itemPermission');
+
     // first check direct permissions
     const userPerm = await this._getDirectUserPermissionToItemOrCollectionExcludingOwner(ctx.currentUserId, itemId);
 
@@ -689,7 +708,7 @@ class PermissionService {
     };
 
     await this.permissions.create(info);
-    await this.changeLog.logLastUpdateForUsers([targetUserId], {type: 'itemUpdate', items: [itemId]});
+    await this.changeLog.logItemChangeForUserIds([targetUserId], [itemId]);
   }
 
   async _removeUserPermission(userId: string, itemId: string) {
@@ -746,7 +765,12 @@ class PermissionService {
         permission: PermissionType.editor,
       };
       await txPermission.create(currentOwnerUpdatedPerm);
-      tx.commit();
+      // Awaited: an unawaited commit lets the function continue - and return -
+      // while the transaction is still settling, so a caller can read back the
+      // old owner, and a commit failure surfaces as an unhandled rejection
+      // rather than failing the transfer. The siblings at user.service.ts and
+      // content_loader.service.ts both await.
+      await tx.commit();
 
       try {
         await AuditLogService.instance.log(ctx, {

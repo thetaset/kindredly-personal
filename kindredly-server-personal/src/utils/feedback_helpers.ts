@@ -51,3 +51,39 @@ export function getFeedbackData(v: any): ItemFeedbackView {
     visitCount: v.visitCount,
   };
 }
+
+/**
+ * What a visit record should become, given what is already stored.
+ *
+ * Pure and shared by the batch and single-item paths so the two can never disagree about
+ * recency. Two rules live here:
+ *
+ *  - **Recency never moves backwards.** The client queue is durable and drains on app boot,
+ *    so a device offline for weeks flushes stale stamps; without this they overwrite a newer
+ *    visit and make actively-used content look cold on every device.
+ *  - **Each column keeps its OWN existing value** when the incoming visit is not newer.
+ *    Writing `visitTime` into `lastVisit` erased real recency on rows where `visitTime` was
+ *    null but `lastVisit` was set — reachable from unvalidated client input.
+ */
+export function resolveVisitRecord(
+  existing: {lastVisit?: any; visitTime?: any; visitCount?: number} | null | undefined,
+  incomingMs: number,
+  countThresholdMs: number,
+): {lastVisit: any; visitTime: any; visitCount: number} {
+  const incoming = new Date(incomingMs);
+  if (!existing) {
+    return {lastVisit: incoming, visitTime: incoming, visitCount: 1};
+  }
+
+  const existingVisitMs = existing.visitTime ? new Date(existing.visitTime).getTime() : 0;
+  const incomingIsNewer = Number.isFinite(incomingMs) && incomingMs > existingVisitMs;
+
+  // A visit counts as distinct only when the gap since the last one clears the threshold.
+  const countVisit = !existing.visitTime || existingVisitMs < countThresholdMs;
+
+  return {
+    lastVisit: incomingIsNewer ? incoming : existing.lastVisit,
+    visitTime: incomingIsNewer ? incoming : existing.visitTime,
+    visitCount: (existing.visitCount || 0) + (countVisit ? 1 : 0),
+  };
+}

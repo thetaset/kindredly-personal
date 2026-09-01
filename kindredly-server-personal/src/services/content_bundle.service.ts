@@ -1,6 +1,6 @@
 import {RequestContext} from '@/base/request_context';
 import {SysInfoRepo} from '@/db/sysinfo.repo';
-import InternalPublishedService from '@/services/_internal/internal_published.service';
+import {publishedReader} from '@/services/published_access';
 import type {
   AdminContentBundleCatalogResponse,
   AdminContentBundleDefinition,
@@ -77,7 +77,7 @@ const DEFAULT_BUNDLES: BundleDefinition[] = [
 
 class ContentBundleService {
   private sysInfo = new SysInfoRepo();
-  private publishedService = new InternalPublishedService();
+  private publishedService = publishedReader();
 
   private normalizeString(value: unknown): string {
     return typeof value === 'string' ? value.trim() : '';

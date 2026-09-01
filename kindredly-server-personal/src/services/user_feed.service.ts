@@ -1,4 +1,5 @@
 import {RequestContext} from '@/base/request_context';
+import {clampPerPage} from '@/utils/pagination_utils';
 import {v4 as uuidv4} from 'uuid';
 
 import {CommentRepo} from '@/db/comment.repo';
@@ -130,11 +131,19 @@ class UserFeedService {
 
     const safePageInfo = pageInfo || {};
     const {currentPage, perPage, includeTotalRows} = safePageInfo;
-    const safePerPage = Math.max(1, Number(perPage || 10));
+    const safePerPage = clampPerPage(perPage, 10);
     const safeCurrentPage = Math.max(0, Number(currentPage || 0));
 
-    const feedEntries = await this._feedQuery(targetUserId)
-      .limit(safePerPage)
+    const feedQuery = this._feedQuery(targetUserId);
+    if (newOnly) {
+      // Mirror countUnreadByUserId so the "New" list and the unread badge stay consistent.
+      feedQuery.whereNot('user_feed.isRead', true);
+    }
+
+    // Peek one row past the page so hasMore reflects raw feed rows — the shareGroup
+    // dedup below can shrink a full page, which must not read as "no more posts".
+    const feedEntries = await feedQuery
+      .limit(safePerPage + 1)
       .offset(safeCurrentPage * safePerPage)
       .orderBy('user_feed.createdAt', 'desc')
       .select(
@@ -149,7 +158,32 @@ class UserFeedService {
         'user_feed.refType as refType',
       );
 
-    return await this._buildFeedListResponse(feedEntries, includeComments, includeReactions, includeTotalRows === true);
+    const hasMore = feedEntries.length > safePerPage;
+    if (hasMore) feedEntries.pop();
+
+    // Grouped posts fan out to one sibling per group, and the author is a member of every
+    // sibling — so the author's own feed would otherwise show the same logical post N times.
+    // Collapse the author's own siblings to a single entry (which carries shareGroupId, so
+    // the post view can render per-group thread tabs). Recipients are in exactly one sibling,
+    // so their feeds are unaffected.
+    const dedupedEntries: any[] = [];
+    const seenAuthorShareGroups = new Set<string>();
+    for (const entry of feedEntries) {
+      const shareGroupId = entry?.shareGroupId;
+      if (shareGroupId && entry?.userId === targetUserId) {
+        if (seenAuthorShareGroups.has(shareGroupId)) continue;
+        seenAuthorShareGroups.add(shareGroupId);
+      }
+      dedupedEntries.push(entry);
+    }
+
+    const response = await this._buildFeedListResponse(
+      dedupedEntries,
+      includeComments,
+      includeReactions,
+      includeTotalRows === true,
+    );
+    return {...response, hasMore};
   }
 
   async searchPostsByUserId(
@@ -305,14 +339,19 @@ class UserFeedService {
   }
 
   // ROUTE-METHOD
-  // TODO: fix this at some point, currently marks all as read
+  // When ids are provided, only those entries are updated. When ids is empty/omitted,
+  // all of the user's unread entries are marked (used by "Mark all as read").
   async updateReadStatusForMultipleEntries(ctx: RequestContext, ids: string[], isRead: boolean) {
-    await this.userFeed
-      .query()
-      .where('userId', ctx.currentUserId)
-      .whereNot('isRead', true)
-      // .whereIn("user_feed._id", ids)
-      .update({isRead: isRead});
+    const query = this.userFeed.query().where('userId', ctx.currentUserId);
+
+    if (Array.isArray(ids) && ids.length > 0) {
+      query.whereIn('user_feed._id', ids);
+    } else if (isRead) {
+      // Only skip already-read rows for the mark-all-read case.
+      query.whereNot('isRead', true);
+    }
+
+    await query.update({isRead: isRead});
   }
 
   // ROUTE-METHOD

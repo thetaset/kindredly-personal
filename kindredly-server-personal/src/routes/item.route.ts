@@ -349,6 +349,10 @@ class ItemRoute implements Routes {
     // SCH-OK
     this.router.post(
       '/item/update',
+      // Excluded from app-level parsers (see app.ts bigBodyPaths): like
+      // /item/save, item `data` can carry large inline content. Preserves the
+      // prior 70mb ceiling. Parser must precede auth (reads tempAuthToken).
+      express.json({limit: '70mb'}),
       authenticateJWT,
       errorHelper(async (req: ApiReq<'/item/update'>, res) => {
         const ctx = RequestContext.instance(req);
@@ -359,8 +363,8 @@ class ItemRoute implements Routes {
           skipEncUpdate: skipEncUpdate == true,
         });
 
-        // TODO: this is partiallyredundant since similar thing happens above function
-        await this.changeLogService.logItemChange(ctx, itemId, null);
+        // No changelog call here: updateItem logs it, through the same wider
+        // recipient lookup this route used to compensate with. SYNC-2.
 
         const result = {
           success: true,
@@ -396,6 +400,11 @@ class ItemRoute implements Routes {
     // TODO: remove above?
     this.router.post(
       '/item/save',
+      // Excluded from app-level parsers (see app.ts bigBodyPaths): items can
+      // carry large inline content (pasted maps, snapshots). Preserves the prior
+      // 70mb ceiling so existing clients don't start getting 413s. Parser must
+      // precede auth (reads tempAuthToken).
+      express.json({limit: '70mb'}),
       authenticateJWT,
       errorHelper(async (req: ApiReq<'/item/save'>, res) => {
         const ctx = RequestContext.instance(req);
@@ -415,6 +424,9 @@ class ItemRoute implements Routes {
     this.router.post(
       '/item/attachment/add',
 
+      // Excluded from app-level parsers (see app.ts bigBodyPaths): attachments
+      // arrive base64-encoded. Modern clients send JSON; urlencoded is legacy.
+      express.json({limit: '70mb'}),
       express.urlencoded({
         limit: '70mb',
         extended: true,
@@ -562,12 +574,12 @@ class ItemRoute implements Routes {
       errorHelper(async (req: ApiReq<'/item/listByIds'>, res) => {
         let itemIds = req.body.ids;
         let items = [];
-        console.log('itemIds', itemIds);
         if (!itemIds || itemIds.length == 0) {
-          items = await this.itemlistService.listAllItemsWithInfoByUser(
-            RequestContext.instance(req),
-            getTargetUserId(req),
-          );
+          // 'listByIds' with no ids returns nothing. It must NOT fall back to the
+          // entire library: that serializes an unbounded response and is the OOM
+          // shape that crashed prod via /sync/update. Full-library fetch is what
+          // sync is for. No client sends empty ids (all callers guard on length).
+          items = [];
         } else {
           items = await this.itemlistService.listItemsWithInfoByUserForItemIds(
             RequestContext.instance(req),
@@ -794,20 +806,20 @@ class ItemRoute implements Routes {
       errorHelper(async (req: ApiReq<'/collection/addToUserLibrary'>, res) => {
         const ctx = RequestContext.instance(req);
 
-        await this.itemService.addUserCollectionsToLibrary(
+        const outcome = await this.itemService.addUserCollectionsToLibrary(
           ctx,
           getTargetUserId(req),
           req.body.collectionIds,
         );
 
-        if (req.body.collectionIds)
-          for (const colId of req.body.collectionIds) {
-            await this.changeLogService.logItemChange(ctx, colId);
-          }
+        // Only ids actually written. Same reasoning as /item/addToUserLibrary above.
+        for (const colId of outcome.added) {
+          await this.changeLogService.logItemChange(ctx, colId);
+        }
 
         const result = {
           success: true,
-          results: {},
+          results: outcome,
         };
         res.json(result);
       }),
@@ -999,16 +1011,20 @@ class ItemRoute implements Routes {
       authenticateJWT,
       errorHelper(async (req: ApiReq<'/item/addToUserLibrary'>, res) => {
         const ctx = RequestContext.instance(req);
-        await this.itemService.addUserItemsToLibrary(ctx, getTargetUserId(req), req.body.itemIds);
+        const outcome = await this.itemService.addUserItemsToLibrary(ctx, getTargetUserId(req), req.body.itemIds);
 
-        if (req.body.itemIds)
-          for (const itemId of req.body.itemIds) {
-            await this.changeLogService.logItemChange(ctx, itemId);
-          }
+        // Only log a change for ids that were actually written. Logging a refused id
+        // told every device something changed when nothing had.
+        for (const itemId of outcome.added) {
+          await this.changeLogService.logItemChange(ctx, itemId);
+        }
 
+        // `results` carries which ids were added, which were already in that state, and
+        // which were refused. It used to be `{}` with `success: true` regardless, so a
+        // caller could not tell a grant from a refusal -- see ERR-2.
         const result = {
           success: true,
-          results: {},
+          results: outcome,
         };
         res.json(result);
       }),

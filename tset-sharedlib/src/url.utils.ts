@@ -1,5 +1,55 @@
 import { ItemResourceType } from "./constants";
 import { ItemInfoView } from "./shared.types";
+import { AdditionalLink, UrlScopeKind } from "./types/item.types";
+
+/**
+ * Public suffixes that take two labels, so `registrableHost` doesn't read `co.uk`
+ * as the registrable domain. Not a full PSL — this covers the prevalent cases, and
+ * the fallback (last two labels) is right for everything else.
+ */
+const MULTI_PART_SUFFIXES = new Set([
+  'co.uk', 'org.uk', 'gov.uk', 'ac.uk', 'co.jp', 'co.in', 'co.nz', 'co.za', 'co.kr',
+  'com.au', 'com.br', 'com.mx', 'com.cn', 'com.tr', 'com.sg', 'com.hk', 'com.tw',
+]);
+
+/**
+ * Hosts where the *path*, not the hostname, says whose content this is. Allowing
+ * `sites.google.com/*` would hand a child every Google Site on the web, so a link
+ * on one of these stays pinned to its own page instead of taking the host.
+ */
+export const PATH_TENANT_HOSTS = new Set([
+  'sites.google.com',
+  'docs.google.com',
+  'drive.google.com',
+  'groups.google.com',
+  'medium.com',
+  'notion.so',
+  'padlet.com',
+  'linktr.ee',
+]);
+
+/** Registrable ("eTLD+1") domain for a bare hostname. Lowercased, `www.` stripped. */
+export function registrableHost(hostname: string): string {
+  const host = (hostname || '').toLowerCase().replace(/^www\./, '').replace(/\.$/, '');
+  const parts = host.split('.');
+  if (parts.length <= 2) return host;
+
+  const lastTwo = parts.slice(-2).join('.');
+  if (MULTI_PART_SUFFIXES.has(lastTwo)) return parts.slice(-3).join('.');
+  return lastTwo;
+}
+
+/** Lowercased hostname for a URL that may or may not carry a scheme. `www.` stripped. */
+function hostnameOf(url: unknown): string | null {
+  if (typeof url !== 'string' || !url.trim()) return null;
+  try {
+    const withScheme = /^https?:\/\//i.test(url) ? url : `https://${url.trim()}`;
+    const hostname = new URL(withScheme).hostname.toLowerCase();
+    return hostname ? hostname.replace(/^www\./, '') : null;
+  } catch {
+    return null;
+  }
+}
 
 export const SOCIAL_MEDIA_DOMAINS = [
   'facebook.com',
@@ -31,27 +81,250 @@ export function urlToKey(url: string | null) {
 }
 
 
+/**
+ * The pattern a bare URL claims by default: its host (with subdomains when the host
+ * is the registrable domain) and everything under its path.
+ *
+ * Note the `*.` prefix does not widen access on its own — `URLIndexer.getLookupHostnames`
+ * generates the bare and the `*.`-prefixed form of every ancestor, so `example.com/*`
+ * and `*.example.com/*` match identically under `getMatches`. It decides exact-vs-parent
+ * classification and `getExactMatches` on a `www.` host.
+ */
 export function getDefaultPattern(url: string) {
-  let pattern = url;
-  if (url != undefined) {
-    pattern = pattern.replace(/https?:\/\//, '').replace('www.', '');
-    if (pattern.split('.').length == 2 && !pattern.startsWith('*')) {
-      pattern = '*.' + pattern;
-    }
+  if (url == undefined) return url;
 
-    if (!pattern.includes('/')) {
-      pattern = pattern + '/';
-    }
+  // Anchored: an unanchored replace ate a "www." anywhere in the path.
+  let pattern = url.replace(/https?:\/\//, '').replace(/^www\./i, '');
 
-    if (!pattern.endsWith('*')) {
-      pattern = pattern + '*';
-    }
+  // The wildcard test belongs to the hostname. Reading it off the whole string made
+  // a dot in the path ("example.com/file.pdf") look like a third label, so the
+  // subdomain wildcard silently disappeared for those URLs and for every ccTLD.
+  const slashAt = pattern.indexOf('/');
+  const host = slashAt === -1 ? pattern : pattern.slice(0, slashAt);
+  const rest = slashAt === -1 ? '' : pattern.slice(slashAt);
+
+  if (host && host.includes('.') && !host.startsWith('*') && host === registrableHost(host)) {
+    pattern = '*.' + host + rest;
   }
+
+  if (!pattern.includes('/')) {
+    pattern = pattern + '/';
+  }
+
+  if (!pattern.endsWith('*')) {
+    pattern = pattern + '*';
+  }
+
   return pattern;
+}
+
+/** The three scope values, or undefined for anything else. */
+function normalizeScope(value: unknown): UrlScopeKind | undefined {
+  return value === 'specific' || value === 'site' || value === 'domain' ? value : undefined;
+}
+
+/**
+ * The patterns one URL claims at a given scope. Both the URL index and the scope
+ * picker derive through this, so what a parent is shown is what gets indexed.
+ */
+export function buildPatternsForUrlScope(scope: UrlScopeKind, url: string): string[] {
+  if (typeof url !== 'string' || !url.trim()) return [];
+
+  const normalized = toURL(url.trim()) || url.trim();
+  let parsed: URL | null = null;
+  try {
+    parsed = new URL(normalized);
+  } catch {
+    parsed = null;
+  }
+
+  if (!parsed) {
+    const fallback = getDefaultPattern(normalized);
+    return fallback ? [fallback] : [];
+  }
+
+  const host = parsed.hostname.toLowerCase();
+
+  if (scope === 'domain') {
+    const pattern = getDefaultPattern(registrableHost(host));
+    return pattern ? [pattern] : [];
+  }
+
+  if (scope === 'site') {
+    const pattern = getDefaultPattern(host);
+    return pattern ? [pattern] : [];
+  }
+
+  // 'specific'. A root URL has no path to pin to, so it falls back to the default.
+  if (isRootWebsiteURL(normalized)) {
+    const pattern = getDefaultPattern(normalized);
+    return pattern ? [pattern] : [];
+  }
+
+  // No trailing '*': the lookup already generates `path`, `path*` and `path/*` from
+  // the visited URL, and this is the shape the access-request flow has always stored.
+  const pathWithQuery = `${parsed.pathname}${parsed.search}`.replace(/^\//, '');
+  return pathWithQuery ? [`${host}/${pathWithQuery}`] : [host];
+}
+
+/**
+ * How much of a link's address the item should claim, when nobody has said.
+ *
+ * A link grants access to whatever it matches, so the bias is toward the smallest
+ * scope that makes the link useful: the host. `domain` is only inferred where the
+ * item has already shown the whole domain belongs to it.
+ */
+export function inferLinkScope(
+  linkUrl: string,
+  item?: { url?: string | null; info?: { additionalLinks?: AdditionalLink[] | null } | null } | null,
+): UrlScopeKind {
+  const host = hostnameOf(linkUrl);
+  if (!host) return 'specific';
+
+  // Shared hosts where the host says nothing about whose content this is.
+  if (PATH_TENANT_HOSTS.has(host)) return 'specific';
+
+  const domain = registrableHost(host);
+
+  // The item's own site, reached at another address.
+  const itemHost = hostnameOf(item?.url);
+  if (itemHost && registrableHost(itemHost) === domain) return 'domain';
+
+  // A bare domain was given, so the domain is what was meant.
+  if (host === domain) return 'domain';
+
+  // A second address on a domain this item already claims is the evidence that the
+  // whole platform belongs to it — a sign-in that hops clients.* to brandedweb.*
+  // lands here on the second link rather than being guessed on the first.
+  for (const link of item?.info?.additionalLinks || []) {
+    const otherHost = hostnameOf(link?.url);
+    if (!otherHost || otherHost === host) continue;
+    if (registrableHost(otherHost) === domain) return 'domain';
+  }
+
+  return 'site';
 }
 
 
 
+
+
+/**
+ * Every URL pattern an item claims: its explicit `patterns[]`, the default pattern
+ * for each `info.additionalLinks[].url`, and the default pattern for its own `url`.
+ *
+ * This is the single definition of "which URLs belong to this item". Both the
+ * write-side index (`URLDetailsStore.update`) and the read-side matcher
+ * (`URLIndexer.getItemLookupInstance`) call it, so a URL that resolves to an item
+ * on lookup is the same set that got indexed. They used to derive this separately
+ * and had drifted — additionalLinks were matched but never indexed.
+ *
+ * `accessScopeKind: 'specific'` with explicit patterns suppresses the derived
+ * pattern for the item's own url — the patterns are the deliberate narrower scope.
+ * Additional links are always included: each one was added by hand.
+ */
+/**
+ * Explicit `patterns[]`, keeping only non-blank strings. A number or a whitespace
+ * string reaching `URLIndexer.add` throws on `value.replace`, and one bad entry
+ * would cost the item every other pattern it has.
+ */
+function normalizeExplicitPatterns(values: unknown): string[] {
+  if (!Array.isArray(values)) return [];
+  return values.filter((p: unknown): p is string => typeof p === 'string' && p.trim().length > 0);
+}
+
+export function getItemDetailPatterns(details: any): string[] {
+  if (!details || typeof details !== 'object') return [];
+
+  const patternSet = new Set<string>();
+
+  const explicitPatterns = normalizeExplicitPatterns(details.patterns);
+  for (const pattern of explicitPatterns) {
+    patternSet.add(pattern);
+  }
+
+  // One malformed link must not cost the item its other patterns.
+  const addDerived = (url: unknown) => {
+    if (typeof url !== 'string' || url.trim().length === 0) return;
+    try {
+      const pattern = getDefaultPattern(url);
+      if (pattern) patternSet.add(pattern);
+    } catch (e) {
+      console.warn('getItemDetailPatterns: failed to derive pattern for', url, e);
+    }
+  };
+
+  for (const link of details?.info?.additionalLinks || []) {
+    addLinkPatterns(link, details, patternSet);
+  }
+
+  const suppressDerivedUrlPattern =
+    details?.info?.accessScopeKind === 'specific' && explicitPatterns.length > 0;
+  if (!suppressDerivedUrlPattern) {
+    addDerived(details.url);
+  }
+
+  return Array.from(patternSet);
+}
+
+/**
+ * The patterns for one additional link. A link saved before scopes existed carries no
+ * `scope`, so it resolves through `inferLinkScope` — that is what fixes an already-saved
+ * sign-in link without anyone re-editing it.
+ */
+function addLinkPatterns(link: any, details: any, patternSet: Set<string>): void {
+  const url = link?.url;
+  if (typeof url !== 'string' || url.trim().length === 0) return;
+
+  try {
+    const scope = normalizeScope(link?.scope) || inferLinkScope(url, details);
+    for (const pattern of buildPatternsForUrlScope(scope, url)) {
+      if (pattern) patternSet.add(pattern);
+    }
+  } catch (e) {
+    console.warn('getItemDetailPatterns: failed to derive pattern for', url, e);
+  }
+}
+
+/**
+ * The URLs this item *deliberately claims* beyond its own address: hand-written
+ * patterns and scoped additional links.
+ *
+ * Used to answer "am I on this saved item?" rather than "is this allowed?". The
+ * item's own url-derived pattern is excluded on purpose — an item saved for
+ * `school.com` should not swallow `school.com/blog/whatever` and stop you saving it
+ * separately.
+ *
+ * Explicit patterns that merely restate the url are dropped for the same reason:
+ * `updatePatterns()` writes `getDefaultPattern(url)` straight into `patterns[]` on
+ * every url edit and on every new item, so for most items `patterns[]` is a copy of
+ * the url rather than a claim on anything else.
+ */
+export function getItemClaimedPatterns(details: any): string[] {
+  if (!details || typeof details !== 'object') return [];
+
+  const patternSet = new Set<string>();
+
+  let urlPattern: string | null = null;
+  if (typeof details.url === 'string' && details.url.trim().length > 0) {
+    try {
+      urlPattern = getDefaultPattern(details.url) || null;
+    } catch {
+      urlPattern = null;
+    }
+  }
+
+  for (const pattern of normalizeExplicitPatterns(details.patterns)) {
+    if (pattern === urlPattern) continue;
+    patternSet.add(pattern);
+  }
+
+  for (const link of details?.info?.additionalLinks || []) {
+    addLinkPatterns(link, details, patternSet);
+  }
+
+  return Array.from(patternSet);
+}
 
 
 export function isValidLink(link: string) {
@@ -378,19 +651,17 @@ export function getSiteKey(
 
 /**
  * Returns the registrable domain (eTLD+1) for a URL, e.g. mail.google.com → google.com.
- * Uses a heuristic: if the penultimate label is ≤ 3 chars (e.g. "co", "com", "net"),
- * assume a ccTLD+SLD pattern and take 3 labels; otherwise take 2.
+ *
+ * Delegates to `registrableHost`, which reads a known multi-part-suffix list. The old
+ * "penultimate label ≤ 3 chars" heuristic got `bbc.co.uk` right but also read
+ * `foo.abc.com` as its own registrable domain.
  */
 export function getRegistrableDomain(url: string): string | null {
   try {
     const hostname = new URL(url).hostname.toLowerCase()
     if (!hostname || hostname === 'localhost') return hostname || null
-    const parts = hostname.split('.')
-    if (parts.length < 2) return null
-    if (parts.length >= 3 && parts[parts.length - 2].length <= 3) {
-      return parts.slice(-3).join('.')
-    }
-    return parts.slice(-2).join('.')
+    if (!hostname.includes('.')) return null
+    return registrableHost(hostname)
   } catch {
     return null
   }

@@ -37,7 +37,24 @@ class PostRoute implements Routes {
 
     // SCH-OK
     this.router.post(
+      '/post/listByShareGroup',
+      authenticateJWT,
+      errorHelper(async (req: ApiReq<'/post/listByShareGroup'>, res) => {
+        const results = await this.postService.listByShareGroup(RequestContext.instance(req), req.body.shareGroupId);
+        const result = {
+          success: true,
+          results: results,
+        };
+        res.json(result);
+      }),
+    );
+
+    // SCH-OK
+    this.router.post(
       '/post/create',
+      // Excluded from app-level parsers (see app.ts bigBodyPaths): post images
+      // arrive base64-encoded. Modern clients send JSON; urlencoded is legacy.
+      express.json({limit: '50mb'}),
       express.urlencoded({
         limit: '50mb',
         extended: true,
@@ -63,6 +80,23 @@ class PostRoute implements Routes {
           RequestContext.instance(req),
           req.body.postId,
           req.body.sharedWith,
+        );
+        const result = {
+          success: true,
+          results: results,
+        };
+        res.json(result);
+      }),
+    );
+
+    this.router.post(
+      '/post/updateEncInfo',
+      authenticateJWT,
+      errorHelper(async (req: ApiReq<'/post/updateEncInfo'>, res) => {
+        const results = await this.postService.updatePostEncInfo(
+          RequestContext.instance(req),
+          req.body.postId,
+          req.body.encInfo,
         );
         const result = {
           success: true,

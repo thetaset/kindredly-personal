@@ -1,5 +1,5 @@
 import {Routes} from '@interfaces/routes.interface';
-import {Router} from 'express';
+import express, {Router} from 'express';
 import {ApiReq} from '@/types/api-types';
 
 import {authenticateJWT, errorHelper, getTargetUserId} from '../utils/auth_utils';
@@ -7,6 +7,7 @@ import {authenticateJWT, errorHelper, getTargetUserId} from '../utils/auth_utils
 import ActivityService from '@/services/activity.service';
 import {RequestContext} from '@/base/request_context';
 import ChangeLogService from '@/services/change_log.service';
+import {SyncType} from '@/db/user_changelog.repo';
 
 class UserActivityRoute implements Routes {
   public router = Router();
@@ -25,6 +26,10 @@ class UserActivityRoute implements Routes {
     // - de
     this.router.post(
       '/user/activity/push',
+      // Excluded from app-level parsers (see app.ts bigBodyPaths): a client
+      // that was offline for a long time can push a large accumulated log, and
+      // old clients can't split the payload — a 413 would retry forever.
+      express.json({limit: '70mb'}),
       authenticateJWT,
       errorHelper(async (req: ApiReq<'/user/activity/push'>, res) => {
         const results = await this.activityService.saveUserActivityLog(
@@ -72,6 +77,18 @@ class UserActivityRoute implements Routes {
           results,
         };
         res.json(result);
+      }),
+    );
+
+    this.router.post(
+      '/user/activity/uploadImageClassificationSamples',
+      authenticateJWT,
+      errorHelper(async (req: ApiReq<'/user/activity/uploadImageClassificationSamples'>, res) => {
+        const results = await this.activityService.uploadImageClassificationSamples(
+          RequestContext.instance(req),
+          req.body,
+        );
+        res.json({success: true, results});
       }),
     );
 
@@ -178,7 +195,15 @@ class UserActivityRoute implements Routes {
         await this.activityService.updateVisitHistoryForItems_deprecate(ctx, req.body.updateList);
 
         let itemIds = req.body.updateList.map((item) => item.id);
-        await this.changeLogService.logItemChangeForUserIds([ctx.currentUserId], itemIds, null);
+        // Pass the type explicitly. `null` does NOT fall back to the parameter default -- a default
+        // only applies to `undefined` -- so this used to write `{type: null, items: [...]}`, which
+        // sync.service.ts treats as a corrupt row and answers with a FULL library reset. With
+        // `strict: false` in this package, `strictNullChecks` is off and nothing flagged it.
+        await this.changeLogService.logItemChangeForUserIds(
+          [ctx.currentUserId],
+          itemIds,
+          SyncType.itemUpdate,
+        );
 
         const result = {
           success: true,

@@ -1,5 +1,5 @@
 import {RequestContext} from '@/base/request_context';
-import {getRedisClient} from '@/base/redis_client';
+import {getKeyValueStore} from '@/base/runtime.factory';
 import {ClientInfoRepo} from '@/db/client_info.repo';
 import SSEManager from '@/services/sse.manager';
 import User from 'tset-sharedlib/schemas/public/User';
@@ -15,6 +15,12 @@ import {v4 as uuidv4} from 'uuid';
 class ClientInfoService {
   private static readonly MANAGED_SESSION_STALE_MS = 10 * 60 * 1000;
   private static readonly REMOTE_ACTION_STATUS_TTL_SECONDS = 5 * 60;
+  /** A client that has not checked in for a year is forgotten, not just hidden. */
+  private static readonly CLIENT_RETENTION_MS = 365 * 24 * 60 * 60 * 1000;
+
+  private clientRetentionCutoff(): Date {
+    return new Date(Date.now() - ClientInfoService.CLIENT_RETENTION_MS);
+  }
 
   private normalizeManagedConnectionClientId(clientId: string | null | undefined, targetUserId: string): string {
     const value = String(clientId || '').trim();
@@ -25,7 +31,7 @@ class ClientInfoService {
   constructor(
     private clientInfoRepo = new ClientInfoRepo(),
     private sseManager = SSEManager.getInstance(),
-    private redis = getRedisClient(),
+    private redis = getKeyValueStore(),
   ) {}
 
   private isPaidAccountType(accountType: string | null | undefined): boolean {
@@ -269,7 +275,17 @@ class ClientInfoService {
   async listClients(ctx: RequestContext, targetUserId: string) {
     await ctx.verifySelfOrAdmin(targetUserId);
 
-    const lst = await this.clientInfoRepo.listByUserId(targetUserId);
+    const cutoff = this.clientRetentionCutoff();
+    // Drop long-dead clients rather than filtering them out on every read. Doing it
+    // here keeps the table bounded without a separate sweep job, and a failed prune
+    // must not take the list down with it.
+    try {
+      await this.clientInfoRepo.deleteInactiveForUser(targetUserId, cutoff);
+    } catch (e) {
+      console.error('[ClientInfo] failed to prune inactive clients', e);
+    }
+
+    const lst = await this.clientInfoRepo.listByUserId(targetUserId, {activeSince: cutoff});
     return lst;
   }
 
@@ -277,7 +293,7 @@ class ClientInfoService {
     await ctx.verifySelfOrAdmin(targetUserId);
 
     const [clients, liveConnections] = await Promise.all([
-      this.clientInfoRepo.listByUserId(targetUserId),
+      this.clientInfoRepo.listByUserId(targetUserId, {activeSince: this.clientRetentionCutoff()}),
       this.sseManager.getConnectionDetailsForUser(targetUserId),
     ]);
 

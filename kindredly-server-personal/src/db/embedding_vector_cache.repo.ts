@@ -9,8 +9,12 @@ export type EmbeddingVectorCacheEntry = {
   namespace: string;
   modelId: string;
   cacheKey: string;
-  embedding: number[];
+  // Opaque encrypted blob ({encryptedData, iv}) — the server never sees the plaintext vector.
+  embedding: {encryptedData: string; iv: string};
   dimensions: number;
+  // Decryption metadata (wrapped key + iv); opaque to the server.
+  encInfo: Record<string, unknown> | null;
+  encrypted: boolean;
   createdAt: Date;
   updatedAt: Date;
 };
@@ -46,13 +50,18 @@ export class EmbeddingVectorCacheRepo extends BaseRepo<EmbeddingVectorCacheEntry
     accountId: string;
     namespace: string;
     modelId: string;
-    items: Array<{cacheKey: string; embedding: number[]; dimensions?: number}>;
+    items: Array<{
+      cacheKey: string;
+      embedding: {encryptedData: string; iv: string};
+      dimensions: number;
+      encInfo: Record<string, unknown>;
+      encrypted: true;
+    }>;
   }): Promise<number> {
     if (!params.items.length) return 0;
 
     const now = new Date();
     const rows = params.items.map((item) => {
-      const dimensions = item.dimensions ?? item.embedding.length;
       const namespace = params.namespace || 'default';
       const modelId = params.modelId;
       const accountId = params.accountId;
@@ -65,7 +74,9 @@ export class EmbeddingVectorCacheRepo extends BaseRepo<EmbeddingVectorCacheEntry
         modelId,
         cacheKey,
         embedding: item.embedding,
-        dimensions,
+        dimensions: item.dimensions,
+        encInfo: item.encInfo,
+        encrypted: item.encrypted,
         createdAt: now,
         updatedAt: now,
       };
@@ -77,6 +88,8 @@ export class EmbeddingVectorCacheRepo extends BaseRepo<EmbeddingVectorCacheEntry
       .merge({
         embedding: this.db.raw('EXCLUDED."embedding"'),
         dimensions: this.db.raw('EXCLUDED."dimensions"'),
+        encInfo: this.db.raw('EXCLUDED."encInfo"'),
+        encrypted: this.db.raw('EXCLUDED."encrypted"'),
         updatedAt: now,
       });
 

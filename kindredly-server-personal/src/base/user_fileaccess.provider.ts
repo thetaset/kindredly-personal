@@ -9,6 +9,15 @@ export interface UserFileAccessProvider {
 
   fileExists(filename: string): Promise<boolean>;
 
+  /** Read a plain (non-image) file from image storage; null if it does not exist. */
+  readStorageFile(filename: string): Promise<string | null>;
+
+  /** Write a plain (non-image) UTF-8 file to image storage. */
+  writeStorageFile(filename: string, contents: string): Promise<void>;
+
+  /** Delete a file (image or plain) from image storage; no-op if missing. */
+  deleteImage(filename: string): Promise<void>;
+
   getUserDataStream(refType: string, refId: string, filename: string): Promise<Readable>;
 
   getImageStream(filename): Promise<Readable>;

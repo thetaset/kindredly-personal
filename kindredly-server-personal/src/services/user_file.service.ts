@@ -9,6 +9,7 @@ import {RequestContext} from '../base/request_context';
 import {UserFileAccessProvider} from '../base/user_fileaccess.provider';
 import PermissionService from './permission.service';
 import {getDetailsByAccountType} from '@/defaults/products_and_plans';
+import {base64ByteSize} from '@/utils/binary_utils';
 
 class UserFileService {
   constructor(@inject(TYPES.UserFileAccessProvider) public fileAccessProvider: UserFileAccessProvider) {}
@@ -17,9 +18,20 @@ class UserFileService {
 
   private permissionService = new PermissionService();
 
+  /**
+   * Upload/storage limits for the caller's account, never undefined.
+   *
+   * `getDetailsByAccountType` is a bare lookup, so an account whose `accountType` is unset or
+   * unrecognised returned undefined — and `assertUploadAllowed` then fell all the way through
+   * to the 200MB config ceiling AND skipped the storage check entirely. An account with no
+   * plan should get the free plan's limits, not no limits.
+   *
+   * Narrow on purpose: the same lookup gates item and collection limits elsewhere, and
+   * tightening those is a separate decision.
+   */
   private async getAccountUploadLimits(ctx: RequestContext) {
     const account = await ctx.getAccount();
-    return getDetailsByAccountType(account?.accountType);
+    return getDetailsByAccountType(account?.accountType) ?? getDetailsByAccountType('standard');
   }
 
   private async assertUploadAllowed(ctx: RequestContext, fileSize: number, existingFileSize: number = 0) {
@@ -51,6 +63,27 @@ class UserFileService {
     return `${filename}__chunk_${chunkIndex}`;
   }
 
+  /**
+   * Confirm a caller-supplied fileId names a live file on the caller's own account.
+   *
+   * Needed wherever a client hands us a fileId it minted a moment earlier — post attachments
+   * upload ahead of the post now, so the id arrives from outside instead of being generated
+   * here. Deliberately stricter than read access (`isInNetwork`): naming a file in a post is
+   * closer to owning it than to viewing it.
+   */
+  async assertFileOwnedByAccount(ctx: RequestContext, fileId: string): Promise<UserFile> {
+    if (!fileId) throw new Error('Missing fileId');
+
+    const userFile = await this.userFileRepo.findById(fileId);
+    // Same message for missing and not-yours, so the check can't be used to probe which
+    // file ids exist.
+    if (!userFile || (userFile as any).deletedAt || userFile.accountId !== ctx.accountId) {
+      throw new Error(`UserFile with id ${fileId} not found. `);
+    }
+
+    return userFile;
+  }
+
   // ROUTE-METHOD
   async uploadFile(ctx: RequestContext, fileInfo: FileUploadRequest) {
     if (fileInfo.refType == 'item') {
@@ -75,6 +108,70 @@ class UserFileService {
     }
 
     return await this._uploadBinary(ctx, fileInfo, fileBytes);
+  }
+
+  // ROUTE-METHOD
+  /**
+   * Attach a thumbnail to an already-uploaded file.
+   *
+   * Previews are small and travel as base64 JSON; the file itself does not. Stored under the
+   * same `<filename>_preview_<id>` name `_upload` writes, so nothing on the read side changes.
+   * The preview's bytes count toward the account's storage the same way `_upload` counts them.
+   */
+  async uploadPreview(
+    ctx: RequestContext,
+    {fileId, previewId, data, iv}: {fileId: string; previewId?: string; data: string; iv?: string},
+  ) {
+    if (!data) throw new Error('No preview data to upload.');
+
+    const userFile = await this.assertFileOwnedByAccount(ctx, fileId);
+    const id = String(previewId ?? '0');
+
+    const existingEncInfo = (userFile as any).encInfo as Record<string, unknown> | null;
+    const previewMeta =
+      (existingEncInfo?.previewMeta as Record<string, {iv?: string; bytes?: number}>) || {};
+
+    // What this preview weighed last time, so a re-upload REPLACES that number rather than
+    // adding to it. Writing a thumbnail twice — replacing an item attachment's image, say —
+    // otherwise grew the file's recorded size on every write, and that column is what the
+    // account's storage quota is summed from.
+    const previousPreviewSize = Number(previewMeta[id]?.bytes ?? 0);
+    const previewSize = base64ByteSize(data);
+    await this.assertUploadAllowed(ctx, previewSize, previousPreviewSize);
+
+    await this.fileAccessProvider.uploadUserFileData(
+      data,
+      userFile.refType,
+      userFile.refId,
+      `${userFile.filename}_preview_${id}`,
+    );
+
+    const update: Record<string, unknown> = {updatedAt: new Date()};
+
+    // Per-preview facts about the stored blob: its own iv, and what it weighs.
+    //
+    // The iv has to be its own — a v1 encInfo carries a single iv, so encrypting a thumbnail
+    // under the file's would reuse a (key, iv) pair across two plaintexts, which AES-GCM does
+    // not survive. Files written before this map existed keep decrypting with `encInfo.iv`.
+    //
+    // Only written when the file already has an encInfo: creating one for an unencrypted file
+    // would make readers — which branch on `if (userFile.encInfo)` — try to decrypt plaintext.
+    // Those files skip the size bookkeeping instead. Under-counting a thumbnail never wrongly
+    // blocks an upload; double-counting one eventually does.
+    if (existingEncInfo) {
+      update.encInfo = {
+        ...existingEncInfo,
+        previewMeta: {...previewMeta, [id]: {...(iv ? {iv} : {}), bytes: previewSize}},
+      };
+      update.fileSize = Math.max(
+        0,
+        Number(userFile.fileSize ?? 0) - previousPreviewSize + previewSize,
+      );
+    }
+
+    await this.userFileRepo.updateWithId(userFile._id, update as any);
+
+    return {fileId: userFile._id, previewId: id};
   }
 
   // ROUTE-METHOD
@@ -227,12 +324,22 @@ class UserFileService {
   }
 
   async _upload(ctx: RequestContext, fileInfo: FileUploadRequest) {
-    let fileSize = fileInfo.fileData.length;
+    if (!fileInfo.fileData) {
+      throw new Error('No file data to upload.');
+    }
 
-    if (fileInfo.previews && fileInfo.previews.length > 0) {
-      for (const preview of fileInfo.previews) {
-        fileSize += preview.data.length;
-      }
+    // A preview with no data is a caller bug, not a reason to fail the whole upload —
+    // drop it here so one missing thumbnail can't take down a post or an item save.
+    fileInfo.previews = (fileInfo.previews || []).filter((preview) => !!preview?.data);
+
+    // Decoded bytes, not string length. `fileData` is base64, so measuring the string
+    // over-counted every plan and storage check by 33% — a 30MB video read as 40MB and was
+    // refused against a 35MB limit. `_uploadBinary` has always measured real bytes; this is
+    // the base64 path catching up, so the two agree on what a file weighs.
+    let fileSize = base64ByteSize(fileInfo.fileData);
+
+    for (const preview of fileInfo.previews) {
+      fileSize += base64ByteSize(preview.data);
     }
 
     let ufId: string = fileInfo.ufId;
@@ -439,6 +546,16 @@ class UserFileService {
     // IDs are stored in database with file_ prefix (e.g., file_<uuid>)
     // No transformation needed - use ID as-is
     const userFile = await this._getUserFileDataById(ctx, id);
+
+    // Chunked userfiles are stored as separate chunk objects with no base object on disk.
+    // Streaming the (non-existent) base filename would emit a 200 with headers and then error
+    // mid-stream, leaving clients waiting on a truncated body. Fail fast and clearly instead;
+    // chunked files must be read via getUserFileChunkStreamById / getCiphertextChunkRange.
+    if ((userFile as any)?.encInfo?.chunked) {
+      throw new Error(
+        'UserFile is chunked and has no base object; read it via /userfile/getCiphertextChunkRange instead.',
+      );
+    }
     try {
       // check if previewId is valid, it can be zero
       if (!!previewId && previewId != 'undefined') {

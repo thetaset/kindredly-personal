@@ -4,7 +4,7 @@ import knex from './knex_config';
 import {Knex} from 'knex';
 
 export class ItemRepo extends BaseRepo<Item> {
-  public jsonArrayFields = ['useCriteria', 'tags', 'patterns', 'categories'];
+  public jsonArrayFields = ['useCriteria', 'tags', 'patterns', 'categories', 'kinds'];
   constructor(db: Knex = knex) {
     super('item', db);
   }

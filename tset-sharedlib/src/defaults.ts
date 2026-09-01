@@ -18,9 +18,15 @@ export interface UserOptions{
   whitelistingEnabled: boolean;
   codeInjectionEnabled: boolean;
   contentFilteringEnabled: boolean;
+  /** Keep all links inside the in-app browser instead of opening external apps. */
+  containLinksInternally?: boolean;
   usageLimitsData?: UsageLimitData;
   logActivity: boolean;
   aiChatEnabled?: boolean;
+  /** App Builder: create and edit the code behind Kindredly apps. Admin-granted per child. */
+  appEditorEnabled?: boolean;
+  /** Library-mode kids: allow browsing the published catalog and requesting adds. */
+  explorePublishedEnabled?: boolean;
   accessControlSettings?: AccessControlSettings;
   ruleOverrideSettings?: RuleOverrideSettings
   /** Reward rules and categories configured for this user. */
@@ -41,6 +47,12 @@ export const DEFAULT_USER_OPTIONS:UserOptions = {
   whitelistingEnabled: false,
   codeInjectionEnabled: false,
   contentFilteringEnabled: false,
+  containLinksInternally: false,
+  // Fail-closed seed for device-only mode, where no server record exists. It is NOT the live
+  // default: an absent value resolves through the feature control's per-user-type default
+  // (admin on, restricted off) in useFeatureToggle. See config/appEditorAccess.ts.
+  appEditorEnabled: false,
+  explorePublishedEnabled: false,
   logActivity: false,
   accessControlSettings: {
     takeBreakSettings: {

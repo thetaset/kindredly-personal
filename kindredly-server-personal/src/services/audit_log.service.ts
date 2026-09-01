@@ -3,7 +3,7 @@ import type {Knex} from 'knex';
 import type {RequestContext} from '@/base/request_context';
 import {AuditLogRepo, type AuditLogRow} from '@/db/audit_log.repo';
 
-export type AuditLogEntityType = 'item' | 'collection';
+export type AuditLogEntityType = 'item' | 'collection' | 'user';
 
 export type AuditLogAction =
   | 'item.create'
@@ -12,7 +12,14 @@ export type AuditLogAction =
   | 'collection_item.remove'
   | 'permission.set'
   | 'permission.remove'
-  | 'ownership.transfer';
+  | 'ownership.transfer'
+  // A guardian started watching a child's screen. See docs/specs/live-view.md —
+  // this is the durable counterpart to the on-screen notice the child sees.
+  | 'live_view.start'
+  // A parent disconnected and forgot one of a child's devices. Recorded because a
+  // child holding a parent's PIN can reach the same button through "Unlock settings",
+  // and removing your own monitoring should not be the one act that leaves no trace.
+  | 'device.remove';
 
 export class AuditLogService {
   private static _staticInstance: AuditLogService | null = null;

@@ -3,7 +3,7 @@ import type { EncInfo } from '../shared.types';
 
 export type RefStateOwnerType = 'user' | 'account' | 'session';
 
-export type RefStateRefType = 'item' | 'post' | 'feed_item' | 'app_global';
+export type RefStateRefType = 'item' | 'post' | 'feed_item' | 'app_global' | 'device-guard';
 
 export type RefStateEntry = {
   _id: string;

@@ -145,8 +145,14 @@ function guardedLookup(hostname: string, options: any, callback: any) {
 // keepAlive matches Node >= 19's default global agent — without it these
 // custom agents would silently disable connection reuse for every guarded
 // fetch (fresh DNS + TCP + TLS per request to the same host).
-const guardedHttpAgent = new http.Agent({lookup: guardedLookup, keepAlive: true} as http.AgentOptions);
-const guardedHttpsAgent = new https.Agent({lookup: guardedLookup, keepAlive: true} as https.AgentOptions);
+// The pool bounds matter because free-socket pools are per-host and the hosts
+// here are user-supplied: without maxFreeSockets/timeout the pools grow with
+// every distinct domain ever fetched and each idle TLS socket retains its
+// buffers. `timeout` is the idle-socket reap (it does not abort in-flight
+// requests — DEFAULT_TIMEOUT_MS covers those).
+const AGENT_LIMITS = {keepAlive: true, maxSockets: 64, maxFreeSockets: 8, timeout: 30000};
+const guardedHttpAgent = new http.Agent({lookup: guardedLookup, ...AGENT_LIMITS} as http.AgentOptions);
+const guardedHttpsAgent = new https.Agent({lookup: guardedLookup, ...AGENT_LIMITS} as https.AgentOptions);
 
 // Redirect targets with literal-IP hosts never hit DNS lookup, so the agent
 // guard can't see them — validate each hop here.

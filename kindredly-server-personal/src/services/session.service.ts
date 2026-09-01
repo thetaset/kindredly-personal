@@ -1,5 +1,5 @@
 import {UserSessionRepo} from '@/db/user_session.repo';
-import {getRedisClient} from '@/base/redis_client';
+import {getKeyValueStore} from '@/base/runtime.factory';
 import {config} from '@/config';
 import crypto from 'crypto';
 
@@ -60,26 +60,48 @@ export class SessionService {
 
   /**
    * Single chokepoint for "is this signature-valid authInfo still allowed?".
-   * Applies the enforcement mode: returns {ok:false} only in 'enforce' mode
-   * for a revoked session; 'log' mode logs and allows. EVERY path that
-   * accepts or exchanges a token must call this (header/cookie middleware,
-   * tokenLogin, SSE tickets) — do not reimplement per route.
+   * Applies the enforcement mode: returns {ok:false} in 'enforce' mode for a
+   * revoked session; 'log' mode logs and allows. EVERY path that accepts or
+   * exchanges a token must call this (header/cookie middleware, tokenLogin,
+   * SSE tickets) — do not reimplement per route.
+   *
+   * **Device-agent tokens are the exception, and enforce in every mode.** A parent
+   * pressing "Remove device" has to actually disconnect it, and under the default
+   * `log` mode revocation is recorded and then ignored — the button would lie. This
+   * is also the credential that most needs real revocation: `_createCompanionToken`
+   * mints it with `expAtSec: null`, it never rotates, and it lives on a child's
+   * machine.
+   *
+   * Scoped rather than flipping SESSION_ENFORCEMENT globally, deliberately. Every
+   * signout and password change since the registry shipped has written a `revokedAt`
+   * that has never had a consequence, so the size of the still-in-use-but-revoked
+   * population is unknowable from here — and `checkSession` fails OPEN, meaning a
+   * global flip's failure mode is safe while its success mode is the risk. That is
+   * the worst possible shape for a rollout nobody can rehearse, and it is not
+   * something to discover while shipping one button. This branch is a strict subset
+   * of `enforce`, so it becomes a no-op the day the global flip does happen.
+   *
+   * Costs one cached lookup per device-agent request even under `off` — where `off`
+   * otherwise means "touch neither redis nor the DB". Negligible against a heartbeat
+   * that idles at ten minutes, but an operator who set `off` to shed load should know.
    */
   async verifyAuthInfoSession(
-    authInfo: {sessionId?: string; userId?: string; accountId?: string} | undefined,
+    authInfo: {sessionId?: string; userId?: string; accountId?: string; scope?: string} | undefined,
     info: {appType?: string; clientId?: string; context?: string} = {},
-  ): Promise<{ok: boolean}> {
+  ): Promise<{ok: boolean; reason?: string}> {
     const mode = this.mode;
-    if (mode === 'off' || !authInfo?.sessionId || !authInfo?.userId) return {ok: true};
+    if (!authInfo?.sessionId || !authInfo?.userId) return {ok: true};
+    const deviceAgent = authInfo.scope === 'device-agent';
+    if (mode === 'off' && !deviceAgent) return {ok: true};
     const check = await this.checkSession(authInfo.sessionId, authInfo.userId, {
       accountId: authInfo.accountId,
       appType: info.appType,
       clientId: info.clientId,
     });
     if (!check.ok) {
-      if (mode === 'enforce') {
+      if (mode === 'enforce' || deviceAgent) {
         console.warn('SessionRevoked:', authInfo.sessionId, info.context || '');
-        return {ok: false};
+        return {ok: false, reason: check.reason};
       }
       console.warn('[session] log-only: would reject revoked session', authInfo.sessionId, info.context || '');
     }
@@ -97,7 +119,7 @@ export class SessionService {
     info: {accountId?: string; appType?: string; clientId?: string} = {},
   ): Promise<{ok: boolean; reason?: string}> {
     try {
-      const redis = getRedisClient();
+      const redis = getKeyValueStore();
       const cacheKey = CACHE_PREFIX + sessionId;
 
       const cached = await withTimeout(redis.get(cacheKey), REDIS_CHECK_TIMEOUT_MS);
@@ -142,6 +164,20 @@ export class SessionService {
     await this.invalidateCache([sessionId]);
   }
 
+  /**
+   * Cuts one device off: revokes every live session recorded against its client id.
+   *
+   * Not `revokeAllForUser` — that would sign the child out on every device they own in
+   * order to remove one of them. The client id is the key because both Companion
+   * platforms send `tsclientid: cmp_<deviceId>` and the registry records it on the row.
+   */
+  async revokeForClient(userId: string, clientId: string, reason: string): Promise<number> {
+    const revoked = await this.sessionRepo.revokeByClientId(userId, clientId, reason);
+    const ids = (revoked || []).map((row: any) => (typeof row === 'string' ? row : row._id)).filter(Boolean);
+    await this.invalidateCache(ids);
+    return ids.length;
+  }
+
   /** Revokes all of a user's sessions, optionally sparing the current one. */
   async revokeAllForUser(userId: string, reason: string, exceptSessionId?: string) {
     const revoked = await this.sessionRepo.revokeAllForUser(userId, reason, exceptSessionId);
@@ -156,7 +192,7 @@ export class SessionService {
    */
   async createSseTicket(authInfo: {userId: string; accountId?: string; sessionId?: string}): Promise<string> {
     const ticket = crypto.randomBytes(24).toString('base64url');
-    await getRedisClient().set(
+    await getKeyValueStore().set(
       SSE_TICKET_PREFIX + ticket,
       JSON.stringify({userId: authInfo.userId, accountId: authInfo.accountId, sessionId: authInfo.sessionId}),
       'EX',
@@ -165,12 +201,10 @@ export class SessionService {
     return ticket;
   }
 
-  async consumeSseTicket(
-    ticket: unknown,
-  ): Promise<{userId: string; accountId?: string; sessionId?: string} | null> {
+  async consumeSseTicket(ticket: unknown): Promise<{userId: string; accountId?: string; sessionId?: string} | null> {
     if (typeof ticket !== 'string' || !ticket) return null;
     try {
-      const redis = getRedisClient();
+      const redis = getKeyValueStore();
       const key = SSE_TICKET_PREFIX + ticket;
       const value = await redis.get(key);
       if (!value) return null;
@@ -188,7 +222,7 @@ export class SessionService {
   private async invalidateCache(sessionIds: string[]) {
     if (!sessionIds.length) return;
     try {
-      const redis = getRedisClient();
+      const redis = getKeyValueStore();
       const pipeline = redis.pipeline();
       for (const id of sessionIds) {
         pipeline.set(CACHE_PREFIX + id, 'revoked', 'EX', CACHE_TTL_SEC);

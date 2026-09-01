@@ -13,6 +13,12 @@ export default  interface Post {
 
   sharedWith?: Record<string, any> | null;
 
+  /** Links fan-out siblings created for one "Separate recipients" authoring action. */
+  shareGroupId?: string | null;
+
+  /** Author-facing label for this sibling's group (e.g. "Group 1"). */
+  groupLabel?: string | null;
+
   /** Default value: CURRENT_TIMESTAMP */
   createdAt?: Date | null;
 

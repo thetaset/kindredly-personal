@@ -82,14 +82,27 @@ export function generateToken() {
   return token;
 }
 
+// AES-256 needs exactly 32 key bytes. PASSWORD_STORAGE_ENCRYPTION_KEY is a secret
+// string of arbitrary length (generators commonly emit 40/44/48 characters), so any
+// length other than 32 is folded down with SHA-256 rather than rejected — rejecting
+// meant every encryptPassword/decryptPassword call threw at request time.
+//
+// The exactly-32-character case keeps the original raw-UTF-8 bytes so data already
+// stored under such a key still decrypts. Changing the key's *value* still makes
+// previously stored data unreadable, as it always has.
 function getEncryptionKey(): Uint8Array {
-  let key = config.passwordStorageEncryptionKey;
+  const key = config.passwordStorageEncryptionKey;
 
-  if (key.length !== 32) {
-    throw new Error(`Invalid key length: ${key.length}. Must be exactly 32 bytes.`);
+  if (!key) {
+    throw new Error('PASSWORD_STORAGE_ENCRYPTION_KEY is not set.');
   }
 
-  return new Uint8Array(Buffer.from(key, 'utf8'));
+  const raw = Buffer.from(key, 'utf8');
+  if (raw.length === 32) {
+    return new Uint8Array(raw);
+  }
+
+  return new Uint8Array(crypto.createHash('sha256').update(raw).digest());
 }
 
 export function encryptPassword(str: string) {

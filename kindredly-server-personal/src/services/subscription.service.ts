@@ -6,6 +6,10 @@ import {v4 as uuidv4} from 'uuid';
 import PublishedService from './_interfaces/published.service';
 import SubscriptionManagerService from './_interfaces/subscription_manager.service';
 import PermissionService from './permission.service';
+// TYPE-ONLY — erased at compile time, so it emits no require(). The lazy getter
+// below is what resolves it, and only on a code path a self-hosted server never
+// takes. See services/import_export.service.ts for the full reasoning.
+import type InternalPublishedService from './_internal/internal_published.service';
 import {inject, injectable} from 'inversify';
 import Subscription from 'tset-sharedlib/schemas/public/Subscription';
 import {assertEncInfoUpdateIsSafe, assertEncryptedUpdateHasEncInfo} from '@/utils/encinfo_guards';
@@ -16,6 +20,21 @@ class SubscriptionService {
 
   private subscriptionRepo = new SubscriptionRepo();
   private permissionService = new PermissionService();
+  /** Cloud-only: `services/_internal` is withheld from the published Kindredly
+   *  Personal repo, and this file cannot be — routes/subscription.route.ts is
+   *  registered there. Its one caller checks whether a subscription target is
+   *  viewable published content, and a personal server has no published content
+   *  at all. */
+  private _publishedService: InternalPublishedService | null = null;
+  private get publishedService(): InternalPublishedService {
+    if (!this._publishedService) {
+      // personal-optional: guarded, never reached on a self-hosted server
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
+      const mod = require('./_internal/internal_published.service');
+      this._publishedService = new (mod.default || mod)();
+    }
+    return this._publishedService as InternalPublishedService;
+  }
 
   private async _canViewCollectionForSubscription(ctx: RequestContext, collectionId: string): Promise<boolean> {
     const item = await ctx.getItemById(collectionId);
@@ -54,13 +73,21 @@ class SubscriptionService {
     const isAdmin = await ctx.isAdmin();
     const isSelf = targetUserId === ctx.currentUserId;
 
-    // Non-admin users can only manage their own subscriptions for library items.
+    // Non-admin users can only manage their own subscriptions for library items and
+    // for published collections they are allowed to view.
     if (!isAdmin) {
       if (!isSelf) throw new Error('User auth error');
-      if (refType !== 'item_feed' && refType !== 'col' && refType !== 'shared_col') {
+      if (refType !== 'item_feed' && refType !== 'col' && refType !== 'shared_col' && refType !== 'pub_col') {
         throw new Error('You do not have permission to manage subscriptions');
       }
-      if (refType === 'shared_col') {
+      if (refType === 'pub_col') {
+        // Published collections are authorized via published visibility rules, not
+        // library membership (refId is a published id, not a library item id).
+        const info = await this.publishedService.assertCanViewPublishedById(ctx, refId);
+        if ((info as any)?.type !== 'col') {
+          throw new Error('You do not have permission to subscribe to this collection');
+        }
+      } else if (refType === 'shared_col') {
         const canView = await this._canViewCollectionForSubscription(ctx, refId);
         if (!canView) throw new Error('You do not have permission to subscribe to this collection');
       } else {

@@ -1,5 +1,5 @@
 import { ItemInfoView } from "./shared.types";
-import { getDefaultPattern } from "./url.utils";
+import { getItemDetailPatterns } from "./url.utils";
 
 function parseURLPattern(value: string) {
   value = value.replace(/https?:\/\//, '');
@@ -43,7 +43,10 @@ function getLookupPathnames(path: string) {
 
   let lookupnames = [];
   lookupnames.push('*');
-  for (let i = 0; i < parts.length - 1; i++) {
+  // `i <= parts.length - 1` so the last prefix-glob is generated too. Stopping one
+  // short meant a pattern of `docs/*` never matched `docs/x` (it did match `docs/xy`),
+  // because `docs/*` was the one prefix the visited path never produced.
+  for (let i = 0; i <= parts.length - 1; i++) {
     lookupnames.push(path.substring(0, i) + '*');
 
     if (/[\%\&\?\#\=]/.test(parts[i])) {
@@ -87,12 +90,7 @@ class URLIndexer {
 
 
   static getItemLookupInstance(itemInfo: ItemInfoView): URLIndexer | null {
-  const patterns = (itemInfo?.details?.patterns || []).filter(p => !!p);
-  const accessScopeKind = itemInfo?.details?.info?.accessScopeKind;
-  const shouldSuppressDerivedUrlPattern = accessScopeKind === 'specific' && patterns.length > 0;
-  const url = shouldSuppressDerivedUrlPattern ? null : getDefaultPattern(itemInfo?.details?.url as string);
-  const urls = (itemInfo?.details?.info?.additionalLinks || []).map(link => getDefaultPattern(link.url));
-  const allPatterns = [...patterns, url, ...urls].filter((pattern): pattern is string => !!pattern);
+  const allPatterns = getItemDetailPatterns(itemInfo?.details);
 
   if (allPatterns.length == 0) return null;
 
@@ -103,6 +101,12 @@ class URLIndexer {
 
   public lookup: Record<string, Record<string, string[]>> = {};
   public _revLookup: Record<string, any> = {};
+  /**
+   * `_revLookup` starts as a truthy `{}`, so the old `if (!this._revLookup)` guard
+   * never fired and `remove` silently did nothing. Track the build explicitly, and
+   * keep it current in `add` so a batch of removes pays the O(index) walk once.
+   */
+  private _revLookupBuilt = false;
 
   constructor(lookup = {}) {
     this.lookup = lookup || {};
@@ -118,6 +122,11 @@ class URLIndexer {
       }
       if (!pathLookup[pattern.pathname].includes(entryval)) {
         pathLookup[pattern.pathname].push(entryval);
+        if (this._revLookupBuilt) {
+          const pathlist = this._revLookup[entryval] || [];
+          pathlist.push({ hostname: pattern.hostname, path: pattern.pathname });
+          this._revLookup[entryval] = pathlist;
+        }
       }
       this.lookup[pattern.hostname] = pathLookup;
     }
@@ -134,26 +143,38 @@ class URLIndexer {
         }
       }
     }
+    this._revLookupBuilt = true;
   }
 
   remove(entryval: string) {
     try {
-      if (!this._revLookup) {
+      if (!this._revLookupBuilt) {
         this._buildReverseLookup();
       }
       const pathList = this._revLookup[entryval] || [];
       for (const d of pathList) {
-        const pathArray = this.lookup[d.hostname][d.path];
+        const pathLookup = this.lookup[d.hostname];
+        if (!pathLookup) continue;
+
+        const pathArray = pathLookup[d.path];
         if (pathArray) {
           const index = pathArray.indexOf(entryval);
           if (index > -1) {
             pathArray.splice(index, 1);
             if (pathArray.length === 0) {
-              delete this.lookup[d.hostname][d.path];
+              delete pathLookup[d.path];
             }
           }
         }
+
+        // Don't leave an empty host bucket behind: `hostval in this.lookup` is the
+        // first test on every lookup, and an empty one makes it walk paths for nothing.
+        if (Object.keys(pathLookup).length === 0) {
+          delete this.lookup[d.hostname];
+        }
       }
+      // The entry is gone; a later add rebuilds its path list from scratch.
+      delete this._revLookup[entryval];
     } catch (e) {
       console.error('idx remove error', entryval, e);
     }

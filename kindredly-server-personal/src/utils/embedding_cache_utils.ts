@@ -53,51 +53,54 @@ export function normalizeCacheKeys(v: unknown): string[] {
   return out;
 }
 
-export function validateEmbeddingArray(v: unknown): number[] {
-  if (!Array.isArray(v)) throw new HttpException(400, 'Invalid embedding (must be number[])');
-  if (!v.length) throw new HttpException(400, 'Invalid embedding (empty)');
-  if (v.length > MAX_EMBEDDING_DIMS) {
-    throw new HttpException(400, `Invalid embedding (max dims ${MAX_EMBEDDING_DIMS})`);
-  }
+export const MAX_ENCRYPTED_EMBEDDING_LEN = 1_048_576; // 1 MB ciphertext ceiling per item
 
-  const out: number[] = new Array(v.length);
-  for (let i = 0; i < v.length; i++) {
-    const n = v[i];
-    if (typeof n !== 'number' || !Number.isFinite(n)) {
-      throw new HttpException(400, 'Invalid embedding (non-finite number)');
-    }
-    out[i] = n;
-  }
-
-  return out;
+/**
+ * Validate an encrypted embedding blob. The server is crypto-blind: it never sees the plaintext
+ * vector, so it only checks the opaque ciphertext shape, never the numeric contents.
+ */
+export function validateEncryptedEmbedding(v: unknown): {encryptedData: string; iv: string} {
+  if (!isPlainObject(v)) throw new HttpException(400, 'Invalid embedding (must be encrypted blob)');
+  const encryptedData = requireString(v.encryptedData, 'embedding.encryptedData', {
+    maxLen: MAX_ENCRYPTED_EMBEDDING_LEN,
+  });
+  const iv = requireString(v.iv, 'embedding.iv', {maxLen: 512});
+  return {encryptedData, iv};
 }
 
-export function validatePutItems(v: unknown): Array<{cacheKey: string; embedding: number[]; dimensions?: number}> {
+export type ValidatedPutItem = {
+  cacheKey: string;
+  embedding: {encryptedData: string; iv: string};
+  dimensions: number;
+  encInfo: Record<string, unknown>;
+  encrypted: true;
+};
+
+export function validatePutItems(v: unknown): ValidatedPutItem[] {
   if (!Array.isArray(v)) return [];
-  const out: Array<{cacheKey: string; embedding: number[]; dimensions?: number}> = [];
+  const out: ValidatedPutItem[] = [];
 
   for (const raw of v) {
     if (!isPlainObject(raw)) throw new HttpException(400, 'Invalid items (must be array of objects)');
 
     const cacheKey = requireString(raw.cacheKey, 'cacheKey', {maxLen: MAX_CACHE_KEY_LEN});
-    const embedding = validateEmbeddingArray(raw.embedding);
+    const embedding = validateEncryptedEmbedding(raw.embedding);
 
-    let dimensions: number | undefined;
-    if (raw.dimensions != null) {
-      if (typeof raw.dimensions !== 'number' || !Number.isFinite(raw.dimensions)) {
-        throw new HttpException(400, 'Invalid dimensions (must be number)');
-      }
-      const d = Math.floor(raw.dimensions);
-      if (d <= 0 || d > MAX_EMBEDDING_DIMS) {
-        throw new HttpException(400, `Invalid dimensions (1..${MAX_EMBEDDING_DIMS})`);
-      }
-      if (d !== embedding.length) {
-        throw new HttpException(400, 'Invalid dimensions (must match embedding length)');
-      }
-      dimensions = d;
+    // dimensions is required: it cannot be derived from an opaque ciphertext blob.
+    if (typeof raw.dimensions !== 'number' || !Number.isFinite(raw.dimensions)) {
+      throw new HttpException(400, 'Invalid dimensions (required number)');
+    }
+    const dimensions = Math.floor(raw.dimensions);
+    if (dimensions <= 0 || dimensions > MAX_EMBEDDING_DIMS) {
+      throw new HttpException(400, `Invalid dimensions (1..${MAX_EMBEDDING_DIMS})`);
     }
 
-    out.push({cacheKey, embedding, dimensions});
+    // encInfo (wrapped key + iv) is required so the vector can be decrypted on read.
+    if (!isPlainObject(raw.encInfo)) throw new HttpException(400, 'Invalid encInfo (required)');
+
+    if (raw.encrypted !== true) throw new HttpException(400, 'Invalid item (must be encrypted)');
+
+    out.push({cacheKey, embedding, dimensions, encInfo: raw.encInfo, encrypted: true});
   }
 
   return out;

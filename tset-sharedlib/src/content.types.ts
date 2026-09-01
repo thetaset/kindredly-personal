@@ -1,5 +1,6 @@
 
 import { ItemResourceType } from './constants';
+import { getItemRequirementsForType, hasFeedOfKind, type ItemRequirement } from './item.requirements';
 
 // import { entityNameList, tagNameList, tagOptionsMap } from "tset-sharedlib/constants";
 // 
@@ -12,6 +13,40 @@ export type Cost = 'cost_free' | 'cost_freewithpaid' | 'cost_paid' | 'cost_unkno
 export type Ads = 'ads_no' | 'ads_l' | 'ads_m' | 'ads_h' | 'ads_unknown';
 export type CostDetails = 'costd_pay2rm' | 'costd_no3rdpartyads' | 'costd_nosignin' | 'costd_opensource' | 'costd_unknown';
 export type ContentType = 'ct_app' | 'ct_article' | 'ct_cntcreator' | 'ct_game' | 'ct_music' | 'ct_org' | 'ct_phy_product' | 'ct_ref' | 'ct_video' | 'ct_unknown' | 'ct_other';
+// Ordinal UX/UI design quality — clean & focused → noisy & distracting. Descriptive editorial signal only (not a gate).
+export type DesignLevel = 'design_clean' | 'design_light' | 'design_busy' | 'design_noisy' | 'design_unknown';
+// Design attribute flags (multi-select). Own prefix so they never collide with the single-value DesignLevel scale.
+export type DesignTag = 'dtag_kidfriendly';
+// Audience role (multi-select) — "who is this FOR by role", separate from the age-based TargetAudience.
+export type AudienceRole = 'aud_educator' | 'aud_parent';
+// Freshness — the external resource's own maintenance/activity (like a dormant repo), not our review cadence.
+export type Freshness = 'fresh_active' | 'fresh_aging' | 'fresh_outdated' | 'fresh_unknown';
+
+// A server-fed "domain -> classification" corrective rule. Distributed to clients as a
+// cached, versioned list and merged into the deterministic site-classification layer to
+// fix the local ML classifier on known edge-case sites (without an app release).
+export type SiteOverrideRule = {
+  id: string;
+  label: string;
+  domains: string[];
+  /** Defaults to true (match subdomains). Set false to match the exact host only. */
+  includeSubdomains?: boolean;
+  pathPrefixes?: string[];
+  eduValue: EduValue;
+  intent?: IntentTag;
+  /** Human-readable why, surfaced as the match's sourceNote. */
+  reason: string;
+  /** Force the override even when a stronger eduValue already exists. */
+  alwaysApply?: boolean;
+  /** Reserved for a future block/restrict axis — carried but NOT enforced in v1. */
+  restricted?: boolean;
+};
+
+export type SiteOverridesEnvelope = {
+  version: string;
+  updatedAt: string | null;
+  entries: SiteOverrideRule[];
+};
 
 // Granular micro-tags (topics/genres/patterns) that can roll up into EduValue / ContentType.
 // Stored as strings alongside other criteria in `useCriteria`.
@@ -56,7 +91,7 @@ export type IntentTag =
   | 'intent_doomscroll';
 
 export type UseCriterias = Array<
-  EduValue | MinAgeGroup | TargetAudience | Cost | Ads | CostDetails | ContentType | TopicTag | IntentTag
+  EduValue | MinAgeGroup | TargetAudience | Cost | Ads | CostDetails | ContentType | TopicTag | IntentTag | DesignLevel | DesignTag | AudienceRole | Freshness
 >;
 
 export interface UseCriteriaData {
@@ -69,9 +104,25 @@ export interface UseCriteriaData {
   contentTypes: ContentType[];
   topics?: TopicTag[];
   intent?: IntentTag;
+  design?: DesignLevel;
+  designTags: DesignTag[];
+  audienceRoles: AudienceRole[];
+  freshness?: Freshness;
 }
 
 /***********Item Types */
+/**
+ * Primary item types are *behavioral* — they decide how an item opens and
+ * renders — EXCEPT `'thing'`, which is *semantic*: a `'thing'` is only a
+ * container ("an entity"), and its real classification always lives in
+ * `subType` (film, book, person, …). A `'thing'` should never be surfaced
+ * without a subType.
+ *
+ * Use {@link getEffectiveItemType} to ask "what is this item really?" and
+ * {@link isEntityType} to test for the semantic-entity container. The
+ * `'thing'`-needs-a-subType rule has a single home in
+ * {@link normalizeSubTypeForType} — don't re-implement it at call sites.
+ */
 export const ITEM_TYPE_PRIMARY_VALUES = ['link', 'note', 'file_group', 'default', 'thing', 'col', 'tab'] as const;
 
 export type ItemTypePrimary = (typeof ITEM_TYPE_PRIMARY_VALUES)[number];
@@ -105,9 +156,9 @@ export const typeNameList = [
   { key: 'defaultQuickbar', name: 'Quickbar', icon: 'lightning', parent: "col" ,hide: true},
   { key: 'defaultSharedCollection', name: 'Shared Collection', icon: 'people', parent: "col" ,hide: true},
   { key: 'defaultShowcaseCollection', name: 'Showcase Collection', icon: 'stars', parent: "col" ,hide: true},
-  { key: 'link', name: 'Link', icon: 'link-45deg', primary: true ,hide: false},
-  { key: 'note', name: 'Note', icon: 'sticky', primary: true ,hide: false},
-  { key: 'file_group', name: 'File(s)', icon: 'files', primary: true ,hide: false},
+  { key: 'link', name: 'Link', icon: 'link-45deg', primary: true ,hide: false, featured: true},
+  { key: 'note', name: 'Note', icon: 'sticky', primary: true ,hide: false, featured: true},
+  { key: 'file_group', name: 'File(s)', icon: 'files', primary: true ,hide: false, featured: true},
   { key: 'default', name: 'Default Type', icon: 'file-richtext', primary: true ,hide: true},
   { key: 'tab', name: 'Tab', icon: 'columns-gap', primary: true ,hide: true},
   { key: 'thing', name: 'Thing', icon: 'box', primary: true ,hide: true},
@@ -152,7 +203,7 @@ export const typeNameList = [
   // {key: 'concept', name: 'Concept', icon: 'triangle-fill, parent: "thing",hide: true},
   { key: 'content_creator', name: 'Content Creator', icon: 'person-lines-fill', parent: "thing" ,hide: true},
   // {key: 'electronic_device', name: 'Electronic Device', icon: 'phone, parent: "thing",hide: true},
-  { key: 'event', name: 'Event', icon: 'calendar4-week', parent: "thing" ,hide: true},
+  { key: 'event', name: 'Event', icon: 'calendar4-week', parent: "thing" ,hide: false, featured: true},
   { key: 'film', name: 'Film', icon: 'film', parent: "thing" ,hide: true},
   // {key: 'feed', name: 'Feed', icon: 'rss, parent: "thing",hide: true},
   { key: 'food', name: 'Food', icon: 'cup', parent: "thing" ,hide: true},
@@ -178,6 +229,7 @@ export const typeNameList = [
   { key: 'video', name: 'Video', icon: 'file-play', parent: "thing" ,hide: true},
   { key: 'written_work', name: 'Written Work', icon: 'journal-text', parent: "thing" ,hide: true},
   { key: 'feed_collection', name: 'Feed', icon: 'rss', parent: "link" ,hide: true},
+  { key: 'content_feed', name: 'Content Feed', icon: 'rss', parent: "link" ,hide: false, featured: true},
    { key: 'pub_col_slink', name: 'Published Collection Link', icon: 'arrow-90deg-left', parent: "link" ,hide: true},
 
   {
@@ -195,14 +247,15 @@ export const typeNameList = [
           { value: 'item', text: 'Library app' },
           { value: 'published', text: 'Published app' },
         ],
-        uiGroup: 'primary',
+        // Technical app-ref internals — keep them under the "More details" expander, not up front.
+        uiGroup: 'details',
       },
       {
         name: 'sourceId',
         type: 'string',
         label: 'App source ID',
         placeholder: 'Item ID or publish ID',
-        uiGroup: 'primary',
+        uiGroup: 'details',
       },
       {
         name: 'preferredOpenMode',
@@ -213,7 +266,7 @@ export const typeNameList = [
           { value: 'embedded', text: 'Kindredly' },
           { value: 'either', text: 'Either' },
         ],
-        uiGroup: 'primary',
+        uiGroup: 'details',
       },
       {
         name: 'launchPath',
@@ -235,17 +288,137 @@ export const typeNameList = [
     ],
   },
   { key: 'app', name: 'App', icon: 'phone', parent: "link" ,hide: true},
-  { key: 'website', name: 'Website', icon: 'globe', parent: "link" ,hide: false},
-  { key: 'podcast', name: 'Podcast', icon: 'headphones', parent: "link" ,hide: true},
+  { key: 'website', name: 'Website', icon: 'globe', parent: "link" ,hide: false, featured: true},
+  { key: 'podcast', name: 'Podcast', icon: 'headphones', parent: "link" ,hide: true, featured: true},
   { key: 'yt_channel', name: 'YouTube Channel', icon: 'youtube', parent: "link" ,hide: true},
-  { key: 'yt_video', name: 'YouTube Video', icon: 'youtube', parent: "link" ,hide: true}
+  { key: 'yt_video', name: 'YouTube Video', icon: 'youtube', parent: "link" ,hide: true},
+  { key: 'map', name: 'Map', icon: 'map', parent: "link" ,hide: false, featured: true},
+  { key: 'lesson', name: 'Lesson', icon: 'mortarboard', parent: "thing" ,hide: false, featured: true}
 ] as const;
 
 export type ItemTypeSecondary = (typeof typeNameList)[number]['key'];
 
+/**
+ * The published catalog's "Kind" facet — an explicit allowlist, and the ONLY thing that
+ * decides which kinds appear in Explore search.
+ *
+ * Opt-in by design: `typeNameList` has ~50 entries (animal, plant, memory, song, …), almost
+ * all meaningless in a public catalog, so the default has to be *excluded*. Adding or
+ * removing a kind is a one-line edit here and nowhere else — the client's chip row, the rail
+ * checkboxes, and the server's SQL predicate all read this list.
+ *
+ * Array order is display order. `col` first and `link` last are deliberate: `link` is the
+ * residual bucket ("a link that is nothing more specific"), so it must stay last both
+ * visually and when deriving its NOT-IN exclusion set.
+ *
+ * Unlike {@link SEARCH_CONTENT_KIND_KEYS} in the client's searchContentKinds.ts, this list
+ * deliberately CONTAINS primary type keys (`col`, `link`). That is safe here precisely
+ * because {@link resolveEffectiveItemType} falls back to the primary type when nothing more
+ * specific resolves — which is the behaviour this facet wants. Do not merge the two lists.
+ *
+ * A feed is deliberately NOT a kind. See the note on {@link getSubTypeFromFeeds}: a feed is a
+ * capability that decorates a link (surfaced as the "Subscribable" filter), not an identity.
+ * Podcasts are the one exception kept as a real kind, because audio is a different experience.
+ */
+export const PUBLISHED_SEARCH_KIND_KEYS = [
+  'col',
+  'website',
+  'yt_channel',
+  'podcast',
+  'kin_app',
+  // Residual bucket — must stay last.
+  'link',
+  // Not shipped. 'yt_video' and 'information' are deliberately out: a single video is too
+  // granular to browse the catalog by, and "Info" describes almost every thing-row rather
+  // than distinguishing one. The rest simply have no published rows, and a facet that always
+  // returns nothing is worse than a missing one. Uncomment to surface any of them.
+  // 'yt_video', 'information', 'ebook', 'lesson', 'map',
+] as const satisfies readonly ItemTypeSecondary[];
+
+export type PublishedSearchKind = (typeof PUBLISHED_SEARCH_KIND_KEYS)[number];
+
+/**
+ * The item types offered without Advanced mode — everything else in {@link typeNameList} is a
+ * power-user type and only appears once the person turns Advanced mode on.
+ *
+ * An allowlist rather than a per-entry flag: ~35 of the 46 types are advanced, so a flag would mean
+ * annotating almost every row and the split would be impossible to read at a glance. Deliberately
+ * separate from `featured`, which is display grouping ("Common" vs "More types") and must stay free
+ * to change without moving a type in or out of basic.
+ *
+ * `information` and `other` are here for a structural reason, not because they are common: the
+ * "add a thing" pickers narrow to `parent === 'thing' || key === 'file_group'`, and without these
+ * two that list would be `lesson` and `file_group` alone, with no generic fallback for an item that
+ * fits nothing else.
+ *
+ * Not to be confused with the dead `hide` field on {@link typeNameList}, which nothing reads and
+ * whose values disagree with this split.
+ */
+export const BASIC_ITEM_TYPE_KEYS = [
+  'link',
+  'note',
+  'event',
+  'file_group',
+  'website',
+  'content_feed',
+  'podcast',
+  'map',
+  'lesson',
+  // Separately gated by App Builder access, which itself requires Advanced mode.
+  'kin_app',
+  // Generic fallbacks — see the note above.
+  'information',
+  'other',
+] as const satisfies readonly ItemTypeSecondary[];
+
+const BASIC_ITEM_TYPE_KEY_SET: ReadonlySet<ItemTypeSecondary> = new Set<ItemTypeSecondary>(
+  BASIC_ITEM_TYPE_KEYS,
+);
+
+/** Is this a type anyone can pick, or does it need Advanced mode? */
+export function isBasicItemType(type: ItemTypeSecondary): boolean {
+  return BASIC_ITEM_TYPE_KEY_SET.has(type);
+}
+
+// Parent lookup built straight off `typeNameList` rather than via getItemTypeInfo(): that
+// helper reads a `let` declared much further down this file, which is still in its temporal
+// dead zone while these module-level constants initialise.
+const publishedKindParent = (key: PublishedSearchKind): string | undefined => {
+  // Cast because primary entries in the union have no `parent` key at all.
+  const entry = typeNameList.find((e) => e.key === key) as {parent?: string} | undefined;
+  return entry?.parent;
+};
+
+/**
+ * The link-parented kinds that {@link PUBLISHED_SEARCH_KIND_KEYS} names explicitly — i.e. the
+ * subTypes the `link` residual bucket must EXCLUDE.
+ *
+ * Derived, never typed twice: a hand-maintained copy is how adding a kind silently leaves its
+ * rows double-counted under "Other Links".
+ */
+export const PUBLISHED_SEARCH_LINK_KIND_KEYS: readonly PublishedSearchKind[] =
+  PUBLISHED_SEARCH_KIND_KEYS.filter(
+    (key) => key !== 'col' && key !== 'link' && publishedKindParent(key) === 'link',
+  );
+
+/** The `thing`-parented kinds on the allowlist (Info, Apps). */
+export const PUBLISHED_SEARCH_THING_KIND_KEYS: readonly PublishedSearchKind[] =
+  PUBLISHED_SEARCH_KIND_KEYS.filter((key) => publishedKindParent(key) === 'thing');
+
+/**
+ * The subType values that count as the `information` bucket.
+ *
+ * `normalizeSubTypeForType('thing', null)` defaults to 'information', so rows stored with an
+ * empty subType belong here too — matching what the cards already display.
+ */
+export const PUBLISHED_INFORMATION_SUB_TYPES = ['', 'thing', 'info', 'information'] as const;
+
 type ItemTypeSelectorDescriptor = {
   description: string;
   extraDetails?: string;
+  // Extra search-only synonyms so the type can be found by intent/format words
+  // that may not appear in its name or description (e.g. "rss", "youtube").
+  keywords?: string;
 };
 
 const itemTypeSelectorDescriptors: Partial<Record<ItemTypeSecondary, ItemTypeSelectorDescriptor>> = {
@@ -292,18 +465,42 @@ const itemTypeSelectorDescriptors: Partial<Record<ItemTypeSecondary, ItemTypeSel
   website: {
     description: 'A standard website or web page.',
     extraDetails: 'Best for pages you mainly visit in a browser.',
+    keywords: 'url web page site',
+  },
+  content_feed: {
+    description: 'A content feed you follow for new entries.',
+    extraDetails: 'Best for RSS/Atom feeds — news, poems, word of the day, picture of the day.',
+    keywords: 'rss atom feed news poem poetry word of the day picture of the day daily blog subscribe',
   },
   podcast: {
     description: 'A podcast, audio show, or listening destination.',
     extraDetails: 'Best for audio-first content and recurring episodes.',
+    keywords: 'audio rss feed episodes show listen',
   },
   yt_channel: {
     description: 'A YouTube creator channel or subscription destination.',
     extraDetails: 'Best for channel-level browsing and creator follow lists.',
+    keywords: 'youtube channel video creator',
   },
   yt_video: {
     description: 'A specific YouTube video or single video destination.',
     extraDetails: 'Best for one-off videos instead of an entire channel.',
+    keywords: 'youtube video clip',
+  },
+  map: {
+    description: 'An interactive map or location, embedded inline.',
+    extraDetails: 'Paste a Google Maps or OpenStreetMap link, or a map embed code.',
+    keywords: 'map maps location google openstreetmap osm trailforks mapbox embed directions trail route',
+  },
+  event: {
+    description: 'Something happening at a time, shown on the calendar.',
+    extraDetails: 'An appointment, a practice, a trip. It can repeat, and it can be for the whole family.',
+    keywords: 'event appointment calendar schedule practice birthday trip meeting reminder when date',
+  },
+  lesson: {
+    description: 'A step-through lesson with quizzes and a score.',
+    extraDetails: 'Build it by hand or with AI. Best for vocabulary drills, study guides, and mini-courses.',
+    keywords: 'lesson course quiz flashcard teach tutor study vocabulary practice khan test questions',
   },
   article: {
     description: 'A written article, essay, or reference page.',
@@ -354,8 +551,10 @@ export function getItemTypeSelectorInfo(type: ItemTypeSecondary): {
   parent?: string;
   primary?: boolean;
   hide?: boolean;
+  featured?: boolean;
   description: string;
   extraDetails?: string;
+  keywords?: string;
 } {
   const typeInfo = getItemTypeInfo(type) || {
     name: type,
@@ -370,12 +569,23 @@ export function getItemTypeSelectorInfo(type: ItemTypeSecondary): {
     parent: typeInfo.parent,
     primary: typeInfo.primary,
     hide: typeInfo.hide,
+    featured: typeInfo.featured,
     description: descriptor.description,
     extraDetails: descriptor.extraDetails,
+    keywords: descriptor.keywords,
   };
 }
 
-export function getEditableItemTypeSelectorOptions(options: { onlyThing?: boolean } = {}): Array<ReturnType<typeof getItemTypeSelectorInfo>> {
+/**
+ * The types a picker may offer.
+ *
+ * `includeAdvanced` defaults to false so an unaudited caller gets the short, safe list rather than
+ * all 46 — the admin and published-content pickers opt in explicitly. See
+ * {@link BASIC_ITEM_TYPE_KEYS}.
+ */
+export function getEditableItemTypeSelectorOptions(
+  options: { onlyThing?: boolean; includeAdvanced?: boolean } = {},
+): Array<ReturnType<typeof getItemTypeSelectorInfo>> {
   const hiddenSystemTypes = new Set<ItemTypeSecondary>([
     'col',
     'defaultQuickbar',
@@ -390,6 +600,7 @@ export function getEditableItemTypeSelectorOptions(options: { onlyThing?: boolea
 
   return typeNameList
     .filter((entry) => !hiddenSystemTypes.has(entry.key))
+    .filter((entry) => options.includeAdvanced === true || isBasicItemType(entry.key))
     .filter((entry) => {
       if (!options.onlyThing) {
         return true;
@@ -452,6 +663,7 @@ export type ItemExperienceKind =
   | 'channel'
   | 'app-runner'
   | 'reference'
+  | 'lesson'
   | 'default-item';
 
 export type ItemExperienceCapability =
@@ -460,7 +672,9 @@ export type ItemExperienceCapability =
   | 'supportsFeedDiscovery'
   | 'prefersExternalOpen'
   | 'supportsAttachments'
-  | 'supportsEmbeddedRun';
+  | 'supportsEmbeddedRun'
+  /** Item can be played through a choice of media providers ("Play on…"). */
+  | 'supportsMediaProviders';
 
 export interface ItemExperienceContract {
   id: string;
@@ -478,6 +692,12 @@ export interface ItemExperienceContract {
   pickerSummary: string;
   fallbackChain: string[];
   schemaSource: 'type' | 'subType' | 'none';
+  /**
+   * What this type *needs* in order to deliver what the flags above *promise*.
+   * `capabilityFlags` is the promise; these are its preconditions — keeping them
+   * on one object is what stops the two drifting. See item.requirements.ts.
+   */
+  requirements: ItemRequirement[];
 }
 
 export function isSystemDerivedSubType(
@@ -538,6 +758,10 @@ export function getItemExperienceContract(
     pickerSummary: `${typeInfo.name} item`,
     fallbackChain: [defaultOpenAction, viewAction],
     schemaSource: normalizedSubType ? 'subType' : 'type',
+    // Set on the base contract so every `case` below inherits it through its
+    // `...baseContract` spread — a new type's requirements are one registry
+    // entry, with no edit to this switch.
+    requirements: getItemRequirementsForType(lookupType),
   };
 
   switch (lookupType) {
@@ -558,6 +782,14 @@ export function getItemExperienceContract(
         resourceType: ItemResourceType.SITE_ROOT,
         capabilityFlags: ['prefersExternalOpen'],
         pickerSummary: 'Website link with generic open behavior.',
+      };
+    case 'map':
+      return {
+        ...baseContract,
+        experienceKind: 'generic-link',
+        semanticKinds: ['map', 'link'],
+        capabilityFlags: ['prefersExternalOpen'],
+        pickerSummary: 'Interactive map embedded inline, with an open-original link.',
       };
     case 'yt_video':
       return {
@@ -605,8 +837,27 @@ export function getItemExperienceContract(
         experienceKind: 'audio',
         semanticKinds: ['podcast', 'audio'],
         defaultViewMode: 'audio',
+        capabilityFlags: ['supportsFeedDiscovery', 'supportsStructuredMetadata', 'supportsMediaProviders'],
+        pickerSummary: 'Podcast that can be played through a choice of media providers.',
+      };
+    case 'music':
+    case 'song':
+      return {
+        ...baseContract,
+        experienceKind: 'audio',
+        semanticKinds: [lookupType, 'audio'],
+        defaultViewMode: 'audio',
+        capabilityFlags: ['supportsStructuredMetadata', 'supportsMediaProviders'],
+        pickerSummary: `${typeInfo.name} that can be played through a choice of media providers.`,
+      };
+    case 'content_feed':
+      return {
+        ...baseContract,
+        experienceKind: 'reader',
+        semanticKinds: ['content_feed', 'feed'],
+        defaultViewMode: 'reader',
         capabilityFlags: ['supportsFeedDiscovery', 'supportsStructuredMetadata'],
-        pickerSummary: 'Podcast link that can opt into audio/feed affordances.',
+        pickerSummary: 'Content feed link (RSS/Atom) that can opt into feed affordances.',
       };
     case 'book':
     case 'ebook':
@@ -627,9 +878,20 @@ export function getItemExperienceContract(
         capabilityFlags: ['supportsEmbeddedRun', 'supportsStructuredMetadata'],
         pickerSummary: 'Kindredly app with runnable app behavior.',
       };
+    case 'lesson':
+      return {
+        ...baseContract,
+        experienceKind: 'lesson',
+        semanticKinds: ['lesson'],
+        defaultViewMode: 'app-runner',
+        capabilityFlags: ['supportsStructuredMetadata', 'supportsAttachments', 'supportsEmbeddedRun'],
+        pickerSummary: 'Step-through lesson with quizzes, scored with retry.',
+      };
     case 'person':
     case 'organization':
     case 'location':
+    case 'film':
+    case 'video_series':
       return {
         ...baseContract,
         experienceKind: 'reference',
@@ -637,6 +899,15 @@ export function getItemExperienceContract(
         defaultViewMode: 'reference',
         capabilityFlags: ['supportsStructuredMetadata'],
         pickerSummary: `${typeInfo.name} reference with structured metadata.`,
+      };
+    case 'event':
+      return {
+        ...baseContract,
+        experienceKind: 'reference',
+        semanticKinds: ['event'],
+        defaultViewMode: 'reference',
+        capabilityFlags: ['supportsStructuredMetadata'],
+        pickerSummary: 'Calendar event with a time, a place, and optional repeats.',
       };
     case 'link':
       return {
@@ -676,11 +947,21 @@ export function getDefaultOpenAction(type: string, subType?: string,
   if ((subType && ['feed_collection'].includes(subType || ''))) {
     return 'openItem';
   }
+  else if ((subType && ['podcast'].includes(subType || ''))) {
+    // Podcasts open their Kindredly item page — that page holds the player, the episode
+    // list and an explicit "Find on…" menu. Their saved url is often a directory page
+    // (podcasts.apple.com/…), and opening it externally hands the user off to a native
+    // podcast app. That handoff must only ever happen from an explicit "Find on…" choice.
+    return 'openItem';
+  }
   else if ((subType && ['yt_channel', 'yt_video'].includes(subType || ''))) {
     return 'openLink'; // 'openItem'
   }
     else if ((subType && ['kin_app'].includes(subType || ''))) {
     return 'runApp'; // 'openItem'
+  }
+  else if ((subType && ['map'].includes(subType || ''))) {
+    return 'openItem'; // maps open inline in Kindredly (MapEmbed), not the external link
   }
   else if (['link'].includes(type)) {
     return 'openLink';
@@ -723,6 +1004,7 @@ export function getItemTypeInfo(type: string): {
   parent?: string;
   primary?: boolean;
   hide?: boolean;
+  featured?: boolean;
   schema?: ReadonlyArray<ItemTypeSchemaField>;
 } {
   return getTypeNameLookup()[type];
@@ -741,6 +1023,25 @@ export function normalizeSubTypeForType(type: string | null | undefined, subType
   return subType as ItemTypeSecondary;
 }
 
+/** True for the semantic-entity container type, whose real type is its subType. */
+export function isEntityType(type: string | null | undefined): boolean {
+  return type === 'thing';
+}
+
+/**
+ * The item's *effective* type — what it really is. For entity items
+ * (`type: 'thing'`) this is the normalized subType (e.g. 'film', defaulting to
+ * 'information'); for every other primary type it's the type itself. Single
+ * source of truth for the "if it's a thing, look at the subType" rule that was
+ * previously hand-rolled at call sites.
+ */
+export function getEffectiveItemType(
+  type: string | null | undefined,
+  subType: string | null | undefined,
+): string {
+  return normalizeSubTypeForType(type, subType) || type || 'default';
+}
+
 export function isInformationItem(type: string | null | undefined, subType: string | null | undefined): boolean {
   if (type === 'information') return true;
 
@@ -756,6 +1057,25 @@ export function isTaskItem(type: string | null | undefined, subType: string | nu
   return normalizeSubTypeForType(type, subType) === 'task';
 }
 
+export function isEventItem(type: string | null | undefined, subType: string | null | undefined): boolean {
+  return normalizeSubTypeForType(type, subType) === 'event';
+}
+
+/**
+ * pageType → subType, covering both the enum values and the legacy string forms.
+ *
+ * Exported because the published catalog's SQL "Kind" facet has to recognise the same
+ * derivation for rows whose subType was never stamped. Reading this table beats restating the
+ * pairs in a WHERE clause, which is how the SQL and the display label drift apart.
+ */
+export const PAGE_TYPE_SUB_TYPES: Readonly<Record<string, ItemTypeSecondary>> = {
+  YOUTUBE_CHANNEL: 'yt_channel',
+  YT_CHANNEL: 'yt_channel',
+  YOUTUBE_VIDEO: 'yt_video',
+  YT_VIDEO: 'yt_video',
+  SITE_ROOT: 'website',
+};
+
 /**
  * Derive item subType from metadata's tsExtractedInfo.pageType
  * Used at persistence time to set correct subType based on resource detection
@@ -763,12 +1083,103 @@ export function isTaskItem(type: string | null | undefined, subType: string | nu
 export function getSubTypeFromMeta(meta: { tsExtractedInfo?: { pageType?: string | null } } | null | undefined): ItemTypeSecondary | null {
   const pageType = meta?.tsExtractedInfo?.pageType;
   if (!pageType) return null;
-  
-  // Handle both enum values and legacy string values
-  if (pageType === 'YOUTUBE_CHANNEL' || pageType === 'YT_CHANNEL') return 'yt_channel';
-  if (pageType === 'YOUTUBE_VIDEO' || pageType === 'YT_VIDEO') return 'yt_video';
-  if (pageType === 'SITE_ROOT') return 'website';
-  return null;
+
+  return PAGE_TYPE_SUB_TYPES[pageType] || null;
+}
+
+// Derive a podcast subType from an item's feed info. A feed no longer changes an
+// item's identity/type — a feed is a subscribable source that decorates a link,
+// surfaced via a `hasFeeds` indicator rather than a distinct "Content Feed" type.
+// Podcasts are the one exception we keep as a real type because audio is a
+// meaningfully different experience. Requires a real audio feed entry (with a
+// feedURL) rather than just a hasFeeds hint, so ordinary articles that merely
+// expose a discoverable feed are not misclassified.
+export function getSubTypeFromFeeds(
+  info: { feeds?: Array<{ feedURL?: string | null; mediaKind?: string | null }> | null } | null | undefined,
+): ItemTypeSecondary | null {
+  // Shares `hasFeedOfKind` with the `feed-of-kind` requirement so the two can't
+  // drift on what "carries an audio feed" means. They differ only on strictness:
+  // this display derivation stays presence-based and must NOT be gated on
+  // verification — it is synchronous, runs on every list render, and is also
+  // used by facet counts, which must agree exactly with the search filter.
+  return hasFeedOfKind(info?.feeds, 'audio') ? 'podcast' : null;
+}
+
+/** The parts of an item's details needed to work out what it really is. */
+export type EffectiveTypeInput = {
+  type?: string | null;
+  subType?: string | null;
+  meta?: { tsExtractedInfo?: { pageType?: string | null } } | null;
+  info?: { feeds?: Array<{ feedURL?: string | null; mediaKind?: string | null }> | null } | null;
+};
+
+/**
+ * The subType an item should be *presented* as, including the derivations that are
+ * never stamped on `details.subType` at save time.
+ *
+ * Single source of truth for a block that display.factory duplicated twice and
+ * searchContentKinds re-implemented incompletely — the drift is what made
+ * feed-derived podcasts invisible to the search "Podcast" filter.
+ *
+ * The feed-derived branch is now also stamped at save time by
+ * {@link deriveSaveTimeSubType}, but only onto items saved since that landed and
+ * only when the subType slot was free. There is deliberately no backfill —
+ * personal items are encrypted, so the server cannot rewrite them. This stays a
+ * permanent legacy read shim rather than something to delete later.
+ */
+export function resolveDisplaySubType(
+  details: EffectiveTypeInput | null | undefined,
+): ItemTypeSecondary | null {
+  let subType = (details?.subType ?? null) as ItemTypeSecondary | null;
+
+  if (details?.type === 'link' && !subType) {
+    subType = getSubTypeFromMeta(details?.meta) ?? getSubTypeFromFeeds(details?.info);
+  }
+
+  // A feed no longer changes an item's type. Legacy items persisted as
+  // 'content_feed' render as a plain link with a hasFeeds indicator instead.
+  if (subType === 'content_feed') {
+    subType = null;
+  }
+
+  return subType;
+}
+
+/**
+ * The subType to persist for an item carrying an audio feed, or null to leave
+ * `subType` alone.
+ *
+ * Pure, so it is testable without instantiating ItemService. Delegating the
+ * "may I write here?" decision to {@link shouldAutoDeriveSubType} means it only
+ * ever fills an empty or system-derived slot and never overwrites a subType the
+ * user picked deliberately.
+ *
+ * Note `'podcast'` is deliberately NOT added to {@link SYSTEM_DERIVED_SUB_TYPES}:
+ * membership of that list grants the system permission to *overwrite* a value,
+ * which would let a later metadata refresh replace an explicit user choice of
+ * "podcast" with "website".
+ */
+export function deriveSaveTimeSubType(
+  details: EffectiveTypeInput | null | undefined,
+): ItemTypeSecondary | null {
+  const derived = getSubTypeFromFeeds(details?.info);
+  if (!derived) return null;
+
+  return shouldAutoDeriveSubType({
+    currentType: details?.type,
+    currentSubType: details?.subType,
+    derivedSubType: derived,
+  })
+    ? derived
+    : null;
+}
+
+/**
+ * {@link getEffectiveItemType} with the display-time derivations applied — the answer to
+ * "what is this item really?" for counting and filtering, not just rendering.
+ */
+export function resolveEffectiveItemType(details: EffectiveTypeInput | null | undefined): string {
+  return getEffectiveItemType(details?.type, resolveDisplaySubType(details));
 }
 
 export function getItemTypeDetails(type: string, subType: string, openWithSettings: Record<string, string> = {}): {
@@ -777,6 +1188,7 @@ export function getItemTypeDetails(type: string, subType: string, openWithSettin
   parent?: string;
   primary?: boolean;
   contractId?: string;
+  experienceKind?: ItemExperienceKind;
   defaultViewMode?: ItemExperienceViewMode;
   capabilityFlags?: ItemExperienceCapability[];
   provider?: string;
@@ -791,6 +1203,7 @@ export function getItemTypeDetails(type: string, subType: string, openWithSettin
   let details = {
     ...typeInfo,
     contractId: contract.id,
+    experienceKind: contract.experienceKind,
     defaultViewMode: contract.defaultViewMode,
     capabilityFlags: contract.capabilityFlags,
     provider: contract.provider,
@@ -800,6 +1213,36 @@ export function getItemTypeDetails(type: string, subType: string, openWithSettin
   };
 
   return details
+}
+
+/**
+ * Canonical, single-source presentation for an item's type. Every list/row/badge
+ * render site should use this instead of branching on the primary `type`.
+ *
+ * - `label`/`icon`/`experienceKind` come from the experience contract (which already
+ *   resolves subType → parent and normalizes), so the *most specific known* type wins:
+ *   subType if present, else the primary type ("Link" is a legitimate base label).
+ * - `leadWith` decides whether a row's secondary text leads with the URL or the type
+ *   label. Generic web destinations (bare `link` and `website`) are URL-led — the URL
+ *   is more useful than the word "Link"/"Website". Everything else (feed, podcast,
+ *   video, channel, reader, app, reference…) is label-led, since the URL is noise.
+ *   The type ICON always communicates type identity regardless of `leadWith`.
+ */
+export function getItemPresentation(
+  type: string | null | undefined,
+  subType: string | null | undefined,
+  url?: string | null,
+): { label: string; icon: string; experienceKind: ItemExperienceKind; leadWith: 'url' | 'label' } {
+  const contract = getItemExperienceContract(type || '', subType || '');
+  const experienceKind = contract.experienceKind;
+  const leadWith: 'url' | 'label' = experienceKind === 'generic-link' && !!url ? 'url' : 'label';
+
+  return {
+    label: contract.label,
+    icon: contract.icon,
+    experienceKind,
+    leadWith,
+  };
 }
 
 
@@ -815,6 +1258,10 @@ export const tagTypes = {
   content: { prefix: 'ct', name: "Format" },
   topics: { prefix: 'topic', name: 'Topics' },
   intent: { prefix: 'intent', name: 'Intent' },
+  design: { prefix: 'design', name: 'Design' },
+  designTags: { prefix: 'dtag', name: 'Design flags' },
+  audienceRoles: { prefix: 'aud', name: 'Made for' },
+  freshness: { prefix: 'fresh', name: 'Freshness' },
   // warning: { prefix: 'wa', name: "Warning Flags" },
 };
 
@@ -846,6 +1293,10 @@ export interface UseCriteriaDataWithDetails {
   contentTypes: TagOptionDetail<ContentType>[];
   topics?: TagOptionDetail<TopicTag>[];
   intent?: TagOptionDetail<IntentTag>;
+  design?: TagOptionDetail<DesignLevel>;
+  designTags: TagOptionDetail<DesignTag>[];
+  audienceRoles: TagOptionDetail<AudienceRole>[];
+  freshness?: TagOptionDetail<Freshness>;
 }
 
 export type ContentTypeIngredient = {
@@ -878,6 +1329,30 @@ export const normalizeEduValueAlias = (value?: string | null): EduValue | undefi
   ].includes(value)
     ? (value as EduValue)
     : undefined;
+};
+
+/**
+ * The single educational value an item counts as, for the "browse by usage" grid and the
+ * matching query filter.
+ *
+ * `useCriteria` is a flat bag of editorial tags, so this picks the first real `eduval_*`
+ * entry (normalizing legacy aliases) and falls back to 'eduval_unknown' when there is
+ * none — the same "unassigned is a bucket you can select" rule SearchScan already applies.
+ *
+ * Counting and filtering MUST both go through this. A grid whose tile counts disagree with
+ * what clicking the tile returns is worse than no grid.
+ */
+export const resolveItemEduValue = (
+  useCriteria: ReadonlyArray<string> | null | undefined,
+): EduValue => {
+  if (Array.isArray(useCriteria)) {
+    for (const tag of useCriteria) {
+      const normalized = normalizeEduValueAlias(tag);
+      if (normalized && normalized !== 'eduval_unknown') return normalized;
+    }
+  }
+
+  return 'eduval_unknown';
 };
 
 export const withEduValueCompatibilityAliases = (values: ReadonlyArray<string>): EduValue[] => {
@@ -1020,6 +1495,50 @@ export const eduValueNutritionLabels: Record<EduValue, ContentTypeNutritionLabel
   },
 };
 
+// Content groupings that are governed by usage limits but are NOT eduValues
+// (social is a designation, video sites are a delivery format). They get their
+// own nutrition labels so the usage-limits UI can explain them.
+export type ExtraContentTypeKey = 'social' | 'video';
+
+export const extraContentTypeNutritionLabels: Record<ExtraContentTypeKey, ContentTypeNutritionLabel> = {
+  social: {
+    title: 'Social Media',
+    tagline: 'Feeds built to keep you scrolling.',
+    description:
+      'Platforms centered on feeds, followers, and reactions. Some genuine connection and creativity lives here, but the core design — infinite scroll, notifications, and algorithmic recommendations — is tuned to maximize time spent, which makes it easy to overuse.',
+    ingredients: [
+      { name: 'Infinite scroll & autoplay', note: 'No natural stopping point.' },
+      { name: 'Algorithmic feed', note: 'Optimized for engagement, not wellbeing.' },
+      { name: 'Social comparison', note: 'Likes, follower counts, and curated highlight reels.' },
+      { name: 'Notifications & streaks', note: 'Designed to pull you back in.' },
+    ],
+    dailyDietGuidance: [
+      'Best with a firm time limit and an allowed-hours window (not right before bed).',
+      'For younger kids, consider blocking entirely under content filtering.',
+      'Talk about what they see — comparison and pressure matter as much as minutes.',
+    ],
+    examples: ['Instagram', 'TikTok', 'Snapchat', 'X / Twitter', 'Facebook'],
+  },
+  video: {
+    title: 'Video Sites',
+    tagline: 'Streaming video — quality varies wildly.',
+    description:
+      'General-purpose video platforms that mix genuinely great learning content with entertainment and junk. Because the same site hosts all of it, autoplay and recommendations can quickly pull a focused session into an endless watch-next spiral.',
+    ingredients: [
+      { name: 'Autoplay & “up next”', note: 'One video becomes ten.' },
+      { name: 'Recommendation rabbit holes', note: 'The algorithm steers what comes next.' },
+      { name: 'Mixed quality', note: 'Educational, entertainment, and junk side by side.' },
+      { name: 'Ads & sponsorships', note: 'Common, and not always obvious to kids.' },
+    ],
+    dailyDietGuidance: [
+      'Set a video-sites time limit so a quick clip doesn’t become an afternoon.',
+      'Prefer library-approved channels or specific videos over open browsing for young kids.',
+      'Turn the “what did you watch?” check-in into a habit.',
+    ],
+    examples: ['YouTube'],
+  },
+};
+
 let colorLookup = {
   'blue': "#3b82f6", // Blue
   'blueDark': "#1d4ed8", // Dark Blue
@@ -1103,36 +1622,40 @@ export const eduTagList: TagOptionDetail<EduValue>[] = [
   ]
 
 
+// Min age = the youngest age the content is suitable for (a floor). Labels read as "Min age N+"
+// so they are never confused with the target-audience tags below (which read as "For …").
 export const minAgeTagList: TagOptionDetail<MinAgeGroup>[] = [
-  { key: 'minage_na', name: 'NA' },
-  { key: 'minage_unknown', name: 'Unassigned' },
-  { key: 'minage_prek', name: 'Pre-K (0-5)' },
-  { key: 'minage_kids', name: 'Young Kids (5-10)' },
-  { key: 'minage_preteen', name: 'Pre-Teens (10-12)' },
-  { key: 'minage_teen', name: 'Teens (13-17)' },
-  { key: 'minage_adult', name: 'Adults' },
+  { key: 'minage_na', name: 'Min age: N/A' },
+  { key: 'minage_unknown', name: 'Min age: Unassigned' },
+  { key: 'minage_prek', name: 'Min age 0+ (Pre-K)' },
+  { key: 'minage_kids', name: 'Min age 5+ (Young Kids)' },
+  { key: 'minage_preteen', name: 'Min age 10+ (Pre-Teens)' },
+  { key: 'minage_teen', name: 'Min age 13+ (Teens)' },
+  { key: 'minage_adult', name: 'Min age 18+ (Adults)' },
 ];
 
+// Target audience = who the content is designed/marketed for. Labels read as "For …" to stay
+// visually distinct from the min-age tags above.
 export const targetAudienceTagList: TagOptionDetail<TargetAudience>[] = [
-  { key: 'ta_all', name: 'All' },
-  { key: 'ta_prek', name: 'Pre-K (0-5)' },
-  { key: 'ta_kids', name: 'Young Kids (5-10)' },
-  { key: 'ta_preteen', name: 'Pre-Teens (10-12)' },
-  { key: 'ta_teen', name: 'Teens (13-17)' },
-  { key: 'ta_adult', name: 'Adults' },
+  { key: 'ta_all', name: 'For all ages', selectedName: 'All ages', icon: 'people', color: '#2065c0' },
+  { key: 'ta_prek', name: 'For Pre-K (0-5)', selectedName: 'Pre-K', icon: 'person', color: '#0ea5e9' },
+  { key: 'ta_kids', name: 'For Young Kids (5-10)', selectedName: 'Young Kids', icon: 'person', color: '#16a34a' },
+  { key: 'ta_preteen', name: 'For Pre-Teens (10-12)', selectedName: 'Pre-Teens', icon: 'person', color: '#65a30d' },
+  { key: 'ta_teen', name: 'For Teens (13-17)', selectedName: 'Teens', icon: 'person', color: '#7c3aed' },
+  { key: 'ta_adult', name: 'For Adults', selectedName: 'Adults', icon: 'person', color: '#64748b' },
 ];
 
-export const costTagList = [
-  { key: 'cost_free', name: 'Free' },
-  { key: 'cost_freewithpaid', name: 'Partially Free' },
-  { key: 'cost_paid', name: 'Paid' },
+export const costTagList: TagOptionDetail<Cost>[] = [
+  { key: 'cost_free', name: 'Free', selectedName: 'Free', icon: 'cash-coin', color: '#16a34a' },
+  { key: 'cost_freewithpaid', name: 'Partially Free', selectedName: 'Partial', icon: 'cash-coin', color: '#2065c0' },
+  { key: 'cost_paid', name: 'Paid', selectedName: 'Paid', icon: 'cash-coin', color: '#2065c0' },
 ];
 
 export const adsTagList: TagOptionDetail<Ads>[] = [
-  { key: 'ads_no', name: 'No Ads' },
-  { key: 'ads_l', name: 'Low' },
-  { key: 'ads_m', name: 'Medium' },
-  { key: 'ads_h', name: 'High' },
+  { key: 'ads_no', name: 'No Ads', selectedName: 'No Ads', icon: 'badge-ad', color: '#16a34a' },
+  { key: 'ads_l', name: 'Low', selectedName: 'Low Ads', icon: 'badge-ad', color: '#65a30d' },
+  { key: 'ads_m', name: 'Medium', selectedName: 'Some Ads', icon: 'badge-ad', color: '#f88e42' },
+  { key: 'ads_h', name: 'High', selectedName: 'Heavy Ads', icon: 'badge-ad', color: '#dc2626' },
 ];
 
 export const costDetailsTagList: TagOptionDetail<CostDetails>[] = [
@@ -1195,6 +1718,34 @@ export const intentTagList: TagOptionDetail<IntentTag>[] = [
   { key: 'intent_doomscroll', name: 'Doomscroll', description: 'Endless feed scrolling / high-pull consumption', icon: 'arrow-repeat' },
 ];
 
+// Ordinal design/distraction scale — one icon across levels, color conveys severity (mirrors adsTagList).
+export const designTagList: TagOptionDetail<DesignLevel>[] = [
+  { key: 'design_clean', name: 'Clean & simple', selectedName: 'Clean', description: 'Focused, uncluttered UI with minimal distractions.', icon: 'window', color: '#16a34a' },
+  { key: 'design_light', name: 'Mostly clean', selectedName: 'Mostly clean', description: 'Generally focused, with minor visual clutter.', icon: 'window', color: '#65a30d' },
+  { key: 'design_busy', name: 'Somewhat distracting', selectedName: 'Somewhat distracting', description: 'Busy layout with notable distractions.', icon: 'window', color: '#f88e42' },
+  { key: 'design_noisy', name: 'Very distracting & noisy', selectedName: 'Very distracting', description: 'Cluttered, noisy, attention-grabbing UI.', icon: 'window', color: '#dc2626' },
+  { key: 'design_unknown', name: 'Unassigned (auto)', selectedName: 'Unknown', description: 'Not assigned or unknown.', hideFromSearch: true, icon: 'window', color: colorLookup['gray'] },
+];
+
+// Design attribute flags (multi-select).
+export const designAttrTagList: TagOptionDetail<DesignTag>[] = [
+  { key: 'dtag_kidfriendly', name: 'Kid-friendly design', selectedName: 'Kid-friendly', description: 'Bright, playful, age-appropriate UI designed for children.', icon: 'emoji-smile', color: '#2065c0' },
+];
+
+// Audience role (multi-select) — who the resource is aimed at by role, separate from age band.
+export const audienceRoleTagList: TagOptionDetail<AudienceRole>[] = [
+  { key: 'aud_educator', name: 'For teachers', selectedName: 'For teachers', description: 'Aimed at teachers/educators (lesson plans, classroom resources).', icon: 'easel', color: '#7c3aed' },
+  { key: 'aud_parent', name: 'For parents', selectedName: 'For parents', description: 'Aimed at parents/caregivers.', icon: 'people', color: '#0d9488' },
+];
+
+// Freshness — the external resource's own maintenance/activity. Muted palette (informative, not alarming).
+export const freshnessTagList: TagOptionDetail<Freshness>[] = [
+  { key: 'fresh_active', name: 'Actively updated', selectedName: 'Active', description: 'The source is actively maintained and kept up to date.', icon: 'arrow-repeat', color: '#16a34a' },
+  { key: 'fresh_aging', name: 'Aging', selectedName: 'Aging', description: 'The source is updated infrequently and is starting to show its age.', icon: 'clock-history', color: '#d97706' },
+  { key: 'fresh_outdated', name: 'Outdated / inactive', selectedName: 'Outdated', description: 'The source is no longer actively maintained; content may be out of date.', icon: 'clock-history', color: '#64748b' },
+  { key: 'fresh_unknown', name: 'Unassigned (auto)', selectedName: 'Unknown', description: 'Not assigned or unknown.', hideFromSearch: true, icon: 'clock-history', color: colorLookup['gray'] },
+];
+
 export interface UseCriteriaDataOptions {
   eduValue?: EduValue[];
   minAgeGroup?: MinAgeGroup[];
@@ -1205,6 +1756,10 @@ export interface UseCriteriaDataOptions {
   contentTypes?: ContentType[];
   topics?: TopicTag[];
   intent?: IntentTag[];
+  design?: DesignLevel[];
+  designTags?: DesignTag[];
+  audienceRoles?: AudienceRole[];
+  freshness?: Freshness[];
 }
 export const tagOptionsMap: UseCriteriaDataOptions = {
   eduValue: eduTagList.map((tag) => tag.key) as EduValue[],
@@ -1216,6 +1771,10 @@ export const tagOptionsMap: UseCriteriaDataOptions = {
   contentTypes: contentTypeTagList.map((tag) => tag.key) as ContentType[],
   topics: topicTagList.map((tag) => tag.key) as TopicTag[],
   intent: intentTagList.map((tag) => tag.key) as IntentTag[],
+  design: designTagList.map((tag) => tag.key) as DesignLevel[],
+  designTags: designAttrTagList.map((tag) => tag.key) as DesignTag[],
+  audienceRoles: audienceRoleTagList.map((tag) => tag.key) as AudienceRole[],
+  freshness: freshnessTagList.map((tag) => tag.key) as Freshness[],
 };
 
 export const tagOptionsWithDetailsMap = {
@@ -1228,6 +1787,10 @@ export const tagOptionsWithDetailsMap = {
   contentTypes: contentTypeTagList,
   topics: topicTagList,
   intent: intentTagList,
+  design: designTagList,
+  designTags: designAttrTagList,
+  audienceRoles: audienceRoleTagList,
+  freshness: freshnessTagList,
 };
 
 
@@ -1243,6 +1806,17 @@ function getTagOptionsMapWithDetails() {
 
 function getTagName(tag: string) {
   return critTagMap[tag]?.name;
+}
+
+/** Full option detail (name, selectedName, icon, color) for any criteria tag key. */
+export function getCriteriaTagDetail(tag: string): TagOptionDetail<string> | undefined {
+  return critTagMap[tag] as TagOptionDetail<string> | undefined;
+}
+
+/** Short display label for a criteria tag chip (selectedName, falling back to name). */
+export function getCriteriaTagShortName(tag: string): string | undefined {
+  const detail = critTagMap[tag];
+  return detail?.selectedName || detail?.name;
 }
 export function getEduValueInfoFromTag(tag: string) {
   const normalized = normalizeEduValueAlias(tag);
@@ -1273,6 +1847,10 @@ export function getUseCriteriaObjWithKeys(tags: Array<string>) {
     contentTypes: [] as Array<ContentType>,
     topics: [] as Array<TopicTag>,
     intent: undefined as IntentTag | undefined,
+    design: undefined as DesignLevel | undefined,
+    designTags: [] as Array<DesignTag>,
+    audienceRoles: [] as Array<AudienceRole>,
+    freshness: undefined as Freshness | undefined,
 
   } satisfies UseCriteriaData;
   try {
@@ -1298,6 +1876,14 @@ export function getUseCriteriaObjWithKeys(tags: Array<string>) {
         result.topics.push(tagVal as TopicTag);
       } else if (tagKey.startsWith('intent_')) {
         result.intent = tagVal as IntentTag;
+      } else if (tagKey.startsWith('design_')) {
+        result.design = tagVal as DesignLevel;
+      } else if (tagKey.startsWith('dtag_')) {
+        result.designTags.push(tagVal as DesignTag);
+      } else if (tagKey.startsWith('aud_')) {
+        result.audienceRoles.push(tagVal as AudienceRole);
+      } else if (tagKey.startsWith('fresh_')) {
+        result.freshness = tagVal as Freshness;
       }
     }
   } catch (e) {
@@ -1317,6 +1903,27 @@ export function isEligibleForRestrictedLibraryHide(tags?: Array<string> | null):
   return !!criteria.eduValue && criteria.eduValue !== 'eduval_unknown';
 }
 
+/**
+ * Existing useCriteria tags that indicate attention-capturing / high-pull design.
+ * Derived signal — we reuse tags that already exist rather than duplicating a
+ * separate "dark pattern" taxonomy.
+ */
+export const ATTENTION_TRAP_TAGS = [
+  'eduval_junk',
+  'topic_short_video_infinite_scroll',
+  'topic_clickbait_sensational_news',
+  'topic_social_feed',
+  'intent_doomscroll',
+] as const;
+
+/** True if any known attention-trap tag is present. */
+export function hasAttentionTraps(tags?: Array<string> | null): boolean {
+  if (!Array.isArray(tags) || tags.length === 0) {
+    return false;
+  }
+  return tags.some((t) => (ATTENTION_TRAP_TAGS as readonly string[]).includes(t));
+}
+
 
 export function getUseCriteriaObjWithInfo(tags: Array<string>) {
   const result = {
@@ -1329,6 +1936,10 @@ export function getUseCriteriaObjWithInfo(tags: Array<string>) {
     contentTypes: [] as Array<TagOptionDetail<ContentType>>,
     topics: [] as Array<TagOptionDetail<TopicTag>>,
     intent: undefined as TagOptionDetail<IntentTag> | undefined,
+    design: undefined as TagOptionDetail<DesignLevel> | undefined,
+    designTags: [] as Array<TagOptionDetail<DesignTag>>,
+    audienceRoles: [] as Array<TagOptionDetail<AudienceRole>>,
+    freshness: undefined as TagOptionDetail<Freshness> | undefined,
 
   } satisfies UseCriteriaDataWithDetails;
   try {
@@ -1358,6 +1969,14 @@ export function getUseCriteriaObjWithInfo(tags: Array<string>) {
         result.topics.push(tagVal as TagOptionDetail<TopicTag>);
       } else if (tagKey.startsWith('intent_')) {
         result.intent = tagVal as TagOptionDetail<IntentTag>;
+      } else if (tagKey.startsWith('design_')) {
+        result.design = tagVal as TagOptionDetail<DesignLevel>;
+      } else if (tagKey.startsWith('dtag_')) {
+        result.designTags.push(tagVal as TagOptionDetail<DesignTag>);
+      } else if (tagKey.startsWith('aud_')) {
+        result.audienceRoles.push(tagVal as TagOptionDetail<AudienceRole>);
+      } else if (tagKey.startsWith('fresh_')) {
+        result.freshness = tagVal as TagOptionDetail<Freshness>;
       }
     }
   } catch (e) {

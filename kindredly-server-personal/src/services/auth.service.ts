@@ -35,7 +35,7 @@ import {generateUsernameAndDisplayedName} from '@/utils/user.utils';
 import {UserAuthInfo} from '@/utils/auth_utils';
 
 import {decryptPassword, encryptPassword} from '@/utils/crypto_util';
-import {_createTempToken, _createToken} from '@/utils/auth_utils';
+import {_createCompanionToken, _createTempToken, _createToken} from '@/utils/auth_utils';
 import {UserOptions} from '@/typing/usertypes';
 import {logger} from '@/utils/logger';
 import AuthValidatorService from './_interfaces/auth_validator.service';
@@ -43,6 +43,7 @@ import {inject, injectable} from 'inversify';
 import {TYPES} from '@/types';
 import {container} from '@/inversify.config';
 import PasskeyService from './passkey.service';
+import {recordSecurityEvent, SECURITY_EVENT_TYPES} from '@/services/security_event.service';
 
 export interface ApplePostData {
   id_token: string;
@@ -218,10 +219,28 @@ class AuthService {
     // Verify and find user for each login type
     const {user, verified} = await this.authValidatorService.validateUserCredentials(userData);
 
-    if (!user || user.deleted) throw new HttpException(409, `User not found `);
-    else if (user.disabled) {
+    // Failed logins were previously thrown away entirely — no counter, no record, nothing
+    // to distinguish one forgetful parent from a credential-stuffing run. The reason is
+    // kept separate from the client-facing message so the ledger can tell "no such user"
+    // (enumeration probing) apart from "wrong password" (guessing).
+    const recordFailure = (reason: string, userId?: string) =>
+      recordSecurityEvent({
+        eventType: SECURITY_EVENT_TYPES.AUTH_LOGIN_FAILED,
+        severity: 'warn',
+        ip: req?.ip,
+        route: '/auth/signin',
+        actorUserId: userId || null,
+        detail: {reason, loginType: userData.loginType},
+      });
+
+    if (!user || user.deleted) {
+      recordFailure('user_not_found');
+      throw new HttpException(409, `User not found `);
+    } else if (user.disabled) {
+      recordFailure('account_locked', user._id);
       throw new HttpException(409, 'User account is locked');
     } else if (!verified) {
+      recordFailure('bad_credentials', user._id);
       throw new HttpException(409, `Login failed`);
     }
 
@@ -247,7 +266,7 @@ class AuthService {
       throw new HttpException(409, 'Login failed');
     }
     if (user.type !== UserType.admin) {
-      throw new HttpException(403, 'Only admin users can modify browser protection');
+      throw new HttpException(403, 'Only admins can approve this');
     }
 
     const hashedPinpass = hashString(pinpass);
@@ -318,14 +337,15 @@ class AuthService {
     if (userData.type == UserType.restricted) {
       options.whitelistingEnabled = true;
       options.contentFilteringEnabled = true;
+      options.logActivity = true;
       plugins = ['default-youtube-no-distractions'];
     }
 
-    options.logActivity = true;
-
     //encrypt password copy if requested to be stored
+    // D5. On /auth/register no account exists yet so the policy cannot apply; it bites on
+    // /auth/createUser, the guardian-adds-a-member path. Adding the member still succeeds.
     let passwordCopy = undefined;
-    if (userData.serverCopyOfPassword) {
+    if (userData.serverCopyOfPassword && !(await this.serverKeyStorageBlocked(ctx))) {
       passwordCopy = encryptPassword(userData.serverCopyOfPassword);
     }
 
@@ -369,11 +389,20 @@ class AuthService {
     }
     ctx.cacheUser(newUser);
 
+    let sharedCollectionResult: {collectionId: string; created: boolean} | null = null;
     try {
       await this.itemService._createDefaultQuickBarCollection(ctx, userId);
-      await this.itemService._createDefaultSharedCollection(ctx, userId);
+      sharedCollectionResult = await this.itemService._createDefaultSharedCollection(ctx, userId);
     } catch (e) {
       console.error('Error creating default collections', e);
+    }
+
+    if (sharedCollectionResult) {
+      try {
+        await this._pinSharedCollectionToHome(ctx, userId, sharedCollectionResult);
+      } catch (e) {
+        console.error('Error pinning shared collection to home', e);
+      }
     }
 
     if (newUser.loginType == LoginType.internal && !!newUser.email) {
@@ -385,6 +414,35 @@ class AuthService {
     await this.friendService.checkFriendRequestsForNewAccount(ctx, userId, ctx.accountId, email);
 
     return newUser;
+  }
+
+  // Pin the family shared collection to the relevant members' home screens.
+  // When the collection was just created, pin it for both the owner (current user)
+  // and the new member; otherwise only the newly added member needs it.
+  // Merge-based so existing pins (and manual unpins) are preserved; per-member errors
+  // are non-fatal so they never block user creation.
+  private async _pinSharedCollectionToHome(
+    ctx: RequestContext,
+    newUserId: string,
+    shared: {collectionId: string; created: boolean},
+  ) {
+    const memberIds = shared.created ? [ctx.currentUserId, newUserId] : [newUserId];
+    const uniqueMemberIds = [...new Set(memberIds.filter(Boolean))];
+
+    for (const memberId of uniqueMemberIds) {
+      try {
+        const prefs = await this.userService.getUserPrefs(ctx, memberId, ['pinnedToHome']);
+        const current = Array.isArray(prefs?.pinnedToHome) ? (prefs.pinnedToHome as string[]) : [];
+        if (current.includes(shared.collectionId)) {
+          continue;
+        }
+        await this.userService.updateUserPrefs(ctx, memberId, {
+          pinnedToHome: [...current, shared.collectionId],
+        });
+      } catch (e) {
+        console.error('Error pinning shared collection for member', memberId, e);
+      }
+    }
   }
 
   public async generateUniqueUsername(ctx: RequestContext) {
@@ -415,9 +473,14 @@ class AuthService {
   // ROUTE-METHOD
   async updatePassword(ctx: RequestContext, userId: string, rawPassword: string, passwordCopy: string | null) {
     await ctx.verifySelfOrAdminOverUser(userId);
+
+    // D5. Changing your password must keep working under the policy; keeping a copy of it
+    // must not. Without this the policy is bypassed by simply setting a password again.
+    const effectiveCopy = (await this.serverKeyStorageBlocked(ctx)) ? null : passwordCopy;
+
     await this.users.updateWithId(userId, {
       password: hashString(rawPassword),
-      passwordCopy: encryptPassword(passwordCopy),
+      passwordCopy: encryptPassword(effectiveCopy),
     });
 
     // Kill outstanding tokens for this user. When changing your own password,
@@ -465,9 +528,27 @@ class AuthService {
   //   });
   // }
 
+  /**
+   * D5. True when this family has turned off server-side key storage. Read from the
+   * account rather than trusted from the request, so the guarantee holds against any
+   * client -- including curl.
+   */
+  private async serverKeyStorageBlocked(ctx: RequestContext) {
+    const account = await ctx.getAccount();
+    return account?.sysOptions?.noServerKeyStorage === true;
+  }
+
   // ROUTE-METHOD
   async saveRecoveryKeyOnServer(ctx: RequestContext, targetUserId: string, recoveryKey: string) {
     await ctx.verifySelfOrAdminOverUser(targetUserId);
+
+    // Storing escrow is the entire purpose of this call, so under the policy it fails
+    // loudly. The two sites below only carry escrow as a side effect of a larger, still
+    // legitimate operation, so they drop the copy instead of failing the operation.
+    if (await this.serverKeyStorageBlocked(ctx)) {
+      throw new HttpException(403, 'This family has turned off Kindredly key storage.');
+    }
+
     await this.users.updateWithId(targetUserId, {
       recoveryKey: encryptPassword(recoveryKey),
     });
@@ -479,41 +560,83 @@ class AuthService {
     targetUserId: string,
     request: RemoveRecoveryKeyFromServerRequest,
   ) {
-    if (!ctx.currentUserId || targetUserId !== ctx.currentUserId) {
-      throw new HttpException(403, 'This action is only available for the current user.');
+    if (!ctx.currentUserId) {
+      throw new HttpException(403, 'Sign in to change recovery settings.');
+    }
+
+    const actingForSelf = targetUserId === ctx.currentUserId;
+
+    if (!actingForSelf) {
+      // Closes the asymmetry: saveRecoveryKeyOnServer takes verifySelfOrAdminOverUser, so a
+      // guardian could create escrow for a child and then nobody could remove it -- a child
+      // who only ever switches in by PIN cannot reach this screen themselves.
+      //
+      // verifyAdminOverUser is the right shape rather than verifySelfOrAdminOverUser: it
+      // additionally refuses when the target is an admin, so this never becomes one guardian
+      // stripping another guardian's recovery. An adult removes their own.
+      await ctx.verifyAdminOverUser(targetUserId, 'Only a guardian can turn this off, and only for a child.');
     }
 
     const user = await ctx.getUserById(targetUserId);
-    const passkeys = await this.passkeyService.listPasskeys(targetUserId);
-    const hasPassword = !!user.password;
-    const hasPasskeys = passkeys.length > 0;
+    const targetPasskeys = await this.passkeyService.listPasskeys(targetUserId);
 
-    if (!hasPassword && !hasPasskeys) {
-      throw new HttpException(400, 'Add a password or passkey before disabling Kindredly recovery.');
+    // Whether anyone is stranded is a question about the TARGET -- they are the one who has
+    // to get back in afterwards.
+    //
+    // A password, specifically, and not "password or passkey" as this used to read. A
+    // passkey is a genuine unlock method but not a universal one: our Android app hosts its
+    // own WebViews and has no WebAuthn at all, so a passkey-only account cannot get in
+    // there. Removing our copy without a password is how somebody loses their library.
+    // Same rule the signup screen enforces, so the two surfaces cannot disagree.
+    if (!user.password) {
+      throw new HttpException(400, 'Set an encryption password before turning off Kindredly recovery.');
+    }
+
+    // Verification proves the ACTING user. A guardian cannot produce a child's passkey, and
+    // should not have to type a child's password to act on their behalf.
+    const actingUser = actingForSelf ? user : await ctx.getCurrentUser();
+    const actingPasskeys = actingForSelf
+      ? targetPasskeys
+      : await this.passkeyService.listPasskeys(ctx.currentUserId);
+
+    if (!actingUser?.password && actingPasskeys.length === 0) {
+      throw new HttpException(400, 'Add a password or passkey to your own account before turning this off.');
     }
 
     if (request.method === 'password') {
-      if (!hasPassword || !request.password || !secureCompareSecrets(user.password, hashString(request.password))) {
+      if (
+        !actingUser?.password ||
+        !request.password ||
+        !secureCompareSecrets(actingUser.password, hashString(request.password))
+      ) {
         throw new HttpException(401, 'Verification failed.');
       }
     } else if (request.method === 'passkey') {
-      if (!hasPasskeys || !request.passkey) {
+      if (actingPasskeys.length === 0 || !request.passkey) {
         throw new HttpException(401, 'Verification failed.');
       }
 
       const authResult = await this.passkeyService.authenticatePasskey(request.passkey, {
         expectedOperation: 'remove-recovery-key',
-        expectedUserId: targetUserId,
+        expectedUserId: ctx.currentUserId,
       });
 
-      if (!authResult.success || !authResult.verified || authResult.userId !== targetUserId) {
+      if (!authResult.success || !authResult.verified || authResult.userId !== ctx.currentUserId) {
         throw new HttpException(401, 'Verification failed.');
       }
     } else {
       throw new HttpException(400, 'Verification method is required.');
     }
 
-    await this.users.updateWithId(targetUserId, {recoveryKey: null});
+    // KEY-3 step 1: clear passwordCopy as well. recoveryKey alone was never the whole story
+    // -- passwordCopy is what getUserForSignin hands back as passwordForClient, so leaving it
+    // made "Kindredly recovery is off" untrue. It is also the second thing the family policy
+    // (D5) counts, so a member could not clear their own block without it.
+    //
+    // Verified safe on 2026-08-27: zero live users have a passwordCopy (the only 4 rows in the
+    // dev database belong to deleted accounts), so nothing depends on it today. Rotation --
+    // KEY-3 step 3 -- is still open: this stops future use, it does not undo that we held it.
+    await this.users.updateWithId(targetUserId, {recoveryKey: null, passwordCopy: null});
   }
 
   // ROUTE-METHOD
@@ -822,6 +945,33 @@ class AuthService {
     const currentUser = await ctx.getCurrentUser();
     const tokenData = _createTempToken(currentUser);
     return {tokenData};
+  }
+
+  /**
+   * Mints the Companion device-agent token during provisioning: scoped to
+   * activity push + heartbeat, revocable via its own sessionId like any other
+   * session. Minted for the CALLING user unless `targetUserId` names a child
+   * the caller administers — the desktop Companion is linked by a parent from
+   * their own session, and the device must upload as the child.
+   */
+  public async mintCompanionToken(
+    ctx: RequestContext,
+    deviceId: string,
+    targetUserId?: string,
+  ): Promise<{token: string; deviceId: string}> {
+    if (!deviceId || typeof deviceId !== 'string' || deviceId.length > 64) {
+      throw new HttpException(400, 'invalid deviceId');
+    }
+    const currentUser = await ctx.getCurrentUser();
+    if (targetUserId && targetUserId !== currentUser._id) {
+      await ctx.verifySelfOrAdminOverUser(targetUserId);
+      const targetUser = await ctx.getUserById(targetUserId);
+      if (!targetUser) throw new HttpException(404, 'target user not found');
+      const tokenData = _createCompanionToken(targetUser, deviceId);
+      return {token: tokenData.token, deviceId};
+    }
+    const tokenData = _createCompanionToken(currentUser, deviceId);
+    return {token: tokenData.token, deviceId};
   }
 
   // ROUTE-METHOD

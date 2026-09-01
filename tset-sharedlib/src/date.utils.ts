@@ -2,6 +2,8 @@
  * Date and age calculation utilities
  */
 
+import type { MinAgeGroup } from './content.types';
+
 export interface DateOfBirth {
   y: number;
   m: number;
@@ -44,4 +46,18 @@ export function isUnderAge(dob: DateOfBirth | null | undefined, ageThreshold: nu
     return null;
   }
   return age < ageThreshold;
+}
+
+/**
+ * Map an age in years to the MinAgeGroup band used by category sets and content tags
+ * @param age Age in years, or null when unknown
+ * @returns The matching age group, or null when age is unknown
+ */
+export function ageGroupForAge(age: number | null): MinAgeGroup | null {
+  if (age === null) return null;
+  if (age < 5) return 'minage_prek';
+  if (age < 10) return 'minage_kids';
+  if (age < 13) return 'minage_preteen';
+  if (age < 18) return 'minage_teen';
+  return 'minage_adult';
 }

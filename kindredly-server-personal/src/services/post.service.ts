@@ -1,4 +1,6 @@
+import {HttpException} from '@/exceptions/HttpException';
 import {PostRepo} from '@/db/post.repo';
+import {clampPerPage} from '@/utils/pagination_utils';
 import {UserRepo} from '@/db/user.repo';
 import {UserFeedRepo} from '@/db/user_feed.repo';
 import {ItemRepo} from '@/db/item.repo';
@@ -26,6 +28,7 @@ import {
   SavePostAttachmentToLibraryResponse,
 } from 'tset-sharedlib/api';
 import {urlToKey} from 'tset-sharedlib/text.utils';
+import {filterToFields} from '@/utils/parse_utils';
 
 class PostService {
   private posts = new PostRepo();
@@ -120,9 +123,7 @@ class PostService {
 
     const attachedLibraryItems = await this.items.query().whereIn('_id', candidateItemIds).select('_id', 'type');
     return new Set(
-      (attachedLibraryItems || [])
-        .filter((item) => item?.type === ItemTypeEnum.collection)
-        .map((item) => item._id),
+      (attachedLibraryItems || []).filter((item) => item?.type === ItemTypeEnum.collection).map((item) => item._id),
     );
   }
 
@@ -137,24 +138,40 @@ class PostService {
     return rawId != null ? String(rawId).trim() : '';
   }
 
+  // Library-only ("whitelisting") restricted user — the only users whose post shares must come
+  // from their library. Restricted users in filter-only mode share like anyone else.
+  private isRestrictedLibraryOnlyUser(user: any): boolean {
+    return user?.type === UserType.restricted && user?.options?.whitelistingEnabled === true;
+  }
+
   private async assertCanShareAttachedLibraryItems(
     ctx: RequestContext,
     attachedItems: any[],
     recipientUserIds: string[],
   ) {
-    if (!attachedItems?.length || !recipientUserIds?.length) {
+    if (!attachedItems?.length) {
       return;
     }
 
     const currentUser = await ctx.getCurrentUser();
-    const hasRestrictedOutOfLibraryBundle =
-      currentUser?.type === UserType.restricted &&
-      (attachedItems || []).some(
-        (attachment) => attachment?.type === 'libItemBundle' && !this.getAttachedShareSourceItemId(attachment),
-      );
+    // Bundles carry post-only link data rather than a saved library item. Reject them for
+    // library-only users even when a client claims a library match: otherwise a modified or
+    // stale client could turn an arbitrary URL into a shareable attachment without it ever
+    // becoming a real library item. The composer attaches exact saved items and leaves every
+    // other URL as ordinary post text.
+    const hasRestrictedLibraryOnlyBundle =
+      this.isRestrictedLibraryOnlyUser(currentUser) &&
+      (attachedItems || []).some((attachment) => attachment?.type === 'libItemBundle');
 
-    if (hasRestrictedOutOfLibraryBundle) {
-      throw new Error('Restricted users can only share content that is already in their library');
+    if (hasRestrictedLibraryOnlyBundle) {
+      throw new HttpException(
+        403,
+        'You can only share links already saved in your library. Remove the attachment or save it first.',
+      );
+    }
+
+    if (!recipientUserIds?.length) {
+      return;
     }
 
     const attachedItemIds = Array.from(
@@ -166,10 +183,19 @@ class PostService {
       ),
     );
 
+    if (this.isRestrictedLibraryOnlyUser(currentUser)) {
+      for (const itemId of attachedItemIds) {
+        const isInCurrentUsersLibrary = await this.permissionService.isInLibraryForUser(ctx, ctx.currentUserId, itemId);
+        if (!isInCurrentUsersLibrary) {
+          throw new HttpException(403, 'You can only share links already saved in your library.');
+        }
+      }
+    }
+
     for (const itemId of attachedItemIds) {
       const canShare = await this.permissionService._hasSharePermissionDirectOrAsAdmin(ctx, itemId);
       if (!canShare) {
-        throw new Error("You don't have permission to share one or more attached library items");
+        throw new HttpException(403, "You don't have permission to share one or more attached library items");
       }
     }
   }
@@ -181,13 +207,39 @@ class PostService {
     const records = await this.posts
       .findMany({userId: targetUserId})
       .where('deletedAt', null)
-      .limit(perPage)
+      .limit(clampPerPage(perPage, 100))
       .offset(currentPage)
       .orderBy('createdAt', 'desc');
 
     if (!includeTotalRows) return {records, count: null};
     const count = await this.posts.countRows({userId: targetUserId});
     return {records, count};
+  }
+
+  // ROUTE-METHOD
+  // Returns all fan-out siblings of a grouped post so the AUTHOR can view every group's
+  // isolated thread from one unified card. Author-only: recipients must never receive
+  // sibling (cross-group) data — that would leak other groups' membership.
+  async listByShareGroup(ctx: RequestContext, shareGroupId: string) {
+    if (!shareGroupId) throw new Error('shareGroupId required');
+
+    const siblings = await this.posts.findMany({shareGroupId}).where('deletedAt', null).orderBy('createdAt', 'asc');
+
+    if (!siblings || siblings.length === 0) return [];
+
+    // All siblings share the same author; gate on it.
+    await ctx.verifySelfOrAdminOverUser(siblings[0].userId);
+
+    const allUserIds = Array.from(new Set(siblings.flatMap((s) => (Array.isArray(s.sharedWith) ? s.sharedWith : []))));
+    const users = await this.users.findWhereIdIn(allUserIds);
+    const userLookup = Object.fromEntries(
+      users.map((u) => [u._id, filterToFields(['_id', 'profileImage', 'username', 'displayedName'], u)]),
+    );
+
+    return siblings.map((s) => ({
+      ...s,
+      sharedWithUsers: (Array.isArray(s.sharedWith) ? s.sharedWith : []).map((uid) => userLookup[uid]).filter(Boolean),
+    }));
   }
 
   async removeById(ctx: RequestContext, id: string) {
@@ -198,6 +250,14 @@ class PostService {
   async createPost(ctx: RequestContext, createRequest: CreatePostRequest) {
     let {postType, data, attachedItems, sharedWith} = createRequest;
     let encInfo: EncInfo | null = createRequest.encInfo ?? null;
+    const shareGroupId = createRequest.shareGroupId ?? null;
+    const groupLabel = createRequest.groupLabel ?? null;
+
+    // Grouped ("Separate recipients") sharing is admin-only. Each grouped sibling carries a
+    // shareGroupId; restricted users must never create isolated-audience posts.
+    if (shareGroupId) {
+      await ctx.verifyCurrentUserIsAdmin();
+    }
 
     await ctx.verifyInNetwork(sharedWith);
 
@@ -230,6 +290,8 @@ class PostService {
       createdAt: currentTimeSt,
       encInfo: encInfo,
       encrypted,
+      shareGroupId,
+      groupLabel,
     };
 
     //Create after because we update attachedItems
@@ -389,6 +451,41 @@ class PostService {
     return postId;
   }
 
+  /** Attachment types whose payload is a file this service would otherwise upload. */
+  private static readonly FILE_ATTACHMENT_TYPES = new Set(['imageFile', 'videoFile', 'file']);
+
+  /**
+   * Accept an attachment whose bytes the client already uploaded.
+   *
+   * Modern clients upload attachments ahead of the post (binary, or chunked above 16mb) and
+   * send only a fileId, so a 100MB video never enters this request body. Older clients —
+   * extension and mobile ship on their own cadence — still send base64 `fileData`, and those
+   * fall through to the upload branches below.
+   *
+   * Returns true when the attachment was handled here.
+   */
+  private async _adoptPreUploadedAttachment(attachedItem: any, ctx: RequestContext): Promise<boolean> {
+    if (!PostService.FILE_ATTACHMENT_TYPES.has(attachedItem?.type)) return false;
+
+    const fileId = attachedItem?.data?.fileId;
+    if (!fileId || typeof fileId !== 'string') return false;
+
+    // A fileId is caller-supplied now, so it has to be checked. Without this, a post could
+    // name any file id in the system and hand its recipients a reference to it.
+    await this.userFileService.assertFileOwnedByAccount(ctx, fileId);
+
+    // Never carry raw bytes into the post row alongside a fileId — a client that sends both
+    // would otherwise persist the whole base64 payload in the attachedItems JSON.
+    if (attachedItem.data?.fileData) {
+      delete attachedItem.data.fileData;
+    }
+    if (attachedItem.data?.imagePreview) {
+      delete attachedItem.data.imagePreview;
+    }
+
+    return true;
+  }
+
   private async _saveAttachmentsAndModifyAttachedItemsObject(
     attachedItems: any[],
     ctx: RequestContext,
@@ -401,39 +498,64 @@ class PostService {
       throw new Error(`Posts can have up to ${MAX_POST_ATTACHMENTS} attachments.`);
     }
 
+    // Rollout signal. /post/create still parses a 50mb JSON body only because old clients
+    // inline base64 `fileData` here; that parser is the largest remaining OOM path on the
+    // write side (app.ts:270). When this stops firing across shipped clients, the parser can
+    // drop to a couple of mb.
+    const legacyInlineCount = attachmentList.filter(
+      (a) => PostService.FILE_ATTACHMENT_TYPES.has(a?.type) && !!a?.data?.fileData && !a?.data?.fileId,
+    ).length;
+    if (legacyInlineCount > 0) {
+      console.info(
+        `[post.create] legacy inline attachment payload: ${legacyInlineCount} attachment(s) sent base64 fileData instead of a pre-uploaded fileId`,
+      );
+    }
+
     if (attachmentList.length > 0) {
       for (const attachedItem of attachmentList) {
+        // Already uploaded by the client, ahead of the post, through /userfile/uploadBinary
+        // or the chunked route. Nothing to do here but confirm the file is ours — the
+        // attachment already carries the shape the branches below produce.
+        if (await this._adoptPreUploadedAttachment(attachedItem, ctx)) {
+          continue;
+        }
+
         if (attachedItem.type == 'imageFile') {
           const adata = attachedItem.data;
           const imageType = adata.imageType || 'jpeg';
+          // A preview is optional. Sending {data: undefined} used to reach
+          // `preview.data.length` in _upload and throw, failing the whole post.
+          const previews = adata.imagePreview ? [{data: adata.imagePreview, id: '0', type: 'jpeg'}] : [];
           const ref = await this.userFileService._upload(ctx, {
             refId: postId,
             refType: 'post',
             fileType: imageType,
             filename: 'image_' + attachedItem.id,
             encInfo,
-            previews: [{data: adata.imagePreview, id: '0', type: 'jpeg'}],
+            previews,
             fileData: adata.fileData || adata.image,
           });
 
           //replace data with fileInfo
-          attachedItem.data = {fileId: ref._id, imageType, hasPreview: true};
+          attachedItem.data = {fileId: ref._id, imageType, hasPreview: previews.length > 0};
         } else if (attachedItem.type == 'videoFile') {
           const adata = attachedItem.data;
-          const imageType = adata.imageType || 'jpeg';
           const {fileData, fileType} = attachedItem.data;
+          // Quicktime (.mov) never gets a thumbnail on the client, so this is the common
+          // case, not an edge case — it posts without a preview rather than failing.
+          const previews = adata.imagePreview ? [{data: adata.imagePreview, id: '0', type: 'jpeg'}] : [];
           const ref = await this.userFileService._upload(ctx, {
             refId: postId,
             refType: 'post',
             fileType: fileType,
             filename: 'video_' + attachedItem.id,
             encInfo,
-            previews: [{data: adata.imagePreview, id: '0', type: 'jpeg'}],
+            previews,
             fileData: fileData,
           });
 
           //replace data with fileInfo
-          attachedItem.data = {fileId: ref._id, fileType};
+          attachedItem.data = {fileId: ref._id, fileType, hasPreview: previews.length > 0};
         } else if (attachedItem.type == 'file') {
           const {fileData, fileType, filename} = attachedItem.data || {};
           if (!fileData) {
@@ -463,6 +585,14 @@ class PostService {
   async updateSharedWith(ctx: RequestContext, postId: string, sharedWith: string[]) {
     const post = await this.posts.findById(postId);
     await ctx.verifySelfOrAdminOverUser(post.userId);
+
+    // Grouped posts keep audiences isolated per sibling; editing one sibling's recipients
+    // would break that guarantee. Editing group membership is a phase-2 feature.
+    if (post.shareGroupId) {
+      throw new Error(
+        "Recipients of a grouped post can't be edited individually. Delete and re-share to change groups.",
+      );
+    }
 
     const originalSharedWith = post.sharedWith;
 
@@ -533,6 +663,21 @@ class PostService {
     return true;
   }
 
+  // ROUTE-METHOD
+  // Owner-only, dumb persistence: this route only extends an already-encrypted post's key list
+  // (e.g. to add a wrapped key for a newly-shared friend). Validating which keys are legitimate
+  // is the client's job (EncryptionSharingService); this route doesn't diff or inspect contents.
+  async updatePostEncInfo(ctx: RequestContext, postId: string, encInfo: EncInfo) {
+    const post = await this.posts.findById(postId);
+    if (!post || post.deletedAt) throw new Error('Post not found');
+    await ctx.verifySelfOrAdminOverUser(post.userId);
+
+    if (!post.encInfo) throw new Error('Post is not encrypted');
+
+    await this.posts.updateWithId(postId, {encInfo});
+    return true;
+  }
+
   async saveAttachmentToLibrary(
     ctx: RequestContext,
     request: SavePostAttachmentToLibraryRequest,
@@ -561,8 +706,7 @@ class PostService {
 
     const currentUser = await ctx.getCurrentUser();
     const sharer = await ctx.getUserById(post.userId);
-    const isRestrictedLibraryOnly =
-      currentUser?.type === UserType.restricted && currentUser?.options?.whitelistingEnabled === true;
+    const isRestrictedLibraryOnly = this.isRestrictedLibraryOnlyUser(currentUser);
     const sharerIsAdminInAccount = !!sharer && sharer.accountId === ctx.accountId && sharer.type === UserType.admin;
 
     if (isRestrictedLibraryOnly && !isOwnPost && !sharerIsAdminInAccount) {
@@ -604,7 +748,23 @@ class PostService {
     const post = await this.posts.findById(id);
     await ctx.verifySelfOrAdminOverUser(post.userId);
 
-    return await this.posts.updateWithId(id, {deletedAt: new Date()});
+    const deletedAt = new Date();
+
+    // Grouped posts fan out to one sibling per group; deleting one must delete them all so
+    // no group is left with an orphaned thread.
+    if (post.shareGroupId) {
+      const siblings = await this.posts.findMany({shareGroupId: post.shareGroupId}).where('deletedAt', null);
+      for (const sibling of siblings) {
+        await this.posts.updateWithId(sibling._id, {deletedAt});
+        const feeds = await this.userFeed.findMany({refType: 'post', refId: sibling._id});
+        for (const feed of feeds) {
+          if (!feed.isDeleted) await this.userFeed.updateWithId(feed._id, {isDeleted: true});
+        }
+      }
+      return true;
+    }
+
+    return await this.posts.updateWithId(id, {deletedAt});
   }
 }
 

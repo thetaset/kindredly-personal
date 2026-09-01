@@ -17,6 +17,15 @@ import {
   validatePutItems,
 } from '@/utils/embedding_cache_utils';
 
+/**
+ * Server-side embedding vector cache.
+ *
+ * DORMANT: no client currently calls these routes. It is encryption-only by design — `put`
+ * accepts ONLY encrypted blobs (the plaintext vector never reaches the server) and stores them
+ * opaquely. The future client caller must encrypt each item's vector and attach `encInfo`, use
+ * namespace='item' + cacheKey=itemId, send explicit `dimensions`, and chunk to MAX_PUT_ITEMS /
+ * MAX_GET_KEYS. Do not wire a caller until that path is intentionally enabled.
+ */
 class EmbeddingCacheRoute implements Routes {
   public router = Router();
 
@@ -53,8 +62,10 @@ class EmbeddingCacheRoute implements Routes {
           results: {
             items: rows.map((r) => ({
               cacheKey: r.cacheKey,
-              embedding: r.embedding,
+              embedding: r.embedding, // opaque encrypted blob; client decrypts using encInfo
               dimensions: r.dimensions,
+              encInfo: r.encInfo,
+              encrypted: r.encrypted,
               updatedAt: r.updatedAt?.toISOString?.() ?? String(r.updatedAt),
             })),
           },

@@ -162,6 +162,18 @@ class AccountRoute implements Routes {
       }),
     );
 
+    this.router.post(
+      '/account/keyStoragePolicy/update',
+      authenticateJWT,
+      errorHelper(async (req: ApiReq<'/account/keyStoragePolicy/update'>, res) => {
+        const results = await this.accountService.updateKeyStoragePolicy(
+          RequestContext.instance(req),
+          req.body.noServerKeyStorage,
+        );
+        res.json({success: true, results});
+      }),
+    );
+
     // SCH-OK
     this.router.post(
       '/account/users',

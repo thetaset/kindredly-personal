@@ -21,9 +21,19 @@ export type { EduValue, MinAgeGroup, TargetAudience, Cost, Ads, CostDetails, Con
 export * from './activity.types';
 export * from './activity-flags.types';
 
+// Companion device guard (device app monitoring)
+export * from './device-guard.types';
+
+// Desktop Companion status (shared by the Electron main process, its preload, and the extension)
+export * from './desktop-status.types';
+
 // Reason codes (precedence helpers)
 export * from './reason-code.utils';
 export * from './reason-metadata';
+
+// What to offer someone a block just stopped, chosen by why it stopped them
+export * from './block-intervention';
+export * from './offscreen-ideas';
 
 // Social
 export * from './social.types';

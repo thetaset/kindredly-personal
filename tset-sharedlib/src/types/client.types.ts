@@ -56,6 +56,38 @@ export interface ClientSettings {
   showRedirectsInHistory: boolean;
   disableAllImageScanningOnDevice: boolean;
   developerMode: boolean;
+
+  /**
+   * Per-entry on/off for item-attached site CSS, keyed `<itemId>::<entryId>`.
+   * A missing key means "unset" and falls back to the entry's category default,
+   * so one map replaces what would otherwise be a settings key per cleanup.
+   */
+  siteStyleSettings: Record<string, boolean> | null;
+
+  /**
+   * Entries a guardian has pinned on, same key shape as `siteStyleSettings`.
+   *
+   * Guardian-only: see `GUARDIAN_ONLY_PREF_KEYS`. It is a separate key from the
+   * preferences above precisely so the server can refuse a restricted user's write
+   * here while still letting them set their own preferences.
+   */
+  siteStyleLocks: Record<string, boolean> | null;
+}
+
+/**
+ * Pref keys only an account admin may write, even for their own user.
+ *
+ * `updateUserPrefs` otherwise authorizes with `verifySelfOrAdmin` and then writes any
+ * key it is handed, so "self" includes a restricted user writing their own prefs. Any
+ * setting meant to constrain a restricted user has to be listed here or it is advisory
+ * only — the UI disabling a control is not enforcement.
+ */
+export const GUARDIAN_ONLY_PREF_KEYS = ['siteStyleLocks'] as const;
+
+export type GuardianOnlyPrefKey = (typeof GUARDIAN_ONLY_PREF_KEYS)[number];
+
+export function isGuardianOnlyPrefKey(key: string): key is GuardianOnlyPrefKey {
+  return (GUARDIAN_ONLY_PREF_KEYS as readonly string[]).includes(key);
 }
 
 export interface StorageCleanupSettings {
@@ -65,8 +97,11 @@ export interface StorageCleanupSettings {
   batchSize?: number;
   pipelineRetentionMs?: number;
   embeddingsRetentionMs?: number;
+  activityEmbeddingsRetentionMs?: number;
+  itemEmbeddingsRetentionMs?: number;
   metaLookupRetentionMs?: number;
   emailCacheRetentionMs?: number;
+  finishedJobsRetentionMs?: number;
 }
 
 export interface SharedClientSettings {
@@ -75,6 +110,14 @@ export interface SharedClientSettings {
   installVersion?: string;
   offlineFallbackEnabled?: boolean;
   storageCleanup?: StorageCleanupSettings;
+  /**
+   * Offer the experimental encryption-password choice during Google/Apple signup.
+   *
+   * Device-level and pre-auth on purpose: the choice has to be made before an account
+   * exists, so it cannot live on a user pref or an account feature flag. Same shape as
+   * Custom Server Settings, which is reachable from the sign-in screen for the same reason.
+   */
+  encryptionPasswordAtSignup?: boolean;
 }
 
 // Deprecated types - kept for backward compatibility

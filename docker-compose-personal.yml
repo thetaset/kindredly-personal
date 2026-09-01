@@ -15,7 +15,7 @@ services:
     profiles:
       - migrate
       - createdb
-    platform: linux/x86_64
+    platform: ${KND_PLATFORM:-linux/x86_64}
     build:
       context: ./
       dockerfile: kindredly-server-personal/Dockerfile
@@ -46,7 +46,7 @@ services:
       # - kindredly_personal_node_modules:/app/kindredly-server-personal/node_modules
   kindredly-task-server:
     image: kindredly-server
-    platform: linux/x86_64
+    platform: ${KND_PLATFORM:-linux/x86_64}
     build:
       context: ./
       dockerfile: kindredly-server-personal/Dockerfile
@@ -79,7 +79,7 @@ services:
       # - kindredly_personal_node_modules:/app/kindredly-server-personal/node_modules
   kindredly-server-personal:
     image: kindredly-server
-    platform: linux/x86_64
+    platform: ${KND_PLATFORM:-linux/x86_64}
     build:
       context: ./
       dockerfile: kindredly-server-personal/Dockerfile
@@ -126,10 +126,39 @@ services:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: admin
       POSTGRES_DB: kindredlydb
+    # Appliance sizing. Postgres ships defaults meant for a server
+    # (shared_buffers=128MB, max_connections=100); this box is a small board.
+    #
+    # max_connections=40 is a floor, not a preference: config.ts sets pool
+    # max=10 per process, this file runs TWO app processes against this
+    # database (kindredly-server-personal and kindredly-task-server) = 20,
+    # plus dbmigration at startup, plus ~6 background workers Postgres runs
+    # itself. Measured: 23 client connections already puts pg_stat_activity at
+    # 28, so 30 left only two spare and a box that fails to boot under a
+    # connection storm is worse than a box using 1MB more. Do not lower this
+    # without lowering the pool in config.ts first.
+    command:
+      - postgres
+      - '-c'
+      - 'shared_buffers=32MB'
+      - '-c'
+      - 'max_connections=40'
+      - '-c'
+      - 'work_mem=2MB'
+      - '-c'
+      - 'maintenance_work_mem=16MB'
+      - '-c'
+      - 'effective_cache_size=256MB'
     ports:
       - '5435:5432'
     volumes:
-      - kindredly_postgres:/data
+      # MUST be /var/lib/postgresql/data -- that is this image's PGDATA. It was
+      # mounted at /data, which Postgres never writes to, so the whole database
+      # lived in the container's writable layer and `docker compose down`
+      # destroyed it. See the LITE-14 note in docs/trackers/lite-profile-tracker.md
+      # before upgrading an existing box: its data is in the old container, not
+      # in this volume.
+      - kindredly_postgres:/var/lib/postgresql/data
     networks:
       - kindredly_backend
 

@@ -124,10 +124,14 @@ class AccessRequestService {
 
   // ROUTE-METHOD
   async addAccessRequest(ctx: RequestContext, key: string, type: string, details: any, message: string) {
-    // const existingRequest = await this._getAccessRequestByRequesterAndKey(ctx, key);
-    // if (existingRequest.length > 0) {
-    //   return null;
-    // }
+    // Library-add requests dedup by requester+key so re-asking for the same
+    // item doesn't pile up duplicates for the parent.
+    if ((type || 'url') === 'publishedItem' || (type || 'url') === 'item') {
+      const existing = await this._getAccessRequestByRequesterAndKey(ctx, key);
+      const pendingType = (type || 'url') === 'publishedItem' ? 'publishedItem' : 'item';
+      const pending = (existing as any[]).find((r) => r?.type === pendingType && r?.status === 'requested');
+      if (pending) return pending._id;
+    }
 
     const accessRequestId = 'arq_' + uuidv4();
     const requester = await ctx.getCurrentUser();
@@ -157,7 +161,14 @@ class AccessRequestService {
       userId: ctx.currentUserId,
     });
 
-    await this.notificationsService.sendAccessRequestNotification(ctx, requester, accessRequestId, key);
+    await this.notificationsService.sendAccessRequestNotification(
+      ctx,
+      requester,
+      accessRequestId,
+      key,
+      type || 'url',
+      details,
+    );
 
     return accessRequestId;
   }
@@ -188,15 +199,33 @@ class AccessRequestService {
       }
     }
 
+    // The key is a publishId (not a URL) for published-catalog add requests,
+    // and an itemId for library-item add requests.
+    const isPublishedItemRequest = accessrequest.type === 'publishedItem';
+    const isLibraryItemRequest = accessrequest.type === 'item';
+    const publishedItemName = (accessrequest.details as any)?.srcTitle || 'the item';
+    const libraryItemName =
+      (accessrequest.details as any)?.srcTitle || (accessrequest.details as any)?.name || 'the item';
+
     let title = 'Request ';
     if (isApproved) {
       title += 'Granted';
-      message = isActionRequest
-        ? `Request GRANTED for ${accessrequest.key}.`
-        : `Request GRANTED for <a href="${accessrequest.key}">${accessrequest.key}</a>. `;
+      if (isActionRequest) {
+        message = `Request GRANTED for ${accessrequest.key}.`;
+      } else if (isPublishedItemRequest) {
+        message = `Request GRANTED: "${publishedItemName}" was added to your library.`;
+      } else if (isLibraryItemRequest) {
+        message = `Request GRANTED: "${libraryItemName}" was added to your library.`;
+      } else {
+        message = `Request GRANTED for <a href="${accessrequest.key}">${accessrequest.key}</a>. `;
+      }
     } else {
       title += 'Denied';
-      message = `Request DENIED for ${accessrequest.key}`;
+      message = isPublishedItemRequest
+        ? `Request DENIED for "${publishedItemName}"`
+        : isLibraryItemRequest
+          ? `Request DENIED for "${libraryItemName}"`
+          : `Request DENIED for ${accessrequest.key}`;
     }
 
     const notificationData = {
@@ -205,7 +234,13 @@ class AccessRequestService {
       additionalMessage: approverNote,
       refInfo: {
         requestId: id,
-        resourceType: isActionRequest ? 'action' : 'url',
+        resourceType: isActionRequest
+          ? 'action'
+          : isPublishedItemRequest
+            ? 'publishedItem'
+            : isLibraryItemRequest
+              ? 'item'
+              : 'url',
         resourceURL: accessrequest.key,
         approvalStatus: isApproved ? 'approved' : status,
       },

@@ -314,11 +314,16 @@ class ExternalMetaCacheService {
   ): Promise<{meta: ItemMeta | null; extendedInfo: ExternalMetaExtendedInfo | null}> {
     try {
       if (resourceType === ItemResourceType.YT_VIDEO) {
-        return await this.fetchYouTubeVideoMeta(url, externalId);
+        const result = await this.fetchYouTubeVideoMeta(url, externalId);
+        // The YouTube Data API path is entirely key/quota dependent and returns
+        // null on any failure (missing/invalid key, quota, private/deleted video).
+        // Fall back to scraping the page's og:image so we still get a thumbnail.
+        return result.meta ? result : {meta: await fetchGenericHtmlMeta(url), extendedInfo: null};
       }
 
       if (resourceType === ItemResourceType.YT_CHANNEL) {
-        return await this.fetchYouTubeChannelMeta(url, externalId);
+        const result = await this.fetchYouTubeChannelMeta(url, externalId);
+        return result.meta ? result : {meta: await fetchGenericHtmlMeta(url), extendedInfo: null};
       }
 
       if (resourceType === 'REDDIT_POST') {

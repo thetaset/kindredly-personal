@@ -110,4 +110,6 @@ export interface FeedItemView {
 export interface FeedListResponse {
   records: FeedItemView[];
   count?: number | null;
+  /** Whether older feed rows exist past this page. Absent on older servers. */
+  hasMore?: boolean;
 }

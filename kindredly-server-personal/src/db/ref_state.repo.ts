@@ -64,6 +64,8 @@ export class RefStateRepo {
     ownerId: string;
     stateKey?: string;
     stateSubKey?: string;
+    stateSubKeyGte?: string;
+    stateSubKeyLte?: string;
     limit: number;
     cursorUpdatedAt?: Date;
   }): Promise<RefStateRow[]> {
@@ -79,11 +81,22 @@ export class RefStateRepo {
 
     if (input.stateKey) query.andWhere({stateKey: input.stateKey});
     if (input.stateSubKey !== undefined) query.andWhere({stateSubKey: input.stateSubKey});
+    if (input.stateSubKeyGte !== undefined) query.andWhere('stateSubKey', '>=', input.stateSubKeyGte);
+    if (input.stateSubKeyLte !== undefined) query.andWhere('stateSubKey', '<=', input.stateSubKeyLte);
     if (input.cursorUpdatedAt) query.andWhere('updatedAt', '<', input.cursorUpdatedAt);
 
     return await query;
   }
 
+  /**
+   * Batched sibling of listByRef.
+   *
+   * Ordered `refId, stateSubKey` rather than `updatedAt desc` — "most recently
+   * touched" is meaningless across refs, and this order matches the leading
+   * columns of uniq_ref_state_owner_ref_key (ownerType, ownerId, refType, refId,
+   * stateKey, stateSubKey), so the range scan satisfies the sort with no heap
+   * sort and no additional index.
+   */
   async listByRefs(input: {
     refType: string;
     refIds: string[];
@@ -91,6 +104,11 @@ export class RefStateRepo {
     ownerId: string;
     stateKey?: string;
     stateSubKey?: string;
+    stateSubKeyGte?: string;
+    stateSubKeyLte?: string;
+    limit?: number;
+    cursorRefId?: string;
+    cursorStateSubKey?: string;
   }): Promise<RefStateRow[]> {
     if (input.refIds.length === 0) {
       return [];
@@ -102,10 +120,64 @@ export class RefStateRepo {
         ownerType: input.ownerType,
         ownerId: input.ownerId,
       })
-      .whereIn('refId', input.refIds);
+      .whereIn('refId', input.refIds)
+      .orderBy([
+        {column: 'refId', order: 'asc'},
+        {column: 'stateSubKey', order: 'asc'},
+      ]);
 
+    if (input.limit !== undefined) query.limit(input.limit);
     if (input.stateKey) query.andWhere({stateKey: input.stateKey});
     if (input.stateSubKey !== undefined) query.andWhere({stateSubKey: input.stateSubKey});
+    if (input.stateSubKeyGte !== undefined) query.andWhere('stateSubKey', '>=', input.stateSubKeyGte);
+    if (input.stateSubKeyLte !== undefined) query.andWhere('stateSubKey', '<=', input.stateSubKeyLte);
+
+    if (input.cursorRefId !== undefined && input.cursorStateSubKey !== undefined) {
+      const {cursorRefId, cursorStateSubKey} = input;
+      query.andWhere((builder) => {
+        builder.where('refId', '>', cursorRefId).orWhere((inner) => {
+          inner.where('refId', '=', cursorRefId).andWhere('stateSubKey', '>', cursorStateSubKey);
+        });
+      });
+    }
+
+    return await query;
+  }
+
+  /**
+   * Cross-owner sweep for background jobs, keyset-paginated on (updatedAt, _id).
+   *
+   * Every other read here is owner-scoped, which is the right default for request
+   * handling. This one exists for the Companion tamper watch, which has to notice
+   * devices that have *stopped* reporting — inherently a question you cannot ask
+   * one owner at a time. Callers are background jobs with no RequestContext, so
+   * there is no ACL to apply; keep it that way and keep the callers few.
+   */
+  async listAllByStateKey(input: {
+    refType: string;
+    refId: string;
+    stateKey: string;
+    limit: number;
+    cursorUpdatedAt?: Date;
+    cursorId?: string;
+  }): Promise<RefStateRow[]> {
+    const query = this.knex<RefStateRow>('ref_state')
+      .where({refType: input.refType, refId: input.refId, stateKey: input.stateKey})
+      // Ascending + a tiebreaker on _id so pagination is stable even when many
+      // rows share an updatedAt (they do — devices check in on the same cadence).
+      .orderBy([
+        {column: 'updatedAt', order: 'asc'},
+        {column: '_id', order: 'asc'},
+      ])
+      .limit(input.limit);
+
+    if (input.cursorUpdatedAt) {
+      query.andWhere((b) =>
+        b
+          .where('updatedAt', '>', input.cursorUpdatedAt!)
+          .orWhere((b2) => b2.where('updatedAt', input.cursorUpdatedAt!).andWhere('_id', '>', input.cursorId ?? '')),
+      );
+    }
 
     return await query;
   }

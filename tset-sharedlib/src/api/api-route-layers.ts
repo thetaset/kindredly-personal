@@ -36,6 +36,11 @@ export const serverOnlyRoutes: Array<keyof ApiRouteMap> = [
   '/admin/contentLoader/dryRun',
   '/admin/contentLoader/execute',
   '/admin/contentLoader/uploadAsset',
+  '/admin/feedGen/plan',
+  '/admin/feedGen/generatePosts',
+  '/admin/feedGen/searchSources',
+  '/admin/feedGen/listFeeds',
+  '/admin/feedGen/loadFeed',
   '/admin/published/package/export',
   '/admin/published/package/import',
   '/admin/published/enrich',
@@ -46,11 +51,26 @@ export const serverOnlyRoutes: Array<keyof ApiRouteMap> = [
   '/admin/contentBundles/update',
   '/admin/contactrequest/list',
   '/admin/dataRetention/run',
+  '/admin/rateLimit/get',
+  '/admin/rateLimit/set',
+  '/admin/security/summary',
+  '/admin/aiBudget/set',
   '/admin/getGalleryDBs',
+  '/admin/getItems',
   '/admin/item/list',
   '/admin/published/changeBlockedStatus',
+  '/admin/apps/list',
+  '/admin/apps/save',
+  '/admin/thinkingPuzzles/list',
+  '/admin/thinkingPuzzles/save',
+  '/admin/thinkingPuzzles/setStatus',
+  '/admin/thinkingPuzzles/delete',
+  '/admin/thinkingPuzzles/importSeed',
   '/admin/published/changeType',
   '/admin/published/changeProcessingState',
+  '/admin/published/setCuration',
+  '/admin/published/updateContentFields',
+  '/admin/published/create',
   '/admin/published/process',
   '/admin/published/info',
   '/admin/published/replaceImage',
@@ -68,6 +88,7 @@ export const serverOnlyRoutes: Array<keyof ApiRouteMap> = [
   '/admin/user/changeLockStatus',
   '/admin/user/info',
   '/admin/user/list',
+  '/admin/user/stats',
 
   // Auth routes that bypass BGRouter (handled by auth service directly)
   '/auth/signin',
@@ -101,7 +122,11 @@ export const clientOnlyRoutes: Array<keyof ApiRouteMap> = [
   '/client/widget/status',
   '/nativeClientCheck',
   '/nativeDesktopStatus',
+  '/nativeDesktopBridgeState',
+  '/nativeDesktopOpenControls',
+  '/nativeDesktopRelaunchBrowsers',
   '/nativeDesktopLockdown',
+  '/nativeDesktopSetCheckup',
   '/nativeDesktopAuthorizeChallenge',
   '/nativeMessage',
   '/test/client/dbtest',
@@ -114,6 +139,24 @@ export const clientOnlyRoutes: Array<keyof ApiRouteMap> = [
   '/activityMonitor/update',
   '/collection/showcase/repairFriendEncryption',
   '/collection/healChildEncryptionKeys',
+  '/item/facetCounts',
+  // Task state is client-side and encrypted, so the check-in's task gate can
+  // only be answered in the background. There is no server handler by design.
+  '/checkpoint/taskgate/status',
+  // Events are items whose times live in the encrypted `info` blob, so listing
+  // and expanding them can only happen on a signed-in client.
+  '/event_items/upsert',
+  '/event_items/get',
+  '/event_items/archive',
+  '/event_items/listForUser',
+  '/event/occurrences/listByRange',
+  // Which server this device talks to is a device setting -- there is nobody to ask but the
+  // device itself, and discovery has to work with no server reachable at all.
+  '/serverSettings/get',
+  '/serverSettings/update',
+  '/serverSettings/refresh',
+  '/serverSettings/discover',
+  '/serverSettings/checkUrl',
 ];
 
 /**

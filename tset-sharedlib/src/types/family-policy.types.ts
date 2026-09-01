@@ -73,6 +73,12 @@ export interface FamilyPolicyTargetMatchRule extends FamilyPolicyRuleBase {
   ruleType?: 'target_match';
   targetKind: FamilyPolicyRuleTargetKind;
   targetValue: string;
+  // Full pattern set covered by this rule (e.g. every URL/pattern of a library
+  // item). `targetValue` remains the primary/back-compat entry and is always
+  // included here; older clients that only read `targetValue` still match it.
+  // Only used for domain/url_prefix target kinds; each entry's kind is inferred
+  // (a value containing '/' is a url_prefix, otherwise a domain).
+  targetValues?: string[];
   includeSubdomains?: boolean;
   decisionKind: FamilyPolicyRuleDecisionKind;
   eduValue?: EduValue;

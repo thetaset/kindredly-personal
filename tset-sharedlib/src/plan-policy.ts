@@ -34,6 +34,11 @@ export type SharedPlanPolicy = {
     advancedScheduleTools: boolean;
     aiChat: boolean;
     advancedStandaloneApps: boolean;
+    /**
+     * AI-assisted content authoring (the collection builder / "Creating with AI").
+     * Kept separate from `aiChat`, which is still off on every plan.
+     */
+    contentAuthoring: boolean;
   };
 };
 
@@ -55,8 +60,12 @@ export const sharedPlanPolicies: Record<SharedPlanKey, SharedPlanPolicy> = {
       customerFacingCapacityLabel: 'Standard library capacity',
     },
     files: {
-      maxVisibleStorageBytes: 500 * MB,
-      maxUploadBytes: 35 * MB,
+      // 2GB / 100MB, not 500MB / 35MB. A single phone video is 45-100MB/minute, so the old
+      // upload cap was about 45 seconds of 1080p and the old storage cap was ten of them for
+      // the life of the account. Raising the upload limit without the storage limit only
+      // moves where the wall is.
+      maxVisibleStorageBytes: 2 * GB,
+      maxUploadBytes: 100 * MB,
       warnAtPercent: 70,
       urgentWarnAtPercent: 85,
       blockAtPercent: 100,
@@ -68,6 +77,7 @@ export const sharedPlanPolicies: Record<SharedPlanKey, SharedPlanPolicy> = {
       advancedScheduleTools: false,
       aiChat: false,
       advancedStandaloneApps: false,
+      contentAuthoring: false,
     },
   },
   plus: {
@@ -94,11 +104,19 @@ export const sharedPlanPolicies: Record<SharedPlanKey, SharedPlanPolicy> = {
     },
     readiness: {
       weeklyReports: false,
-      calendar: false,
-      advancedInsights: false,
+      // Gates Tasks. Was false here as well as on standard, which meant Tasks
+      // could only ever be on in Developer Mode (the only path that skips the
+      // plan check). Tasks already declares requiresPaid, so Plus is the tier
+      // that gets it and standard stays blocked by requiresPaid regardless.
+      calendar: true,
+      advancedInsights: true,
       advancedScheduleTools: false,
-      aiChat: false,
+      // Gates AI Chat, Wake Word (Companion), and Entity Notes AI Suggest.
+      // Was false here as well as on standard, which blocked all three on every
+      // plan — Plus included. AI features are a paid-tier feature, so Plus is true.
+      aiChat: true,
       advancedStandaloneApps: false,
+      contentAuthoring: true,
     },
   },
 };

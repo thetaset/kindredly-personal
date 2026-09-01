@@ -4,17 +4,53 @@ import ExternalMetaCacheService from './external_meta_cache.service';
 import {RequestContext} from '../base/request_context';
 import axios from 'axios';
 import {assertSafeExternalUrl, safeFetchConfig} from '@/utils/safe_fetch';
+import {buildDefaultBrowserHeaders} from '@/utils/fetch_helpers';
+import {classifyUpstreamBlock, readStreamPrefix, type UpstreamBlockVerdict} from '@/utils/upstream_block';
+import {recordSecurityEvent, SECURITY_EVENT_TYPES} from '@/services/security_event.service';
 import type {Response} from 'express';
 import {getYTResourceTypeFromURL} from 'tset-sharedlib/url.utils';
 import {ItemResourceType} from 'tset-sharedlib/constants';
-import AITaskService from './_internal/aitask.service';
 import type {ItemMeta, ResourceFetchInfoResponse} from 'tset-sharedlib/types/item.types';
-import ContentModerationService from './_internal/content_moderation.service';
+// TYPE-ONLY, deliberately — see the lazy getter below. `import type` is erased
+// at compile time, so it emits no require() and cannot fail on a build where
+// services/_internal is not present.
+import type AITaskService from './_internal/aitask.service';
+import type ContentModerationService from './_internal/content_moderation.service';
 import {ModerationSeverity} from 'tset-sharedlib/moderation.types';
-import {getRedisClient} from '@/base/redis_client';
+import {getKeyValueStore} from '@/base/runtime.factory';
+import {
+  acquireFeedLock,
+  getFeedCacheEntry,
+  isFeedEntryFresh,
+  releaseFeedLock,
+  setFeedCacheEntry,
+  waitForFeedCacheEntry,
+  type FeedCacheEntry,
+} from './feed_cache.service';
 import {findSourcePriorityDomainRule} from './source_priority_domain_policy';
+import {ClassificationModelArtifactRepo} from '@/db/classification_model_artifact.repo';
+import {SITE_OVERRIDE_RULES} from '@/data/site-overrides';
+import type {SiteOverridesEnvelope} from 'tset-sharedlib/content.types';
+import {createHash} from 'crypto';
 
 type ClassificationValue = {value: string; confidence: number};
+
+function isStreamLike(data: any): boolean {
+  return !!data && typeof data.on === 'function';
+}
+
+/** Coerce a buffered axios body of any shape into a Buffer. */
+function toBuffer(data: any): Buffer {
+  if (Buffer.isBuffer(data)) return data;
+  if (data instanceof ArrayBuffer) return Buffer.from(new Uint8Array(data));
+  if (ArrayBuffer.isView(data)) return Buffer.from(data.buffer, data.byteOffset, data.byteLength);
+  if (typeof data === 'string') return Buffer.from(data, 'utf8');
+  return Buffer.alloc(0);
+}
+
+function toBufferPrefix(data: any, maxBytes: number): Buffer {
+  return toBuffer(data).subarray(0, maxBytes);
+}
 
 type SourcePriorityClassificationResult = {
   classification: string;
@@ -43,9 +79,9 @@ type SourcePriorityClassificationResult = {
 class ExternalDataService {
   private itemsRepo = new ItemRepo();
   private taskRunnerService = new TaskRunnerService();
-  private aiTaskService = new AITaskService();
-  private contentModerationService = new ContentModerationService();
+  private classificationModelArtifactRepo = new ClassificationModelArtifactRepo();
   private metaCacheService: ExternalMetaCacheService;
+  private siteOverridesEnvelope: SiteOverridesEnvelope | null = null;
 
   private readonly dailyQuota = Number(process.env.SOURCE_PRIORITY_LLM_DAILY_QUOTA || '250');
   private readonly featureDisabled = process.env.SOURCE_PRIORITY_LOOKUP_DISABLED === 'true';
@@ -53,6 +89,84 @@ class ExternalDataService {
 
   constructor() {
     this.metaCacheService = new ExternalMetaCacheService();
+  }
+
+  /**
+   * The cloud-only services, resolved on first use rather than at construction.
+   *
+   * `services/_internal` is withheld from the published Kindredly Personal repo
+   * (scripts/personal-sync/server-src.exclude), and this file is not — too many
+   * open services import it. A top-level `import` of a withheld module compiles
+   * fine there, because that build is `swc src --out-dir dist`, which transpiles
+   * without resolving — and then the server dies on start with
+   * MODULE_NOT_FOUND. The whole published repo has been in that state.
+   *
+   * A lazy require moves the resolution to the code paths that need it, and
+   * those are paths a self-hosted server never takes: moderation runs on
+   * publish-and-share and a personal server has no published routes at all
+   * (app.ts skips them when config.privateServer), and the AI task queue is a
+   * cloud worker. On the cloud the behaviour is unchanged — same classes, same
+   * instances, first touch instead of construction — and call sites stay
+   * non-null, which is the point of a getter over an optional field.
+   */
+  private _aiTaskService: AITaskService | null = null;
+  private get aiTaskService(): AITaskService {
+    if (!this._aiTaskService) {
+      // personal-optional: guarded, never reached on a self-hosted server
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
+      const mod = require('./_internal/aitask.service');
+      this._aiTaskService = new (mod.default || mod)();
+    }
+    return this._aiTaskService as AITaskService;
+  }
+
+  private _contentModerationService: ContentModerationService | null = null;
+  private get contentModerationService(): ContentModerationService {
+    if (!this._contentModerationService) {
+      // personal-optional: guarded, never reached on a self-hosted server
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
+      const mod = require('./_internal/content_moderation.service');
+      this._contentModerationService = new (mod.default || mod)();
+    }
+    return this._contentModerationService as ContentModerationService;
+  }
+
+  /**
+   * Fetch the active learned-classifier artifact for distribution to clients.
+   * Returns null when no model has been published/activated yet. Clients cache
+   * by `version` and re-download when it changes.
+   */
+  async getActiveLearnedClassifierModel(kind?: string): Promise<{
+    version: string;
+    kind: string;
+    embeddingModelId: string;
+    artifact: any;
+    createdAt: string | null;
+  } | null> {
+    const normalizedKind = (typeof kind === 'string' && kind.trim()) || 'eduValue_logreg';
+    const row = await this.classificationModelArtifactRepo.findActive(normalizedKind);
+    if (!row?._id) return null;
+    return {
+      version: row.version,
+      kind: row.kind,
+      embeddingModelId: row.embeddingModelId,
+      artifact: row.artifact,
+      // Match the wire contract (api-route-map declares string | null).
+      createdAt: row.createdAt ? new Date(row.createdAt).toISOString() : null,
+    };
+  }
+
+  /**
+   * Curated site-classification overrides for client distribution. The list is a
+   * checked-in file (code = source of truth); `version` is a content hash so clients
+   * cache it and re-parse only when the file actually changes. Memoized per process.
+   */
+  getActiveSiteOverrides(): SiteOverridesEnvelope {
+    if (!this.siteOverridesEnvelope) {
+      const version = createHash('sha1').update(JSON.stringify(SITE_OVERRIDE_RULES)).digest('hex').slice(0, 12);
+      this.siteOverridesEnvelope = {version, updatedAt: null, entries: SITE_OVERRIDE_RULES};
+    }
+    return this.siteOverridesEnvelope;
   }
 
   private toClassificationValues(values: string[] | undefined, confidence: number): ClassificationValue[] {
@@ -111,6 +225,45 @@ class ExternalDataService {
       userId: ctx.currentUserId,
       accountId: ctx.accountId,
     });
+  }
+
+  /**
+   * Estimate useCriteria tags for admin enrichment (direct, non user-gated LLM call).
+   * Returns suggested tag keys with confidence; callers filter + apply with human review.
+   */
+  async estimateUseCriteriaForAdmin(input: {
+    title?: string;
+    description?: string;
+    url?: string;
+  }): Promise<Array<{value: string; confidence: number}>> {
+    return this.aiTaskService.estimateUseCriteria(input);
+  }
+
+  /**
+   * Ask AI to clean up / simplify a title and description (the existing
+   * `cleanupData` task). Returns only fields the model actually rewrote; callers
+   * surface them as reviewable overwrite patches.
+   */
+  async cleanupContentText(
+    ctx: RequestContext,
+    input: {name?: string; description?: string},
+  ): Promise<{name?: string; description?: string}> {
+    const result = (await this.aiTaskService.taskRequest(ctx, {
+      taskname: 'cleanupData',
+      data: {name: input.name || '', description: input.description || ''},
+      maxTokens: 600,
+    })) as {message?: {content?: string}};
+
+    try {
+      const parsed = JSON.parse(result?.message?.content || '{}') as Record<string, unknown>;
+      const out: {name?: string; description?: string} = {};
+      if (typeof parsed.name === 'string' && parsed.name.trim()) out.name = parsed.name.trim();
+      if (typeof parsed.description === 'string' && parsed.description.trim())
+        out.description = parsed.description.trim();
+      return out;
+    } catch {
+      return {};
+    }
   }
 
   /**
@@ -414,7 +567,7 @@ class ExternalDataService {
     }
 
     try {
-      const redis = getRedisClient();
+      const redis = getKeyValueStore();
       const dateKey = new Date().toISOString().slice(0, 10);
       const quotaKey = `source_priority_llm_quota:${accountId}:${userId}:${dateKey}`;
       const used = await redis.incr(quotaKey);
@@ -477,16 +630,324 @@ class ExternalDataService {
   }
 
   /**
+   * Was this failure a CDN turning *us* away, rather than the origin saying no?
+   *
+   * Feeds only, on purpose: the image and `type: 'json'` callers read the body
+   * blind (`.blob()` / `.json()` with no `.ok` check), so changing the failure
+   * shape underneath them would be an unrelated behaviour change. Gating here
+   * keeps their blast radius at zero.
+   */
+  private async detectUpstreamBlock(
+    type: string,
+    response: {headers: Record<string, any>; data?: any},
+    contentType: string,
+  ): Promise<UpstreamBlockVerdict> {
+    if (type !== 'rss') {
+      return {blocked: false};
+    }
+
+    // The header signal needs no body, so check it before touching the stream.
+    const headerVerdict = classifyUpstreamBlock({headers: response.headers});
+    if (headerVerdict.blocked) {
+      return headerVerdict;
+    }
+
+    // Only sniff markup. A challenge page is HTML; anything binary is not worth
+    // buffering, and we are about to discard this body either way.
+    const sniffable = !contentType || contentType.includes('text/html') || contentType.includes('text/plain');
+    if (!sniffable) {
+      return {blocked: false};
+    }
+
+    // The feed path buffers the body (it has to, to cache it); the image path
+    // still streams. `readStreamPrefix` returns '' for a non-stream, so without
+    // this branch the challenge-page sniff would silently stop working for
+    // exactly the type it was written for. UTF-8 regardless of the declared
+    // charset is fine here — a challenge page is ASCII HTML, and we are only
+    // pattern-matching it, not rendering it.
+    const bodyPrefix = isStreamLike(response.data)
+      ? await readStreamPrefix(response.data)
+      : toBufferPrefix(response.data, 32 * 1024).toString('utf8');
+    return classifyUpstreamBlock({headers: response.headers, bodyPrefix});
+  }
+
+  /**
+   * Report a bot mitigation as a structured envelope the client can act on.
+   *
+   * Status 422 is chosen for what it is *not*: 403 would be remapped to an auth
+   * error client-side, and 502/503/504 are read as "Kindredly is unavailable"
+   * and trip a global disconnected state — over one third-party feed host. The
+   * client keys on `errorType`, never on this status.
+   */
+  /**
+   * Record a proxy-related security event, pulling the actor off the underlying request.
+   *
+   * The proxy helpers only receive `res`, so identity comes from `res.req` rather than a
+   * threaded RequestContext — that keeps every existing caller's signature unchanged.
+   */
+  private recordProxyEvent(
+    res: Response,
+    eventType: (typeof SECURITY_EVENT_TYPES)[keyof typeof SECURITY_EVENT_TYPES],
+    severity: 'info' | 'warn' | 'critical',
+    detail: Record<string, unknown>,
+  ): void {
+    const req: any = (res as any)?.req;
+    recordSecurityEvent({
+      eventType,
+      severity,
+      ip: req?.ip,
+      route: req?.path,
+      actorUserId: req?.authInfo?.userId || null,
+      actorAccountId: req?.authInfo?.accountId || null,
+      clientId: req?.authInfo?.clientId || null,
+      detail,
+    });
+  }
+
+  private sendUpstreamBlocked(res: Response, url: string, upstreamStatus: number, signal?: string): void {
+    let host = '';
+    try {
+      host = new URL(url).host;
+    } catch {
+      // A malformed URL never reaches here (assertSafeExternalUrl parsed it),
+      // but the envelope must not fail to send over a hostname.
+    }
+
+    // Informational rather than a warning: an upstream CDN block is the remote site's
+    // decision, not abuse of ours. It is tracked because a sharp rise means our egress IPs
+    // are getting reputation-flagged, which is an availability problem worth seeing early.
+    this.recordProxyEvent(res, SECURITY_EVENT_TYPES.PROXY_UPSTREAM_BLOCKED, 'info', {
+      upstreamStatus,
+      reason: signal,
+    });
+
+    res.status(422).json({
+      success: false,
+      errorType: 'UPSTREAM_BLOCKED',
+      message: 'This site blocked the request from our servers.',
+      details: {upstreamStatus, signal, host},
+    });
+  }
+
+  /**
+   * Decode a feed body using the charset the origin declared.
+   *
+   * The stream path passed bytes through untouched, so a windows-1252 or
+   * ISO-8859-1 feed arrived intact. Buffering has to decode, and axios would
+   * assume UTF-8 — which turns every accented character in those feeds into
+   * replacement characters. Read the declared charset instead, and fall back to
+   * UTF-8 for the (large) majority that declare nothing.
+   */
+  private decodeFeedBody(data: any, contentType: string): string {
+    const buffer = toBuffer(data);
+    const declared = /charset\s*=\s*["']?([\w-]+)/i.exec(contentType)?.[1]?.toLowerCase();
+    if (!declared || declared === 'utf-8' || declared === 'utf8') {
+      return buffer.toString('utf8');
+    }
+
+    try {
+      return new TextDecoder(declared).decode(buffer);
+    } catch {
+      // An unknown or bogus charset label. UTF-8 is the better guess than
+      // failing the whole feed over a header.
+      return buffer.toString('utf8');
+    }
+  }
+
+  /**
+   * Re-label a decoded body as UTF-8 while keeping the origin's media type.
+   *
+   * The bytes we send are a UTF-8 encoding of a JS string, so leaving the
+   * origin's `charset=ISO-8859-1` on it would be a lie the client would act on.
+   */
+  private toUtf8ContentType(contentType: string): string {
+    const mediaType = (contentType || 'application/xml').split(';')[0].trim();
+    return `${mediaType || 'application/xml'}; charset=utf-8`;
+  }
+
+  private sendFeedBody(res: Response, body: string, contentType: string, cacheState: string): void {
+    console.log('Proxy feed results on their way', {cacheState});
+    res.setHeader('Content-Type', contentType || 'application/xml; charset=utf-8');
+    // Diagnostic only — no client reads it, and none should. It exists so a
+    // "why is this feed stale / why did the origin see so many requests"
+    // question can be answered from a response rather than from server logs.
+    res.setHeader('X-Kindredly-Feed-Cache', cacheState);
+    res.send(body);
+  }
+
+  /**
+   * Serve a feed, going upstream at most once per feed per freshness window
+   * across all users.
+   *
+   * The proxy is the webapp's only path to a feed (no CORS headers on feed
+   * hosts), so without this every user's refresh was its own origin request
+   * from our one egress IP. Nothing here may make a request *fail* that would
+   * otherwise have succeeded: a Redis fault, a lock timeout, or an unparseable
+   * URL all fall through to the plain uncached fetch.
+   */
+  private async serveFeedWithCache(url: string, res: Response): Promise<void> {
+    const cached = await getFeedCacheEntry(url);
+    if (cached && isFeedEntryFresh(cached)) {
+      this.sendFeedBody(res, cached.body, cached.contentType, 'hit');
+      return;
+    }
+
+    const lockToken = await acquireFeedLock(url);
+    if (!lockToken) {
+      // Someone else is already fetching this exact feed. Wait for their result
+      // — but only briefly. Falling through to our own fetch is the same
+      // behaviour as before the cache existed; being stuck behind a stranger's
+      // slow request would be worse than the duplicate fetch we are avoiding.
+      const waited = await waitForFeedCacheEntry(url);
+      if (waited) {
+        this.sendFeedBody(res, waited.body, waited.contentType, 'wait');
+        return;
+      }
+    }
+
+    try {
+      await this.fetchAndServeFeed(url, res, cached);
+    } finally {
+      if (lockToken) await releaseFeedLock(url, lockToken);
+    }
+  }
+
+  private async fetchAndServeFeed(url: string, res: Response, cached: FeedCacheEntry | null): Promise<void> {
+    const conditionalHeaders: Record<string, string> = {};
+    if (cached?.etag) conditionalHeaders['If-None-Match'] = cached.etag;
+    if (cached?.lastModified) conditionalHeaders['If-Modified-Since'] = cached.lastModified;
+
+    let response: {status: number; statusText?: string; headers: Record<string, any>; data?: any};
+    try {
+      response = await axios.get(
+        url,
+        safeFetchConfig({
+          // Bytes, not text: axios would decode as UTF-8 regardless of what the
+          // origin declared, and would try to JSON.parse the result on top of
+          // that. Decoding is `decodeFeedBody`'s job.
+          responseType: 'arraybuffer',
+          transformResponse: [(data: any) => data],
+          // 304 is a success here, not an error, so status handling stays ours.
+          validateStatus: () => true,
+          headers: buildDefaultBrowserHeaders(
+            {
+              Accept: 'application/rss+xml, application/atom+xml, application/xml;q=0.9, text/xml;q=0.9, */*;q=0.8',
+              ...conditionalHeaders,
+            },
+            // Declaring `no-cache` makes some origins skip returning validators,
+            // which would defeat the revalidation we just asked for.
+            {noCache: false},
+          ),
+        }),
+      );
+    } catch (error: any) {
+      // A transport failure is transient by nature, so a body from the last 24
+      // hours beats an error page. Only here — never for a block or a 4xx.
+      if (cached) {
+        console.error('Feed fetch failed, serving stale body:', error?.message, url);
+        this.sendFeedBody(res, cached.body, cached.contentType, 'stale');
+        return;
+      }
+      throw error;
+    }
+
+    const contentType = response.headers['content-type'] || '';
+
+    if (response.status === 304 && cached) {
+      await setFeedCacheEntry(url, {...cached, fetchedAt: Date.now()});
+      this.sendFeedBody(res, cached.body, cached.contentType, 'revalidated');
+      return;
+    }
+
+    const isXmlFeed = contentType.includes('xml');
+
+    if (response.status !== 200 || !isXmlFeed) {
+      // A managed challenge is usually served as text/html with HTTP 200, so the
+      // content-type check is the *most* common way a block shows up, not an
+      // afterthought to the status check.
+      const verdict = await this.detectUpstreamBlock('rss', response, contentType);
+      console.error('Error fetching feed:', response.status, url, {
+        contentType,
+        blocked: verdict.blocked,
+        signal: verdict.signal,
+      });
+
+      if (verdict.blocked) {
+        // Deliberately not served from stale cache. A block is a persistent
+        // condition, and the 422 envelope is what tells the person the app and
+        // extension would load this feed directly. Papering over it with a
+        // day-old body would hide the one thing they can act on.
+        this.sendUpstreamBlocked(res, url, response.status, verdict.signal);
+        return;
+      }
+
+      // A 5xx is the origin having a bad minute; a 4xx or a non-feed response is
+      // a real answer the person should see.
+      if (cached && response.status >= 500) {
+        this.sendFeedBody(res, cached.body, cached.contentType, 'stale');
+        return;
+      }
+
+      if (response.status !== 200) {
+        res.status(response.status).send(response.statusText || 'Upstream request failed');
+      } else {
+        res.status(502).send('Upstream resource was not an XML feed');
+      }
+      return;
+    }
+
+    const body = this.decodeFeedBody(response.data, contentType);
+    const outboundContentType = this.toUtf8ContentType(contentType);
+
+    await setFeedCacheEntry(url, {
+      body,
+      contentType: outboundContentType,
+      etag: response.headers['etag'] || undefined,
+      lastModified: response.headers['last-modified'] || undefined,
+      fetchedAt: Date.now(),
+    });
+
+    this.sendFeedBody(res, body, outboundContentType, 'miss');
+  }
+
+  /**
    * Proxy and stream external data (images, RSS feeds)
    */
   async fetchAndStreamData(url: string, res: Response, type: 'image' | 'rss' | string): Promise<void> {
     try {
-      assertSafeExternalUrl(url);
+      try {
+        assertSafeExternalUrl(url);
+      } catch (ssrfError) {
+        // Someone asked the server to fetch a private or non-HTTP address. The guard
+        // already refused; this records that it happened so a sustained probe (cloud
+        // metadata, RFC1918 sweeps) is visible rather than just a stream of 500s.
+        // The URL itself is deliberately not recorded — only that it was rejected.
+        this.recordProxyEvent(res, SECURITY_EVENT_TYPES.PROXY_SSRF_BLOCKED, 'critical', {
+          reason: 'forbidden_target',
+          feature: type,
+        });
+        throw ssrfError;
+      }
+
+      // Feeds take a separate, buffered path so one upstream fetch can serve
+      // every user subscribed to that feed. Images keep streaming — their
+      // bodies do not belong in Redis.
+      if (type === 'rss') {
+        await this.serveFeedWithCache(url, res);
+        return;
+      }
+
+      // Identify as a browser. Left alone, axios sends `User-Agent: axios/x.y.z`,
+      // which Cloudflare-fronted hosts reject outright from a datacenter IP — a
+      // 403 the client can do nothing about, because its own fallback (a direct
+      // fetch from the page) is cross-origin and always blocked outside the
+      // extension. This proxy is the only path those clients have.
       const response = await axios.get(
         url,
         safeFetchConfig({
           responseType: 'stream',
           validateStatus: () => true,
+          headers: buildDefaultBrowserHeaders(),
         }),
       );
 
@@ -496,26 +957,27 @@ class ExternalDataService {
         }
       };
 
+      const contentType = response.headers['content-type'] || '';
+
       if (response.status !== 200) {
-        console.error('Error fetching data:', response.status, url);
+        const verdict = await this.detectUpstreamBlock(type, response, contentType);
         closeUpstream();
+        console.error('Error fetching data:', response.status, url, {
+          blocked: verdict.blocked,
+          signal: verdict.signal,
+        });
+        if (verdict.blocked) {
+          this.sendUpstreamBlocked(res, url, response.status, verdict.signal);
+          return;
+        }
         res.status(response.status).send(response.statusText || 'Upstream request failed');
         return;
       }
-
-      const contentType = response.headers['content-type'] || '';
 
       if (type === 'image' && !contentType.startsWith('image/')) {
         console.error('Error fetching data: not an image');
         closeUpstream();
         res.status(502).send('Upstream resource was not an image');
-        return;
-      }
-
-      if (type === 'rss' && !contentType.includes('xml')) {
-        console.error('Error fetching data: not an xml feed');
-        closeUpstream();
-        res.status(502).send('Upstream resource was not an XML feed');
         return;
       }
 

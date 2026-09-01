@@ -7,6 +7,27 @@ import {
 } from '../src/extraction.utils';
 import { mergeOptions } from '../src/meta.utils';
 
+describe('YouTube channel identifier extraction', () => {
+  // Regression: a channel saved by its @handle must ALSO capture the canonical
+  // UC channel id. Channel grants match by UC id, so a handle-only channel
+  // can't be matched against a video that resolves to its UC id.
+  test('captures the UC channel id even when a handle is present', async () => {
+    const html = `
+      <html><head><title>Kurzgesagt – In a Nutshell</title></head>
+      <body>
+        <script>var ytcfg = {"externalChannelId":"UCsXVk37bltHxD1rDPwtNM8Q"};</script>
+      </body></html>`;
+
+    const meta = await extractMetadata('https://www.youtube.com/@Kurzgesagt', html);
+    const info = meta.tsExtractedInfo!;
+
+    expect(info.pageType).toBe('YOUTUBE_CHANNEL');
+    expect(info.handleId).toBe('kurzgesagt');
+    expect(info.youtubeChannelIds).toContain('UCsXVk37bltHxD1rDPwtNM8Q');
+    expect(info.channelId).toBe('UCsXVk37bltHxD1rDPwtNM8Q');
+  });
+});
+
 describe('metadata extraction image precedence', () => {
   test('mergeOptions respects source order instead of string length', () => {
     expect(mergeOptions(['first', 'a much longer second value'])).toBe('first');
@@ -65,11 +86,45 @@ describe('metadata extraction image precedence', () => {
         url: 'https://example.com/feed.xml',
         title: 'Main RSS Feed',
         type: 'rss',
+        source: 'head',
       },
       {
         url: 'https://example.com/atom.xml',
         title: 'Atom Feed',
         type: 'atom',
+        source: 'head',
+      },
+    ]);
+  });
+
+  test('tags body anchor feeds as anchor and head declarations as head', async () => {
+    const meta = await extractMetadata(
+      'https://example.com/blog/post',
+      `
+        <html>
+          <head>
+            <title>Example Blog</title>
+            <link rel="alternate" type="application/rss+xml" title="Main RSS Feed" href="/feed.xml" />
+          </head>
+          <body>
+            <a href="https://example.com/sections/politics/rss" title="Politics RSS">Politics feed</a>
+          </body>
+        </html>
+      `,
+    );
+
+    expect(meta.tsExtractedInfo?.discoveredFeedLinks).toEqual([
+      {
+        url: 'https://example.com/feed.xml',
+        title: 'Main RSS Feed',
+        type: 'rss',
+        source: 'head',
+      },
+      {
+        url: 'https://example.com/sections/politics/rss',
+        title: 'Politics RSS',
+        type: 'rss',
+        source: 'anchor',
       },
     ]);
   });

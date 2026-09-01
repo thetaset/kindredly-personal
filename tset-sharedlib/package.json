@@ -3,7 +3,9 @@
   "version": "3.0.0",
   "description": "",
   "scripts": {
-    "build": "tsc",
+    "build": "tsc && node scripts/copy-json-assets.js",
+    "generate-request-schemas": "node scripts/generate-request-schemas.js",
+    "check-request-schemas": "node scripts/generate-request-schemas.js --check",
     "test": "jest",
     "test:watch": "jest --watch",
     "dev": "tsc -w",
@@ -22,6 +24,7 @@
     "@types/jest": "^29.5.14",
     "jest": "^29.7.0",
     "ts-jest": "^29.3.4",
+    "ts-json-schema-generator": "^2.9.0",
     "tslib": "^2.6.2",
     "typescript": "^5.4.2"
   },

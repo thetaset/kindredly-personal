@@ -1,17 +1,44 @@
 import {AuditLogRepo} from '@/db/audit_log.repo';
+import {ClassificationDatasetSampleRepo} from '@/db/classification_dataset_sample.repo';
 import {EventLogRepo} from '@/db/event_log.repo';
+import {SecurityEventRepo} from '@/db/security_event.repo';
 import {UserActivityLogRepo} from '@/db/user_activity_log.repo';
 import {UserChangeLogRepo} from '@/db/user_changelog.repo';
 
 const MIN_SAFE_RETENTION_DAYS = 30;
 const ACTIVITY_LOG_RETENTION_DAYS = 30;
-const EXTENDED_LOG_RETENTION_DAYS = 90;
+/**
+ * Also read by SyncService, which has to know how far back a sync cursor can point
+ * before the rows behind it may have been deleted out from under it (SYNC-9). Shared
+ * rather than duplicated: if these two ever disagree, the sync gap check is silently
+ * wrong in whichever direction the drift went.
+ */
+export const EXTENDED_LOG_RETENTION_DAYS = 90;
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
+/**
+ * Contributed classifier samples. Longer than the activity log because a
+ * training set is only useful if it accumulates, but bounded rather than kept
+ * forever — the classification tables previously had no expiry at all.
+ */
+const CLASSIFICATION_SAMPLE_RETENTION_DAYS = 180;
+
 type PurgeTarget = {
-  table: 'user_activity_log' | 'user_change_log' | 'audit_log' | 'event_log';
+  table:
+    | 'user_activity_log'
+    | 'user_change_log'
+    | 'audit_log'
+    | 'event_log'
+    | 'security_event'
+    | 'classification_dataset_sample';
   retentionDays: number;
-  repo: UserActivityLogRepo | UserChangeLogRepo | AuditLogRepo | EventLogRepo;
+  repo:
+    | UserActivityLogRepo
+    | UserChangeLogRepo
+    | AuditLogRepo
+    | EventLogRepo
+    | SecurityEventRepo
+    | ClassificationDatasetSampleRepo;
 };
 
 export class DataRetentionService {
@@ -26,6 +53,8 @@ export class DataRetentionService {
   private readonly userChangeLogRepo = new UserChangeLogRepo();
   private readonly auditLogRepo = new AuditLogRepo();
   private readonly eventLogRepo = new EventLogRepo();
+  private readonly securityEventRepo = new SecurityEventRepo();
+  private readonly classificationDatasetSampleRepo = new ClassificationDatasetSampleRepo();
 
   private assertRetentionDays(days: number, table: string) {
     if (!Number.isInteger(days) || days < MIN_SAFE_RETENTION_DAYS) {
@@ -75,6 +104,12 @@ export class DataRetentionService {
       {table: 'user_change_log', retentionDays: EXTENDED_LOG_RETENTION_DAYS, repo: this.userChangeLogRepo},
       {table: 'audit_log', retentionDays: EXTENDED_LOG_RETENTION_DAYS, repo: this.auditLogRepo},
       {table: 'event_log', retentionDays: EXTENDED_LOG_RETENTION_DAYS, repo: this.eventLogRepo},
+      {table: 'security_event', retentionDays: EXTENDED_LOG_RETENTION_DAYS, repo: this.securityEventRepo},
+      {
+        table: 'classification_dataset_sample',
+        retentionDays: CLASSIFICATION_SAMPLE_RETENTION_DAYS,
+        repo: this.classificationDatasetSampleRepo,
+      },
     ];
 
     const results = [] as Array<{table: string; deleted: number}>;

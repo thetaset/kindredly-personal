@@ -45,6 +45,20 @@ export interface AgentResponse {
 export interface AgentHistoryRecord {
   response: AgentResponse;
   input: AgentInput;
+  /**
+   * Per-step agent activity within this turn (tool calls + their results),
+   * in order. Older records without it stay readable — never migrate stored
+   * sessions. Results are size-capped at write time.
+   */
+  steps?: Array<{
+    kind: 'assistant_text' | 'tool_call' | 'tool_result';
+    callId?: string;
+    name?: string;
+    arguments?: any;
+    text?: string;
+    result?: any;
+    truncated?: boolean;
+  }>;
 }
 
 export interface AgentSession {
@@ -53,4 +67,8 @@ export interface AgentSession {
   history: AgentHistoryRecord[];
   step: number;
   done: boolean;
+  /** Explicit display name (app-editor sessions use the app's item name). */
+  name?: string;
+  createdAt?: string;
+  updatedAt?: string;
 }

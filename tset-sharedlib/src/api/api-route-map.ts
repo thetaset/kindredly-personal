@@ -1,5 +1,21 @@
+import type { DeviceGrant } from "../restrictions/deviceGrants";
+import type { SiteStyleEntryV1 } from "../types/item.types";
 import type {
   AccountInfoResponse,
+  SiteStyleForUrlRequest,
+  SiteStyleGenerateRequest,
+  SiteStyleGenerateResponse,
+  SiteStyleListRequest,
+  SiteStyleRevertEntryRequest,
+  SiteStyleRevertEntryResponse,
+  SiteStyleSaveEntryRequest,
+  SiteStyleSaveEntryResponse,
+  SiteStyleMatchReportsRequest,
+  SiteStyleMatchReportsResponse,
+  SiteStyleReportMatchRequest,
+  SiteStyleReportMatchResponse,
+  SiteStyleListResponse,
+  SiteStyleForUrlResponse,
   AIItemSuggestRequest,
   AIItemSuggestResponse,
   AIItemUpdateRequest,
@@ -12,18 +28,57 @@ import type {
   AITextResponse,
   AIUsageGetSummaryRequest,
   AIUsageGetSummaryResponse,
-  AIUserRequest,
-  AIUserResponse,
   AttachmentAddResponse,
   AccessEvaluateRequest,
   AccessEvaluateResponse,
   AdminContentBundleCatalogResponse,
+  AdminSetupCatalogResponse,
+  AdminUpdateSetupCatalogRequest,
+  GetSetupCatalogRequest,
+  GetSetupCatalogResponse,
+  AdminPuzzleContentListRequest,
+  AdminPuzzleContentListResponse,
+  AdminPuzzleContentSaveRequest,
+  AdminPuzzleContentSaveResponse,
+  AdminPuzzleContentSetStatusRequest,
+  AdminPuzzleContentDeleteRequest,
+  AdminPuzzleContentDeleteResponse,
+  AdminPuzzleContentImportSeedRequest,
+  AdminPuzzleContentImportSeedResponse,
+  ThinkingPuzzlesCatalogRequest,
+  ThinkingPuzzlesCatalogResponse,
   AdminContentLoaderDryRunRequest,
   AdminContentLoaderDryRunResponse,
   AdminContentLoaderExecuteRequest,
   AdminContentLoaderExecuteResponse,
   AdminContentLoaderUploadAssetRequest,
   AdminContentLoaderUploadAssetResponse,
+  AdminContentSourceSearchPodcastsRequest,
+  AdminContentSourceSearchPodcastsResponse,
+  AdminContentSourceParseFeedRequest,
+  AdminContentSourceParseFeedResponse,
+  AdminContentSourceFetchUrlsRequest,
+  AdminContentSourceFetchUrlsResponse,
+  AdminContentSourceCreateDraftRequest,
+  AdminContentSourceCreateDraftResponse,
+  AdminContentSourceListDraftsResponse,
+  AdminContentSourceGetDraftRequest,
+  AdminContentSourceGetDraftResponse,
+  AdminContentSourceAppendCandidatesRequest,
+  AdminContentSourceAppendCandidatesResponse,
+  AdminContentSourceRemoveCandidateRequest,
+  AdminContentSourceRemoveCandidateResponse,
+  AdminContentSourcePromoteDraftRequest,
+  AdminContentSourcePromoteDraftResponse,
+  AdminFeedGenPlanRequest,
+  AdminFeedGenPlanResponse,
+  AdminFeedGenGeneratePostsRequest,
+  AdminFeedGenGeneratePostsResponse,
+  AdminFeedGenSearchSourcesRequest,
+  AdminFeedGenSearchSourcesResponse,
+  AdminFeedGenListFeedsResponse,
+  AdminFeedGenLoadFeedRequest,
+  AdminFeedGenLoadFeedResponse,
   AdminPublishedPackageExportRequest,
   AdminPublishedPackageExportResponse,
   AdminPublishedChangeTypeRequest,
@@ -33,6 +88,7 @@ import type {
   AdminPublishedInfoResponse,
   AdminPublishedReplaceImageRequest,
   AdminPublishedReplaceImageResponse,
+  AdminPublishedAssignBannerImageRequest,
   AdminPublishedProcessRequest,
   AdminPublishedProcessResponse,
   AdminPublishedPackageImportRequest,
@@ -61,12 +117,27 @@ import type {
   GetManagedRemoteActionStatusResponse,
   QueueManagedRemoteActionRequest,
   QueueManagedRemoteActionResponse,
+  GetLiveViewFramesRequest,
+  GetLiveViewFramesResponse,
+  PushLiveViewFrameRequest,
+  PushLiveViewFrameResponse,
+  StartLiveViewRequest,
+  StartLiveViewResponse,
+  StopLiveViewRequest,
+  StopLiveViewResponse,
+  RequestActivitySyncAllRequest,
+  RequestActivitySyncAllResponse,
   SendManagedClientDebugToastRequest,
   SendManagedClientDebugToastResponse,
   ContentLookupRequest,
   ContentLookupResponse,
   CreatePostRequest,
   CreatePostResponse,
+  CreateGroupedPostRequest,
+  CreateGroupedPostResponse,
+  ListByShareGroupRequest,
+  PodcastFeedLookupRequest,
+  PodcastFeedLookupResponse,
   PostReadReceiptListRequest,
   PostReadReceiptListResponse,
   PostReadReceiptMarkRequest,
@@ -160,7 +231,9 @@ import type {
   TempDisableBlockingStatusResponse,
   SourcePriorityClassificationResponse,
   UpdateActivityLogRequest,
+  RecordInAppActivityRequest,
   UpdateItemRequest,
+  UpdatePostEncInfoRequest,
   UpdateProfileImageRequest,
   UpdatePublicProfileRequest,
   UpdateUserInfoRequest,
@@ -181,6 +254,56 @@ import type {
   BannerCatalogSearchResponse,
   BannerRecommendRequest,
   BannerRecommendResponse,
+  AdminBannerListResponse,
+  AdminBannerGenerateRequest,
+  AdminBannerGenerateResponse,
+  AdminBannerGenerateFromPromptRequest,
+  AdminBannerGenerateFromPromptResponse,
+  AdminBannerSuggestPromptRequest,
+  AdminBannerSuggestPromptResponse,
+  AdminBannerPublishRequest,
+  AdminBannerPublishResponse,
+  AdminBannerTestLocalRequest,
+  AdminBannerTestLocalResponse,
+  AdminBannerGeneratorSaveRequest,
+  AdminBannerGeneratorSelectRequest,
+  AdminBannerGeneratorDeleteRequest,
+  AdminBannerGeneratorResponse,
+  AdminBannerSaveRequest,
+  AdminBannerCreateRequest,
+  AdminBannerMutateResponse,
+  AdminBannerBulkStyleRequest,
+  AdminBannerBulkStyleResponse,
+  AdminBannerStyleAddRequest,
+  AdminBannerStyleDeleteRequest,
+  AdminBannerStylesResponse,
+  AdminBannerEnhanceRequest,
+  AdminBannerEnhanceResponse,
+  AdminBannerInpaintRequest,
+  AdminBannerInpaintResponse,
+  AdminBannerCategoryAddRequest,
+  AdminBannerCategoryAddResponse,
+  AdminBannerHideRequest,
+  AdminBannerDeleteRequest,
+  AdminBannerDeleteResponse,
+  AdminBannerSuggestionsRequest,
+  AdminBannerSuggestionsResponse,
+  AdminBannerSuggestionAddRequest,
+  FreeImageSearchRequest,
+  FreeImageSearchResponse,
+  FreeImageFetchRequest,
+  FreeImageFetchResponse,
+  AdminCategorySetsResponse,
+  AdminCategorySetSaveRequest,
+  AdminCategorySetDeleteRequest,
+  AdminCategorySetUploadIconRequest,
+  AdminCategorySetUploadIconResponse,
+  AdminCategoryCoverageResponse,
+  CategorySetsResponse,
+  PublishedCategoryCoverageResponse,
+  AdminAiConfigResponse,
+  AdminAiConfigSaveRequest,
+  AdminDashboardStatsResponse,
   EmbeddingCacheClearRequest,
   EmbeddingCacheClearResponse,
   EmbeddingCacheGetRequest,
@@ -189,9 +312,19 @@ import type {
   EmbeddingCachePutResponse,
   EmbeddingCacheStatsRequest,
   EmbeddingCacheStatsResponse,
+  PublishResult,
+  GetServerSettingsRequest,
+  ServerSettingsView,
+  UpdateServerSettingsRequest,
+  DiscoverServersRequest,
+  DiscoverServersResponse,
+  CheckServerUrlRequest,
+  CheckServerUrlResponse,
 } from "./api-types";
 
 import type { AccountType } from "../types/user.types";
+import type { DeviceGuardStatus, DeviceAppInventory, DeviceAppPolicy, CompanionDeviceView, CompanionProbeResult, CompanionOpenTarget, DesktopBridgeStatus, CompiledDeviceRuleSet } from "../types/device-guard.types";
+import type { LessonGenRequest, LessonGenResponse, LessonGradeRequest, LessonGradeResponse } from "../lesson.utils";
 
 import type { KeyEntry } from "../shared.types";
 
@@ -226,6 +359,7 @@ import type {
   Published,
   PublishedFeedItem,
   PublishedInfoView,
+  PublishedMapFeedRow,
   ReactionInfo,
   ResourceFetchInfoResponse,
   ServerVersionInfo,
@@ -241,6 +375,17 @@ import type {
 import { AccountOptions } from "../schemas/public/Account";
 import type { SystemOptions } from "../schemas/public/Account";
 import type { TaskCompletion, TaskDefinition } from "../types/task.types";
+import type { EventDefinition, EventOccurrenceView } from "../types/event.types";
+
+// Types previously referenced with inline import() syntax, which the request-schema generator
+// cannot resolve. Same types, ordinary imports.
+import type {SiteOverridesEnvelope} from '../content.types';
+import type {EduValue} from '../shared.types';
+import type {ArticleAnalyzeRequest, ArticleAnalyzeResponse} from '../types/articleTrust.types';
+import type {DailyRewardStates, RewardSettings} from '../types/reward.types';
+import type {CheckpointRelease, CheckpointTaskGateStatus} from '../types/usage-limits.types';
+import type {TaskCompletionStatus} from '../types/task.types';
+import type {ArtifactDeleteRequest, ArtifactDeleteResponse, ArtifactGetRequest, ArtifactGetResponse, ArtifactListRequest, ArtifactListResponse, ArtifactSyncPendingRequest, ArtifactSyncPendingResponse, ArtifactUpsertRequest, ArtifactUpsertResponse, GetClassificationEvalProgramStatusRequest, GetClassificationEvalProgramStatusResponse, GetGroupedEntriesSinceRequest, GetGroupedEntriesSinceResponse, PlatformAlertReceiverView, GetSessionSummarySnapshotRequest, GetSessionSummarySnapshotResponse, GetTopicAttentionRequest, GetTopicAttentionResponse, GetUsageInsightsReportRequest, GetUsageInsightsReportResponse, GetUsageSessionsSinceRequest, GetUsageSessionsSinceResponse, InvalidateActivityMonitorsRequest, InvalidateActivityMonitorsResponse, LearnedClassifierArtifact, ReportClassificationIssueRequest, ReportClassificationIssueResponse, SaveUserActivityLogResponse, UploadClassificationDatasetSamplesRequest, UploadClassificationDatasetSamplesResponse, UploadImageClassificationSamplesRequest, UploadImageClassificationSamplesResponse, UsageLogCollapseMode, UserActivityLogListResponse} from './api-types';
 
 export interface ApiRouteMap {
   "/": { request: {}; response: void };
@@ -340,6 +485,13 @@ export interface ApiRouteMap {
     response: { ok: true };
   };
 
+  // Article trust: source-reputation lookup + rule-based analysis.
+  // Backend-driven and non-LLM by default (optional LLM enrichment is off by default).
+  "/article/analyze": {
+    request: ArticleAnalyzeRequest;
+    response: ArticleAnalyzeResponse;
+  };
+
   // Tasks
   "/task/list": {
     request: { assignedToUserId?: string; includeArchived?: boolean };
@@ -377,7 +529,7 @@ export interface ApiRouteMap {
         task: TaskDefinition;
         occurrenceStartMs: number;
         completed: boolean;
-        completionStatus?: import('../types/task.types').TaskCompletionStatus;
+        completionStatus?: TaskCompletionStatus;
         completionAtMs?: number;
         completionNote?: string;
         completedByUserId?: string;
@@ -391,12 +543,45 @@ export interface ApiRouteMap {
     response: ListTaskOccurrencesByRangeResponse;
   };
 
+  // Daily Check-in task gate. Client background route only — there is no server
+  // handler, because task state is client-side and encrypted. Read-only: the
+  // gate that refuses a clear lives on /user/checkpoint/clear.
+  "/checkpoint/taskgate/status": {
+    request: { userId?: string | null; forceRefresh?: boolean };
+    response: CheckpointTaskGateStatus;
+  };
+
+  // Calendar events. Client background routes only — there are no server
+  // handlers, for the same reason tasks have none: an event is an item whose
+  // times, title and location live in the encrypted `info` blob, so only a
+  // signed-in client can read or expand them.
+  "/event_items/upsert": {
+    request: { event: EventDefinition };
+    response: { event: EventDefinition };
+  };
+  "/event_items/get": {
+    request: { eventId: string };
+    response: { event: EventDefinition | null };
+  };
+  "/event_items/archive": {
+    request: { eventId: string; archived: boolean };
+    response: { success: true };
+  };
+  "/event_items/listForUser": {
+    request: { userId: string; includeArchived?: boolean };
+    response: { events: EventDefinition[] };
+  };
+  "/event/occurrences/listByRange": {
+    request: { userId: string; startMs: number; endMs: number };
+    response: { nowMs: number; occurrences: EventOccurrenceView[] };
+  };
+
   // Rewards
   "/reward/state/get": {
     request: { userId?: string | null };
     response: {
-      rewardSettings: import('../types/reward.types').RewardSettings;
-      dailyState: import('../types/reward.types').DailyRewardStates;
+      rewardSettings: RewardSettings;
+      dailyState: DailyRewardStates;
       triggerProgress: Record<string, { progressMinutes?: number; completedTaskIds?: string[] }>;
     };
   };
@@ -488,12 +673,12 @@ export interface ApiRouteMap {
 
   // Task Items (v1: Tasks as Items)
   "/task_items/upsert": {
-    request: { task: import('../types/task.types').TaskDefinition };
-    response: { task: import('../types/task.types').TaskDefinition };
+    request: { task: TaskDefinition };
+    response: { task: TaskDefinition };
   };
   "/task_items/listAssigned": {
     request: { userId: string; includeArchived?: boolean };
-    response: { tasks: Array<import('../types/task.types').TaskDefinition> };
+    response: { tasks: Array<TaskDefinition> };
   };
   "/task_items/assignees": {
     request: { taskId: string };
@@ -515,6 +700,82 @@ export interface ApiRouteMap {
   "/task_completion/listForTask": {
     request: { taskId: string; ownerId?: string; limit?: number };
     response: { entries: any[]; nextCursorUpdatedAt?: string };
+  };
+
+  // Lesson progress & quiz scores via RefState (user-owned, item-scoped)
+  "/lesson_progress/get": {
+    request: { lessonItemId: string; ownerId?: string };
+    response: { position: any; attemptsByQuiz: Record<string, any> };
+  };
+  "/lesson_progress/savePosition": {
+    request: {
+      lessonItemId: string;
+      ownerId?: string;
+      completedThroughKey?: string | null;
+      currentStepKey?: string | null;
+      visitedStepKeys?: string[];
+      progressPct?: number;
+      completed?: boolean;
+      completedAtMs?: number;
+      bestOverallScorePct?: number;
+      lastOverallScorePct?: number;
+      startedAtMs?: number;
+    };
+    response: { entry: any };
+  };
+  "/lesson_progress/recordQuizAttempt": {
+    request: {
+      lessonItemId: string;
+      ownerId?: string;
+      quizStepKey: string;
+      answers: Record<string, any>;
+      earned: number;
+      total: number;
+      pct: number;
+      passed: boolean;
+    };
+    response: any;
+  };
+  "/lesson_progress/reset": {
+    request: { lessonItemId: string; ownerId?: string; quizStepKeys: string[] };
+    response: { success: boolean };
+  };
+
+  // Background route: proxies to the server's /article/analyze, or short-circuits to
+  // { status: 'offline' } in local mode.
+  "/monitor/analyzeContent": {
+    request: { url?: string; title?: string; text?: string; byline?: string };
+    response: any;
+  };
+
+  // Dev-only dataset generation: drives real tabs through the classification pipeline so
+  // its output can be exported as labelled samples. Background-only, never a server route.
+  "/datasetgen/status": {
+    request: {};
+    response: { localMode: boolean; canRunTabs: boolean; running: boolean };
+  };
+  "/datasetgen/run": {
+    request: { urls?: string[]; concurrency?: number; dwellMs?: number; loadTimeoutMs?: number };
+    response: any;
+  };
+  "/datasetgen/export": {
+    request: {};
+    response: { count: number; records: Array<Record<string, any>> };
+  };
+  "/datasetgen/clear": {
+    request: {};
+    response: any;
+  };
+
+  // Personal lesson generation (user-scoped, metered). Returns a plaintext draft
+  // the builder shows for review/edit before the client encrypts + saves it.
+  "/usertask/lessonGen/generate": {
+    request: LessonGenRequest;
+    response: LessonGenResponse;
+  };
+  "/usertask/lessonGen/grade": {
+    request: LessonGradeRequest;
+    response: LessonGradeResponse;
   };
   "/access_request/add": {
     request: { key: string; type?: string; details?: any; message?: string };
@@ -569,6 +830,18 @@ export interface ApiRouteMap {
   "/account/extendedFeatures/update": {
     request: { updates: NonNullable<SystemOptions["extendedFeatures"]> };
     response: { success: true };
+  };
+
+  /**
+   * Family-wide key custody policy (D5). Turning it on is refused while any member
+   * still has key material on the server, so the response reports who is blocking.
+   */
+  "/account/keyStoragePolicy/update": {
+    request: { noServerKeyStorage: boolean };
+    response: {
+      noServerKeyStorage: boolean;
+      blockedBy?: Array<{ userId: string; displayedName: string }>;
+    };
   };
   "/account/import": {
     request: { importData: any };
@@ -631,6 +904,42 @@ export interface ApiRouteMap {
     response: FamilyPolicyRuleDeleteResponse;
   };
 
+  // Local-only: item-attached site CSS, resolved in the client background
+  "/sitestyle/saveEntry": {
+    request: SiteStyleSaveEntryRequest;
+    response: SiteStyleSaveEntryResponse;
+  };
+
+  "/sitestyle/revertEntry": {
+    request: SiteStyleRevertEntryRequest;
+    response: SiteStyleRevertEntryResponse;
+  };
+
+  "/sitestyle/generate": {
+    request: SiteStyleGenerateRequest;
+    response: SiteStyleGenerateResponse;
+  };
+
+  "/sitestyle/reportMatch": {
+    request: SiteStyleReportMatchRequest;
+    response: SiteStyleReportMatchResponse;
+  };
+
+  "/sitestyle/matchReports": {
+    request: SiteStyleMatchReportsRequest;
+    response: SiteStyleMatchReportsResponse;
+  };
+
+  "/sitestyle/list": {
+    request: SiteStyleListRequest;
+    response: SiteStyleListResponse;
+  };
+
+  "/sitestyle/forUrl": {
+    request: SiteStyleForUrlRequest;
+    response: SiteStyleForUrlResponse;
+  };
+
   // Local-only session state (handled in client background, not the server)
   "/ref_state/session/upsert": {
     request: RefStateUpsertRequest;
@@ -647,24 +956,24 @@ export interface ApiRouteMap {
 
   // Artifacts: local-first store with immediate sync (client background)
   "/artifact/upsert": {
-    request: import('./api-types').ArtifactUpsertRequest;
-    response: import('./api-types').ArtifactUpsertResponse;
+    request: ArtifactUpsertRequest;
+    response: ArtifactUpsertResponse;
   };
   "/artifact/get": {
-    request: import('./api-types').ArtifactGetRequest;
-    response: import('./api-types').ArtifactGetResponse;
+    request: ArtifactGetRequest;
+    response: ArtifactGetResponse;
   };
   "/artifact/list": {
-    request: import('./api-types').ArtifactListRequest;
-    response: import('./api-types').ArtifactListResponse;
+    request: ArtifactListRequest;
+    response: ArtifactListResponse;
   };
   "/artifact/delete": {
-    request: import('./api-types').ArtifactDeleteRequest;
-    response: import('./api-types').ArtifactDeleteResponse;
+    request: ArtifactDeleteRequest;
+    response: ArtifactDeleteResponse;
   };
   "/artifact/syncPending": {
-    request: import('./api-types').ArtifactSyncPendingRequest;
-    response: import('./api-types').ArtifactSyncPendingResponse;
+    request: ArtifactSyncPendingRequest;
+    response: ArtifactSyncPendingResponse;
   };
   "/account/stats": {
     request: {};
@@ -678,8 +987,12 @@ export interface ApiRouteMap {
     response: UsageSummaryResponse;
   };
   "/activity/getUsageInsightsReport": {
-    request: import('./api-types').GetUsageInsightsReportRequest;
-    response: import('./api-types').GetUsageInsightsReportResponse;
+    request: GetUsageInsightsReportRequest;
+    response: GetUsageInsightsReportResponse;
+  };
+  "/activity/getTopicAttention": {
+    request: GetTopicAttentionRequest;
+    response: GetTopicAttentionResponse;
   };
   "/activity/getUrlRuleExplanation": {
     request: GetUrlRuleExplanationRequest;
@@ -690,20 +1003,20 @@ export interface ApiRouteMap {
     response: any;
   };
   "/activity/getUsageSince": {
-    request: { userId?: string; createdAt: number; collapseMode?: import('./api-types').UsageLogCollapseMode };
+    request: { userId?: string; createdAt: number; collapseMode?: UsageLogCollapseMode };
     response: any[];
   };
   "/activity/getGroupedEntriesSince": {
-    request: import('./api-types').GetGroupedEntriesSinceRequest;
-    response: import('./api-types').GetGroupedEntriesSinceResponse;
+    request: GetGroupedEntriesSinceRequest;
+    response: GetGroupedEntriesSinceResponse;
   };
   "/activity/getSessionsSince": {
-    request: import('./api-types').GetUsageSessionsSinceRequest;
-    response: import('./api-types').GetUsageSessionsSinceResponse;
+    request: GetUsageSessionsSinceRequest;
+    response: GetUsageSessionsSinceResponse;
   };
   "/activity/getSessionSummarySnapshot": {
-    request: import('./api-types').GetSessionSummarySnapshotRequest;
-    response: import('./api-types').GetSessionSummarySnapshotResponse;
+    request: GetSessionSummarySnapshotRequest;
+    response: GetSessionSummarySnapshotResponse;
   };
   "/activity/list": {
     request: { userId?: string; limit?: number };
@@ -714,16 +1027,20 @@ export interface ApiRouteMap {
     response: void;
   };
   "/activity/reportClassificationIssue": {
-    request: import('./api-types').ReportClassificationIssueRequest;
-    response: import('./api-types').ReportClassificationIssueResponse;
+    request: ReportClassificationIssueRequest;
+    response: ReportClassificationIssueResponse;
   };
   "/activity/getClassificationEvalProgramStatus": {
-    request: import('./api-types').GetClassificationEvalProgramStatusRequest;
-    response: import('./api-types').GetClassificationEvalProgramStatusResponse;
+    request: GetClassificationEvalProgramStatusRequest;
+    response: GetClassificationEvalProgramStatusResponse;
   };
   "/activity/uploadClassificationDatasetSamples": {
-    request: import('./api-types').UploadClassificationDatasetSamplesRequest;
-    response: import('./api-types').UploadClassificationDatasetSamplesResponse;
+    request: UploadClassificationDatasetSamplesRequest;
+    response: UploadClassificationDatasetSamplesResponse;
+  };
+  "/activity/uploadImageClassificationSamples": {
+    request: UploadImageClassificationSamplesRequest;
+    response: UploadImageClassificationSamplesResponse;
   };
   "/activity/syncUsageLog": { request: {}; response: any };
   "/activityMonitor/startFrameEventTrackingForCurrentTab": {
@@ -734,9 +1051,18 @@ export interface ApiRouteMap {
     request: UpdateActivityLogRequest;
     response: void;
   };
+  "/activityMonitor/recordInApp": {
+    request: RecordInAppActivityRequest;
+    response: void;
+  };
   "/admin/account/changeSysOptions": {
     request: { accountId: string; optionName: string; optionValue: any };
     response: void;
+  };
+  /** Set or clear an AI spend override. `usdMonthly: null` clears it. */
+  "/admin/aiBudget/set": {
+    request: { scope: "account" | "user"; targetId: string; usdMonthly: number | null };
+    response: { scope: "account" | "user"; targetId: string; usdMonthly: number | null };
   };
   "/admin/account/changeType": {
     request: { accountId: string; accountType: AccountType };
@@ -751,14 +1077,55 @@ export interface ApiRouteMap {
       users: UserView[];
     };
   };
+  "/admin/rollout/readiness": {
+    request: { accountId: string };
+    response: {
+      reports: Array<{
+        capKey: string;
+        description: string;
+        minClientVersion: string;
+        ready: boolean;
+        enabled: boolean;
+        activeWindowDays: number;
+        fleet: Array<{
+          userId: string | null;
+          appType: string | null;
+          appVersion: string | null;
+          lastSeen: string | null;
+          ok: boolean;
+          reason?: string;
+        }>;
+        blockedBy: string[];
+      }>;
+    };
+  };
+  "/admin/rollout/setReady": {
+    request: { accountId: string; capKey: string; enabled: boolean; force?: boolean };
+    response: { capKey: string; enabled: boolean; ready: boolean; blockedBy: string[] };
+  };
   "/admin/contactrequest/list": {
     request: { pageInfo?: any };
-    response: Array<{
-      id: string;
-      email: string;
-      message: string;
-      createdAt: number;
-    }>;
+    response: { records: any[]; count: number | null };
+  };
+  "/admin/contactrequest/update": {
+    request: { id: string; processed: boolean; processNote?: string | null };
+    response: any;
+  };
+  "/admin/alertReceivers/list": {
+    request: {};
+    response: { receivers: PlatformAlertReceiverView[] };
+  };
+  "/admin/alertReceivers/add": {
+    request: { usernameOrEmail: string; note?: string };
+    response: { receivers: PlatformAlertReceiverView[] };
+  };
+  "/admin/alertReceivers/remove": {
+    request: { userId: string };
+    response: { receivers: PlatformAlertReceiverView[] };
+  };
+  "/admin/user/stats": {
+    request: {};
+    response: { total: number; active7: number; active30: number; new30: number; disabled: number };
   };
   "/admin/dataRetention/run": {
     request: {};
@@ -767,6 +1134,78 @@ export interface ApiRouteMap {
       deletedTotal: number;
       durationMs: number;
       completedAt: string;
+    };
+  };
+  "/admin/rateLimit/get": {
+    request: {};
+    response: {
+      enabled: boolean;
+      /** Whether the live value comes from the runtime override or RATE_LIMITING_ENABLED. */
+      source: "runtime_override" | "environment";
+      envDefaultEnabled: boolean;
+      /** Non-null when the last override read failed; the reported value is then stale. */
+      lastError: string | null;
+      pollIntervalMs: number;
+    };
+  };
+  "/admin/rateLimit/set": {
+    /** `disabled: null` clears the override and reverts to RATE_LIMITING_ENABLED. */
+    request: { disabled: boolean | null };
+    response: {
+      enabled: boolean;
+      source: "runtime_override" | "environment";
+      envDefaultEnabled: boolean;
+      lastError: string | null;
+      pollIntervalMs: number;
+    };
+  };
+  /**
+   * The security ledger, summarised for the admin console.
+   *
+   * One call rather than three: the page shows totals, sources and a recent list together,
+   * and splitting them would let the three disagree about which window they describe.
+   */
+  "/admin/security/summary": {
+    request: {
+      /** Window to summarise. Server clamps to a small allowed set. */
+      hours?: number;
+    };
+    response: {
+      windowHours: number;
+      generatedAt: string;
+      totalOccurrences: number;
+      counts: Array<{
+        eventType: string;
+        severity: "info" | "warn" | "critical";
+        /** Sum of coalesced occurrences, not the row count. */
+        occurrences: number;
+        rows: number;
+      }>;
+      /** Grouped to a /24 or /48 — the ledger never stores a raw address. */
+      sources: Array<{ ipPrefix: string; occurrences: number }>;
+      recent: Array<{
+        _id: string;
+        eventType: string;
+        severity: "info" | "warn" | "critical";
+        ipPrefix: string | null;
+        route: string | null;
+        actorAccountId: string | null;
+        actorUserId: string | null;
+        occurrences: number;
+        createdAt: string;
+      }>;
+      /** What the digest would raise for this window right now. */
+      findings: Array<{
+        key: string;
+        severity: "warn" | "critical";
+        title: string;
+        detail: Record<string, string | number>;
+      }>;
+      /** Shown beside the events, because "is limiting even on?" changes how to read them. */
+      rateLimiting: {
+        enabled: boolean;
+        source: "runtime_override" | "environment";
+      };
     };
   };
   "/admin/cache/list": {
@@ -834,7 +1273,7 @@ export interface ApiRouteMap {
   };
   "/admin/classificationEval/samples/list": {
     request: {
-      filterBy?: { userId?: string; datasetId?: string; search?: string } | null;
+      filterBy?: { userId?: string; datasetId?: string; search?: string; mismatchOnly?: boolean } | null;
       pageInfo: {
         currentPage: number;
         perPage?: number;
@@ -863,6 +1302,14 @@ export interface ApiRouteMap {
         sampleCountTotal: number;
         userCount: number;
         lastSeenAt: string | null;
+        comparableCount: number;
+        mismatchCount: number;
+        accuracy: number | null;
+        // Registry decoration (null/defaulted when the dataset has no registry row).
+        name?: string | null;
+        task?: string;
+        role?: string;
+        frozen?: boolean;
       }>;
       count: number | null;
     };
@@ -871,8 +1318,52 @@ export interface ApiRouteMap {
     request: { datasetId: string };
     response: { deletedCount: number };
   };
+  "/admin/classificationEval/datasets/buildFromCatalog": {
+    request: {
+      datasetId: string;
+      perClass?: number;
+      classes?: string[];
+      curatedOnly?: boolean;
+      includeStarterUrls?: boolean;
+    };
+    response: {
+      datasetId: string;
+      requested: number;
+      fetched: number;
+      inserted: number;
+      skippedDuplicate: number;
+      perClassRequested: Record<string, number>;
+      perClassInserted: Record<string, number>;
+      errors: Array<{ url: string; error: string }>;
+    };
+  };
+  "/admin/classificationEval/datasets/buildFromUrls": {
+    request: {
+      datasetId: string;
+      urls?: string[];
+      feedUrls?: string[];
+      eduValueHint?: string;
+      maxPerFeed?: number;
+    };
+    response: {
+      datasetId: string;
+      requested: number;
+      fetched: number;
+      inserted: number;
+      skippedDuplicate: number;
+      errors: Array<{ url: string; error: string }>;
+    };
+  };
   "/admin/classificationEval/datasets/runGroundTruth": {
-    request: { datasetId: string; maxSamples?: number; model?: string };
+    request: {
+      datasetId: string;
+      maxSamples?: number;
+      model?: string;
+      onlyUnlabeled?: boolean;
+      offset?: number;
+      promptOverride?: string;
+      sampleIds?: number[];
+    };
     response: {
       datasetId: string;
       scanned: number;
@@ -925,6 +1416,241 @@ export interface ApiRouteMap {
     request: { id: number };
     response: boolean;
   };
+  "/admin/classificationEval/samples/savePrediction": {
+    request: { sampleId: number; eduValue: string | null; scores?: Record<string, number>; source?: string };
+    response: { updated: boolean; eduValue: string | null };
+  };
+  "/admin/classificationEval/samples/saveLabelOverride": {
+    request: { sampleId: number; humanOverride: string | null };
+    response: { updated: boolean; humanOverride: string | null };
+  };
+  "/admin/classificationEval/datasets/recrawlPageText": {
+    request: { datasetId: string; maxSamples?: number; offset?: number; onlyMissing?: boolean; sampleIds?: number[]; includeMetadata?: boolean };
+    response: {
+      datasetId: string;
+      scanned: number;
+      updated: number;
+      failed: number;
+      skipped: number;
+      items: Array<{
+        id: number;
+        title: boolean;
+        description: boolean;
+        body: boolean;
+        bodyReason: string | null;
+        metaReason: string | null;
+        outcome: "updated" | "failed" | "skipped";
+      }>;
+    };
+  };
+  "/admin/classificationEval/datasets/exportTrainingSamples": {
+    request: { datasetId: string; offset?: number; limit?: number; onlyLabeled?: boolean };
+    response: {
+      datasetId: string;
+      offset: number;
+      limit: number;
+      total: number;
+      rows: Array<{
+        id: number;
+        pageData: { pageTitle: string | null; description: string | null; extractedText: string | null };
+        groundTruth: any;
+        sessionContext: any;
+      }>;
+    };
+  };
+  "/admin/classificationEval/datasets/exportFull": {
+    request: { datasetId: string; offset?: number; limit?: number };
+    response: {
+      datasetId: string;
+      offset: number;
+      limit: number;
+      total: number;
+      rows: Array<{
+        id: number;
+        datasetId: string;
+        sourceType: string;
+        sourceId: string | null;
+        sampleCount: number;
+        lastSeenAt: string | null;
+        createdAt: string | null;
+        details: any;
+      }>;
+    };
+  };
+  "/admin/classificationEval/datasets/import": {
+    request: {
+      datasetId: string;
+      rows: Array<{ details?: any; sourceType?: string | null; sampleCount?: number }>;
+      preserveGroundTruth?: boolean;
+    };
+    response: { datasetId: string; received: number; inserted: number; updated: number; skipped: number };
+  };
+  "/admin/classificationEval/models/publish": {
+    request: {
+      version?: string;
+      kind?: string;
+      embeddingModelId?: string;
+      artifact: LearnedClassifierArtifact;
+      metrics?: any;
+      datasetSnapshot?: any;
+      activate?: boolean;
+    };
+    response: { version: string; kind: string; active: boolean; _id: number };
+  };
+  "/admin/classificationEval/models/list": {
+    request: { kind?: string; limit?: number };
+    response: { records: any[]; count: number };
+  };
+  "/admin/classificationEval/models/get": {
+    request: { version: string };
+    response: { record: any | null };
+  };
+  "/admin/classificationEval/models/activate": {
+    request: { version: string };
+    response: { version: string; active: boolean };
+  };
+  "/admin/classificationEval/models/delete": {
+    request: { version: string };
+    response: { deleted: boolean };
+  };
+  "/admin/classificationEval/anchors/generateCandidates": {
+    request: { eduValueClass: string; n?: number; model?: string };
+    response: { eduValueClass: string; phrases: string[]; model: string };
+  };
+  "/admin/classificationEval/anchors/save": {
+    request: {
+      version?: string;
+      label?: string;
+      anchors: Record<string, string[]>;
+      metrics?: any;
+      datasetId?: string;
+      activate?: boolean;
+    };
+    response: { version: string; active: boolean; _id: number };
+  };
+  "/admin/classificationEval/anchors/list": {
+    request: { limit?: number };
+    response: {
+      records: Array<{
+        _id: number;
+        version: string;
+        label: string | null;
+        anchors: Record<string, string[]>;
+        metrics: any | null;
+        datasetId: string | null;
+        active: boolean;
+        createdAt: string;
+      }>;
+    };
+  };
+  "/admin/classificationEval/anchors/activate": {
+    request: { version: string };
+    response: { version: string; active: boolean };
+  };
+  "/admin/classificationEval/anchors/getActive": {
+    request: {};
+    response: {
+      version: string | null;
+      label: string | null;
+      anchors: Record<string, string[]> | null;
+      metrics: any | null;
+      datasetId: string | null;
+      lastUpdatedAt: string | null;
+    };
+  };
+  "/admin/classificationEval/anchors/delete": {
+    request: { version: string };
+    response: { deleted: boolean };
+  };
+  "/admin/classificationEval/labelPrompt/get": {
+    request: {};
+    response: { prompt: string; isCustom: boolean; default: string };
+  };
+  "/admin/classificationEval/labelPrompt/save": {
+    request: { prompt: string };
+    response: { prompt: string; isCustom: boolean };
+  };
+  "/admin/classificationEval/labelPrompt/reset": {
+    request: {};
+    response: { prompt: string; isCustom: boolean };
+  };
+  "/admin/classificationEval/datasets/create": {
+    request: {
+      datasetId: string;
+      name?: string;
+      description?: string;
+      task?: string;
+      role?: string;
+      frozen?: boolean;
+      sources: Array<{
+        datasetId: string;
+        mode?: "all" | "sample";
+        limit?: number;
+        onlyLabeled?: boolean;
+        onlyDisagreements?: boolean;
+        classes?: string[];
+        samplingStrategy?: "first" | "random" | "balanced" | "newest" | "confidence";
+        seed?: number;
+      }>;
+      dedupeByUrl?: boolean;
+      excludeUrlsFrom?: string[];
+    };
+    response: { datasetId: string; inserted: number; perSource: Array<{ datasetId: string; copied: number }> };
+  };
+  "/admin/classificationEval/datasets/updateMeta": {
+    request: { datasetId: string; name?: string; description?: string; task?: string; role?: string; frozen?: boolean };
+    response: { datasetId: string; created: boolean };
+  };
+  "/admin/classificationEval/evalRuns/save": {
+    request: {
+      evalRunId?: string;
+      task?: string;
+      target?: string;
+      testSetDatasetId: string;
+      candidateKind: string;
+      candidateRef?: any;
+      candidateLabel?: string;
+      runConfig?: any;
+      status?: string;
+      metrics: any;
+      predictions: Array<{ sampleId: number; gold: string; predicted: string | null; scores?: Record<string, number> | null }>;
+    };
+    response: { evalRunId: string; testSetSignature: string; _id: number };
+  };
+  "/admin/classificationEval/evalRuns/list": {
+    request: { testSetDatasetId?: string; task?: string; target?: string; candidateKind?: string; limit?: number };
+    response: { records: any[]; count: number };
+  };
+  "/admin/classificationEval/evalRuns/get": {
+    request: { evalRunId: string };
+    response: { run: any; predictions: any[] } | null;
+  };
+  "/admin/classificationEval/evalRuns/delete": {
+    request: { evalRunId: string };
+    response: { deleted: boolean };
+  };
+  "/admin/classificationEval/models/classifySamples": {
+    request: { datasetId: string; classifierType?: "source_priority" | "task_runner"; sampleIds?: number[]; maxSamples?: number };
+    response: {
+      datasetId: string;
+      classifierType: string;
+      predictions: Array<{ sampleId: number; predicted: string | null; restricted: boolean; confidence: number | null }>;
+      scanned: number;
+      failed: number;
+      skipped: number;
+    };
+  };
+  "/admin/classificationEval/models/classifyLlm": {
+    request: { datasetId: string; model?: string; promptOverride?: string; sampleIds?: number[]; maxSamples?: number };
+    response: {
+      datasetId: string;
+      model: string;
+      predictions: Array<{ sampleId: number; predicted: string | null; restricted: boolean; confidence: number | null }>;
+      scanned: number;
+      failed: number;
+      skipped: number;
+    };
+  };
   "/admin/contentBundles/get": {
     request: {};
     response: AdminContentBundleCatalogResponse;
@@ -936,6 +1662,39 @@ export interface ApiRouteMap {
   "/admin/contentBundles/reset": {
     request: {};
     response: AdminContentBundleCatalogResponse;
+  };
+  "/admin/setupCatalog/get": {
+    request: {};
+    response: AdminSetupCatalogResponse;
+  };
+  "/admin/setupCatalog/update": {
+    request: AdminUpdateSetupCatalogRequest;
+    response: AdminSetupCatalogResponse;
+  };
+  "/admin/setupCatalog/reset": {
+    request: {};
+    response: AdminSetupCatalogResponse;
+  };
+  // Thinking Puzzles content store (self-contained; not tied to published or library items)
+  "/admin/thinkingPuzzles/list": {
+    request: AdminPuzzleContentListRequest;
+    response: AdminPuzzleContentListResponse;
+  };
+  "/admin/thinkingPuzzles/save": {
+    request: AdminPuzzleContentSaveRequest;
+    response: AdminPuzzleContentSaveResponse;
+  };
+  "/admin/thinkingPuzzles/setStatus": {
+    request: AdminPuzzleContentSetStatusRequest;
+    response: AdminPuzzleContentSaveResponse;
+  };
+  "/admin/thinkingPuzzles/delete": {
+    request: AdminPuzzleContentDeleteRequest;
+    response: AdminPuzzleContentDeleteResponse;
+  };
+  "/admin/thinkingPuzzles/importSeed": {
+    request: AdminPuzzleContentImportSeedRequest;
+    response: AdminPuzzleContentImportSeedResponse;
   };
   "/admin/contentLoader/dryRun": {
     request: AdminContentLoaderDryRunRequest;
@@ -949,9 +1708,72 @@ export interface ApiRouteMap {
     request: AdminContentLoaderUploadAssetRequest;
     response: AdminContentLoaderUploadAssetResponse;
   };
+  "/admin/contentSource/searchPodcasts": {
+    request: AdminContentSourceSearchPodcastsRequest;
+    response: AdminContentSourceSearchPodcastsResponse;
+  };
+  "/admin/contentSource/parseFeed": {
+    request: AdminContentSourceParseFeedRequest;
+    response: AdminContentSourceParseFeedResponse;
+  };
+  "/admin/contentSource/fetchUrls": {
+    request: AdminContentSourceFetchUrlsRequest;
+    response: AdminContentSourceFetchUrlsResponse;
+  };
+  "/admin/contentSource/draft/create": {
+    request: AdminContentSourceCreateDraftRequest;
+    response: AdminContentSourceCreateDraftResponse;
+  };
+  "/admin/contentSource/draft/list": {
+    request: {};
+    response: AdminContentSourceListDraftsResponse;
+  };
+  "/admin/contentSource/draft/get": {
+    request: AdminContentSourceGetDraftRequest;
+    response: AdminContentSourceGetDraftResponse;
+  };
+  "/admin/contentSource/draft/append": {
+    request: AdminContentSourceAppendCandidatesRequest;
+    response: AdminContentSourceAppendCandidatesResponse;
+  };
+  "/admin/contentSource/draft/removeCandidate": {
+    request: AdminContentSourceRemoveCandidateRequest;
+    response: AdminContentSourceRemoveCandidateResponse;
+  };
+  "/admin/contentSource/draft/promote": {
+    request: AdminContentSourcePromoteDraftRequest;
+    response: AdminContentSourcePromoteDraftResponse;
+  };
+  "/admin/feedGen/plan": {
+    request: AdminFeedGenPlanRequest;
+    response: AdminFeedGenPlanResponse;
+  };
+  "/admin/feedGen/generatePosts": {
+    request: AdminFeedGenGeneratePostsRequest;
+    response: AdminFeedGenGeneratePostsResponse;
+  };
+  "/admin/feedGen/searchSources": {
+    request: AdminFeedGenSearchSourcesRequest;
+    response: AdminFeedGenSearchSourcesResponse;
+  };
+  "/admin/feedGen/listFeeds": {
+    request: Record<string, never>;
+    response: AdminFeedGenListFeedsResponse;
+  };
+  "/admin/feedGen/loadFeed": {
+    request: AdminFeedGenLoadFeedRequest;
+    response: AdminFeedGenLoadFeedResponse;
+  };
   "/admin/getGalleryDBs": {
     request: { dbId?: string };
-    response: Array<{ id: string; name: string; itemCount: number }>;
+    response: {
+      galleryDBData: Array<{ _id: string; groupIds: string[] }>;
+      galleryGroupDBData: Array<{ _id: string; name: string; itemIds: string[]; query?: string }>;
+    };
+  };
+  "/admin/getItems": {
+    request: { itemIds: string[] };
+    response: { items: Published[] };
   };
   "/admin/item/list": {
     request: { filterBy?: any; pageInfo?: any };
@@ -965,6 +1787,25 @@ export interface ApiRouteMap {
     request: AdminPublishedChangeTypeRequest;
     response: AdminPublishedChangeTypeResponse;
   };
+  "/admin/apps/list": {
+    request: Record<string, never>;
+    response: Published[];
+  };
+  "/admin/apps/save": {
+    request: {
+      publishId?: string | null;
+      title: string;
+      summary?: string | null;
+      path: string;
+      categories?: string[] | null;
+      icon?: string | null;
+      accent?: string | null;
+      eyebrow?: string | null;
+      webappOnly?: boolean | null;
+      imageFilename?: string | null;
+    };
+    response: Published;
+  };
   "/admin/published/delete": {
     request: AdminPublishedDeleteRequest;
     response: AdminPublishedDeleteResponse;
@@ -976,9 +1817,96 @@ export interface ApiRouteMap {
     };
     response: void;
   };
+  "/admin/published/setCuration": {
+    request: {
+      itemId: string;
+      curated: boolean;
+      curatorComment?: string;
+    };
+    response: void;
+  };
   "/admin/published/process": {
     request: AdminPublishedProcessRequest;
     response: AdminPublishedProcessResponse;
+  };
+  "/admin/published/create": {
+    request: {
+      type: string;
+      subType?: string | null;
+      name: string;
+      description?: string;
+      url?: string;
+      textContent?: string;
+      categories?: string[];
+      useCriteria?: string[];
+      // false (default) = create as an unpublished draft in the pipeline; true = publish now.
+      published?: boolean;
+    };
+    response: { item: Published; heldForReview: boolean };
+  };
+  "/admin/published/updateContentFields": {
+    request: {
+      itemId: string;
+      name?: string;
+      description?: string;
+      textContent?: string;
+      categories?: string[];
+      useCriteria?: string[];
+      patterns?: string[];
+      additionalLinks?: any[];
+      feeds?: any[];
+      url?: string;
+      excludeFromSearch?: boolean;
+      // Publish state. false = Unpublish (also hides from search); true = re-list.
+      published?: boolean;
+      // Semantic kind (podcast, yt_channel, website, …) — drives the Explore "Kind" facet.
+      // Empty string clears it back to null.
+      subType?: string | null;
+    };
+    response: { item: Published };
+  };
+  "/admin/published/attachment/add": {
+    request: {
+      itemId: string;
+      filename: string;
+      fileType: string;
+      fileData: string;
+    };
+    response: { item: Published };
+  };
+  "/admin/published/attachment/remove": {
+    request: {
+      itemId: string;
+      attachmentId: string;
+    };
+    response: { item: Published };
+  };
+  "/admin/published/attachment/get": {
+    request: {
+      itemId: string;
+      attachmentId: string;
+    };
+    response: { filename: string; fileType: string; fileData: string };
+  };
+  "/admin/published/bulkCategories": {
+    request: {
+      itemIds: string[];
+      add?: string[];
+      remove?: string[];
+    };
+    response: { updated: number };
+  };
+  "/admin/published/remapCategories": {
+    // Rewrite published.categories across all rows: { oldId: newId | null } (null/'' drops).
+    // The reusable rename / merge / delete tool so the taxonomy is never a one-way door.
+    request: {
+      remap: Record<string, string | null>;
+    };
+    response: {
+      total: number;
+      updated: number;
+      dropped: Record<string, number>;
+    };
   };
   "/admin/published/info": {
     request: { itemId: string };
@@ -986,6 +1914,10 @@ export interface ApiRouteMap {
   };
   "/admin/published/replaceImage": {
     request: AdminPublishedReplaceImageRequest;
+    response: AdminPublishedReplaceImageResponse;
+  };
+  "/admin/published/assignBannerImage": {
+    request: AdminPublishedAssignBannerImageRequest;
     response: AdminPublishedReplaceImageResponse;
   };
   "/admin/published/package/export": {
@@ -1020,6 +1952,21 @@ export interface ApiRouteMap {
   "/admin/signin": {
     request: { username: string; password: string };
     response: { token: string; user: UserView };
+  };
+  "/admin/diagnostics/list": {
+    request: {};
+    response: { checks: Array<{ id: string; title: string; description: string }> };
+  };
+  "/admin/diagnostics/run": {
+    request: { checkId: string };
+    response: {
+      checkId: string;
+      status: "ok" | "warn" | "fail";
+      summary: string;
+      recommendation?: string;
+      details?: Record<string, string | number | boolean | null>;
+      ranAt: string;
+    };
   };
   "/admin/sse/clearAllData": { request: {}; response: void };
   "/admin/sse/clearHeartbeats": { request: {}; response: void };
@@ -1096,6 +2043,12 @@ export interface ApiRouteMap {
     request: { sessionId: string; actionResult: any; context?: any; mode?: string; model?: string };
     response: ChatStreamCompleteEvent;
   };
+  // Client-only bgroute: aborts the in-flight stream and halts the agent loop
+  // for a session. No server handler (the fetch abort closes the SSE request).
+  "/ai/cancel": {
+    request: { sessionId: string };
+    response: { success: boolean; cancelled: boolean };
+  };
   "/ai/approval/respond": {
     request: { requestId: string; approved: boolean };
     response: { success: boolean };
@@ -1108,11 +2061,58 @@ export interface ApiRouteMap {
     request: { changeSetId: string };
     response: { success: boolean; changeSetId?: string; undoResults?: any; error?: string; alreadyUndone?: boolean };
   };
+  /** Client-only: the record lives in account-scoped ref_state, read through the background. */
+  "/ai/changeset/history": {
+    request: { limit?: number };
+    response: { success: boolean; entries: any[] };
+  };
   "/ai/sessionList": { request: {}; response: AISessionResponse[] };
+  "/ai/uiBridge/respond": {
+    request: { requestId: string; result?: any };
+    response: any;
+  };
+  // Client-only bgroute. No server handler. Use this rather than getSessionById +
+  // updateSession: that pair round-trips a display copy of a guide session (privacy
+  // tokens already rendered as real names) back into storage.
+  "/ai/appendResponseToSession": {
+    request: { sessionId: string; response: { id: string; respToUser: string } };
+    response: { success: boolean; saved: boolean };
+  };
   "/ai/setCurrentSessionId": { request: { id: string }; response: void };
   "/ai/updateSession": { request: { session: any }; response: { success: boolean } };
+  /** Client-only: renames merge into the persisted record in the background. No server handler. */
+  "/ai/renameSession": {
+    request: { sessionId: string; name: string };
+    response: { success: boolean };
+  };
   "/ai/textRequest": { request: AITextRequest; response: AITextResponse };
-  "/ai/userRequest": { request: AIUserRequest; response: AIUserResponse };
+  /** The collection builder's copy/paste JSON format spec, admin-editable server-side. */
+  "/ai/collectionAuthoringPrompt": { request: {}; response: { formatSpec: string } };
+  // Client-only (extension/native) direct-provider bgroutes. No server handler.
+  "/ai/provider/listOllamaModels": {
+    request: { endpoint: string };
+    response: { ok: boolean; models: { name: string }[]; error?: string };
+  };
+  "/ai/provider/syncOriginRule": { request: {}; response: { success: boolean } };
+  /**
+   * The active chat provider. A route rather than a direct settings read because `scope: 'client'`
+   * settings live in the CURRENT origin's storage — a hosted frame reading them sees its own empty
+   * store, never the extension's — and because it lets the AI bridge proxy the answer.
+   */
+  "/ai/provider/getConfig": {
+    request: {};
+    response: {
+      supported: boolean;
+      provider: "server" | "ollama";
+      endpoint: string;
+      model: string;
+      thinking: boolean;
+    };
+  };
+  "/ai/provider/setConfig": {
+    request: { provider?: "server" | "ollama"; endpoint?: string; model?: string; thinking?: boolean };
+    response: { success: boolean; message?: string };
+  };
   "/auth/checkPassword": {
     request: { password: string; userId?: string };
     response: { valid: boolean };
@@ -1125,6 +2125,11 @@ export interface ApiRouteMap {
   "/auth/desktopHandoff/create": {
     request: {};
     response: { tokenData: TokenData };
+  };
+  "/auth/mintCompanionToken": {
+    /** `targetUserId`: an admin linking a device for a child they administer (desktop Companion). */
+    request: { deviceId: string; deviceName?: string; targetUserId?: string };
+    response: { token: string; deviceId: string };
   };
   "/auth/createUser": { request: CreateUserRequest; response: UserView };
   "/auth/forceResetPassword": { request: { userId?: string }; response: void };
@@ -1226,6 +2231,25 @@ export interface ApiRouteMap {
   "/auth/signinlocal": { request: Record<string, any>; response: AuthResponse };
   "/auth/getRestrictedUser": { request: {}; response: UserView };
   "/auth/signout": { request: {}; response: void };
+  // Extension → hosted-webapp transparent sign-in handoff (client bg routes only; never hit the server).
+  "/auth/handoffExport": {
+    request: {};
+    response: {
+      token: string;
+      encPassword: string | null;
+      userId: string;
+      userSnapshot: UserView;
+    } | null;
+  };
+  "/auth/handoffImport": {
+    request: {
+      token: string;
+      encPassword?: string | null;
+      userId: string;
+      userSnapshot: UserView;
+    };
+    response: { success: boolean };
+  };
   "/auth/startEmailVerification": {
     request: { verificationCode: string };
     response: void;
@@ -1276,6 +2300,120 @@ export interface ApiRouteMap {
     response: { token: string; user?: UserView };
   };
   "/client/hometab": { request: {}; response: boolean };
+  "/client/openAppPage": { request: { path?: string }; response: boolean };
+  // Companion device-guard (client-only bg routes; Android child device)
+  "/companion/provision": {
+    /** `targetUserId`: link for this child (admin on a shared/desktop device). Default: the active user. */
+    request: { deviceName?: string; targetUserId?: string };
+    response: { ok: boolean; deviceId?: string; error?: string };
+  };
+  "/companion/unlink": {
+    request: {};
+    response: { ok: boolean; error?: string };
+  };
+  "/companion/status": {
+    request: {};
+    response: CompanionProbeResult;
+  };
+  "/companion/open": {
+    request: { target: CompanionOpenTarget };
+    response: { ok: boolean; error?: string };
+  };
+  "/companion/rules/push": {
+    request: { forceRefresh?: boolean };
+    response: { ok: boolean; rulesCount?: number; unchanged?: boolean; error?: string };
+  };
+  "/companion/inventory/sync": {
+    request: { targetUserId?: string };
+    response: { ok: boolean; count?: number; error?: string };
+  };
+  "/companion/inventory/list": {
+    request: { childUserId?: string };
+    response: { inventories: DeviceAppInventory[] };
+  };
+  "/companion/devices/list": {
+    request: { childUserId: string };
+    response: { devices: CompanionDeviceView[] };
+  };
+  /**
+   * The parent's app protections for one child. `policy: null` means never
+   * configured, which the UI shows differently from "configured to block nothing".
+   */
+  "/companion/policy/get": {
+    request: { childUserId?: string };
+    response: { policy: DeviceAppPolicy | null };
+  };
+  "/companion/policy/save": {
+    request: { childUserId?: string; policy: DeviceAppPolicy };
+    response: { ok: boolean };
+  };
+  /**
+   * SERVER route (unlike the rest of /companion/*): confirms a parent authorized
+   * turning uninstall protection off. Requires a live permission-override token,
+   * which the server verifies — the child is signed in on this phone, so the
+   * decision can't be made client-side.
+   */
+  "/companion/protection/authorizeRemoval": {
+    request: { deviceId?: string };
+    response: { authorized: boolean; adminUserId?: string; at?: number; reason?: string };
+  };
+  /**
+   * Server route: the child's own device reports newly installed apps so the
+   * account's parents get a notification.
+   *
+   * The only server addition in the phone-apps feature. It lives here rather than
+   * riding an existing route because the DETECTION has to happen on the child's
+   * device — that is the one place holding both the decrypted inventory and the
+   * decrypted policy. The app NAMES are sent in the clear deliberately: the
+   * inventory stays encrypted, but a notification a parent can actually read has
+   * to carry readable text, and "Roblox was installed" is not browsing history.
+   */
+  "/companion/apps/reportNew": {
+    request: { pkgs: string[]; labels?: string[] };
+    response: { ok: boolean; notified?: number };
+  };
+  /**
+   * SERVER route: the compiled device ruleset for the CALLING device.
+   *
+   * Guard used to get this over local IPC from the main app, which meant a parent's block
+   * landed on a child's phone only when that child next opened Kindredly (UX-019). The server
+   * can compile it because usage limits are not end-to-end encrypted and the app inventory
+   * and policy are already in ref_state — so Guard fetches a finished ruleset instead.
+   *
+   * Takes no user or device id on purpose. Both come from the token; a body-supplied id is
+   * what would let one child's Companion read a sibling's rules. `tzOffsetMinutes` is the one
+   * input the server cannot know, and it is clamped server-side.
+   */
+  "/companion/rules/current": {
+    request: { tzOffsetMinutes?: number };
+    response: { ruleSet: CompiledDeviceRuleSet };
+  };
+  /**
+   * SERVER route: a parent removes one of a child's devices — disconnect and forget,
+   * in that order.
+   *
+   * One endpoint rather than the client orchestrating a revoke plus four deletes,
+   * because the order is the whole guarantee and only the server can hold it. The
+   * worst partial failure — rows deleted, credential still live — is a device that
+   * vanished from the parent's list and carried on reporting.
+   *
+   * Idempotent: removing an already-removed device revokes nothing and deletes
+   * nothing, and says so rather than failing.
+   */
+  "/companion/devices/remove": {
+    request: { childUserId: string; deviceId: string };
+    response: { ok: boolean; revokedSessions: number; deletedRows: number };
+  };
+  /** Client bg route: authorize with the server, then tell Guard to stand down. */
+  "/companion/protection/disable": {
+    request: {};
+    response: { ok: boolean; error?: string };
+  };
+  /** Client bg route: record the parent's opt-in and open Guard's protection screen. */
+  "/companion/protection/enable": {
+    request: {};
+    response: { ok: boolean; error?: string };
+  };
   "/client/widget/status": { request: {}; response: any };
   "/collection/listByUser": {
     request: CollectionListByUserRequest;
@@ -1326,9 +2464,21 @@ export interface ApiRouteMap {
     request: { collectionId: string; typeFilter?: string; userId?: string };
     response: ItemInfoView[];
   };
+  "/collection/structure": {
+    request: Record<string, never>;
+    response: { relations: Array<{ collectionId: string; itemId: string; itemType: string }> };
+  };
   "/collection/shareWithFriend": {
     request: { collectionId: string; friendUserId: string; permission: PermissionType };
     response: { success: boolean };
+  };
+  /**
+   * Client-only: the command bar's execution path for gated tools. Handled in the
+   * background (AIToolGate via AICommandSurface), never forwarded to the server.
+   */
+  "/command/runTool": {
+    request: { toolId: string; params?: Record<string, unknown>; sessionId: string };
+    response: { success: boolean; result?: any; error?: string };
   };
   "/comment/create": {
     request: CreateCommentRequest;
@@ -1373,10 +2523,48 @@ export interface ApiRouteMap {
     response: any;
   };
   "/content/getTermDict": { request: { key: string }; response: any };
+  "/content/checkAdultUrlSignal": {
+    request: { url: string };
+    response: any;
+  };
   "/content/imageClassify": { request: { images: any }; response: Array<any> };
+  "/content/imageClassifier/recoverInjection": {
+    request: { url?: string };
+    response: { injected: boolean; reason?: string } | any;
+  };
+  // Dev-only image-classifier perf instrumentation, driven by ImageClassTest.vue.
+  "/content/imageClassifyRequestPerf/report": {
+    request: any;
+    response: { ok: boolean };
+  };
+  "/content/imageClassifyRequestPerf/get": {
+    request: {};
+    response: any;
+  };
+  "/content/imageClassifyRequestPerf/reset": {
+    request: {};
+    response: any;
+  };
   "/content/imageClassifyCache/clear": {
     request: {};
     response: { clearedEntries: number };
+  };
+  /**
+   * Client-only: the local image-classification decision-sample buffer (developer
+   * tools + page reports). Nothing here leaves the device; upload is a separate,
+   * opted-in path.
+   */
+  "/content/imageClassifySamples/list": {
+    request: { limit?: number };
+    response: { total: number; samples: any[] };
+  };
+  "/content/imageClassifySamples/markReported": {
+    request: { url?: string };
+    response: { imageKeys: string[]; blocked: number; total: number };
+  };
+  "/content/imageClassifySamples/clear": {
+    request: {};
+    response: { ok: boolean };
   };
   "/content/imageClassifySkip/get": {
     request: { url: string };
@@ -1572,7 +2760,7 @@ export interface ApiRouteMap {
   "/content/fixPipelineClassification": {
     request: {
       pipelineResultId?: string | null;
-      eduValue: import('../shared.types').EduValue;
+      eduValue: EduValue;
       url?: string;
       startTime?: number;
       endTime?: number;
@@ -1585,7 +2773,7 @@ export interface ApiRouteMap {
       error?: string;
       result?: {
         pipelineResultId: string | null;
-        eduValue: import('../shared.types').EduValue;
+        eduValue: EduValue;
         updatedPipeline: boolean;
         updatedActivityLog: boolean;
         updatedActivityLogEntries: number;
@@ -1639,12 +2827,34 @@ export interface ApiRouteMap {
     request: ContentLookupRequest;
     response: ContentLookupResponse;
   };
+  "/data/learnedClassifierModel/getActive": {
+    request: { kind?: string };
+    response: {
+      model: {
+        version: string;
+        kind: string;
+        embeddingModelId: string;
+        artifact: LearnedClassifierArtifact;
+        createdAt: string | null;
+      } | null;
+    };
+  };
+  "/data/siteOverrides/getActive": {
+    request: Record<string, never>;
+    response: {
+      overrides: SiteOverridesEnvelope | null;
+    };
+  };
   /** @deprecated Use /data/contentInfo with options.includeMetadata instead. Kept for backward compatibility. */
   "/data/meta": { request: { url: string }; response: ItemMeta };
   /** @deprecated Use /data/contentInfo with options.includeResourceInfo instead. Kept for backward compatibility. */
   "/data/resourceInfo": {
     request: { url: string };
     response: ResourceFetchInfoResponse;
+  };
+  "/data/podcastFeedLookup": {
+    request: PodcastFeedLookupRequest;
+    response: PodcastFeedLookupResponse;
   };
 
   "/data/raw": {
@@ -1802,6 +3012,26 @@ export interface ApiRouteMap {
       topK?: number;
     };
     response: { suggestions: any[] };
+  };
+
+  // Dedicated per-item embedding cache (background-only; inference stays in bg).
+  "/itemEmbedding/getMany": {
+    request: { items: Array<{ itemId: string; text: string }> };
+    response: { results: Array<{ itemId: string; embedding: number[] }> };
+  };
+  "/itemEmbedding/stats": {
+    request: {};
+    response: { count: number; byModel: Record<string, number>; approxBytes: number };
+  };
+
+  // Dedicated per-page activity embedding cache (background-only; local-first, never synced).
+  "/activityEmbedding/getBySession": {
+    request: { activitySessionId: string };
+    response: { results: Array<{ key: string; embedding: number[] }> };
+  };
+  "/activityEmbedding/stats": {
+    request: {};
+    response: { count: number; byModel: Record<string, number>; approxBytes: number };
   };
 
   "/embeddingCache/get": { request: EmbeddingCacheGetRequest; response: EmbeddingCacheGetResponse };
@@ -1983,6 +3213,15 @@ export interface ApiRouteMap {
     response: SharedFeedbackFeedMarkSeenResponse;
   };
   "/feed/proxy": { request: { url: string; type?: string }; response: string };
+  /**
+   * Background-only. Reads and consumes the feed offer the extension's navigation
+   * watcher recorded for a tab, when a clicked RSS link was downloaded instead of
+   * navigated to.
+   */
+  "/feed/pendingOffer": {
+    request: { tabId?: number };
+    response: { feedUrl: string; detectedAt: number } | null;
+  };
   "/feed/resolveYouTubeFeedUrl": {
     request: { url: string; meta?: Record<string, any> | null; currentFeedURL?: string | null };
     response: string | null;
@@ -2220,6 +3459,27 @@ export interface ApiRouteMap {
     request: ReadLaterFeedRequest;
     response: ItemInfoView[];
   };
+  /**
+   * Local lookup — items assigned any of `kinds` (bg handler only). `kinds` is an
+   * encrypted column, so the server can never answer this.
+   */
+  "/item/listByKinds": {
+    request: { kinds: string[]; limit?: number };
+    response: ItemInfoView[];
+  };
+  /** Local lookup — app-kind-tagged items plus library Kindredly apps (bg handler only). */
+  "/item/listLibraryApps": {
+    request: { kinds: string[] };
+    response: ItemInfoView[];
+  };
+  /**
+   * Item counts bucketed along one browse axis, for the Library's browse grids.
+   * Local index only (bg handler); keyed by the raw facet key, never a display label.
+   */
+  "/item/facetCounts": {
+    request: { dimension: "type" | "usage" | "status" };
+    response: Record<string, number>;
+  };
   "/item/rediscover": {
     request: RediscoverQueueRequest;
     response: ItemInfoView[];
@@ -2252,6 +3512,10 @@ export interface ApiRouteMap {
   "/item/localLibrary/clear": {
     request: { includeRestricted?: boolean };
     response: any;
+  };
+  "/item/banner/localize": {
+    request: { itemId: string };
+    response: { queued: boolean };
   };
   "/item/setUserPermission": {
     request: { itemId: string; permission: PermissionType };
@@ -2309,7 +3573,7 @@ export interface ApiRouteMap {
     };
   };
   "/item/findWithPublishId": {
-    request: { publishId: string; targetUserId?: string };
+    request: { publishId: string; publishIdBlindKey?: string; targetUserId?: string };
     response: ItemInfoView[];
   };
   "/items/match": {
@@ -2329,7 +3593,25 @@ export interface ApiRouteMap {
   };
   "/nativeDesktopStatus": {
     request: {};
-    response: { success: boolean; data?: any; error?: string };
+    response: { success: boolean; bridge?: DesktopBridgeStatus; data?: any; error?: string };
+  };
+  "/nativeDesktopBridgeState": {
+    request: {};
+    response: { success: boolean; bridge: DesktopBridgeStatus };
+  };
+  "/nativeDesktopOpenControls": {
+    request: {};
+    response: { success: boolean; type?: string; error?: string };
+  };
+  /** Ask the Companion to quit and reopen the browsers still waiting on a restart. */
+  "/nativeDesktopRelaunchBrowsers": {
+    request: { entryIds?: string[] };
+    response: {
+      success: boolean;
+      type?: string;
+      data?: { relaunched?: string[]; failed?: { browserAppName: string; error: string }[] };
+      error?: string;
+    };
   };
   "/nativeDesktopLockdown": {
     request: {
@@ -2339,6 +3621,15 @@ export interface ApiRouteMap {
       updateUrl?: string;
     };
     response: { success: boolean; data?: any; error?: string };
+  };
+  "/nativeDesktopSetCheckup": {
+    request: {
+      audience?: string;
+      firstRunDismissedAt?: string;
+      /** Keyed by check id; the value is a `CheckupDisposition`, carried opaquely. */
+      dispositions?: Record<string, unknown>;
+    };
+    response: { success: boolean; error?: string };
   };
   "/nativeDesktopAuthorizeChallenge": {
     request: {
@@ -2364,6 +3655,14 @@ export interface ApiRouteMap {
     request: CreatePostRequest;
     response: CreatePostResponse;
   };
+  "/post/createGrouped": {
+    request: CreateGroupedPostRequest;
+    response: CreateGroupedPostResponse;
+  };
+  "/post/listByShareGroup": {
+    request: ListByShareGroupRequest;
+    response: Post[];
+  };
   "/post/readReceipt/mark": {
     request: PostReadReceiptMarkRequest;
     response: PostReadReceiptMarkResponse;
@@ -2381,9 +3680,15 @@ export interface ApiRouteMap {
     request: { postId: string; sharedWith: string[] };
     response: void;
   };
+  "/post/updateEncInfo": {
+    request: UpdatePostEncInfoRequest;
+    response: void;
+  };
   "/pubfile/get": {
     request: { fileId?: string; pubId?: string; filename?: string };
-    response: { data: Buffer | string; contentType: string; filename?: string };
+    // Base64 file bytes. Published files are stored plaintext, so callers writing them into a
+    // library item must supply the item's encInfo on upload to get them encrypted at rest.
+    response: string;
   };
   "/published/collectionItemFeed": {
     request: { itemId: string };
@@ -2403,9 +3708,22 @@ export interface ApiRouteMap {
     request: { searchData?: any; pageInfo?: any };
     response: { rows: Published[]; moreAvailable: boolean };
   };
+  "/published/categoryCoverage": {
+    request: Record<string, never>;
+    response: PublishedCategoryCoverageResponse;
+  };
   "/content/bundle/recommend": {
     request: RecommendContentBundlesRequest;
     response: RecommendContentBundlesResponse;
+  };
+  "/setup/catalog/get": {
+    request: GetSetupCatalogRequest;
+    response: GetSetupCatalogResponse;
+  };
+  // Auth-optional: the puzzle app is `requiresLogin: false`, so guests must be able to read it.
+  "/thinkingPuzzles/catalog": {
+    request: ThinkingPuzzlesCatalogRequest;
+    response: ThinkingPuzzlesCatalogResponse;
   };
   "/published/flag": {
     request: { itemId: string; details?: Record<string, any> };
@@ -2426,6 +3744,10 @@ export interface ApiRouteMap {
   "/published/item/importFromPublished": {
     request: ImportFromPublishedRequest;
     response: string;
+  };
+  "/published/listForMap": {
+    request: { limit?: number };
+    response: { rows: PublishedMapFeedRow[] };
   };
   "/published/listGroupIdsForGallery": {
     request: { galleryId: string; dbId?: string };
@@ -2463,7 +3785,7 @@ export interface ApiRouteMap {
       tempAuthToken?: TokenData;
       actionApprovalRequestId?: string;
     };
-    response: void;
+    response: PublishResult;
   };
   "/published/publishCollectionClient/init": {
     request: {
@@ -2513,7 +3835,7 @@ export interface ApiRouteMap {
       actionApprovalRequestId?: string;
       tempAuthToken?: TokenData;
     };
-    response: { publishId: string };
+    response: PublishResult;
   };
   /**
    * UI -> BG orchestration route for client-upload publishing. Background decrypts locally and streams plaintext to server.
@@ -2532,11 +3854,11 @@ export interface ApiRouteMap {
       useCriteria?: any;
       tempAuthToken?: TokenData;
     };
-    response: { publishId: string };
+    response: PublishResult;
   };
   "/published/publishItem": {
     request: { itemId: string; itemData: any };
-    response: void;
+    response: PublishResult;
   };
   "/published/reviewsByUser": {
     request: { userId: string };
@@ -2610,6 +3932,138 @@ export interface ApiRouteMap {
   };
   "/search/embedded": { request: any; response: any };
   "/search/status": { request: {}; response: { indexRebuilding: boolean } };
+  // Read-only telemetry: library size (sampled, not scanned) plus a rolling
+  // sample of recent search timings split by phase. Never carries query text.
+  "/search/diagnostics": {
+    request: {};
+    response: {
+      libraryStats: {
+        itemCount: number;
+        sampledRows: number;
+        meanRowBytes: number;
+        p95RowBytes: number;
+        approxTotalBytes: number;
+      } | null;
+      summary: {
+        sampleSize: number;
+        p50Ms: number;
+        p95Ms: number;
+        maxMs: number;
+        meanItemsScanned: number;
+        meanScanMs: number;
+        meanRankMs: number;
+        meanEnrichMs: number;
+        // Per-engine split. The corpus serves what it can; filtered and
+        // browse-mode queries can only be answered by the full scan.
+        corpusEngine: {
+          sampleSize: number;
+          p50Ms: number;
+          p95Ms: number;
+          maxMs: number;
+          meanEnrichMs: number;
+          // Cold = the packed record had to be read back. The MV3 case.
+          coldSampleSize: number;
+          coldP50Ms: number;
+          warmSampleSize: number;
+          warmP50Ms: number;
+          meanQueryMs: number;
+          meanHydrateMs: number;
+          meanHydratedItems: number;
+          rebuildCount: number;
+          meanRebuildMs: number;
+          corpusItems: number;
+          corpusBytes: number;
+        };
+        scanEngine: {
+          sampleSize: number;
+          p50Ms: number;
+          p95Ms: number;
+          maxMs: number;
+          meanEnrichMs: number;
+        };
+        // Read right after agreement: an engine that always falls back shows a
+        // healthy p50 while doing nothing.
+        fallbackRate: number;
+        fallbackReasons: Record<string, number>;
+        // Packed-corpus shadow engine. Warm and cold are reported separately
+        // because the extension is MV3 and a blended number would hide the
+        // service-worker-eviction case that matters most.
+        shadow: {
+          sampleSize: number;
+          okCount: number;
+          agreementRate: number;
+          meanJaccard: number;
+          warmSampleSize: number;
+          warmP50Ms: number;
+          warmP95Ms: number;
+          coldSampleSize: number;
+          coldP50Ms: number;
+          coldP95Ms: number;
+          meanLoadMs: number;
+          meanWarmAcquireMs: number;
+          meanQueryMs: number;
+          rebuildCount: number;
+          meanRebuildMs: number;
+          corpusItems: number;
+          corpusBytes: number;
+        };
+      };
+      shadowEnabled: boolean;
+      corpusEngineEnabled: boolean;
+      recentSearches: Array<{
+        at: string;
+        // Absent on events recorded before the corpus was promoted; treat as 'scan'.
+        engine?: "scan" | "corpus";
+        fellBackReason?: "filters" | "browse-mode" | "flag-off" | "error";
+        hydrateMs?: number;
+        corpus?: {
+          warm: boolean;
+          loadMs: number;
+          rebuildMs: number;
+          deltaMs: number;
+          deltaItems: number;
+          queryMs: number;
+          hydratedItems: number;
+          corpusItems: number;
+          corpusBytes: number;
+        };
+        queryLength: number;
+        queryCount: number;
+        itemsScanned: number;
+        candidatesMatched: number;
+        scanMs: number;
+        rankMs: number;
+        enrichMs: number;
+        totalMs: number;
+        shadow?: {
+          ok: boolean;
+          error?: string;
+          warm: boolean;
+          loadMs: number;
+          rebuildMs: number;
+          acquireMs: number;
+          candidateMs: number;
+          scoreMs: number;
+          totalMs: number;
+          corpusItems: number;
+          corpusBytes: number;
+          candidateCount: number;
+          comparedQueries: number;
+          topNMatch: boolean;
+          jaccard: number;
+          firstMismatchRank: number | null;
+        };
+      }>;
+    };
+  };
+  "/search/setShadowEnabled": {
+    request: { enabled: boolean };
+    response: { enabled: boolean };
+  };
+  "/search/setCorpusEngineEnabled": {
+    request: { enabled: boolean };
+    response: { enabled: boolean };
+  };
   "/search/terms": {
     request: { type: string; userId?: string };
     response: Array<{ key: string; text: string; count: number }>;
@@ -2659,9 +4113,23 @@ export interface ApiRouteMap {
     request: { minutes: number };
     response: any;
   };
-  "/serverSettings/get": { request: any; response: any };
+  /** Walk a blocked tab back to the last page that was actually allowed. */
+  "/sentry/rewindToSafety": {
+    request: { tabId?: number };
+    response: { started: boolean };
+  };
+  /** Whether that tab has an earlier page to return to at all. */
+  "/sentry/hasBackTarget": {
+    request: { tabId?: number };
+    response: { hasBackTarget: boolean };
+  };
+  "/serverSettings/get": { request: GetServerSettingsRequest; response: ServerSettingsView | null };
   "/serverSettings/refresh": { request: {}; response: void };
-  "/serverSettings/update": { request: any; response: any };
+  "/serverSettings/update": { request: UpdateServerSettingsRequest; response: void };
+  /** Looks for a Kindredly server on this machine, on a named box, and optionally across a /24. */
+  "/serverSettings/discover": { request: DiscoverServersRequest; response: DiscoverServersResponse };
+  /** Confirms a hand-typed server address before it is saved. */
+  "/serverSettings/checkUrl": { request: CheckServerUrlRequest; response: CheckServerUrlResponse };
   "/store/config": {
     request: {};
     response: { publicKey: string; environment: string };
@@ -2714,15 +4182,36 @@ export interface ApiRouteMap {
     request: { quick?: boolean; overrideIndexRebuild?: boolean };
     response: boolean;
   };
+  "/sync/fullResetLog": {
+    request: {};
+    response: { at: string; userId: string; source: string; reasons: string[] }[];
+  };
   "/sync/retryFailed": { request: {}; response: void };
   "/sync/retryOperation": { request: { operationId: string }; response: void };
   "/sync/trigger": { request: {}; response: void };
   "/sync/update": {
-    request: { lastUpdate?: number; userId?: string };
+    request: {
+      // The legacy cursor: a wall-clock date. Superseded by lastRevision, kept for
+      // clients that have not upgraded. Declared `number` and parsed with `new Date()`,
+      // which is exactly why the revision needed a field of its own -- a bare revision
+      // like 51291 would have parsed as 1970.
+      lastUpdate?: number;
+      // SYNC-4. The changelog id this client has already seen, from a previous
+      // response's `revision`. Takes precedence over lastUpdate when both are sent.
+      lastRevision?: number;
+      userId?: string;
+      // Client supports chunked full sync (server may respond with chunkedItemIds).
+      chunked?: boolean;
+      // Fetch details for one page of item ids (max 500 per request).
+      fetchItemIds?: string[];
+    };
     response: ItemChangeLogUpdate;
   };
   "/system/contactRequest": {
-    request: { contactType?: string; userInfo?: any; message: string };
+    // diagnostics: optional client-assembled bug-report bundle (redacted client-side);
+    // the server folds it into userInfo.diagnostics for storage.
+    // urgent: bug reports only — marks the platform alert high-priority.
+    request: { contactType?: string; userInfo?: any; message: string; diagnostics?: any; urgent?: boolean };
     response: void;
   };
   "/system/status": {
@@ -2753,7 +4242,7 @@ export interface ApiRouteMap {
   };
   "/user/activity/logList": {
     request: { userId?: string; type?: string; options?: any };
-    response: import('./api-types').UserActivityLogListResponse;
+    response: UserActivityLogListResponse;
   };
   "/activity/logNewVisit": {
     request: { itemId: string; userId?: string };
@@ -2770,23 +4259,27 @@ export interface ApiRouteMap {
       encInfo?: any;
       complete?: boolean;
     };
-    response: import('./api-types').SaveUserActivityLogResponse;
+    response: SaveUserActivityLogResponse;
   };
   "/user/activity/invalidateMonitors": {
-    request: import('./api-types').InvalidateActivityMonitorsRequest;
-    response: import('./api-types').InvalidateActivityMonitorsResponse;
+    request: InvalidateActivityMonitorsRequest;
+    response: InvalidateActivityMonitorsResponse;
   };
   "/user/activity/reportClassificationIssue": {
-    request: import('./api-types').ReportClassificationIssueRequest;
-    response: import('./api-types').ReportClassificationIssueResponse;
+    request: ReportClassificationIssueRequest;
+    response: ReportClassificationIssueResponse;
   };
   "/user/activity/getClassificationEvalProgramStatus": {
-    request: import('./api-types').GetClassificationEvalProgramStatusRequest;
-    response: import('./api-types').GetClassificationEvalProgramStatusResponse;
+    request: GetClassificationEvalProgramStatusRequest;
+    response: GetClassificationEvalProgramStatusResponse;
   };
   "/user/activity/uploadClassificationDatasetSamples": {
-    request: import('./api-types').UploadClassificationDatasetSamplesRequest;
-    response: import('./api-types').UploadClassificationDatasetSamplesResponse;
+    request: UploadClassificationDatasetSamplesRequest;
+    response: UploadClassificationDatasetSamplesResponse;
+  };
+  "/user/activity/uploadImageClassificationSamples": {
+    request: UploadImageClassificationSamplesRequest;
+    response: UploadImageClassificationSamplesResponse;
   };
   "/user/activity/pushEntries": { request: { entries: any[] }; response: void };
   "/user/activity/removeEntry": { request: { id: string }; response: void };
@@ -2815,6 +4308,20 @@ export interface ApiRouteMap {
     };
   };
 
+  "/user/client/heartbeat": {
+    request: { status?: DeviceGuardStatus };
+    response: {
+      serverTimeMs: number;
+      /**
+       * A parent's approvals, in a form the device can apply to the ruleset it already cached.
+       *
+       * Here rather than on a channel of its own because this is the one call a Companion makes
+       * with no browser running, which is exactly the situation an approval has to survive. Read
+       * `restrictions/deviceGrants` before adding a kind: a grant may only ever LOOSEN.
+       */
+      grants?: DeviceGrant[];
+    };
+  };
   "/user/client/list": {
     request: { userId?: string };
     response: ClientInfoView[];
@@ -2839,6 +4346,10 @@ export interface ApiRouteMap {
     request: { userId?: string; clientId: string; url: string };
     response: QueueManagedRemoteActionResponse;
   };
+  "/user/client/remoteAction/localDecision": {
+    request: { token: string; approved: boolean };
+    response: { success: boolean; result: { matched: boolean } };
+  };
   "/user/client/remoteAction/forceSyncSettings": {
     request: { userId?: string; clientId: string; refreshCurrentUser?: boolean; refreshUserPrefs?: boolean };
     response: QueueManagedRemoteActionResponse;
@@ -2858,6 +4369,43 @@ export interface ApiRouteMap {
   "/user/client/remoteAction/ack": {
     request: AckManagedRemoteActionRequest;
     response: AckManagedRemoteActionResponse;
+  };
+  "/user/client/remoteAction/syncActivityAll": {
+    request: RequestActivitySyncAllRequest;
+    response: RequestActivitySyncAllResponse;
+  };
+  /**
+   * Client-only wrappers over /user/liveView/*: the background decrypts each
+   * device's frame before handing it to the UI, so the frames stay E2E-encrypted
+   * on the wire and the UI never touches key material.
+   */
+  "/liveView/start": {
+    request: { userIds: string[]; cadenceMs?: number };
+    response: { success: boolean; result: { session: any; devices: any[] } };
+  };
+  "/liveView/latest": {
+    request: { sessionId: string; clientId?: string; cadenceMs?: number };
+    response: { success: boolean; result: { session: any; devices: any[] } };
+  };
+  "/liveView/stop": {
+    request: { sessionId: string };
+    response: { success: boolean; result: any };
+  };
+  "/user/liveView/start": {
+    request: StartLiveViewRequest;
+    response: StartLiveViewResponse;
+  };
+  "/user/liveView/latest": {
+    request: GetLiveViewFramesRequest;
+    response: GetLiveViewFramesResponse;
+  };
+  "/user/liveView/stop": {
+    request: StopLiveViewRequest;
+    response: StopLiveViewResponse;
+  };
+  "/user/liveView/pushFrame": {
+    request: PushLiveViewFrameRequest;
+    response: PushLiveViewFrameResponse;
   };
   "/user/current": { request: {}; response: UserView };
   "/user/debug": { request: { data?: any }; response: { [key: string]: any } };
@@ -2891,6 +4439,15 @@ export interface ApiRouteMap {
   "/user/encryption/deleteRecoveryKey": {
     request: { userId?: string };
     response: void;
+  };
+  /**
+   * KEY-0 repair. Removes the password-wrapped copy of a user's secret when that user has
+   * no password — for SSO accounts that copy was wrapped under a key derived from a null
+   * password, which is a global constant. Refuses when the user actually has a password.
+   */
+  "/user/encryption/deletePasswordWrappedSecret": {
+    request: { userId?: string };
+    response: { removed: boolean };
   };
   "/user/encryption/listKeys": {
     request: { userId?: string };
@@ -2985,6 +4542,18 @@ export interface ApiRouteMap {
       tempAuthToken?: TokenData;
     };
     response: void;
+  };
+  /**
+   * Mark your OWN daily check-in done for today.
+   *
+   * Deliberately takes no userId and no settings: it is the one write a
+   * restricted user is allowed to make against their own access control, so it
+   * touches nothing but `checkpointRelease` and refuses in guardian mode.
+   * Everything else still goes through the admin-gated /user/options/update.
+   */
+  "/user/checkpoint/clear": {
+    request: {};
+    response: { release: CheckpointRelease };
   };
   "/user/settings/copy": {
     request: CopyUserSettingsRequest;
@@ -3109,6 +4678,142 @@ export interface ApiRouteMap {
     request: BannerRecommendRequest;
     response: BannerRecommendResponse;
   };
+  "/admin/banner/list": {
+    request: Record<string, never>;
+    response: AdminBannerListResponse;
+  };
+  "/admin/banner/generate": {
+    request: AdminBannerGenerateRequest;
+    response: AdminBannerGenerateResponse;
+  };
+  "/admin/banner/generateFromPrompt": {
+    request: AdminBannerGenerateFromPromptRequest;
+    response: AdminBannerGenerateFromPromptResponse;
+  };
+  "/admin/banner/suggestPrompt": {
+    request: AdminBannerSuggestPromptRequest;
+    response: AdminBannerSuggestPromptResponse;
+  };
+  "/admin/banner/publish": {
+    request: AdminBannerPublishRequest;
+    response: AdminBannerPublishResponse;
+  };
+  "/admin/banner/testLocal": {
+    request: AdminBannerTestLocalRequest;
+    response: AdminBannerTestLocalResponse;
+  };
+  "/admin/banner/generator/save": {
+    request: AdminBannerGeneratorSaveRequest;
+    response: AdminBannerGeneratorResponse;
+  };
+  "/admin/banner/generator/select": {
+    request: AdminBannerGeneratorSelectRequest;
+    response: AdminBannerGeneratorResponse;
+  };
+  "/admin/banner/generator/delete": {
+    request: AdminBannerGeneratorDeleteRequest;
+    response: AdminBannerGeneratorResponse;
+  };
+  "/admin/banner/save": {
+    request: AdminBannerSaveRequest;
+    response: AdminBannerMutateResponse;
+  };
+  "/admin/banner/create": {
+    request: AdminBannerCreateRequest;
+    response: AdminBannerMutateResponse;
+  };
+  "/admin/banner/style/bulk": {
+    request: AdminBannerBulkStyleRequest;
+    response: AdminBannerBulkStyleResponse;
+  };
+  "/admin/banner/style/add": {
+    request: AdminBannerStyleAddRequest;
+    response: AdminBannerStylesResponse;
+  };
+  "/admin/banner/style/delete": {
+    request: AdminBannerStyleDeleteRequest;
+    response: AdminBannerStylesResponse;
+  };
+  "/admin/banner/enhance": {
+    request: AdminBannerEnhanceRequest;
+    response: AdminBannerEnhanceResponse;
+  };
+  "/admin/banner/inpaint": {
+    request: AdminBannerInpaintRequest;
+    response: AdminBannerInpaintResponse;
+  };
+  "/admin/banner/category/add": {
+    request: AdminBannerCategoryAddRequest;
+    response: AdminBannerCategoryAddResponse;
+  };
+  "/admin/banner/hide": {
+    request: AdminBannerHideRequest;
+    response: AdminBannerMutateResponse;
+  };
+  "/admin/banner/delete": {
+    request: AdminBannerDeleteRequest;
+    response: AdminBannerDeleteResponse;
+  };
+  "/admin/banner/suggestions": {
+    request: AdminBannerSuggestionsRequest;
+    response: AdminBannerSuggestionsResponse;
+  };
+  "/admin/banner/suggestion/add": {
+    request: AdminBannerSuggestionAddRequest;
+    response: AdminBannerMutateResponse;
+  };
+  "/admin/banner/freeimage/search": {
+    request: FreeImageSearchRequest;
+    response: FreeImageSearchResponse;
+  };
+  "/admin/banner/freeimage/fetch": {
+    request: FreeImageFetchRequest;
+    response: FreeImageFetchResponse;
+  };
+  "/media/categorySets": {
+    request: Record<string, never>;
+    response: CategorySetsResponse;
+  };
+  "/admin/categorySets/list": {
+    request: Record<string, never>;
+    response: AdminCategorySetsResponse;
+  };
+  "/admin/categorySets/coverage": {
+    request: Record<string, never>;
+    response: AdminCategoryCoverageResponse;
+  };
+  "/admin/categorySets/save": {
+    request: AdminCategorySetSaveRequest;
+    response: AdminCategorySetsResponse;
+  };
+  "/admin/categorySets/delete": {
+    request: AdminCategorySetDeleteRequest;
+    response: AdminCategorySetsResponse;
+  };
+  "/admin/categorySets/reset": {
+    request: Record<string, never>;
+    response: AdminCategorySetsResponse;
+  };
+  "/admin/categorySets/uploadIcon": {
+    request: AdminCategorySetUploadIconRequest;
+    response: AdminCategorySetUploadIconResponse;
+  };
+  "/admin/aiconfig/get": {
+    request: Record<string, never>;
+    response: AdminAiConfigResponse;
+  };
+  "/admin/aiconfig/save": {
+    request: AdminAiConfigSaveRequest;
+    response: AdminAiConfigResponse;
+  };
+  "/admin/aiconfig/reset": {
+    request: Record<string, never>;
+    response: AdminAiConfigResponse;
+  };
+  "/admin/dashboard/stats": {
+    request: Record<string, never>;
+    response: AdminDashboardStatsResponse;
+  };
   "/userfile/upload": { request: FileUploadRequest; response: FileRefInfo };
   "/userfile/uploadChunkedInit": {
     request: Omit<FileUploadRequest, 'fileData' | 'previews'> & {
@@ -3117,6 +4822,13 @@ export interface ApiRouteMap {
       chunkCount: number;
     };
     response: FileRefInfo;
+  };
+  "/userfile/uploadPreview": {
+    // Thumbnails ride separately from the file: the binary and chunked upload routes carry
+    // metadata in a header, where a base64 JPEG does not fit. `iv` is the preview's own
+    // AES-GCM iv — it is never the file's, which already covers the file's own bytes.
+    request: { fileId: string; previewId?: string; data: string; iv?: string };
+    response: { fileId: string; previewId: string };
   };
   "/userfile/getCiphertextChunkRange": {
     request: { fileId: string; startChunk: number; chunkCount: number };
@@ -3284,7 +4996,9 @@ export const authOptionalRoutes: Array<keyof ApiRouteMap> = [
   "/published/view",
   "/published/countView",
   "/published/filteredSearch",
+  "/published/categoryCoverage",
   "/published/listRecent",
+  "/published/listForMap",
   "/published/matchForURL",
   "/published/collectionsByUser",
   "/published/reviewsByUser",
@@ -3293,6 +5007,9 @@ export const authOptionalRoutes: Array<keyof ApiRouteMap> = [
   "/published/listWithIds",
   "/published/listWithChild",
   "/published/collectionItemFeed",
+
+  // Thinking Puzzles catalog — the app is `requiresLogin: false`, so guest play reads it too
+  "/thinkingPuzzles/catalog",
 
   // Public user profiles
   "/user/public/get",
@@ -3316,6 +5033,10 @@ export const authOptionalRoutes: Array<keyof ApiRouteMap> = [
 
   // Server settings (needed for client config)
   "/serverSettings/get",
+
+  // Finding and testing a personal server -- all of it happens before anyone signs in
+  "/serverSettings/discover",
+  "/serverSettings/checkUrl",
 
   // Public file access
   "/pubfile/get",

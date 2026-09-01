@@ -13,7 +13,7 @@ export function getContactUsEmailTemplate(type, refId) {
 
         `,
     };
-  } else if (type in ['suggestion']) {
+  } else if (['suggestion'].includes(type)) {
     return {
       subject: `Suggestion Submitted`,
       body: `Thank you for your suggestion!  We really appreciate your feedback and will do our best to get back to you. 
@@ -24,7 +24,7 @@ export function getContactUsEmailTemplate(type, refId) {
       
         `,
     };
-  } else if (type in ['unsolicitedContact', 'unsolicitedInvite']) {
+  } else if (['unsolicitedContact', 'unsolicitedInvite'].includes(type)) {
     return {
       subject: `Unsolicited Reported Submitted`,
       body: `Thank you for submitting this report.  We will work to address this issue as soon as possible. 
@@ -35,7 +35,7 @@ export function getContactUsEmailTemplate(type, refId) {
 
         `,
     };
-  } else if (type in ['contentIssue']) {
+  } else if (['contentIssue'].includes(type)) {
     return {
       subject: `Content Issue Reported`,
       body: `
@@ -46,10 +46,21 @@ export function getContactUsEmailTemplate(type, refId) {
             - Kindredly Support.
         `,
     };
-  } else if (type in ['support']) {
+  } else if (['support'].includes(type)) {
     return {
       subject: `Support Request`,
       body: `Thank you for contacting our support team.  We will review your request and contact you as soon as possible.  Please keep in mind, we are a small team and we may not get back to you right away.
+            <br/>
+            <br/>
+            <br/>
+            - Kindredly Support.
+
+        `,
+    };
+  } else if (['bug'].includes(type)) {
+    return {
+      subject: `Bug Report Received`,
+      body: `Thank you for reporting this bug.  We will review it and work on a fix as soon as possible.
             <br/>
             <br/>
             <br/>

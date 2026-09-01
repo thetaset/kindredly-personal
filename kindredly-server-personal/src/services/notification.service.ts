@@ -10,11 +10,17 @@ import {UserRepo} from '@/db/user.repo';
 import {UserPrefKeys, UserPrefRepo} from '@/db/user_pref.repo';
 import Notification from 'tset-sharedlib/schemas/public/Notification';
 import User from 'tset-sharedlib/schemas/public/User';
+import {userPrefDefaults} from 'tset-sharedlib/schemas/public/UserPref';
 import {NotificationGroupType, NotificationMethod, NotificationType} from '@/typing/enum_strings';
 import {UserType} from 'tset-sharedlib/shared.types';
 import ClientInfoService from './client_info.service';
 import VerificationService from './verification.service';
 import {ACCOUNT_INVITE_MSG, INVITATION_TO_ACCOUNT} from '@/defaults/message_templates';
+import {clampOffset, clampPerPage} from '@/utils/pagination_utils';
+
+// Whitelist: `sort` is a client-supplied column name going straight into
+// .orderBy(), so anything outside this set falls back to createdAt.
+const NOTIFICATION_SORT_FIELDS = ['createdAt', 'updatedAt', 'readAt', 'type'];
 
 const typeToTitle = {
   WELCOME_USER: 'Welcome to Kindredly!',
@@ -29,6 +35,8 @@ const typeToTitle = {
   NEW_ITEM: 'New Item Added to Your Library',
   SHARED_ITEM: 'New Shared Item',
   RESTRICTED_USER_PUBLISHED: 'Restricted User Published',
+  DEVICE_PROTECTION_ALERT: 'Device Protection Alert',
+  PLATFORM_ALERT: 'Platform Alert',
 };
 
 function notiticationTypeToTitle(type: string) {
@@ -83,6 +91,40 @@ class NotificationService {
     }
   }
 
+  /**
+   * A data-only push that shows the child NOTHING.
+   *
+   * Guard pulls its rules on a 15-minute backstop; this is what makes a parent's block arrive
+   * in seconds instead (UX-019). It carries no rules — only a marker telling the device to
+   * fetch — so it needs no encryption and leaks nothing if it is ever seen.
+   *
+   * Deliberately NOT `sendPushNotificationToAllUserDevices`: that one always builds an APNs
+   * `alert` and a title/body, which on the child's phone would read as "your parent just
+   * blocked something". `content-available` wakes the app without a banner, and no `title`
+   * or `body` key is sent, so the Android receiver has nothing to display even if it tried.
+   */
+  async sendSilentDeviceRuleSync(userId: string) {
+    const tokens = await this.clientInfoService.listDeviceTokensUsedSinceXDaysAgo(userId, maxAgeOfDevicesInDays);
+    if (tokens.length === 0) return {sent: 0};
+
+    this.setupService.sendPushNotification({
+      apns: {
+        // Background delivery. `apns-priority: 5` is required for content-available pushes;
+        // 10 with no alert is rejected by APNs outright.
+        headers: {'apns-push-type': 'background', 'apns-priority': '5'},
+        payload: {aps: {'content-available': 1}},
+      },
+      android: {priority: 'high'},
+      data: {
+        kndAction: 'syncDeviceRules',
+        targetUserId: userId,
+      },
+      tokens,
+    });
+
+    return {sent: tokens.length};
+  }
+
   async sendPushNotificationToAllUserDevicesMultipleUsers(
     userIds: string[],
     notification: {title: string; body: string},
@@ -119,7 +161,8 @@ class NotificationService {
   }
 
   async canSend(notificationSettings: Record<string, any>, method: string, type: string) {
-    if (type == NotificationType.USER_JOINED_ACCOUNT) {
+    // PLATFORM_ALERT: staff-only ops alerts must not be mutable (see enum_strings.ts).
+    if (type == NotificationType.USER_JOINED_ACCOUNT || type == NotificationType.PLATFORM_ALERT) {
       return true;
     }
 
@@ -132,7 +175,13 @@ class NotificationService {
         ? notificationSettings.categories
         : notificationSettings;
 
-    const selectedCategory = categoryMap?.[type] || categoryMap?.DEFAULT;
+    // A type the user has never seen falls back to its *packaged* default before the
+    // catch-all DEFAULT. Without this, every newly-introduced category silently
+    // inherits DEFAULT's `push: false` for every existing user — which would have
+    // made DEVICE_PROTECTION_ALERT push-silent for exactly the families that
+    // already have Guard set up. An explicit user setting still wins.
+    const packagedDefault = userPrefDefaults.notificationSettings.categories[type];
+    const selectedCategory = categoryMap?.[type] || packagedDefault || categoryMap?.DEFAULT;
     if (selectedCategory && typeof selectedCategory === 'object') {
       return selectedCategory?.[method] === true;
     }
@@ -229,6 +278,12 @@ class NotificationService {
         NotificationType.FOLLOWING_UPDATE,
         NotificationType.NEW_COMMENT,
         NotificationType.RESTRICTED_USER_PUBLISHED,
+        // Emailed as well as pushed: the whole point of a tamper alert is that it
+        // reaches the parent, and a parent whose phone is off is exactly the
+        // situation in which a child picks to try.
+        NotificationType.DEVICE_PROTECTION_ALERT,
+        // Staff ops alerts (bug reports): email is one of the three required channels.
+        NotificationType.PLATFORM_ALERT,
       ].includes(type)
     ) {
       if (targetUser.email != null && targetUser.email.length > 0) {
@@ -397,13 +452,16 @@ class NotificationService {
 
   // ROUTE-METHOD
   async listUserNotifcations(ctx: RequestContext, pageInfo: any = null) {
-    let {page, pageSize, sort, order, unreadOnly} = pageInfo || {
-      page: 0,
-      pageSize: 30,
-      sort: 'createdAt',
-      order: 'desc',
-      unreadOnly: false,
-    };
+    let {page, pageSize, sort, order, unreadOnly} = pageInfo || {};
+
+    // Defaults previously applied only when pageInfo was entirely absent, so
+    // a partial object (or a hostile pageSize) reached .limit()/.orderBy()
+    // unchecked: pageSize:1e9 returned the whole history, and a missing sort
+    // produced `order by "undefined"` — a 500.
+    const safePageSize = clampPerPage(pageSize, 30);
+    const safePage = clampOffset(page);
+    const safeSort = NOTIFICATION_SORT_FIELDS.includes(sort) ? sort : 'createdAt';
+    const safeOrder = String(order).toLowerCase() === 'asc' ? 'asc' : 'desc';
 
     const notifications = await this.notificationsRepo
       .findMany({
@@ -414,9 +472,9 @@ class NotificationService {
           this.whereNull('readAt').orWhere('readAt', null);
         }
       })
-      .orderBy(sort, order)
-      .limit(pageSize)
-      .offset(page * pageSize);
+      .orderBy(safeSort, safeOrder)
+      .limit(safePageSize)
+      .offset(clampOffset(safePage * safePageSize));
 
     const user = await ctx.getCurrentUser();
 
@@ -521,22 +579,95 @@ class NotificationService {
     if (!verification) return null;
   }
 
-  async sendAccessRequestNotification(ctx: RequestContext, requester: User, accessRequestId: string, key: string) {
-    // TODO: Fix
+  async sendAccessRequestNotification(
+    ctx: RequestContext,
+    requester: User,
+    accessRequestId: string,
+    key: string,
+    type: string = 'url',
+    details?: any,
+  ) {
+    const requesterName = requester.displayedName || requester.username || 'A user';
+    const requestPath = `/kindredapp/#/settings/useraccessrequests?requestId=${accessRequestId}`;
+
+    let title: string;
+    let summary: string;
+    if (type === 'time') {
+      title = 'More screen time';
+      summary = `${requesterName} asked for more screen time.`;
+    } else if (type === 'publishedItem') {
+      const itemName = details?.srcTitle || 'a catalog item';
+      title = 'Library add request';
+      summary = `${requesterName} wants "${itemName}" added to their library.`;
+    } else if (type === 'item') {
+      const itemName = details?.srcTitle || details?.name || 'an item';
+      title = 'Library add request';
+      summary = `${requesterName} wants "${itemName}" added to their library.`;
+    } else if (type === 'checkpoint') {
+      title = 'Daily Check-in';
+      // Lead with the parent's own reminder when there is one — it is the thing
+      // they need to judge, and it may have been written weeks ago.
+      const note = typeof details?.checkpointNote === 'string' ? details.checkpointNote.trim() : '';
+      summary = note
+        ? `${requesterName} is asking to get online. You asked: "${note}"`
+        : `${requesterName} is asking to get online.`;
+    } else if (type === 'appCapability') {
+      const appName = details?.itemName || 'an app';
+      const capability =
+        details?.capability === 'location'
+          ? 'Location'
+          : details?.capability === 'capture.photo'
+            ? 'Camera'
+            : 'a device feature';
+      title = 'App permission request';
+      summary = `${requesterName}'s app "${appName}" wants to use ${capability}.`;
+    } else if (type === 'emailSender') {
+      const address = (details?.emailAddress || String(key || '').replace(/^EMAIL:/, '') || 'someone new').trim();
+      title = 'Email contact request';
+      summary = `${requesterName} wants to email ${address}.`;
+    } else if (type === 'url') {
+      let site = key;
+      try {
+        site = new URL(key).hostname.replace(/^www\./, '');
+      } catch {
+        // key isn't a parseable URL — fall back to the raw value
+      }
+      title = 'Website access request';
+      summary = `${requesterName} wants to open ${site}.`;
+    } else {
+      title = 'Access request';
+      summary = `${requesterName} requested access.`;
+    }
+
     const notificationData = {
-      title: `New Request from ${requester.username} to ${key}`,
-      message: `<a href="/kindredapp/#/settings/useraccessrequests?requestId=${accessRequestId}">request</a> from ${requester.username} to ${key}`,
-      emailMessage: `Request from ${requester.username} to ${key}.
+      title,
+      // The push body falls back to `title`, which is only the request category
+      // ("Website access request"). `summary` names who asked and for what, which
+      // is the whole value of the notification on a lock screen.
+      shortMessage: summary,
+      // Keep an inline review link in the message so older clients still have a
+      // working way to act; newer clients render a dedicated "Review request" button.
+      message: `${summary} <a href="${requestPath}">Review request</a>`,
+      emailMessage: `${summary}
         <br/>
         <br/>
-        <a class="button" href="${config.serverHostname}/kindredapp/#/settings/useraccessrequests?requestId=${accessRequestId}">Open Request</a>`,
+        <a class="button" href="${config.serverHostname}${requestPath}">Open Request</a>`,
 
       refInfo: {
         requestId: accessRequestId,
         requesterUsername: requester.username,
-        resourceType: 'url',
+        requesterDisplayName: requesterName,
+        requestType: type,
+        resourceType: type,
         resourceId: key,
-        resourceName: key,
+        resourceName:
+          type === 'time'
+            ? 'More screen time'
+            : type === 'checkpoint'
+              ? 'Daily Check-in'
+              : type === 'publishedItem'
+                ? details?.srcTitle || key
+                : key,
       },
     };
 
@@ -546,6 +677,7 @@ class NotificationService {
       ctx.currentUserId,
       ctx.accountId,
       notificationData,
+      true,
     );
   }
 

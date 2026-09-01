@@ -13,6 +13,43 @@ export enum ItemResourceType {
 
 export const BASE64_DELIM = "\r\n--TSB_$$\r\n";
 
+// Chunked full sync (/sync/update): max item ids the server will hydrate per
+// page request, and the size the client pages at. Shared so the two can never
+// drift — if the client paged larger than the server accepts, every chunked
+// full sync would 413 on the first page. Keep client page size <= this.
+export const SYNC_FETCH_MAX_IDS_PER_PAGE = 500;
+
+// Partial sync (/sync/update with lastUpdate): above this many changed item
+// ids, the server answers with a full reset instead of materializing every
+// changed item in one response. 2x the chunk page size — beyond that a giant
+// partial is no cheaper than a chunked full sync, and one response holding
+// thousands of full items is the exact shape that OOM-crashed prod (2026-07-05).
+export const SYNC_PARTIAL_MAX_CHANGED_IDS = SYNC_FETCH_MAX_IDS_PER_PAGE * 2;
+
+// Legacy single-response full sync (_syncAll, clients that don't send
+// chunked:true): refuse to serialize libraries larger than this in one
+// payload. Such clients get a 413 telling them to upgrade; previously the
+// attempt could OOM the server process.
+export const SYNC_SINGLE_RESPONSE_MAX_ITEMS = 5000;
+
+// Item visit history (/activity/updateItemVisitHistory). Two DIFFERENT numbers on
+// purpose — making them equal is what wedges a client.
+//
+// The client flushes at this many queued entries, and sends at most this many per
+// request. The queue was previously unbounded, and the endpoint does work per entry,
+// so one long browsing session could produce a single very large request.
+export const ITEM_VISIT_MAX_BATCH = 500;
+
+// The server rejects a request above this. Deliberately far above the client cap:
+// extension and mobile builds update on their own schedule, so a deployed server
+// meets clients that predate the cap and can hold more than 500 queued. If the two
+// limits matched, such a client would flush, be rejected, keep the batch, and retry
+// the same oversized request forever — with no way out but an app update.
+//
+// The ceiling is about bounding request size, not protecting the database; the write
+// is a single upsert, and Postgres does not care about 5,000 rows in one statement.
+export const ITEM_VISIT_SERVER_MAX_BATCH = 5000;
+
 export const OFFICIAL_PUBLISHER_PUBLIC_ID = 'kindredly-official';
 export const OFFICIAL_PUBLISHER_USERNAME = 'Kindredly';
 export const OFFICIAL_PUBLISHER_FULL_NAME = 'Kindredly Official';
@@ -21,6 +58,13 @@ export const OFFICIAL_PUBLISHER_ABOUT = 'Official published content from Kindred
 export function isOfficialPublisherId(value: string | null | undefined): boolean {
   return value === OFFICIAL_PUBLISHER_PUBLIC_ID;
 }
+
+// Models the admin classification labeling UI may pick from. Single source of
+// truth shared by the server allowlist (admin.service.ts) and the client model
+// picker (AdminClassificationEvalData.vue). The first entry is the default used
+// whenever no (valid) model is requested.
+export const GROUND_TRUTH_MODELS = ['gpt-5.4-nano', 'gpt-4o-mini'] as const;
+export const DEFAULT_GROUND_TRUTH_MODEL = GROUND_TRUTH_MODELS[0];
 
 const YOUTUBE_CATEGORIES = {
   "01": "Film & Animation",

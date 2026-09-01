@@ -74,19 +74,41 @@ export type StreamResult = void
 export interface ServerVersionInfo {
   serverVersion: string;
   versionMessage: string | null;
+  /**
+   * Legacy channel. Compared against `config.clientVersion`, which is derived from the API path
+   * and is therefore the constant '3.0.0' for EVERY build — so this can never distinguish one
+   * client from another. It must keep containing '3.0.0': deployed clients compute
+   * `clientSupportedByServer` from it, and any other value makes all of them believe they are
+   * unsupported. Do not repurpose this field; use supportedAppVersions instead.
+   */
   supportedVersions: string[];
+  /**
+   * Real per-build gating, compared against `config.appVersion` (e.g. '3.0.246'). Optional and
+   * absent by default; an empty or missing value means "no constraint", which is what every
+   * client sees today. Clients older than this field ignore it, so populating it only affects
+   * builds that understand it.
+   */
+  supportedAppVersions?: string[];
 }
 
 /** Entry in kindredVersion.json for a specific app type */
 export interface LatestVersionEntry {
+  /**
+   * Legacy field, compared against the constant `config.clientVersion` ('3.0.0'). Setting it
+   * above 3.0.0 makes every already-deployed client report an update as available, so leave it
+   * at '3.0.0' and use latestAppVersion instead.
+   */
   latestVersion: string;
   lastUpdated?: string;
+  /** Real latest build (e.g. '3.0.246'), compared against `config.appVersion`. */
+  latestAppVersion?: string;
 }
 
 /** Shape of kindredVersion.json fetched from server */
 export interface LatestVersionInfo {
   webapp?: LatestVersionEntry;
   extension?: LatestVersionEntry;
+  electron?: LatestVersionEntry;
   android?: LatestVersionEntry;
   ios?: LatestVersionEntry;
   thetaserver?: LatestVersionEntry;
@@ -97,7 +119,10 @@ export interface LatestVersionInfo {
 export interface VersionSummary {
   success: boolean;
   clientSupportedByServer: boolean;
+  /** Always '3.0.0' — derived from the API path, not the build. Kept for back-compat. */
   currentClientVersion: string;
+  /** The real build number (e.g. '3.0.246'); this is the one worth showing a user. */
+  currentAppVersion?: string;
   currentServerVersion: string;
   lastUpdateTimestamp: number;
   // Only present when latestVersionInfo is available

@@ -15,6 +15,7 @@ import {
   errorHelper,
   getTargetUserId,
   removeSensitiveInfoFromUser,
+  verifyWithRing,
 } from '../utils/auth_utils';
 
 import {logger} from '@/utils/logger';
@@ -46,7 +47,6 @@ class AuthRoute implements Routes {
 
         const {findUser, tokenData, passwordForClient, recoveryKeyForClient} = authInfo;
 
-
         let response: AuthResponse = {
           tokenData,
           passwordForClient,
@@ -72,7 +72,6 @@ class AuthRoute implements Routes {
           req,
         );
 
-
         let response: AuthResponse = {
           tokenData,
           passwordForClient,
@@ -96,7 +95,6 @@ class AuthRoute implements Routes {
             (req.body.clientInfoData as any) || {},
             req,
           );
-
 
         const response: AuthResponse = {
           tokenData,
@@ -192,7 +190,6 @@ class AuthRoute implements Routes {
           (clientInfo as any) || {},
         );
 
-
         let results: AuthResponse = {
           tokenData,
           user: removeSensitiveInfoFromUser(findUser),
@@ -238,6 +235,23 @@ class AuthRoute implements Routes {
       authenticateJWT,
       errorHelper(async (req: ApiReq<'/auth/desktopHandoff/create'>, res) => {
         const results = await this.authService.createDesktopHandoffToken(RequestContext.instance(req));
+
+        res.json({
+          success: true,
+          results,
+        });
+      }),
+    );
+
+    this.router.post(
+      '/auth/mintCompanionToken',
+      authenticateJWT,
+      errorHelper(async (req: ApiReq<'/auth/mintCompanionToken'>, res) => {
+        const results = await this.authService.mintCompanionToken(
+          RequestContext.instance(req),
+          req.body.deviceId,
+          req.body.targetUserId,
+        );
 
         res.json({
           success: true,
@@ -423,7 +437,7 @@ class AuthRoute implements Routes {
       '/auth/tokenLogin',
       errorHelper(async (req: ApiReq<'/auth/tokenLogin'>, res) => {
         const token = req.body.token;
-        jsonwebtoken.verify(token, config.jwtAccessTokenSecret, (err, authInfo) => {
+        verifyWithRing(token, (err, authInfo) => {
           if (err || !authInfo || typeof authInfo === 'string' || !authInfo.userId) {
             try {
               const jwtFp = crypto

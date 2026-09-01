@@ -48,7 +48,12 @@ class ApiTypeChecker {
     
     // Extract route paths using regex
     // Matches: '/path/to/route': { request: ...; response: ... }
-    const routePattern = /['"]([^'"]+)['"]\s*:\s*\{\s*request:/g;
+    //
+    // The comment alternatives are load-bearing: an entry that documents itself between the
+    // brace and `request:` was invisible to this scan, so a route that IS in the map got
+    // reported as undefined. A checker with false positives is worse than no checker — it
+    // trains you to ignore it — so tolerate `//` and `/* */` here.
+    const routePattern = /['"]([^'"]+)['"]\s*:\s*\{(?:\s|\/\/[^\n]*\n|\/\*[\s\S]*?\*\/)*request:/g;
     const routes = [];
     let match;
     

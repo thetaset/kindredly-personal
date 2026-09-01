@@ -105,7 +105,29 @@ class RedisClientFactory {
   }
 }
 
-// Export singleton instance getter
-export const getRedisClient = () => RedisClientFactory.getInstance().getClient();
+/**
+ * The raw ioredis client - an escape hatch, not the general accessor.
+ *
+ * This used to be `getRedisClient()` and was called from 12 files. It is now
+ * named to be loud and greppable, because reaching for it opts a call site out
+ * of the `lite` profile entirely: on an appliance there is no Redis to return.
+ *
+ * Two legitimate callers, both cloud-only:
+ *   - `middlewares/ratelimiting.middleware.ts` hands the client to
+ *     `rate-limiter-flexible` as its `storeClient`, which wants a real ioredis
+ *     and nothing else. That file is already withheld from self-hosted builds
+ *     (`scripts/personal-sync/server-src.exclude`), so `lite` uses
+ *     `RateLimiterMemory` there instead. A clean split.
+ *   - `services/_internal/internal_published.service.ts`, which a box never runs.
+ *
+ * Everything else goes through `getKeyValueStore()` in `base/runtime.factory.ts`.
+ */
+export const requireIoRedis = () => RedisClientFactory.getInstance().getClient();
+
+/**
+ * A dedicated connection for pub/sub, which cannot share a client with ordinary
+ * commands. Consumed only by the Redis `EventBus` implementation.
+ */
 export const createRedisPubSubClient = () => RedisClientFactory.getInstance().createPubSubClient();
+
 export const disconnectRedis = () => RedisClientFactory.getInstance().disconnect();

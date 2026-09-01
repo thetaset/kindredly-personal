@@ -27,17 +27,68 @@ import {
 } from 'tset-sharedlib/types/item.types';
 import {OFFICIAL_PUBLISHER_PUBLIC_ID, OFFICIAL_PUBLISHER_USERNAME} from 'tset-sharedlib/constants';
 import {urlToKey} from 'tset-sharedlib/text.utils';
+import {mapLegacyCategoryIds} from 'tset-sharedlib/publishedCategoryMapping';
 import {v4 as uuidv4} from 'uuid';
-import {publishedItemSchemaUpdater} from './_internal/internal_published.service';
-import {PublishedFileService} from './_internal/published_file.service';
-import {PublishedModerationReporter} from './_internal/published_moderation_reporter.service';
+// TYPE-ONLY. These three live under services/_internal, which is withheld from
+// the published Kindredly Personal repo — and this file cannot be withheld with
+// them, because routes/account.route.ts imports it for the personal-only
+// /account/delete endpoint. `import type` is erased at compile time, so nothing
+// here emits a require(); the lazy getters below do that, on the one code path
+// that needs it. See the comment on publishedFileService.
+import type {publishedItemSchemaUpdater as PublishedItemSchemaUpdater} from './_internal/internal_published.service';
+import type {PublishedFileService} from './_internal/published_file.service';
+import type {PublishedModerationReporter} from './_internal/published_moderation_reporter.service';
 import {RequestContext} from '../base/request_context';
 
 class ImportExportService {
   private published = new PublishedRepo();
   private publishedRelations = new PublishedRelationRepo();
-  private publishedFileService = new PublishedFileService();
-  private publishedModerationReporter = PublishedModerationReporter.instance;
+
+  /**
+   * The cloud-only publishing services, resolved on first use.
+   *
+   * Every caller of these is an admin published-package import or export. A
+   * self-hosted server reaches none of them — app.ts does not register the
+   * published routes when config.privateServer, and the admin routes are
+   * withheld outright — but it DOES load this file, because account.route.ts
+   * imports the class for /account/delete.
+   *
+   * Resolved at construction, that made the published repo die on start with
+   * MODULE_NOT_FOUND: its build is `swc src --out-dir dist`, which transpiles
+   * without resolving, so a withheld import is a runtime failure and not a build
+   * one. Resolved on first use, the cloud behaviour is identical — same classes,
+   * same singleton — and the self-hosted server simply never asks.
+   *
+   * Call sites are unchanged and stay non-null, which is the point: a getter
+   * keeps "this is cloud-only plumbing" in one place instead of scattering
+   * optional-chaining through nine call sites that can never see a null.
+   */
+  private _publishedFileService: PublishedFileService | null = null;
+  private get publishedFileService(): PublishedFileService {
+    if (!this._publishedFileService) {
+      // personal-optional: guarded, never reached on a self-hosted server
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
+      this._publishedFileService = new (require('./_internal/published_file.service').PublishedFileService)();
+    }
+    return this._publishedFileService as PublishedFileService;
+  }
+
+  private _publishedModerationReporter: PublishedModerationReporter | null = null;
+  private get publishedModerationReporter(): PublishedModerationReporter {
+    if (!this._publishedModerationReporter) {
+      // personal-optional: guarded, never reached on a self-hosted server
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
+      const mod = require('./_internal/published_moderation_reporter.service');
+      this._publishedModerationReporter = mod.PublishedModerationReporter.instance;
+    }
+    return this._publishedModerationReporter as PublishedModerationReporter;
+  }
+
+  private get publishedItemSchemaUpdater(): typeof PublishedItemSchemaUpdater {
+    // personal-optional: guarded, never reached on a self-hosted server
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    return require('./_internal/internal_published.service').publishedItemSchemaUpdater;
+  }
 
   //
   async exportCollections(_ctx: RequestContext, _options: unknown) {}
@@ -131,8 +182,14 @@ class ImportExportService {
 
   private async planPackageImport(
     manifest: AdminPublishedPackageDataManifest,
-  ): Promise<Array<{record: AdminPublishedPackageRecord; existing: Published | null; duplicateOfLocalId: string | null}>> {
-    const rows: Array<{record: AdminPublishedPackageRecord; existing: Published | null; duplicateOfLocalId: string | null}> = [];
+  ): Promise<
+    Array<{record: AdminPublishedPackageRecord; existing: Published | null; duplicateOfLocalId: string | null}>
+  > {
+    const rows: Array<{
+      record: AdminPublishedPackageRecord;
+      existing: Published | null;
+      duplicateOfLocalId: string | null;
+    }> = [];
     // Records later in the package that share an identity with an earlier record
     // must write to the same row, not create a duplicate.
     const seenIdentities = new Map<string, string>();
@@ -161,15 +218,19 @@ class ImportExportService {
     const {manifest, bundleFilesByAssetId, assetImportMode} = await this.parsePackageImport(request);
     this.validatePackageAssetReferences(manifest, assetImportMode, bundleFilesByAssetId);
     const plannedRows = await this.planPackageImport(manifest);
+    // Skip duplicates by default; callers can opt into the legacy overwrite behavior.
+    const skipDuplicates = request.skipDuplicates !== false;
 
     if (request.dryRun) {
+      const matchedCount = plannedRows.filter((row) => !!row.existing || !!row.duplicateOfLocalId).length;
       return {
         manifest,
         dryRun: true,
         batchId: null,
         summary: {
-          createdCount: plannedRows.filter((row) => !row.existing && !row.duplicateOfLocalId).length,
-          updatedCount: plannedRows.filter((row) => !!row.existing || !!row.duplicateOfLocalId).length,
+          createdCount: plannedRows.length - matchedCount,
+          updatedCount: skipDuplicates ? 0 : matchedCount,
+          skippedDuplicateCount: skipDuplicates ? matchedCount : 0,
           relationCount: manifest.relations.length,
           relationDeletedCount: 0,
           importedBannerCount: 0,
@@ -181,7 +242,7 @@ class ImportExportService {
         results: plannedRows.map(({record, existing, duplicateOfLocalId}) => ({
           localId: record.localId,
           publishId: existing?._id || null,
-          action: existing || duplicateOfLocalId ? 'updated' : 'created',
+          action: existing || duplicateOfLocalId ? (skipDuplicates ? 'skipped' : 'updated') : 'created',
           type: record.type,
           name: record.name,
           importedAssetCount: 0,
@@ -207,16 +268,38 @@ class ImportExportService {
 
     let createdCount = 0;
     let updatedCount = 0;
+    let skippedDuplicateCount = 0;
     let importedBannerCount = 0;
     let importedAttachmentCount = 0;
     let pendingBannerAssetCount = 0;
     let pendingAttachmentCount = 0;
+    let heldForReviewCount = 0;
 
     for (const {record, existing, duplicateOfLocalId} of plannedRows) {
       const duplicateTargetId = duplicateOfLocalId ? publishIdByLocalId.get(duplicateOfLocalId) : undefined;
       const publishId = duplicateTargetId || existing?._id || record.publishId || `pub_pkg-${uuidv4()}`;
       const isUpdate = !!existing?._id || !!duplicateTargetId;
       publishIdByLocalId.set(record.localId, publishId);
+
+      // Skip duplicates rather than overwriting. The localId→publishId mapping above is kept so
+      // relations in this package still resolve to the already-existing row.
+      if (isUpdate && skipDuplicates) {
+        skippedDuplicateCount++;
+        results.push({
+          localId: record.localId,
+          publishId,
+          action: 'skipped',
+          type: record.type,
+          name: record.name,
+          importedAssetCount: 0,
+          existingName:
+            existing?.name ||
+            (duplicateOfLocalId
+              ? manifest.records.find((other) => other.localId === duplicateOfLocalId)?.name || null
+              : null),
+        });
+        continue;
+      }
 
       const sourceInfo = this.clonePlainObject(record.sourceInfo);
       const nextSourceInfo = sourceInfo && typeof sourceInfo === 'object' ? sourceInfo : {};
@@ -259,8 +342,10 @@ class ImportExportService {
       }
 
       const importedInfo = this.clonePlainObject(record.info) || {};
-      const manifestProcessing = ((importedInfo as any).postImportProcessing || {}) as Partial<PostImportProcessingInfo>;
-      const existingProcessing = ((existing?.info as any)?.postImportProcessing || {}) as Partial<PostImportProcessingInfo>;
+      const manifestProcessing = ((importedInfo as any).postImportProcessing ||
+        {}) as Partial<PostImportProcessingInfo>;
+      const existingProcessing = ((existing?.info as any)?.postImportProcessing ||
+        {}) as Partial<PostImportProcessingInfo>;
       const iso = now.toISOString();
       // Re-imports must not regress an existing row's review state (e.g. knock an
       // approved live item back into the pipeline); only new rows enter fresh.
@@ -281,7 +366,7 @@ class ImportExportService {
       };
       const nextInfo = setPostImportProcessingOnInfo(importedInfo as any, processing);
 
-      const payload = publishedItemSchemaUpdater({
+      const payload = this.publishedItemSchemaUpdater({
         ...(existing || {}),
         _id: publishId,
         key: url ? urlToKey(url) : existing?.key || null,
@@ -291,7 +376,7 @@ class ImportExportService {
         subType: (record.subType as any) || existing?.subType || null,
         name: record.name,
         description: record.description || null,
-        categories: this.normalizeStringArray(record.categories),
+        categories: mapLegacyCategoryIds(this.normalizeStringArray(record.categories)),
         useCriteria: this.normalizeStringArray(record.useCriteria),
         imageFilename: importedAssets.imageFilename,
         published:
@@ -328,6 +413,41 @@ class ImportExportService {
         updatedAt: now,
         createdAt: existing?.createdAt || now,
       });
+
+      // Content-safety gate: hold flagged live rows in needs_review instead of
+      // publishing. Only rows that come out published=true can go public.
+      if (payload.published === true) {
+        const gate = await this.publishedModerationReporter.evaluatePublishGate(
+          RequestContext.instanceForSystem(),
+          {
+            _id: payload._id,
+            type: payload.type,
+            name: payload.name,
+            description: payload.description,
+            data: payload.data,
+            imageFilename: payload.imageFilename,
+            publishType: payload.publishType,
+            visibilityCode: payload.visibilityCode,
+          },
+          {
+            sourceMode: 'admin_package_import',
+            localId: record.localId,
+            url: this.getPackageRecordUrl(record),
+          },
+          {source: 'packageImport'},
+        );
+        if (!gate.allow) {
+          heldForReviewCount += 1;
+          payload.published = false;
+          payload.excludeFromSearch = true;
+          payload.info = setPostImportProcessingOnInfo(payload.info as any, {
+            state: 'needs_review',
+            source: 'package',
+            updatedAt: now.toISOString(),
+            lastError: gate.reason,
+          }) as any;
+        }
+      }
 
       await this.published.create(payload);
 
@@ -422,6 +542,8 @@ class ImportExportService {
         pendingBannerAssetCount,
         pendingAttachmentCount,
         skippedRelationCount,
+        skippedDuplicateCount,
+        heldForReviewCount,
       },
       results,
       warnings,
@@ -887,8 +1009,7 @@ class ImportExportService {
   }) {
     const {record, assetMap, nextPublishConfig, warnings} = options;
 
-    const pendingBannerAssetId =
-      record.imageAssetId && assetMap.has(record.imageAssetId) ? record.imageAssetId : null;
+    const pendingBannerAssetId = record.imageAssetId && assetMap.has(record.imageAssetId) ? record.imageAssetId : null;
     if (record.imageAssetId && !pendingBannerAssetId) {
       warnings.push(`Missing banner asset ${record.imageAssetId} for ${record.localId}.`);
     }
@@ -990,9 +1111,11 @@ class ImportExportService {
     }
 
     if (record.easyId) {
-      const byEasyId = await this.published.findById(record.easyId);
+      // easyId is NOT the primary key — findById(easyId) always missed, so easyId-only
+      // re-imports were never deduped. Match the column directly.
+      const byEasyId = await this.published.query().where({easyId: record.easyId}).first();
       if (byEasyId) {
-        return byEasyId;
+        return byEasyId as Published;
       }
     }
 
@@ -1005,6 +1128,16 @@ class ImportExportService {
 
     const url = this.getPackageRecordUrl(record);
     if (url) {
+      // Match on the normalized url key (protocol/trailing-slash insensitive — the same key we
+      // store at write time) so http/https and trailing-slash variants dedupe reliably. Fall back
+      // to the raw url column for legacy rows written before the key was populated.
+      const normalizedKey = urlToKey(url);
+      if (normalizedKey) {
+        const byKey = await this.published.query().where({key: normalizedKey}).first();
+        if (byKey) {
+          return byKey as Published;
+        }
+      }
       const byUrl = await this.published
         .query()
         .whereRaw(`coalesce(published.data->>'url', published.meta->>'url') = ?`, [url])
@@ -1137,7 +1270,10 @@ class ImportExportService {
     }
 
     const publishId = this.requireString(asset.ownerPublishedId, `${asset.assetId}.ownerPublishedId`);
-    const runtimeRef = this.requireString(asset.sourceRuntimeRef || asset.filename, `${asset.assetId}.sourceRuntimeRef`);
+    const runtimeRef = this.requireString(
+      asset.sourceRuntimeRef || asset.filename,
+      `${asset.assetId}.sourceRuntimeRef`,
+    );
     const stream = await this.publishedFileService.getPubFileStream(null as any, publishId, runtimeRef);
     return String(await streamToBase64(stream));
   }

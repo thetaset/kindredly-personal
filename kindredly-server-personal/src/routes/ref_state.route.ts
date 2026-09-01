@@ -1,5 +1,5 @@
 import {Routes} from '@interfaces/routes.interface';
-import {Router} from 'express';
+import express, {Router} from 'express';
 import {body} from 'express-validator';
 import {ApiReq} from '@/types/api-types';
 import {authenticateJWT, errorHelper} from '@/utils/auth_utils';
@@ -26,14 +26,24 @@ class RefStateRoute implements Routes {
       body('encInfo').optional({nullable: true}).isObject(),
     ];
 
+    // NOTE: these validator chains are currently inert — nothing in this codebase
+    // calls `validationResult`, so they document intent rather than enforce it.
+    // The limits that actually apply live in RefStateService (MAX_LIMIT,
+    // MAX_BATCH_REFS, MAX_BATCH_LIMIT). Wiring validation up is a separate,
+    // codebase-wide change.
     const validateList = [
       body('refType').notEmpty().isString(),
-      body('refId').notEmpty().isString(),
+      body('refId').optional().isString(),
+      body('refIds').optional().isArray({max: 200}),
       body('stateKey').optional().isString(),
       body('stateSubKey').optional({nullable: true}).isString(),
+      body('stateSubKeyGte').optional().isString(),
+      body('stateSubKeyLte').optional().isString(),
       body('ownerId').optional().isString(),
-      body('limit').optional().isInt({min: 1, max: 200}),
+      body('limit').optional().isInt({min: 1, max: 500}),
       body('cursorUpdatedAt').optional().isString(),
+      body('cursorRefId').optional().isString(),
+      body('cursorStateSubKey').optional().isString(),
     ];
 
     const validateDelete = [
@@ -47,6 +57,10 @@ class RefStateRoute implements Routes {
     // USER scope
     this.router.post(
       '/ref_state/user/upsert',
+      // Excluded from app-level parsers (see app.ts bigBodyPaths): stores
+      // arbitrary encrypted app-state blobs (mind maps, kanban boards) that can
+      // exceed the default limit. Parser must precede auth (reads tempAuthToken).
+      express.json({limit: '70mb'}),
       authenticateJWT,
       validateUpsert,
       errorHelper(async (req: ApiReq<'/ref_state/user/upsert'>, res) => {
@@ -81,6 +95,9 @@ class RefStateRoute implements Routes {
     // ACCOUNT scope
     this.router.post(
       '/ref_state/account/upsert',
+      // Excluded from app-level parsers (see app.ts bigBodyPaths): encrypted
+      // app-state blobs. Parser must precede auth (reads tempAuthToken).
+      express.json({limit: '70mb'}),
       authenticateJWT,
       validateUpsert,
       errorHelper(async (req: ApiReq<'/ref_state/account/upsert'>, res) => {

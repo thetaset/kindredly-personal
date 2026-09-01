@@ -19,6 +19,27 @@ export interface PublishedFeedItem {
   item: ItemInfoView;
 }
 
+/** Lightweight projection of a published row for the Knowledge Map feed. */
+export interface PublishedMapFeedRow {
+  _id: string;
+  easyId?: string | null;
+  type?: string | null;
+  subType?: string | null;
+  name?: string | null;
+  description?: string | null;
+  /** Canonical gen_* category-leaf ids (== knowledge-map region ids). */
+  categories?: string[] | null;
+  imageFilename?: string | null;
+  /** data->>'url' — lets the client resolve meta/favicon image fallbacks. */
+  url?: string | null;
+  statViewCount?: number | null;
+  statSubCount?: number | null;
+  overallRating?: number | null;
+  numRatings?: number | null;
+  /** Date server-side; serialized to a string over the wire. */
+  createdAt?: DateString | Date | null;
+}
+
 export interface PublishedStatsView {
   overallRating?: number;
   numRatings?: number;
@@ -123,11 +144,16 @@ export type SubscriptionCompletionMode = 'open' | 'explicit';
 export type SubscriptionWorkThroughProgressV1 = {
   completedThroughKey?: string | null;
   completedAt?: DateString | null;
+  /** Local calendar date (YYYY-MM-DD) of the most recent paced unlock. */
+  lastUnlockDate?: string | null;
+  unlockedThroughKey?: string | null;
 };
 
 export type SubscriptionConsumeSettingsV1 = {
   mode?: SubscriptionConsumeMode;
   completionMode?: SubscriptionCompletionMode;
+  /** Work-through release pacing: 0/undefined = own pace, 1 = daily, 3, 7 = weekly. */
+  paceIntervalDays?: number;
   workThrough?: SubscriptionWorkThroughProgressV1;
 };
 

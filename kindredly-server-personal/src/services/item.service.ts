@@ -1,10 +1,10 @@
+import {HttpException} from '@/exceptions/HttpException';
 import {v4 as uuidv4} from 'uuid';
 import EventAuditService from './record_event.service';
 
 import {AccountRepo} from '@/db/account.repo';
 import {ItemRepo} from '@/db/item.repo';
 import {UserRepo} from '@/db/user.repo';
-import {UserChangeLogRepo} from '@/db/user_changelog.repo';
 import Item from 'tset-sharedlib/schemas/public/Item';
 import AccessRequestService from './access_request.service';
 import FeedbackService from './feedback.service';
@@ -36,7 +36,7 @@ import {DynamicObject} from '@/utils/crypto_util';
 import {assertEncInfoUpdateIsSafe, payloadContainsCiphertext} from '@/utils/encinfo_guards';
 import {SysInfoRepo} from '@/db/sysinfo.repo';
 import {container} from '@/inversify.config';
-import {DefaultCategories} from 'tset-sharedlib/constants';
+import {CANONICAL_CATEGORIES} from 'tset-sharedlib/publishedCategoryMapping';
 import {SaveItemRequest, SaveItemResponse, CreateCollectionOptions} from 'tset-sharedlib/api';
 import {getFeedbackData} from '@/utils/feedback_helpers';
 import {computeFeedbackUpdate} from 'tset-sharedlib/feedback.utils';
@@ -54,6 +54,7 @@ const validAttributes = new Set([
   'categories',
   'tags',
   'useCriteria',
+  'kinds',
   'url',
   'patterns',
   'imageFilename',
@@ -62,6 +63,7 @@ const validAttributes = new Set([
   'metaUpdatedAt',
   'published',
   'publishId',
+  'publishIdBlindKey',
   'publishName',
   'publishDescription',
   'publishVisibilityCode',
@@ -114,7 +116,6 @@ interface UserData {
 
 class ItemService {
   private accounts = new AccountRepo();
-  private changeLog = new UserChangeLogRepo();
   private permissionsRepo = new UserPermRepo();
   private itemRelations = new ItemRelationRepo();
   private evenLogService = new EventAuditService();
@@ -310,17 +311,9 @@ class ItemService {
   //--------------------
 
   async _getAllCategories() {
-    // label if available
-    let availableCatsIds = await this._getAvailCategories();
-    let results = [];
-    for (const cat of DefaultCategories) {
-      if (availableCatsIds.includes(cat.id)) {
-        results.push({...cat, available: true});
-      } else {
-        results.push({...cat});
-      }
-    }
-    return results;
+    // The category vocabulary is now the canonical Category Explorer "general" leaves
+    // (see publishedCategoryMapping). All leaves are available for browsing/assignment.
+    return CANONICAL_CATEGORIES.map((cat) => ({...cat, available: true}));
   }
 
   async _getAvailCategories(): Promise<string[]> {
@@ -557,7 +550,7 @@ class ItemService {
       }
     }
 
-    this.changeLoggerService.logItemChangeForUserIds(Array.from(usersToUpdate), [itemId]).catch((e) => {});
+    await this.changeLoggerService.logItemChangeForUserIds(Array.from(usersToUpdate), [itemId]);
 
     this.evenLogService
       .recordEvent({
@@ -584,30 +577,90 @@ class ItemService {
 
     const targetUser = await ctx.getUserById(targetUserId);
 
-    await this.updateUserLibraryMembership(ctx, targetUserId, collectionIds, true, {
+    return await this.updateUserLibraryMembership(ctx, targetUserId, collectionIds, true, {
       requireClassified: targetUser?.type === UserType.restricted,
     });
-    return {};
   }
 
   // ROUTE-METHOD
   async addUserCollectionsToLibrary(ctx: RequestContext, targetUserId: string, collectionIds = []) {
-    await this.updateUserLibraryMembership(ctx, targetUserId, collectionIds, false);
-    return {};
+    return await this.updateUserLibraryMembership(ctx, targetUserId, collectionIds, false);
   }
 
   // ROUTE-METHOD
   async addUserItemsToLibrary(ctx: RequestContext, targetUserId: string, itemIds = []) {
-    await this.updateUserLibraryMembership(ctx, targetUserId, itemIds, false);
-    return {};
+    return await this.updateUserLibraryMembership(ctx, targetUserId, itemIds, false);
   }
 
   // ROUTE-METHOD
   async removeUserItemsFromLibrary(ctx: RequestContext, targetUserId: string, itemIds = []) {
-    await this.updateUserLibraryMembership(ctx, targetUserId, itemIds, true, {
+    return await this.updateUserLibraryMembership(ctx, targetUserId, itemIds, true, {
       requireClassified: true,
     });
-    return {};
+  }
+
+  /**
+   * Whether the ctx user can VIEW this item, by any path: direct/inherited/admin-inherited
+   * permission, account admin, collection visibility (shared within the account, network
+   * within their friends), or membership in an ancestor collection they can see.
+   *
+   * Mirrors comment.service.validateViewAccess except that the admin pass is scoped to
+   * the item's account — an account boundary must hold for library membership and
+   * feedback writes, unlike comments where a bare admin pass is long-standing behavior.
+   */
+  async canUserViewItem(ctx: RequestContext, itemId: string): Promise<boolean> {
+    const item = await ctx.getItemById(itemId);
+    if (!item) return false;
+
+    if ((await ctx.isAdmin()) && item.accountId === ctx.accountId) return true;
+    if (await this.permissionService._hasAnyPermissionDirectOrAsAdmin(ctx, itemId)) return true;
+
+    const visibility = item.visibility;
+    if (item.accountId === ctx.accountId && (visibility === 'shared' || visibility === 'network')) return true;
+    if (visibility === 'network' && item.userId && (await ctx.isInNetwork(item.userId))) return true;
+
+    // Visible ancestor collection grants transitive view.
+    const maxDepth = 6;
+    const maxNodes = 75;
+    const visited = new Set<string>();
+
+    const initialParents = await this.itemRelationService._getParentRelationsForItem(itemId);
+    let queue: Array<{colId: string; depth: number}> = (initialParents || [])
+      .map((r) => r?.collectionId)
+      .filter((v): v is string => typeof v === 'string' && v.length > 0)
+      .map((colId) => ({colId, depth: 0}));
+
+    while (queue.length > 0 && visited.size < maxNodes) {
+      const next = queue.shift();
+      if (!next) break;
+      const {colId, depth} = next;
+      if (!colId || visited.has(colId)) continue;
+      visited.add(colId);
+
+      if (await this.permissionService._hasAnyPermissionDirectOrAsAdmin(ctx, colId)) return true;
+
+      const col = await ctx.getItemById(colId);
+      if (col) {
+        if (col.accountId === ctx.accountId && (col.visibility === 'shared' || col.visibility === 'network')) {
+          return true;
+        }
+        if (col.visibility === 'network' && col.userId && (await ctx.isInNetwork(col.userId))) {
+          return true;
+        }
+      }
+
+      if (depth >= maxDepth) continue;
+
+      const parents = await this.itemRelationService._getParentRelationsForItem(colId);
+      for (const r of parents || []) {
+        const pid = r?.collectionId;
+        if (typeof pid === 'string' && pid.length > 0 && !visited.has(pid)) {
+          queue.push({colId: pid, depth});
+        }
+      }
+    }
+
+    return false;
   }
 
   private async updateUserLibraryMembership(
@@ -624,11 +677,31 @@ class ItemService {
       throw new Error('Only restricted users can hide classified items from their library');
     }
 
+    // Restricted (library-only) users do not self-add visible items; a guardian
+    // approves those through an access request instead. Guardians may still add
+    // on their behalf.
+    const targetIsRestricted = targetUser?.type === UserType.restricted;
+    const selfAddAllowed = targetUserId === ctx.currentUserId && !targetIsRestricted;
+    const actorIsAdmin = await ctx.isAdmin();
+
     const pendingUpdates: Array<{
       permId: string;
       itemId: string;
       existing: any | null;
+      permission?: PermissionType | null;
     }> = [];
+
+    // What actually happened, per id. This method used to `continue` past a refusal
+    // and return nothing, so the route answered `200 {success: true}` for a write it
+    // had declined -- and `approveItemAdd` toasted "Added to their library", closed
+    // the request as approved, and told the child it was granted, with no permission
+    // written anywhere (ERR-2 / agent-observations #68).
+    //
+    // `refused` and `unchanged` are kept apart on purpose: "we would not do that" and
+    // "it was already like that" are both non-writes, but only one of them is a
+    // caller's problem.
+    const refused: string[] = [];
+    const unchanged: string[] = [];
 
     // Batch the per-item item + permission lookups (was 2 findById queries per
     // item). The per-item isInLibraryForUser check below stays as-is — batching
@@ -666,11 +739,26 @@ class ItemService {
           ? true
           : await this.permissionService.isInLibraryForUser(ctx, targetUserId, itemId);
 
-      if (!existing && !hasEffectiveLibraryAccess) {
+      let addedViaVisibility = false;
+
+      if (!existing && !hasEffectiveLibraryAccess && !hidden) {
+        // No permission path yet. Allow adding an item the user can already see:
+        // - self-add of a visible item (non-restricted users only), or
+        // - a guardian adding a visible item to a managed user's library.
+        if ((selfAddAllowed || actorIsAdmin) && (await this.canUserViewItem(ctx, itemId))) {
+          addedViaVisibility = true;
+        }
+      }
+
+      if (!existing && !hasEffectiveLibraryAccess && !addedViaVisibility) {
+        // Declined: no permission path, and not visible enough to grant one.
+        refused.push(itemId);
         continue;
       }
 
       if ((existing as any)?.notInLibrary === hidden) {
+        // Already in the state asked for. Not a refusal — nothing to do.
+        unchanged.push(itemId);
         continue;
       }
 
@@ -678,6 +766,7 @@ class ItemService {
         permId,
         itemId,
         existing: existing || null,
+        permission: addedViaVisibility ? PermissionType.viewer : null,
       });
     }
 
@@ -687,7 +776,7 @@ class ItemService {
           _id: update.permId,
           userId: targetUserId,
           itemId: update.itemId,
-          permission: null,
+          permission: update.permission ?? null,
           notInLibrary: hidden,
           sharedByUserId: null,
           createdAt: new Date(),
@@ -700,13 +789,24 @@ class ItemService {
         notInLibrary: hidden,
       } as any);
     }
+
+    return {
+      added: pendingUpdates.map((u) => u.itemId),
+      unchanged,
+      refused,
+    };
   }
 
   async _createDefaultQuickBarCollection(ctx: RequestContext, targetUserId: string) {
     const user = await ctx.getUserById(targetUserId);
     if (user.quickBarCollectionId) {
+      // A `quickBarCollectionId` can outlive the collection it points at, and `findById` neither
+      // returns a row for a deleted id nor filters soft-deletes — so a dangling pointer arrives
+      // here as `undefined` and reading `.subType` off it threw a TypeError, abandoning the user
+      // with no quickbar at all. Treat dangling and soft-deleted alike as "no quickbar" and fall
+      // through: the create below repoints `user.quickBarCollectionId`, which repairs the row.
       const col = await this.itemRepo.findById(user.quickBarCollectionId);
-      if (col.subType == 'defaultQuickbar') {
+      if (col && !col.deleted && col.subType == 'defaultQuickbar') {
         console.log('Quickbar exists');
         return false;
       }
@@ -729,11 +829,14 @@ class ItemService {
     return true;
   }
 
-  async _createDefaultSharedCollection(ctx: RequestContext, targetUserId: string) {
+  async _createDefaultSharedCollection(
+    ctx: RequestContext,
+    targetUserId: string,
+  ): Promise<{collectionId: string; created: boolean} | null> {
     const users = await this.users.listByAccountId(ctx.accountId);
 
     if (users.length == 1) {
-      return;
+      return null;
     }
 
     const targetUser = await ctx.getUserById(targetUserId);
@@ -748,7 +851,7 @@ class ItemService {
     if (defaultSharedCollection != null) {
       console.log('Default shared collection exists, giving permission');
       await this.permissionService._setUserPermission(ctx, targetUserId, defaultSharedCollection._id, permissionSt);
-      return;
+      return {collectionId: defaultSharedCollection._id, created: false};
     }
 
     const newCollectionId = await this.createCollection(
@@ -765,7 +868,23 @@ class ItemService {
 
     await this.permissionService.setUserPermission(ctx, targetUserId, newCollectionId, permissionSt);
 
-    return true;
+    // Seed a friendly welcome note so the shared collection isn't empty on first use.
+    try {
+      const noteId = await this._createItem(ctx, {
+        type: ItemTypeEnum.note,
+        name: "Welcome to your family's Shared Collection",
+        info: {
+          editor: 'txt',
+          value:
+            'Anything saved here is shared with everyone in your family. Add links, notes, and resources you want everyone to see. You can edit or delete this note anytime.',
+        },
+      });
+      await this.itemRelationService._addItemToCollection(ctx, newCollectionId, noteId, ItemTypeEnum.note);
+    } catch (e) {
+      console.error('Error seeding shared collection welcome note', e);
+    }
+
+    return {collectionId: newCollectionId, created: true};
   }
 
   // ROUTE-METHOD
@@ -1397,7 +1516,16 @@ class ItemService {
 
     const itemDetails = await ctx.getItemById(itemId);
     if (!itemDetails) {
-      throw new Error('Item not found');
+      // A miss is not a server fault. This one is hot: TaskItemService probes
+      // /item/infoById with a freshly minted task id to decide create-vs-update, so
+      // EVERY task a parent creates produced a 500 and four console errors
+      // (agent-observations #58). Same family as ERR-1.
+      //
+      // NOTE this does not quiet the console on its own — RemoteRequester logs any
+      // `success: false` whatever the status. Removing the noise needs the client to
+      // stop asking: TaskItemService.upsertTaskItem should be told it is creating
+      // rather than inferring it from a lookup that is designed to miss.
+      throw new HttpException(404, 'Item not found');
     }
 
     let isCollection = itemDetails.type == ItemTypeEnum.collection;
@@ -1614,10 +1742,7 @@ class ItemService {
     //   );
     // }
 
-    await this.changeLog.logLastUpdateForUsers([ctx.currentUserId], {
-      type: 'itemUpdate',
-      items: [itemId],
-    });
+    await this.changeLoggerService.logItemChangeForUserIds([ctx.currentUserId], [itemId]);
     return itemId;
   }
 
@@ -1668,9 +1793,7 @@ class ItemService {
         : ctx;
 
     const directTargetCreateCtx =
-      !useAccessRequestOverrideFlow &&
-      !!targetUserId &&
-      targetUserId !== ctx.currentUserId
+      !useAccessRequestOverrideFlow && !!targetUserId && targetUserId !== ctx.currentUserId
         ? ctx.cloneWithActingUser(targetUserId, {tempAuthUserId: null})
         : ctx;
 
@@ -1871,10 +1994,9 @@ class ItemService {
       ...toAddColIds,
     ]);
 
-    await this.changeLog.logLastUpdateForUsers(Array.from(new Set([...addUserIds, ...removeUserIds])), {
-      type: 'itemUpdate',
-      items: [itemId],
-    });
+    await this.changeLoggerService.logItemChangeForUserIds(Array.from(new Set([...addUserIds, ...removeUserIds])), [
+      itemId,
+    ]);
 
     //send notifications
     if (!skipNotifications) {
@@ -1904,6 +2026,15 @@ class ItemService {
 
   // ROUTE-METHOD
   async updateItemFeedbackValue(ctx: RequestContext, itemId: string, attrName: string, value: any) {
+    // Feedback is per-user state, but it must never be writable for items the
+    // user cannot see (the route previously had no check at all).
+    if (!(await this.canUserViewItem(ctx, itemId))) {
+      // A refusal is not a server fault. 403 goes out as HTTP 200 with the code in
+      // the body (SOFT_STATUS_CODES), so the message the client renders is unchanged
+      // -- it just stops counting as a 5xx. ERR-3.
+      throw new HttpException(403, 'No permission to update feedback for this item');
+    }
+
     const feedback = computeFeedbackUpdate(attrName, value);
 
     await this.feedbackService._updateItemFeedback(ctx.currentUserId, itemId, feedback);
@@ -1993,14 +2124,12 @@ class ItemService {
       await this.itemRepo.updateWithId(itemId, info);
     }
 
-    //TODO: this may be redundent
-    // update for all users who DIRECT have access to this item
-    const userIds = await this.permissionService._listUserIdsOfAllUserWithDirectPermissionsToItems(ctx, [itemId]);
-
-    await this.changeLog.logLastUpdateForUsers(userIds, {
-      type: 'itemUpdate',
-      items: [itemId],
-    });
+    // Recipients come from logItemChange's own lookup, which includes people who
+    // reach this item through a shared parent collection. The DIRECT-permission
+    // lookup that used to be here missed them, and /item/update papered over it by
+    // logging a second time at the route -- while updateItem's three other callers
+    // got no such compensation. SYNC-2.
+    await this.changeLoggerService.logItemChange(ctx, itemId);
   }
 
   async archiveItemUpdate(ctx: RequestContext, itemId: string, value: boolean) {

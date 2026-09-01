@@ -7,7 +7,7 @@ export async function up(knex: Knex): Promise<void> {
     table.string('clientId'); // generated on client side
     table.string('clientVersion');
 
-    table.string('appId'); // kindred
+    table.string('appId'); // kindredly
     table.string('appType');  // android, webapp, extension, ios
     table.string('appVersion');
     

@@ -16,9 +16,12 @@ import UserService from '@/services/user.service';
 
 import AccessRequestService from '@/services/access_request.service';
 import ClientInfoService from '@/services/client_info.service';
+import LiveViewService from '@/services/live_view.service';
+import {RefStateService} from '@/services/ref_state.service';
 import NotificationService from '@/services/notification.service';
 import {RequestContext} from '@/base/request_context';
 import UserFeedService from '@/services/user_feed.service';
+import {CompanionTamperWatchService} from '@/services/companion_tamper_watch.service';
 
 import {container} from '@/inversify.config';
 import {MiscNotificationStats} from 'tset-sharedlib/shared.types';
@@ -28,12 +31,15 @@ class UserRoute implements Routes {
 
   private userService = new UserService();
   private clientInfoService = new ClientInfoService();
+  private liveViewService = new LiveViewService();
 
   private notificationService = container.resolve(NotificationService);
 
   private accessRequestService = new AccessRequestService();
 
   private feedService = new UserFeedService();
+
+  private refStateService = new RefStateService();
 
   constructor() {
     console.info(`Initializing routes ${this.constructor.name}`);
@@ -207,11 +213,18 @@ class UserRoute implements Routes {
       '/user/info/update',
       authenticateJWT,
       errorHelper(async (req: ApiReq<'/user/info/update'>, res) => {
-        await this.userService.setDisplayedName(
-          RequestContext.instance(req),
-          getTargetUserId(req),
-          req.body?.data?.displayedName,
-        );
+        const ctx = RequestContext.instance(req);
+        const targetUserId = getTargetUserId(req);
+
+        if (req.body?.data?.displayedName !== undefined) {
+          await this.userService.setDisplayedName(ctx, targetUserId, req.body.data.displayedName);
+        }
+
+        // Its own call, not another field on setDisplayedName: a birthday is admin-only
+        // because it decides age-based restrictions, and the name is not.
+        if (req.body?.data?.dob) {
+          await this.userService.setDateOfBirth(ctx, targetUserId, req.body.data.dob);
+        }
 
         const result = {
           success: true,
@@ -262,6 +275,43 @@ class UserRoute implements Routes {
           results: results,
         };
         res.json(result);
+      }),
+    );
+
+    // SCH-OK
+    // Companion device-agent check-in. authenticateJWT already refreshes
+    // client_info.lastSeen from headers (the primary heartbeat); this also
+    // persists the self-reported DeviceGuardStatus blob for the parent view.
+    this.router.post(
+      '/user/client/heartbeat',
+      authenticateJWT,
+      errorHelper(async (req: ApiReq<'/user/client/heartbeat'>, res) => {
+        const ctx = RequestContext.instance(req);
+        const status = req.body?.status;
+        if (status && status.deviceId) {
+          await this.refStateService.upsert(ctx, 'user', {
+            refType: 'device-guard',
+            refId: 'companion',
+            stateKey: 'status',
+            stateSubKey: status.deviceId,
+            data: status as any,
+          });
+          // A device reporting a tamper event is still alive and won't be for long
+          // — alert the parent now rather than waiting for the 30-minute sweep.
+          // Deliberately not awaited: the check-in must not slow down or fail
+          // because a notification did.
+          void CompanionTamperWatchService.instance
+            .noteHeartbeat(ctx.currentUserId, status)
+            .catch((e) => console.error('[CompanionTamperWatch] heartbeat notify failed', e));
+        }
+        // A parent's approvals ride back on the check-in, because this is the one call a
+        // Companion makes with no browser running — and "no browser running" is exactly when a
+        // child is blocked from a game and waiting on an answer. The alternative, holding a
+        // compiled ruleset server-side and returning that, would put a policy blob for every
+        // child at rest here for a feature that does not need one. See
+        // `tset-sharedlib/restrictions/deviceGrants` for why a grant may only ever loosen.
+        const grants = await this.userService.getDeviceGrantsForCurrentUser(ctx);
+        res.json({success: true, results: {serverTimeMs: Date.now(), grants}});
       }),
     );
 
@@ -346,6 +396,60 @@ class UserRoute implements Routes {
       authenticateJWT,
       errorHelper(async (req: ApiReq<'/user/client/remoteAction/ack'>, res) => {
         const results = await this.clientInfoService.ackManagedRemoteAction(RequestContext.instance(req), req.body);
+
+        res.json({
+          success: true,
+          results,
+        });
+      }),
+    );
+
+    this.router.post(
+      '/user/liveView/start',
+      authenticateJWT,
+      errorHelper(async (req: ApiReq<'/user/liveView/start'>, res) => {
+        const results = await this.liveViewService.startWatchSession(RequestContext.instance(req), req.body);
+
+        res.json({
+          success: true,
+          results,
+        });
+      }),
+    );
+
+    this.router.post(
+      '/user/liveView/latest',
+      authenticateJWT,
+      errorHelper(async (req: ApiReq<'/user/liveView/latest'>, res) => {
+        const results = await this.liveViewService.getLatestFrames(RequestContext.instance(req), req.body);
+
+        res.json({
+          success: true,
+          results,
+        });
+      }),
+    );
+
+    this.router.post(
+      '/user/liveView/stop',
+      authenticateJWT,
+      errorHelper(async (req: ApiReq<'/user/liveView/stop'>, res) => {
+        const results = await this.liveViewService.stopWatchSession(RequestContext.instance(req), req.body);
+
+        res.json({
+          success: true,
+          results,
+        });
+      }),
+    );
+
+    // Called by the watched child, not by a guardian. The child's own JWT is
+    // the identity; nothing in the body names a user.
+    this.router.post(
+      '/user/liveView/pushFrame',
+      authenticateJWT,
+      errorHelper(async (req: ApiReq<'/user/liveView/pushFrame'>, res) => {
+        const results = await this.liveViewService.pushFrame(RequestContext.instance(req), req.body);
 
         res.json({
           success: true,

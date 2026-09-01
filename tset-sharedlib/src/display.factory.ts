@@ -18,8 +18,8 @@ import {
   getUseCriteriaObjWithKeys,
   getItemTypeDetails,
   getItemTypeInfo,
-  getSubTypeFromMeta,
   normalizeSubTypeForType,
+  resolveDisplaySubType,
 } from './content.types';
 import { resolveAbsoluteUrl } from './extraction.utils';
 
@@ -90,14 +90,46 @@ function normalizeExternalImageCandidate(value: unknown, baseUrl?: string): stri
   return resolveAbsoluteUrl(baseUrl, src) || src;
 }
 
+/**
+ * Last-resort display guard for strings that are almost certainly leftover
+ * ciphertext (e.g. legacy double-encrypted fields that "decrypt" into inner
+ * ciphertext): one unbroken base64 run with `=` padding, optionally wrapped
+ * in literal JSON quotes. Real names/comments virtually never look like this.
+ */
+const CIPHERTEXT_LIKE = /^"?[A-Za-z0-9+/]{16,}={1,2}"?$/;
+
+function scrubCiphertextLike(value?: string | null): string | undefined {
+  if (!value) return undefined;
+  return CIPHERTEXT_LIKE.test(value.trim()) ? undefined : value;
+}
+
+/**
+ * Relation details are encrypted separately from the item. If the relation
+ * still carries encryption keys but was never successfully decrypted, its
+ * strings hold raw ciphertext and must not be used for display.
+ */
+function usableRelationDetails(
+  collectionRelation?: ItemRelationView
+): { name?: string; description?: string; comment?: string } | null {
+  const details = collectionRelation?.details;
+  if (!details) return null;
+  const rel = collectionRelation as any;
+  const hasEncKeys =
+    Array.isArray(rel.encInfo?.keys) && rel.encInfo.keys.length > 0;
+  if (rel.encrypted === true && hasEncKeys && rel.decrypted !== true) {
+    return null;
+  }
+  return details;
+}
+
 function resolveName(
   details: Item,
   collectionRelation?: ItemRelationView,
   meta?: any
 ): string {
   return (
-    collectionRelation?.details?.name ||
-    details.name ||
+    scrubCiphertextLike(usableRelationDetails(collectionRelation)?.name) ||
+    scrubCiphertextLike(details.name) ||
     meta?.title ||
     prettyURL(details.url ?? undefined) ||
     '?'
@@ -110,8 +142,8 @@ function resolveDescription(
   meta?: any
 ): string | undefined {
   return (
-    collectionRelation?.details?.description ||
-    details.description ||
+    scrubCiphertextLike(usableRelationDetails(collectionRelation)?.description) ||
+    scrubCiphertextLike(details.description) ||
     meta?.description
   ) ?? undefined;
 }
@@ -123,7 +155,10 @@ function resolveComment(
   details: Item,
   collectionRelation?: ItemRelationView
 ): string | undefined {
-  return (collectionRelation?.details?.comment || details.comment) ?? undefined;
+  return (
+    scrubCiphertextLike(usableRelationDetails(collectionRelation)?.comment) ||
+    scrubCiphertextLike(details.comment)
+  ) ?? undefined;
 }
 
 /**
@@ -186,12 +221,9 @@ export function createDisplayItem(
   const playbackSchema = getPlaybackSchemaV1(itemInfo);
   const useCriteriaData = getUseCriteriaObjWithKeys(normalizeStringArray(details.useCriteria) || []);
   
-  // Determine subType
-  let subType = details.subType;
-  if (details.type === 'link' && !subType) {
-    subType = getSubTypeFromMeta(meta);
-  }
-  
+  // Determine subType (includes the derivations that are not stamped at save time)
+  const subType = resolveDisplaySubType(details);
+
   // Get display metadata
   const { typeName, typeIcon } = getIconInfo(details.type!, subType ?? undefined);
   const typeDetails = getItemTypeDetails(details.type!, subType ?? '');
@@ -228,6 +260,7 @@ export function createDisplayItem(
     type: details.type!,
     subType: subType ?? undefined,
     contractId: typeDetails.contractId,
+    experienceKind: typeDetails.experienceKind,
     defaultViewMode: typeDetails.defaultViewMode,
     capabilityFlags: typeDetails.capabilityFlags,
     provider: typeDetails.provider,
@@ -248,6 +281,7 @@ export function createDisplayItem(
     
     categories: normalizeStringArray(details.categories),
     tags: details.tags ?? undefined,
+    kinds: normalizeStringArray(details.kinds),
     useCriteria: normalizeStringArray(details.useCriteria),
     eduValue: useCriteriaData.eduValue,
     patterns: details.patterns ?? undefined,
@@ -328,12 +362,9 @@ export function createPublishedDisplayItem(
   const { details, stats, curation, parentRelation, inLibrary } = publishedInfo;
   const meta = details.meta;
   
-  // Determine subType
-  let subType = details.subType;
-  if (details.type === 'link' && !subType) {
-    subType = getSubTypeFromMeta(meta);
-  }
-  
+  // Determine subType (includes the derivations that are not stamped at save time)
+  const subType = resolveDisplaySubType(details);
+
   const { typeName, typeIcon } = getIconInfo(details.type!, subType ?? undefined);
   const typeDetails = getItemTypeDetails(details.type!, subType ?? '');
   
@@ -362,6 +393,7 @@ export function createPublishedDisplayItem(
     type: details.type!,
     subType: subType ?? undefined,
     contractId: typeDetails.contractId,
+    experienceKind: typeDetails.experienceKind,
     defaultViewMode: typeDetails.defaultViewMode,
     capabilityFlags: typeDetails.capabilityFlags,
     provider: typeDetails.provider,
@@ -380,6 +412,7 @@ export function createPublishedDisplayItem(
     imageFilename: defaultImage,
     
     patterns: details.data?.patterns,
+    data: details.data ?? undefined,
     categories: normalizeStringArray(details.categories),
     useCriteria: normalizeStringArray(details.useCriteria),
     

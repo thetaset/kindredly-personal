@@ -231,6 +231,48 @@ class KeyEntryService {
     }
   }
 
+  /**
+   * KEY-0 repair. SSO accounts were created with no password, but the client derived a
+   * password key anyway — from a null that coerces to the string "null". The result is a
+   * copy of the user secret wrapped under a constant every attacker can compute, sitting
+   * in key_entry. This removes that copy.
+   *
+   * Refuses when the user has a real password: there the entry is their genuine unlock
+   * method and deleting it would lock them out.
+   *
+   * See docs/trackers/key-custody-and-recovery-tracker.md, KEY-0.
+   */
+  async deletePasswordWrappedSecret(ctx: RequestContext, targetUserId: string): Promise<{removed: boolean}> {
+    await ctx.verifySelfOrAdminOverUser(targetUserId);
+
+    const user = await ctx.getUserById(targetUserId);
+    if (!user) {
+      throw new Error('User not found');
+    }
+
+    // A user with a password is using this entry legitimately. Never touch it.
+    if (user.password) {
+      return {removed: false};
+    }
+
+    // listForUser does not filter soft-deletes, so without the deletedAt check a repeat
+    // call re-tombstones dead rows and reports removed: true having removed nothing.
+    const currentKeys = await this.keyEntries.listForUser(targetUserId);
+    const stale = currentKeys.filter((r) => r.unwrappingKeyId === 'userPassword' && !r.deletedAt);
+
+    if (stale.length === 0) {
+      return {removed: false};
+    }
+
+    for (const entry of stale) {
+      if (entry._id) {
+        await this.keyEntries.updateWithId(entry._id, {deletedAt: new Date()});
+      }
+    }
+
+    return {removed: true};
+  }
+
   async removeById(ctx: RequestContext, id: string) {
     return await this.keyEntries.updateWithId(id, {deletedAt: new Date()});
   }

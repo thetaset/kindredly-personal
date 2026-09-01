@@ -1,4 +1,5 @@
 import {RequestContext} from '@/base/request_context';
+import {clampPerPage} from '@/utils/pagination_utils';
 import {config} from '@/config';
 import {v4 as uuidv4} from 'uuid';
 
@@ -53,7 +54,7 @@ class CommentService {
       .select('comment.*', 'user.profileImage', 'user.username')
       .whereIn('comment.userId', allowedAuthorIds)
       .where('deletedAt', null)
-      .limit(perPage)
+      .limit(clampPerPage(perPage, 100))
       .offset(currentPage)
       .orderBy('createdAt', 'asc');
 

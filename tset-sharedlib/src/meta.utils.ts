@@ -27,7 +27,10 @@ export function checkIfYTChannel(url: string) {
   );
 }
 
-const channelFromUrlRegex = /\/(channel|c|user)\/?([^\/?#]+)(?:[/?#].*)?/i;
+// The separator slash after the segment name is REQUIRED: with an optional
+// slash, "/c" matches as a prefix of unrelated path segments and captures the
+// remainder as a channel id (e.g. "/collection" -> "ollection", "/clips" -> "lips").
+const channelFromUrlRegex = /\/(channel|c|user)\/([^\/?#]+)(?:[/?#].*)?/i;
 
 const channelFromUrlAtRegex = /\/@([^\/?#]+)(?:[/?#].*)?/i;
 

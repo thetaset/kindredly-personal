@@ -1,6 +1,7 @@
 import {config} from '@/config';
 import {assertSafeExternalUrl, safeFetchConfig} from '@/utils/safe_fetch';
 import axios from 'axios';
+import * as cheerio from 'cheerio';
 import {ItemResourceType} from 'tset-sharedlib/constants';
 import {
   extractMetadata,
@@ -83,14 +84,23 @@ export interface YouTubeChannelInfo {
   };
 }
 
-function buildDefaultBrowserHeaders(extraHeaders: Record<string, string> = {}): Record<string, string> {
+export function buildDefaultBrowserHeaders(
+  extraHeaders: Record<string, string> = {},
+  options: {noCache?: boolean} = {},
+): Record<string, string> {
+  // `no-cache` is right for metadata and images, where a stale answer is the
+  // whole failure mode. It is wrong for feed revalidation: some origins skip
+  // returning validators when the request declares it won't use them, which
+  // defeats If-None-Match before it starts. Opt-out, not removal — the other
+  // callers depend on the freshness.
+  const noCacheHeaders = options.noCache === false ? {} : {'Cache-Control': 'no-cache', Pragma: 'no-cache'};
+
   return {
     'User-Agent':
       'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36',
     Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,application/json;q=0.8,*/*;q=0.7',
     'Accept-Language': 'en-US,en;q=0.9',
-    'Cache-Control': 'no-cache',
-    Pragma: 'no-cache',
+    ...noCacheHeaders,
     ...extraHeaders,
   };
 }
@@ -372,6 +382,54 @@ export async function axiosCall<T = any>(url: string, options?: AxiosRequestConf
   }
 }
 
+/**
+ * Downloads a remote image and returns it as a base64 data URL, or null if the
+ * URL is unsafe, unreachable, or does not resolve to an image. Shared by the
+ * published-item banner persistence paths (metadata processing + enrichment).
+ */
+export async function fetchImageAsDataUrl(
+  imageUrl: string,
+  extraHeaders?: Record<string, string>,
+): Promise<string | null> {
+  const trimmed = (imageUrl || '').trim();
+  if (!trimmed) {
+    return null;
+  }
+
+  try {
+    assertSafeExternalUrl(trimmed);
+    const response = await axios.get(
+      trimmed,
+      safeFetchConfig({
+        responseType: 'arraybuffer',
+        timeout: 18000,
+        validateStatus: () => true,
+        // Send a real browser User-Agent. Some hosts (e.g. upload.wikimedia.org)
+        // return 403 to requests with no/default UA, which previously surfaced as a
+        // silent null (image patch never applied). extraHeaders still win.
+        headers: buildDefaultBrowserHeaders({
+          Accept: 'image/avif,image/webp,image/apng,image/*,*/*;q=0.8',
+          ...(extraHeaders || {}),
+        }),
+      }),
+    );
+
+    if (response.status !== 200) {
+      return null;
+    }
+
+    const contentType = typeof response.headers?.['content-type'] === 'string' ? response.headers['content-type'] : '';
+    if (!contentType.startsWith('image/')) {
+      return null;
+    }
+
+    return `data:${contentType};base64,${Buffer.from(response.data).toString('base64')}`;
+  } catch (error) {
+    console.error('Failed to fetch image as data URL', trimmed, error);
+    return null;
+  }
+}
+
 export async function getDefaultMetadata(url: string, message: string): Promise<ItemMeta> {
   let isRootURL = isRootWebsiteURL(url);
   return {
@@ -387,7 +445,7 @@ export async function getDefaultMetadata(url: string, message: string): Promise<
  * Returns true when the fetched HTML is a bot-challenge / access-denied page
  * rather than the actual site content (Cloudflare, Akamai, generic 403, etc.).
  */
-function isBotBlockPage(html: string): boolean {
+export function isBotBlockPage(html: string): boolean {
   const lower = html.slice(0, 4000).toLowerCase();
   return (
     lower.includes('cf-browser-verification') ||
@@ -436,6 +494,79 @@ export async function fetchGenericHtmlMeta(url: string, options: FetchOptions = 
     console.error(`Error fetching generic HTML metadata for URL: ${url}`, error);
     return getDefaultMetadata(url, error.message);
   }
+}
+
+/**
+ * Fetch a page and extract its readable body text, returning the failure reason
+ * when text can't be obtained instead of silently swallowing it. Used by the
+ * classification-eval crawl path so admins can see *why* a feature input is
+ * missing (timeout / http status / bot-block / empty / parse). `reason` is null
+ * on success; `text` is null on any failure.
+ */
+export async function fetchPageBodyTextResult(
+  url: string,
+  maxChars = 20000,
+): Promise<{text: string | null; reason: string | null}> {
+  const trimmed = (url || '').trim();
+  if (!trimmed) return {text: null, reason: 'no-url'};
+  try {
+    assertSafeExternalUrl(trimmed);
+  } catch {
+    return {text: null, reason: 'unsafe-url'};
+  }
+
+  let response: AxiosResponse<string>;
+  try {
+    response = await axios.get<string>(
+      trimmed,
+      safeFetchConfig({
+        timeout: 18000,
+        headers: buildDefaultBrowserHeaders(),
+        validateStatus: () => true,
+      }),
+    );
+  } catch (error: any) {
+    const msg = String(error?.message || error || '');
+    const reason = error?.code === 'ECONNABORTED' || /timeout/i.test(msg) ? 'timeout' : 'network-error';
+    return {text: null, reason};
+  }
+
+  if (response.status >= 400) return {text: null, reason: `http-${response.status}`};
+
+  const data = response.data;
+  if (typeof data !== 'string' || !data.trim()) return {text: null, reason: 'empty-response'};
+  if (isBotBlockPage(data)) return {text: null, reason: 'bot-blocked'};
+
+  let text: string;
+  try {
+    const $ = cheerio.load(data);
+    // Drop non-content / boilerplate nodes before reading text.
+    $('script, style, noscript, template, svg, iframe, nav, header, footer, aside, form, button').remove();
+    const root = $('main').length ? $('main') : $('body').length ? $('body') : $('html');
+    text = root
+      .text()
+      .replace(/[ \t\f\v]+/g, ' ')
+      .replace(/\s*\n\s*/g, '\n')
+      .replace(/\n{3,}/g, '\n\n')
+      .trim();
+  } catch (error: any) {
+    return {text: null, reason: 'parse-fail'};
+  }
+  // Too little text to be a useful feature (usually a JS-rendered SPA shell);
+  // treat as "no body" so the Features indicator stays honest.
+  if (text.length < 30) return {text: null, reason: 'too-short'};
+  return {text: text.length > maxChars ? text.slice(0, maxChars) : text, reason: null};
+}
+
+/**
+ * Fetch a page and extract its readable body text (server-side, no browser).
+ * Strips scripts/styles/nav/chrome and collapses whitespace so the result is a
+ * reasonable stand-in for the content-script's `extractedText` feature input.
+ * Returns null on fetch failure, a bot-block page, or empty text. Thin wrapper
+ * over fetchPageBodyTextResult for callers that don't need the failure reason.
+ */
+export async function fetchPageBodyText(url: string, maxChars = 20000): Promise<string | null> {
+  return (await fetchPageBodyTextResult(url, maxChars)).text;
 }
 
 export async function fetchYoutubeChannelMetaWithApiByURL(

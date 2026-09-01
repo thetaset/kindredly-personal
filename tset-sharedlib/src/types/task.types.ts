@@ -92,6 +92,21 @@ export type TaskDefinition = {
    */
   dueAtMs?: number
 
+  /**
+   * The day a one-off task is due, when it is due on a day but at no particular time
+   * ("take out the bins on Tuesday"). Start of that local day, in ms.
+   *
+   * Tasks needed their own field for this; events carry `allDay` instead. Before it existed
+   * `dueAtMs` was the ONLY day-carrier a one-off task had, so clearing the time did not make
+   * the task untimed — it sent it back to `createdAt`, the day it was typed, which is only
+   * ever right by coincidence (UX-035). A midnight `dueAtMs` could not stand in either: it
+   * makes "due at 00:00" and "due, no time" indistinguishable.
+   *
+   * Set at most one of `dueAtMs` and `dueDateMs`. `dueAtMs` wins if both are present, so a
+   * task that gains a time does not have to have this cleared in the same write.
+   */
+  dueDateMs?: number
+
   linkedItemIds?: string[]
   sourceItemId?: string
   linkType?: 'project' | 'reference' | 'reading' | 'custom'

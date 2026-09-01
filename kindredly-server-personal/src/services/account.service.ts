@@ -148,6 +148,48 @@ class AccountService {
     return true;
   }
 
+  /**
+   * D5, the family-wide key custody policy.
+   *
+   * Turning it ON is refused while any member still has a recovery key or password copy
+   * on our servers. Purging on their behalf would be the other option and it is the wrong
+   * one -- for a member relying on Kindredly recovery, a silent purge is a permanent
+   * lockout. So the toggle reports who is still holding, and each member clears their own.
+   *
+   * Turning it OFF is always allowed: it only re-opens a choice, it does not restore
+   * anything that was deleted.
+   */
+  // ROUTE-METHOD
+  async updateKeyStoragePolicy(ctx: RequestContext, noServerKeyStorage: boolean) {
+    if (!(await ctx.isAdmin())) {
+      throw new Error('Not authorized');
+    }
+
+    if (noServerKeyStorage) {
+      const blockedBy = await this.listMembersWithServerKeyMaterial(ctx);
+      if (blockedBy.length > 0) {
+        return {noServerKeyStorage: false, blockedBy};
+      }
+    }
+
+    const account = await ctx.getAccount();
+    const sysOptions = (account?.sysOptions || {}) as SystemOptions;
+
+    await this.accounts.updateWithId(ctx.accountId, {
+      sysOptions: {...sysOptions, noServerKeyStorage},
+    });
+
+    return {noServerKeyStorage};
+  }
+
+  /** Members whose key material we still hold. Empty means the policy can be turned on. */
+  async listMembersWithServerKeyMaterial(ctx: RequestContext) {
+    const users = await this.users.listByAccountId(ctx.accountId);
+    return users
+      .filter((u) => !u.deleted && (!!u.recoveryKey || !!u.passwordCopy))
+      .map((u) => ({userId: u._id as string, displayedName: u.displayedName || u.username || ''}));
+  }
+
   async _getAccountById(id: string) {
     const account = await this.accounts.findById(id);
     return account;

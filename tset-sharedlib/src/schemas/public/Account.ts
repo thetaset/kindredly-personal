@@ -7,6 +7,20 @@ export interface AccountOptions {
 export interface SystemOptions {
   aiChatSupported?: boolean;
   extendedFeatures?: Record<string, boolean>;
+  /**
+   * Admin override for this family's monthly AI spend allowance, in USD.
+   * Unset means the plan default applies. 0 is a valid value meaning "no AI spend".
+   */
+  aiBudgetUsdMonthly?: number | null;
+  /**
+   * Family-wide key custody policy (D5). When true the server refuses to hold key
+   * material for any member of this account -- no recovery-key escrow, no password copy.
+   * Unset or false keeps the default, where Kindredly backup is available.
+   *
+   * Enforced server-side on purpose: the guarantee has to be a property of the system,
+   * not a promise the client makes. See docs/trackers/key-custody-and-recovery-tracker.md.
+   */
+  noServerKeyStorage?: boolean;
 }
 
 export type AccountType = 'standard' | 'plus' | 'superplus';

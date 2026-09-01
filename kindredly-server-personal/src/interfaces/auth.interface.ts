@@ -7,6 +7,10 @@ export interface DataStoredInToken {
   accountId: string;
   sessionId: string;
   expAtSec?: number;
+  /** Limited-purpose token. 'device-agent' (Companion satellite app) is confined to DEVICE_AGENT_ALLOWED_PATHS. */
+  scope?: 'device-agent';
+  /** Device the scoped token was minted for. */
+  deviceId?: string;
 }
 
 export interface RequestWithUser extends Request {

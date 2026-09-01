@@ -139,6 +139,22 @@ class UserEncryptionRoute implements Routes {
         res.json(result);
       }),
     );
+
+    // KEY-0 repair — see KeyEntryService.deletePasswordWrappedSecret.
+    this.router.post(
+      '/user/encryption/deletePasswordWrappedSecret',
+      authenticateJWT,
+      errorHelper(async (req: ApiReq<'/user/encryption/deletePasswordWrappedSecret'>, res) => {
+        const results = await this.keyEntryService.deletePasswordWrappedSecret(
+          RequestContext.instance(req),
+          getTargetUserId(req),
+        );
+        res.json({
+          success: true,
+          results,
+        });
+      }),
+    );
   }
 }
 

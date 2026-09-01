@@ -24,8 +24,18 @@ export class BaseRepo<TModel> {
     return repo;
   }
 
-  // // TODO: Test this -- not in use yet
-  // // Call this to bind a transaction to the repository
+  /**
+   * Bind a transaction to a copy of this repo, so `this.query()` runs inside it.
+   *
+   * In use at five call sites (permission.service, user.service, audit_log.service);
+   * the "not in use yet" note it used to carry had been wrong for a while. SYNC-7.
+   *
+   * It rebinds `this.knex` and NOTHING else, which is the trap: a repo method that
+   * reaches for the globally imported `knex` -- as `UserChangeLogRepo` did until
+   * SYNC-6 -- writes outside the transaction while looking like it is inside one.
+   * That is worse than no transaction, because it reads as fixed. Before binding a
+   * transaction to a repo, check every statement in it goes through `this.query()`.
+   */
   withTransaction(trx: Knex.Transaction) {
     const repo = Object.create(this);
     repo.trx = trx;

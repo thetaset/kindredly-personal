@@ -20,6 +20,35 @@ export enum NotificationType {
   NEW_COMMENT = 'NEW_COMMENT',
   FOLLOWING_UPDATE = 'FOLLOWING_UPDATE',
   RESTRICTED_USER_PUBLISHED = 'RESTRICTED_USER_PUBLISHED',
+  /**
+   * A child's Kindredly Guard device stopped reporting, reported a tamper attempt,
+   * or had its uninstall protection removed.
+   *
+   * Its own category on purpose: `canSend` gates push delivery per notification
+   * type, so folding these into an existing type would let a parent who muted that
+   * unrelated category silently lose the one alert that must not be lost.
+   */
+  DEVICE_PROTECTION_ALERT = 'DEVICE_PROTECTION_ALERT',
+
+  /**
+   * New apps appeared on a child's Guard device since the parent last reviewed
+   * them.
+   *
+   * Separate from DEVICE_PROTECTION_ALERT for the same reason that one is separate:
+   * `canSend` gates push per type. These are routine and will arrive far more
+   * often, so folding them in would force a parent to choose between being spammed
+   * and muting the tamper alert that must never be missed.
+   */
+  DEVICE_APP_REVIEW = 'DEVICE_APP_REVIEW',
+
+  /**
+   * Platform-operations alert to designated staff users (bug reports, emergencies).
+   *
+   * Bypasses `canSend` entirely: receivers are founder-designated and must not be
+   * able to accidentally mute it, and it must not surface a settings toggle to
+   * ordinary families (it has no userPrefDefaults category on purpose).
+   */
+  PLATFORM_ALERT = 'PLATFORM_ALERT',
 }
 
 export enum EventRecordName {
@@ -46,6 +75,8 @@ export enum RequestTypes {
 export enum TaskRunnerJobTypes {
   runAutoPublish = 'publishedService.runAutoPublish',
   runDataRetention = 'dataRetention.runPurge',
+  runCompanionTamperWatch = 'companionTamperWatch.run',
+  runSecurityDigest = 'securityDigest.run',
   subscribe = 'publishedService.subscribe',
   updateSubscription = 'publishedService.updateSubscription',
   publishedModerationAiReview = 'publishedService.publishedModerationAiReview',

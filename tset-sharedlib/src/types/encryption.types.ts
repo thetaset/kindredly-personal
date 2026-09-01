@@ -20,6 +20,13 @@ export interface JSONSchemaProperties {
   type?: PropertyType;
   encrypted?: boolean;
   encryptedChildren?: boolean;
+  /**
+   * Minimum encryption schema version (`encInfo.sv`) at which this field is encrypted.
+   * Below this version the field is left plaintext (read straight from the column).
+   * Used to add newly-encrypted fields (e.g. publishId/imageFilename at sv=2) without
+   * breaking older rows that stored them plaintext. Absent/undefined ⇒ always encrypted.
+   */
+  minSv?: number;
   properties?: { [key: string]: JSONSchemaProperties };
   defaultKeyType?: string;
   encTarget?: string;
