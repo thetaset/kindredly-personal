@@ -1,0 +1,1 @@
+import{O as a,a as t,M as o}from"./@vueB-twyghJ.js";const u=Symbol("featureGuideFilter");function l(){const e=t(""),n=t(null),i=t(!1);return{query:e,activeCategory:n,showEverything:i,clear:()=>{e.value="",n.value=null}}}function s(){const e=l();return o(u,e),e}let r=null;function f(){const e=a(u,null);return e||(r||(r=l()),r)}export{s as p,f as u};

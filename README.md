@@ -21,14 +21,16 @@ Kindredly Personal Edition is a free, open-source, and self-hosted version of ou
 ## Installation 
 1. Clone the repository
 1. Run `./build_docker_personal.sh`
-1. Run `./start_server_personal.sh` (this will fail, but will setup the database) - press ctrl+c to stop the server
-1. Run `./start_server_personal.sh` again
-1. Visit to http://localhost:4444 (press ctrl+c to stop the server)
+1. Run `./start_server_personal.sh`
+1. Visit http://localhost:4444 (press ctrl+c to stop the server)
+
+The third step used to have to be run twice, the first time only to create the
+database. It does not any more.
 
 
 ## Browser Extensions Setup
 - Install the browser extension from the Chrome Web Store (https://kindredly.ai/download)
-- Visit the custom server settings link on the Sign-in page and give IP address and port of the server (http://localhost:4444/api/v2.3)
+- Visit the custom server settings link on the Sign-in page and give IP address and port of the server (http://localhost:4444/api/v3.0)
 
 ## Current Limitations 
  (only applies to the personal edition and we plan to address them in the future)

@@ -134,9 +134,35 @@ class App {
     if (!TEST_MODE) this.loadData();
   }
 
+  /**
+   * Seeds the one default site plugin. Deliberately best-effort.
+   *
+   * This is a floating promise by design - the server must not wait on it - so
+   * an unhandled rejection here takes the whole process down. That is not
+   * hypothetical: on a self-hosted box the app container starts alongside the
+   * migration container rather than after it, so the very first boot upserts
+   * into `site_plugin` before the table exists and dies with
+   * `relation "site_plugin" does not exist`. nodemon then holds the container
+   * open waiting for a file change, so `restart: unless-stopped` never fires.
+   * That is the failure the published README documents as an installation
+   * step: "Run ./start_server_personal.sh (this will fail, but will setup the
+   * database)".
+   *
+   * Fixing it here rather than with a compose `depends_on` because
+   * `dbmigration` sits behind the `migrate` profile, and a depends_on naming a
+   * service whose profile is inactive makes EVERY compose command invalid -
+   * including `down`. Tried that first; it was worse than the race.
+   *
+   * A seed that could not run is also simply not fatal. The next boot upserts
+   * it, and nothing else in the request path needs it to have happened.
+   */
   async loadData() {
-    const pluginService = new PluginService();
-    await pluginService.initialize();
+    try {
+      const pluginService = new PluginService();
+      await pluginService.initialize();
+    } catch (error) {
+      logger.error('Default site plugin was not seeded; continuing without it', error);
+    }
   }
 
   public listen() {

@@ -73,14 +73,44 @@
     return true;
   }
 
+  /**
+   * "Big and Simple" appearance scale — an axis orthogonal to the colour theme,
+   * mirrored from the synced userPref so it can be stamped before first paint.
+   * Without this, every cold boot renders the unscaled layout until Vue resolves
+   * prefs. Kept in step with src/app/store/appearanceScale.store.ts.
+   */
+  function resolveBigSimple() {
+    try {
+      return window.localStorage.getItem('knd:ui:appearance:bigSimple') === 'true';
+    } catch (error) {
+      return false;
+    }
+  }
+
+  function applyBigSimple(enabled) {
+    // <html> carries the rem base; <body> is stamped separately because
+    // teleported content (modals, dropdowns) renders outside the app root.
+    document.documentElement.classList.toggle('knd-big-simple', enabled);
+    if (!document.body) return false;
+    document.body.classList.toggle('knd-big-simple', enabled);
+    return true;
+  }
+
   var themeName = window.__KND_BOOT_THEME__ || resolveThemeName();
   window.__KND_BOOT_THEME__ = themeName;
 
+  var bigSimple = resolveBigSimple();
+  window.__KND_BOOT_BIG_SIMPLE__ = bigSimple;
+
   applyDocumentTheme(themeName);
 
-  if (!applyBodyTheme(themeName)) {
+  var bodyThemeApplied = applyBodyTheme(themeName);
+  var bodyScaleApplied = applyBigSimple(bigSimple);
+
+  if (!bodyThemeApplied || !bodyScaleApplied) {
     document.addEventListener('DOMContentLoaded', function () {
       applyBodyTheme(window.__KND_BOOT_THEME__ || themeName);
+      applyBigSimple(window.__KND_BOOT_BIG_SIMPLE__ === true);
     }, { once: true });
   }
 })();

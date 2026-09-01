@@ -1,0 +1,466 @@
+{
+  "schemaVersion": 1,
+  "contentVersion": "2026-08-05.1",
+  "updatedAt": "2026-08-05T00:00:00.000Z",
+  "mediaBase": "https://kindredly.ai/feature-guide/media",
+  "categories": [
+    {
+      "id": "library",
+      "label": "Library",
+      "blurb": "What you saved, and how to find it.",
+      "order": 1
+    },
+    {
+      "id": "sharing",
+      "label": "Sharing",
+      "blurb": "Sending things to family and friends.",
+      "order": 2
+    },
+    {
+      "id": "parental-controls",
+      "label": "Parental controls",
+      "blurb": "Limits, filtering, and what you can see.",
+      "order": 3
+    },
+    {
+      "id": "add-ons",
+      "label": "Add-ons",
+      "blurb": "Extras beyond the core.",
+      "order": 4
+    }
+  ],
+  "features": [
+    {
+      "id": "your-library",
+      "title": "Your library",
+      "tagline": "Everything you saved, in one place.",
+      "icon": "collection",
+      "categoryId": "library",
+      "order": 1,
+      "plan": "included",
+      "body": "features/your-library.md",
+      "openTo": "/library",
+      "related": [
+        "subscriptions",
+        "sharing",
+        "library-mode"
+      ],
+      "shots": [
+        {
+          "name": "01-library",
+          "route": "/library"
+        }
+      ]
+    },
+    {
+      "id": "subscriptions",
+      "title": "Subscriptions",
+      "tagline": "Follow a feed and read it here.",
+      "icon": "rss",
+      "categoryId": "library",
+      "order": 2,
+      "plan": "included",
+      "body": "features/subscriptions.md",
+      "control": {
+        "kind": "account",
+        "extendedFeatureId": "extendedFeatures.subscriptions",
+        "defaultEnabled": true
+      },
+      "openTo": "/library/subscriptions",
+      "settingsTo": "/settings/mysubscriptionlist",
+      "requiresAccess": "library.subscriptions",
+      "related": [
+        "your-library",
+        "launchpad"
+      ],
+      "shots": [
+        {
+          "name": "01-subscriptions",
+          "route": "/library/subscriptions"
+        }
+      ]
+    },
+    {
+      "id": "sharing",
+      "title": "Sharing and posts",
+      "tagline": "Send things to people you pick.",
+      "icon": "share",
+      "categoryId": "sharing",
+      "order": 1,
+      "plan": "included",
+      "body": "features/sharing.md",
+      "openTo": "/posts",
+      "related": [
+        "your-library",
+        "library-mode"
+      ],
+      "shots": [
+        {
+          "name": "01-posts",
+          "route": "/posts"
+        },
+        {
+          "name": "02-shared",
+          "route": "/library/items/sharedWithMe"
+        }
+      ]
+    },
+    {
+      "id": "library-mode",
+      "title": "Library Mode",
+      "tagline": "Only what's in their library.",
+      "icon": "shield-lock",
+      "categoryId": "parental-controls",
+      "order": 1,
+      "plan": "included",
+      "body": "features/library-mode.md",
+      "settingsTo": "/settings/filtering",
+      "related": [
+        "content-filtering",
+        "usage-limits"
+      ],
+      "shots": [
+        {
+          "name": "01-access",
+          "route": "/settings/filtering",
+          "selector": ".container-fluid-max1200"
+        }
+      ]
+    },
+    {
+      "id": "content-filtering",
+      "title": "Content filtering",
+      "tagline": "Blocks what shouldn't get through.",
+      "icon": "funnel",
+      "categoryId": "parental-controls",
+      "order": 2,
+      "plan": "included",
+      "body": "features/content-filtering.md",
+      "openTo": "/settings/filtering",
+      "settingsTo": "/settings/filtering/rules",
+      "related": [
+        "library-mode",
+        "page-monitor"
+      ],
+      "shots": [
+        {
+          "name": "01-rules",
+          "route": "/settings/filtering/rules",
+          "selector": ".container-fluid-max1200"
+        }
+      ]
+    },
+    {
+      "id": "usage-limits",
+      "title": "Usage limits",
+      "tagline": "Daily time budgets by content type.",
+      "icon": "hourglass-split",
+      "categoryId": "parental-controls",
+      "order": 3,
+      "plan": "included",
+      "body": "features/usage-limits.md",
+      "settingsTo": "/settings/usagelimits",
+      "related": [
+        "today-dashboard"
+      ],
+      "shots": [
+        {
+          "name": "01-limits",
+          "route": "/settings/usagelimits",
+          "selector": ".container-fluid-max1200"
+        }
+      ]
+    },
+    {
+      "id": "website-settings",
+      "title": "Website settings",
+      "tagline": "Strip the distracting parts out of big sites.",
+      "icon": "globe2",
+      "categoryId": "parental-controls",
+      "order": 4,
+      "plan": "included",
+      "body": "features/website-settings.md",
+      "settingsTo": "/settings/websites",
+      "requiresAccess": "personalSettings.youtube",
+      "related": [
+        "content-filtering",
+        "usage-limits"
+      ],
+      "shots": [
+        {
+          "name": "01-websites",
+          "route": "/settings/websites",
+          "selector": ".container-fluid-max1200"
+        }
+      ]
+    },
+    {
+      "id": "remote-actions",
+      "title": "Remote actions",
+      "tagline": "Reach a child's browser while they're using it.",
+      "icon": "broadcast",
+      "categoryId": "parental-controls",
+      "order": 5,
+      "plan": "plus",
+      "availability": "preview",
+      "body": "features/remote-actions.md",
+      "related": [
+        "library-mode",
+        "content-filtering"
+      ]
+    },
+    {
+      "id": "kindredly-guard",
+      "title": "Kindredly Guard",
+      "tagline": "App time and limits on a child's phone.",
+      "icon": "phone",
+      "categoryId": "parental-controls",
+      "order": 6,
+      "plan": "plus",
+      "stage": "beta",
+      "control": {
+        "kind": "account",
+        "extendedFeatureId": "extendedFeatures.companionDevices"
+      },
+      "body": "features/kindredly-guard.md",
+      "related": [
+        "usage-limits",
+        "kindredly-companion"
+      ]
+    },
+    {
+      "id": "kindredly-companion",
+      "title": "Kindredly Companion",
+      "tagline": "Keeps browser protection in place on a computer.",
+      "icon": "display",
+      "categoryId": "parental-controls",
+      "order": 7,
+      "plan": "included",
+      "stage": "experimental",
+      "body": "features/kindredly-companion.md",
+      "related": [
+        "kindredly-guard",
+        "content-filtering"
+      ]
+    },
+    {
+      "id": "kindredly-router",
+      "title": "Kindredly Router",
+      "tagline": "Protection for every device on the home network.",
+      "icon": "router",
+      "categoryId": "parental-controls",
+      "order": 8,
+      "plan": "included",
+      "availability": "preview",
+      "body": "features/kindredly-router.md",
+      "related": [
+        "kindredly-guard",
+        "kindredly-companion"
+      ]
+    },
+    {
+      "id": "today-dashboard",
+      "title": "Today Dashboard",
+      "tagline": "Your day on one screen.",
+      "icon": "sun",
+      "categoryId": "add-ons",
+      "order": 1,
+      "plan": "included",
+      "since": "3.0",
+      "body": "features/today-dashboard.md",
+      "openTo": "/today",
+      "settingsTo": "/settings/today",
+      "related": [
+        "launchpad",
+        "usage-limits",
+        "tasks"
+      ],
+      "shots": [
+        {
+          "name": "01-today",
+          "route": "/today",
+          "waitFor": "today-usage"
+        }
+      ]
+    },
+    {
+      "id": "launchpad",
+      "title": "Launchpad",
+      "tagline": "Apps and shortcuts on Home.",
+      "icon": "grid-3x3-gap",
+      "categoryId": "add-ons",
+      "order": 2,
+      "plan": "included",
+      "since": "3.0",
+      "body": "features/launchpad.md",
+      "control": {
+        "kind": "pref",
+        "prefKey": "features.taskbar.enabled",
+        "defaultEnabled": true
+      },
+      "openTo": "/",
+      "settingsTo": "/settings/coreapps",
+      "related": [
+        "today-dashboard"
+      ],
+      "shots": [
+        {
+          "name": "01-home",
+          "route": "/"
+        }
+      ]
+    },
+    {
+      "id": "tasks",
+      "title": "Tasks and Calendar",
+      "tagline": "Chores, homework and routines, per person — with a month view.",
+      "icon": "check2-square",
+      "categoryId": "add-ons",
+      "order": 3,
+      "plan": "plus",
+      "stage": "experimental",
+      "availability": "preview",
+      "body": "features/tasks.md",
+      "related": [
+        "today-dashboard"
+      ],
+      "shots": [
+        {
+          "name": "01-tasks",
+          "route": "/tasks",
+          "selector": ".container-fluid-max1200"
+        }
+      ]
+    },
+    {
+      "id": "ai-assistant",
+      "title": "AI Chat",
+      "tagline": "An assistant you can type or talk to.",
+      "icon": "chat-dots",
+      "categoryId": "add-ons",
+      "order": 4,
+      "plan": "plus",
+      "stage": "experimental",
+      "availability": "preview",
+      "body": "features/ai-assistant.md",
+      "related": [
+        "app-editor"
+      ],
+      "shots": [
+        {
+          "name": "01-aichat",
+          "route": "/settings/aichat",
+          "selector": ".container-fluid-max1200"
+        }
+      ]
+    },
+    {
+      "id": "category-explorer",
+      "title": "Category Explorer",
+      "tagline": "Browse the library by subject.",
+      "icon": "diagram-3",
+      "categoryId": "add-ons",
+      "order": 5,
+      "plan": "included",
+      "stage": "beta",
+      "body": "features/category-explorer.md",
+      "control": {
+        "kind": "account",
+        "extendedFeatureId": "extendedFeatures.categoryExplorer",
+        "defaultEnabled": true
+      },
+      "openTo": "/library/categories",
+      "settingsTo": "/settings/categories",
+      "related": [
+        "your-library"
+      ],
+      "shots": [
+        {
+          "name": "01-categories",
+          "route": "/library/categories"
+        }
+      ]
+    },
+    {
+      "id": "app-editor",
+      "title": "App Builder",
+      "tagline": "Build your own apps, and edit the code behind them.",
+      "icon": "code-square",
+      "categoryId": "add-ons",
+      "order": 6,
+      "plan": "included",
+      "stage": "experimental",
+      "body": "features/app-editor.md",
+      "control": {
+        "kind": "option",
+        "optionKey": "appEditorEnabled",
+        "defaultEnabled": false
+      },
+      "settingsTo": "/settings/extendedfeatures",
+      "openTo": "/appeditor",
+      "related": [
+        "your-library",
+        "ai-assistant"
+      ]
+    },
+    {
+      "id": "audio-player",
+      "title": "Audio player",
+      "tagline": "Play podcasts and saved audio, with a queue.",
+      "icon": "play-circle",
+      "categoryId": "add-ons",
+      "order": 7,
+      "plan": "included",
+      "since": "3.0",
+      "body": "features/audio-player.md",
+      "control": {
+        "kind": "pref",
+        "prefKey": "features.audioPlayer.enabled",
+        "defaultEnabled": true
+      },
+      "settingsTo": "/settings/downloads",
+      "related": [
+        "launchpad",
+        "subscriptions"
+      ]
+    },
+    {
+      "id": "flow-mode",
+      "title": "Flow Mode",
+      "tagline": "Same site stays in the same tab.",
+      "icon": "signpost-split",
+      "categoryId": "add-ons",
+      "order": 8,
+      "plan": "included",
+      "stage": "experimental",
+      "body": "features/flow-mode.md",
+      "control": {
+        "kind": "pref",
+        "prefKey": "features.flowMode.enabled",
+        "defaultEnabled": false
+      },
+      "related": [
+        "page-monitor"
+      ]
+    },
+    {
+      "id": "page-monitor",
+      "title": "Page Monitor",
+      "tagline": "On-page readout of filtering and scanning.",
+      "icon": "shield-check",
+      "categoryId": "add-ons",
+      "order": 9,
+      "plan": "included",
+      "stage": "experimental",
+      "body": "features/page-monitor.md",
+      "control": {
+        "kind": "pref",
+        "prefKey": "features.monitorWidget.enabled",
+        "defaultEnabled": false
+      },
+      "related": [
+        "flow-mode"
+      ]
+    }
+  ]
+}

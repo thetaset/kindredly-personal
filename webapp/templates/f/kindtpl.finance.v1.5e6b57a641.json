@@ -1,0 +1,1 @@
+{"id":"kindtpl.finance.v1","name":"Finance","slots":[{"kindId":"finance.bank","importance":"recommended"},{"kindId":"finance.taxes","importance":"recommended"},{"kindId":"finance.insurance.auto","importance":"optional"},{"kindId":"finance.retirement","importance":"optional"}],"layout":"cards","group":"Personal Admin","description":"Banking, taxes, and coverage in one place."}

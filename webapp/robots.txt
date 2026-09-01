@@ -5,4 +5,8 @@ Disallow: /backup/
 Disallow: /config/
 Disallow: /cache/
 
+# The Feature Guide is still being written. Direct and shared links keep working; it just
+# shouldn't be indexed until the entries are finished.
+Disallow: /features
+
 Allow: /

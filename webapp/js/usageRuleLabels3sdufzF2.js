@@ -1,0 +1,1 @@
+import{g2 as n}from"./appLifecycle.storeDfGeWjhE.js";function i(e){return e?e==="simple-overall"?"Overall daily limit":e==="simple-social"?"Social media":e==="simple-edutainment"?n("eduval_edutainment")||"Edu-tainment":e==="simple-entertainment"?n("eduval_fun")||"Entertainment":e==="simple-junk"?n("eduval_junk")||"Junk":null:null}export{i as g};

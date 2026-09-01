@@ -1,8 +1,10 @@
+/* No will-change here: it would promote every image on every page to its own
+   compositor layer. A finite pulse keeps the loading hint without paying
+   continuous paint/composite work for images that stay blurred. */
 img {
   filter: blur(20px);
   transition: filter 0.2s ease, opacity 0.2s ease;
-  animation: ts-preload-loading-pulse 2.2s ease-in-out infinite;
-  will-change: opacity;
+  animation: ts-preload-loading-pulse 2.2s ease-in-out 4;
 }
 
 img[style*="filter: none"],

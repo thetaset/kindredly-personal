@@ -1,0 +1,305 @@
+/*
+  Kindredly sandbox UI kit — a thin component layer for apps built in the App Builder.
+
+  Pico CSS already styles raw HTML elements well. What it does not give an app is the small set of
+  layout and surface pieces every little app ends up hand-rolling: a card, a row, a stat, a chip, a
+  toolbar, an empty state. Hand-rolled versions are where sandbox apps drift into hardcoded colours
+  and stop working in dark mode, so those pieces live here, built on the --knd-* tokens declared in
+  sandbox.html.
+
+  Everything is prefixed .knd-. Nothing here restyles a bare element, so an app that ignores this
+  file entirely looks exactly as it did before.
+
+  Documented for the agent in appManual/docs/ui-kit.doc.md — keep the two in step.
+*/
+
+:root {
+  --knd-space-1: 0.25rem;
+  --knd-space-2: 0.5rem;
+  --knd-space-3: 0.75rem;
+  --knd-space-4: 1rem;
+  --knd-space-5: 1.5rem;
+  --knd-space-6: 2rem;
+
+  --knd-radius: 0.75rem;
+  --knd-radius-sm: 0.5rem;
+  --knd-radius-pill: 999px;
+
+  --knd-shadow: 0 1px 2px rgba(0, 0, 0, 0.06), 0 4px 16px rgba(0, 0, 0, 0.08);
+  --knd-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.08);
+
+  --knd-good: #1f9d55;
+  --knd-warn: #c97a09;
+  --knd-bad: #d64545;
+}
+
+:root[data-knd-theme="dark"],
+:root[data-knd-theme="neon"] {
+  --knd-shadow: 0 1px 2px rgba(0, 0, 0, 0.5), 0 4px 16px rgba(0, 0, 0, 0.45);
+  --knd-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.5);
+
+  --knd-good: #4ade80;
+  --knd-warn: #fbbf24;
+  --knd-bad: #f87171;
+}
+
+/* A readable default stack, replacing the bare `sans-serif` the sandbox shipped with.
+   System fonts only — a webfont cannot load into an opaque-origin iframe. */
+html,
+body {
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ============================ layout ============================ */
+
+.knd-stack { display: flex; flex-direction: column; gap: var(--knd-space-3); }
+.knd-stack-sm { display: flex; flex-direction: column; gap: var(--knd-space-1); }
+.knd-row { display: flex; align-items: center; gap: var(--knd-space-2); flex-wrap: wrap; }
+.knd-row-tight { display: flex; align-items: center; gap: var(--knd-space-1); }
+.knd-spread { display: flex; align-items: center; justify-content: space-between; gap: var(--knd-space-2); }
+.knd-center { display: flex; align-items: center; justify-content: center; }
+.knd-grow { flex: 1 1 auto; min-width: 0; }
+.knd-wrap { max-width: 42rem; margin: 0 auto; }
+
+/* Auto-fitting card grid: as many columns as fit, never narrower than 10rem. */
+.knd-grid {
+  display: grid;
+  gap: var(--knd-space-3);
+  grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
+}
+
+.knd-grid-2 { grid-template-columns: repeat(2, 1fr); }
+.knd-grid-3 { grid-template-columns: repeat(3, 1fr); }
+
+/* ============================ surfaces ============================ */
+
+.knd-card {
+  background: var(--knd-surface);
+  color: var(--knd-text);
+  border: 1px solid var(--knd-border);
+  border-radius: var(--knd-radius);
+  padding: var(--knd-space-4);
+  box-shadow: var(--knd-shadow-sm);
+}
+
+.knd-card-flat { box-shadow: none; }
+
+/* Hover lift, for a card that is also a button or link. */
+.knd-card-action {
+  cursor: pointer;
+  transition: transform 120ms ease, box-shadow 120ms ease, border-color 120ms ease;
+}
+
+.knd-card-action:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--knd-shadow);
+  border-color: var(--knd-accent);
+}
+
+.knd-panel {
+  background: var(--knd-surface-2);
+  border-radius: var(--knd-radius);
+  padding: var(--knd-space-3);
+}
+
+.knd-toolbar {
+  display: flex;
+  align-items: center;
+  gap: var(--knd-space-2);
+  padding: var(--knd-space-2) var(--knd-space-3);
+  background: var(--knd-surface);
+  border: 1px solid var(--knd-border);
+  border-radius: var(--knd-radius-pill);
+}
+
+.knd-divider {
+  height: 1px;
+  background: var(--knd-border);
+  border: 0;
+  margin: var(--knd-space-3) 0;
+}
+
+/* ============================ text ============================ */
+
+.knd-title { font-size: 1.35rem; font-weight: 700; line-height: 1.2; margin: 0; }
+.knd-subtitle { font-size: 1rem; font-weight: 600; line-height: 1.3; margin: 0; }
+.knd-muted { color: var(--knd-muted); }
+.knd-small { font-size: 0.85rem; }
+.knd-accent { color: var(--knd-accent); }
+.knd-good { color: var(--knd-good); }
+.knd-warn { color: var(--knd-warn); }
+.knd-bad { color: var(--knd-bad); }
+.knd-nowrap { white-space: nowrap; }
+
+.knd-eyebrow {
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--knd-muted);
+}
+
+/* A big number with a label under it — the standard "score / streak / total" tile. */
+.knd-stat { display: flex; flex-direction: column; gap: 0.125rem; }
+.knd-stat-value { font-size: 2rem; font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums; }
+.knd-stat-label { font-size: 0.8rem; color: var(--knd-muted); }
+
+/* ============================ controls ============================ */
+
+/* Buttons are opt-in: Pico already styles <button>. Use .knd-btn when a link or a div has to
+   look like a button, or when you want the ghost/quiet variants. */
+.knd-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--knd-space-2);
+  padding: 0.5rem 0.9rem;
+  border: 1px solid transparent;
+  border-radius: var(--knd-radius-sm);
+  background: var(--knd-accent);
+  color: var(--knd-accent-text);
+  font: inherit;
+  font-weight: 600;
+  line-height: 1.2;
+  cursor: pointer;
+  text-decoration: none;
+  transition: filter 120ms ease, background-color 120ms ease, border-color 120ms ease;
+}
+
+.knd-btn:hover { filter: brightness(1.08); }
+.knd-btn:active { filter: brightness(0.95); }
+
+.knd-btn:disabled,
+.knd-btn[aria-disabled="true"] {
+  opacity: 0.5;
+  cursor: not-allowed;
+  filter: none;
+}
+
+.knd-btn-ghost {
+  background: transparent;
+  color: var(--knd-text);
+  border-color: var(--knd-border);
+}
+
+.knd-btn-ghost:hover {
+  background: var(--knd-surface-2);
+  filter: none;
+}
+
+.knd-btn-quiet {
+  background: transparent;
+  color: var(--knd-muted);
+  border-color: transparent;
+}
+
+.knd-btn-quiet:hover {
+  background: var(--knd-surface-2);
+  color: var(--knd-text);
+  filter: none;
+}
+
+.knd-btn-sm { padding: 0.3rem 0.6rem; font-size: 0.85rem; }
+.knd-btn-lg { padding: 0.7rem 1.3rem; font-size: 1.1rem; }
+.knd-btn-pill { border-radius: var(--knd-radius-pill); }
+.knd-btn-block { width: 100%; }
+
+/* Square icon-only button. Pair with <knd-icon>. */
+.knd-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  padding: 0;
+  border: 0;
+  border-radius: var(--knd-radius-sm);
+  background: transparent;
+  color: var(--knd-text);
+  cursor: pointer;
+  transition: background-color 120ms ease;
+}
+
+.knd-icon-btn:hover { background: var(--knd-surface-2); }
+
+.knd-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--knd-space-1);
+  padding: 0.2rem 0.6rem;
+  border-radius: var(--knd-radius-pill);
+  background: var(--knd-surface-2);
+  color: var(--knd-text);
+  font-size: 0.8rem;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.knd-chip-accent { background: var(--knd-accent); color: var(--knd-accent-text); }
+.knd-chip-good { background: var(--knd-good); color: #fff; }
+.knd-chip-warn { background: var(--knd-warn); color: #fff; }
+.knd-chip-bad { background: var(--knd-bad); color: #fff; }
+
+/* ============================ lists ============================ */
+
+.knd-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+
+.knd-list-item {
+  display: flex;
+  align-items: center;
+  gap: var(--knd-space-3);
+  padding: var(--knd-space-3) 0;
+  border-bottom: 1px solid var(--knd-border);
+}
+
+.knd-list-item:last-child { border-bottom: 0; }
+
+/* ============================ feedback ============================ */
+
+.knd-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--knd-space-2);
+  padding: var(--knd-space-6) var(--knd-space-4);
+  text-align: center;
+  color: var(--knd-muted);
+}
+
+.knd-empty svg { opacity: 0.45; }
+
+.knd-progress {
+  height: 0.5rem;
+  border-radius: var(--knd-radius-pill);
+  background: var(--knd-surface-2);
+  overflow: hidden;
+}
+
+.knd-progress-bar {
+  height: 100%;
+  background: var(--knd-accent);
+  border-radius: inherit;
+  transition: width 200ms ease;
+}
+
+/* ============================ motion ============================ */
+
+.knd-fade-in { animation: knd-fade-in 180ms ease both; }
+.knd-pop { animation: knd-pop 180ms cubic-bezier(0.2, 0.9, 0.3, 1.4) both; }
+
+@keyframes knd-fade-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: none; }
+}
+
+@keyframes knd-pop {
+  from { opacity: 0; transform: scale(0.92); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .knd-fade-in,
+  .knd-pop { animation: none; }
+  .knd-card-action { transition: none; }
+}

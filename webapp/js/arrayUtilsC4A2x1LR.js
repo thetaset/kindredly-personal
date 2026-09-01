@@ -1,0 +1,1 @@
+function p(n,t,e,f="_id"){if(t===e||!t||!e)return n;const c=n.findIndex(r=>r[f]===e);if(c===-1)return n;const o=n.find(r=>r[f]===t);if(!o)return n;const i=n.filter(r=>r[f]!==t),u=i.slice(0,c),l=i.slice(c);return[...u,o,...l]}export{p as r};

@@ -1,0 +1,1 @@
+{"id":"personal.health.v1","name":"Health","kindTemplateId":"kindtpl.health.v1","description":"Insurance, providers, and pharmacy — with a view of what you have.","group":"Personal Admin","seedText":"health insurance physician dentist pharmacy provider patient portal coverage","icon":"heart-pulse","tags":["health"],"minAgeGroups":["minage_adult"]}

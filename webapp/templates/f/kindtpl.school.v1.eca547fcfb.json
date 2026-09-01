@@ -1,0 +1,1 @@
+{"id":"kindtpl.school.v1","name":"School","slots":[{"kindId":"school.portal","importance":"recommended"},{"kindId":"school.teacher","importance":"recommended"},{"kindId":"school.calendar","importance":"optional"},{"kindId":"school.lunchMenu","importance":"optional"}],"layout":"cards","group":"Home & Family","description":"Portal, teachers, and schedules for a student."}

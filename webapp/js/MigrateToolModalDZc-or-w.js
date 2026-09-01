@@ -1,0 +1,1 @@
+import{d as o,z as s,D as a,v as t}from"./@vueB-twyghJ.js";const c=o({__name:"MigrateToolModal",emits:["close"],setup(l,{emit:n}){return(r,e)=>(a(),s("div",null,[...e[0]||(e[0]=[t("div",{class:"text-center p-4"},[t("p",null,"Migration tool is currently disabled.")],-1)])]))}});export{c as default};

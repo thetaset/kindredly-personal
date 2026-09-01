@@ -1,0 +1,431 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+
+  <!--
+    Sandbox CSP. App code has no direct network: connect-src 'none' kills fetch/XHR/WebSocket/
+    sendBeacon — the only network path is the host-mediated kindredly.net bridge (postMessage,
+    unaffected by CSP). 'self' covers the bundled subresources above/below (they resolve from
+    this document's URL even though the frame's origin is opaque); 'unsafe-eval' is required
+    because app code executes via new Function; 'unsafe-inline' covers the boot scripts in this
+    file. Remote images/media stay allowed here; the no-net variant used for location-declared
+    apps (sandbox-nonet.html) removes them. Keep the two files in sync — a drift test compares
+    them modulo this policy line.
+  -->
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src data: blob:; font-src 'self' data:; connect-src 'none'; form-action 'none'; frame-src 'none'; object-src 'none'; base-uri 'none'">
+
+  <title>App Sandbox</title>
+
+  <!--
+    localStorage/sessionStorage shim. This iframe runs WITHOUT allow-same-origin, so any native
+    storage access throws SecurityError before app-level guards can catch it. The classic script
+    replaces both with Storage-compatible in-memory proxies; localStorage is additionally persisted
+    per app via the Kindredly refState host API (hydrated in the run-code handler below). Must stay
+    the FIRST script so libraries and app code never see the throwing native accessor.
+  -->
+  <script src="./sandbox-storage-shim.js"></script>
+
+  <!-- Tier 1 Libraries: Available globally in sandbox -->
+  <!-- Pico CSS - Beautiful semantic CSS framework -->
+  <link rel="stylesheet" href="./pico.min.css">
+  
+  <!-- Alpine.js - For reactive UIs -->
+  <script defer src="./alpine.min.js"></script>
+  
+  <!-- Kaboom.js - For game development -->
+  <script src="./kaboom.js"></script>
+
+  <!--
+    Kindredly UI kit + icon set. Both are plain same-origin subresources rather than anything
+    fetched at runtime, because this iframe has an opaque origin: a webfont (CORS-mode by spec)
+    would be blocked, which is why the icons ship as inline SVG path data in a classic script.
+    The <knd-icon> element is defined here in <head>, so it is ready before app code runs.
+  -->
+  <link rel="stylesheet" href="./sandbox-ui.css">
+  <script src="./sandbox-icons.js"></script>
+
+  <!--
+    Kindredly host API bridge. Loaded as a CLASSIC script (exposes window.createKindredlyHostApi)
+    rather than an ES module, because this iframe runs with an opaque `null` origin — module
+    imports would be CORS-blocked against capacitor://localhost on mobile. Classic scripts aren't.
+  -->
+  <script src="./sandbox-host-api.js"></script>
+
+  <!--
+    Theme sync: the host (AppIFrame) passes the current Kindredly theme via ?knd_theme=<name>
+    and live-updates it with a { type:'knd-set-theme' } postMessage. This is a classic inline
+    script (no CORS/module dependency) so theming is applied immediately on load.
+    It sets Pico's data-theme AND a data-knd-theme used by the tokens.
+  -->
+  <script>
+    (function () {
+      function isDark(t) { return t === 'dark' || t === 'neon'; }
+      function applyTheme(theme) {
+        var name = (typeof theme === 'string' && theme) ? theme : 'light';
+        var dark = isDark(name);
+        var root = document.documentElement;
+        root.setAttribute('data-theme', dark ? 'dark' : 'light');   // Pico v2 palette
+        root.setAttribute('data-knd-theme', name);                  // --knd-* token selector
+        root.style.colorScheme = dark ? 'dark' : 'light';
+      }
+      try {
+        applyTheme(new URLSearchParams(location.search).get('knd_theme'));
+        window.addEventListener('message', function (e) {
+          var d = e && e.data;
+          if (d && d.type === 'knd-set-theme' && typeof d.theme === 'string') applyTheme(d.theme);
+        });
+      } catch (e) { /* default light */ }
+    })();
+  </script>
+
+  <style>
+    /*
+      Design tokens for sandbox apps. These adapt to the host theme (data-knd-theme on <html>).
+      App code should style with these variables (var(--knd-surface), var(--knd-text), …) instead
+      of hardcoding black/white — that keeps apps readable in every Kindredly theme.
+    */
+    :root,
+    :root[data-knd-theme="light"],
+    :root[data-knd-theme="pastel"],
+    :root[data-knd-theme="primary"] {
+      --knd-bg: #f9f9f9;
+      --knd-surface: #ffffff;
+      --knd-surface-2: #f1f3f5;
+      --knd-text: #1a1a1a;
+      --knd-muted: #5a5f66;
+      --knd-border: rgba(0, 0, 0, 0.12);
+      --knd-accent: #2f6fed;
+      --knd-accent-text: #ffffff;
+    }
+    :root[data-knd-theme="dark"],
+    :root[data-knd-theme="neon"] {
+      --knd-bg: #121212;
+      --knd-surface: #1e1e1e;
+      --knd-surface-2: #262626;
+      --knd-text: #eaeaea;
+      --knd-muted: #a8adb3;
+      --knd-border: rgba(255, 255, 255, 0.14);
+      --knd-accent: #5b8cff;
+      --knd-accent-text: #0b0b0b;
+    }
+
+    /* No font-family here: sandbox-ui.css sets the system stack, and this block would win
+       over it by order. */
+    html, body {
+      margin: 0;
+      padding: 10px;
+      background: var(--knd-bg);
+      color: var(--knd-text);
+    }
+    .error {
+      color: #f48771;
+      padding: 10px;
+      background: #3b1f1f;
+      border: 1px solid #8b3a3a;
+      margin: 10px 0;
+      border-radius: 4px;
+    }
+  </style>
+</head>
+<body>
+  <div id="app"></div>
+  <!--
+    Classic (non-module) script. The iframe runs with an opaque `null` origin, so ES-module
+    imports and wasm fetches would be CORS-blocked against capacitor://localhost on mobile.
+    Instead, the host (AppIFrame) compiles TS→JS in the real origin and sends already-compiled
+    JS here; this script only EXECUTES it. window.createKindredlyHostApi comes from the classic
+    sandbox-host-api.js loaded in <head>.
+  -->
+  <script>
+    let currentRunId = null;
+    let hostToken = null;
+    let parentOrigin = null;
+
+    function createRequestId() {
+      try {
+        return (crypto && crypto.randomUUID) ? crypto.randomUUID() : String(Date.now()) + '_' + String(Math.random()).slice(2)
+      } catch {
+        return String(Date.now()) + '_' + String(Math.random()).slice(2)
+      }
+    }
+
+    const hostApi = window.createKindredlyHostApi({ createRequestId })
+    hostApi.install()
+
+    // install() REPLACES window.kindredly, so the icon API is attached after it rather than by
+    // sandbox-icons.js itself. window.kndIcon / window.kndIcons keep working either way.
+    if (window.kndIcons) window.kindredly.icons = window.kndIcons
+
+    // localStorage persistence: the head shim keeps writes in memory; back it with the per-app
+    // refState host API so data survives reloads. Hydrated once before the first run; writes are
+    // flushed debounced. Fail-soft: with no host itemId (e.g. attachment previews) the hydrate
+    // times out and storage stays in-memory for this load.
+    const LOCAL_STORAGE_STATE_KEY = '__knd_localstorage';
+    const LOCAL_STORAGE_MAX_CHARS = 800 * 1024;
+    let storageHydration = null;
+    function setupPersistentStorage() {
+      const shim = window.__kndStorageShims && window.__kndStorageShims.localStorage;
+      if (!shim) return Promise.resolve();
+      if (storageHydration) return storageHydration;
+      storageHydration = (async () => {
+        try {
+          const stored = await Promise.race([
+            window.kindredly.refState.get(LOCAL_STORAGE_STATE_KEY),
+            new Promise((resolve) => setTimeout(resolve, 3000)),
+          ]);
+          if (stored && typeof stored === 'object') shim.hydrate(stored);
+        } catch { /* in-memory only */ }
+
+        let flushTimer = null;
+        let warnedTooBig = false;
+        const flush = () => {
+          flushTimer = null;
+          try {
+            const snapshot = shim.snapshot();
+            if (JSON.stringify(snapshot).length > LOCAL_STORAGE_MAX_CHARS) {
+              if (!warnedTooBig) {
+                warnedTooBig = true;
+                console.warn('localStorage exceeds the ~800KB persistence limit; data is kept in memory only. Store less here, or use kindredly.refState for larger data.');
+              }
+              return;
+            }
+            warnedTooBig = false;
+            window.kindredly.refState.set(LOCAL_STORAGE_STATE_KEY, snapshot).catch(() => {});
+          } catch { /* ignore */ }
+        };
+        shim.onWrite(() => {
+          if (flushTimer) clearTimeout(flushTimer);
+          flushTimer = setTimeout(flush, 400);
+        });
+        window.addEventListener('pagehide', () => {
+          if (flushTimer) { clearTimeout(flushTimer); flush(); }
+        });
+      })();
+      return storageHydration;
+    }
+
+    // Runtime error positions: app code executes via new Function(code), so reported line
+    // numbers are offset by the function wrapper and refer to COMPILED js. Measure the wrapper
+    // offset once with a probe error; the host (AppIFrame) maps the compiled position back to
+    // the user's source via the esbuild source map.
+    let fnLineOffset = 0;
+    function parseEvaluatedPosition(stack) {
+      if (!stack || typeof stack !== 'string') return null;
+      const m = /<anonymous>:(\d+):(\d+)/.exec(stack)
+        || /> (?:eval|Function):(\d+):(\d+)/.exec(stack)
+        || /\banonymous@.*:(\d+):(\d+)/.exec(stack);
+      return m ? { line: parseInt(m[1], 10), column: parseInt(m[2], 10) } : null;
+    }
+    try {
+      new Function('throw new Error("__probe__")')();
+    } catch (probeErr) {
+      const probePos = parseEvaluatedPosition(probeErr && probeErr.stack);
+      if (probePos && probePos.line >= 1) fnLineOffset = probePos.line - 1;
+    }
+    function compiledPositionFromStack(stack) {
+      const pos = parseEvaluatedPosition(stack);
+      if (!pos || pos.line <= fnLineOffset) return null;
+      return { line: pos.line - fnLineOffset, column: pos.column };
+    }
+
+    // Snapshot of what actually rendered, sent with run-complete so the editor agent can
+    // verify the UI instead of trusting a clean console (catches "runs fine, shows nothing").
+    function buildDomSummary() {
+      try {
+        const app = document.getElementById('app');
+        const texts = function (nodes, cap) {
+          const out = [];
+          for (let i = 0; i < nodes.length && out.length < cap; i++) {
+            const t = (nodes[i].textContent || '').replace(/\s+/g, ' ').trim().slice(0, 60);
+            if (t) out.push(t);
+          }
+          return out;
+        };
+        const childCount = app ? app.children.length : 0;
+        const textPreview = app ? (app.innerText || '').replace(/\s+/g, ' ').trim().slice(0, 300) : '';
+        const hasCanvas = !!document.querySelector('canvas'); // Kaboom appends its canvas to <body>
+        return {
+          appChildCount: childCount,
+          textPreview: textPreview,
+          headings: app ? texts(app.querySelectorAll('h1,h2,h3'), 5) : [],
+          buttons: app ? texts(app.querySelectorAll('button,[role="button"]'), 8) : [],
+          inputCount: app ? app.querySelectorAll('input,select,textarea').length : 0,
+          hasCanvas: hasCanvas,
+          renderedNothing: childCount === 0 && !textPreview && !hasCanvas,
+        };
+      } catch (e) {
+        return null;
+      }
+    }
+
+    function safeToString(value) {
+      try {
+        if (typeof value === 'string') return value;
+        if (value instanceof Error) return value.stack || value.message || String(value);
+        return JSON.stringify(value);
+      } catch {
+        try {
+          return String(value);
+        } catch {
+          return '[unserializable]';
+        }
+      }
+    }
+
+    function postToParent(payload) {
+      try {
+        if (window.parent && window.parent !== window) {
+          const targetOrigin = parentOrigin || '*'
+          // Payloads may pin their own runId (delayed run-complete must not adopt a newer run's id).
+          const runId = payload && payload.runId !== undefined ? payload.runId : currentRunId;
+          window.parent.postMessage({ ...payload, runId, token: hostToken }, targetOrigin);
+        }
+      } catch {
+        // ignore
+      }
+    }
+
+    // Host API is installed via sandbox-host-api.js
+
+    // Mirror console output to parent for agent verification.
+    (function wrapConsole() {
+      const levels = ['log', 'warn', 'error', 'info', 'debug'];
+      for (const level of levels) {
+        const original = console[level];
+        console[level] = function(...args) {
+          try {
+            postToParent({
+              type: 'sandbox-console',
+              level,
+              args: args.map(a => safeToString(a)).slice(0, 20),
+              ts: Date.now(),
+            });
+          } catch {
+            // ignore
+          }
+          return original.apply(console, args);
+        };
+      }
+    })();
+
+    window.onerror = function(msg, url, line, col, error) {
+      const div = document.createElement('div');
+      div.className = 'error';
+      div.textContent = 'Error: ' + msg;
+      document.body.appendChild(div);
+      postToParent({
+        type: 'sandbox-error',
+        kind: 'runtime',
+        message: String(msg || 'Unknown error'),
+        stack: error && error.stack ? String(error.stack) : undefined,
+        position: compiledPositionFromStack(error && error.stack),
+        ts: Date.now(),
+      });
+      return false;
+    };
+
+    window.onunhandledrejection = function(event) {
+      const reason = event && event.reason ? event.reason : 'Unhandled rejection';
+      const div = document.createElement('div');
+      div.className = 'error';
+      div.textContent = 'Unhandled Promise Rejection: ' + safeToString(reason);
+      document.body.appendChild(div);
+      postToParent({
+        type: 'sandbox-error',
+        kind: 'unhandledrejection',
+        message: safeToString(reason),
+        position: compiledPositionFromStack(reason && reason.stack),
+        ts: Date.now(),
+      });
+      return false;
+    };
+
+    // Listen for code from parent window
+    window.addEventListener('message', async function(event) {
+      // Only accept commands from our parent, on the same origin.
+      if (window.parent === window) {
+        return;
+      }
+      if (event.source !== window.parent) {
+        return;
+      }
+
+      // If we're running without allow-same-origin, our origin will be opaque ("null").
+      // Capture the parent origin on first message and use a shared token for validation.
+      if (!parentOrigin && typeof event.origin === 'string' && event.origin) {
+        parentOrigin = event.origin
+        hostApi.setParentOrigin(parentOrigin)
+      }
+
+      if (event.data && event.data.type === 'run-code') {
+        // Clear previous content (only when starting a new run)
+        const app = document.getElementById('app');
+        while (app.firstChild) {
+          app.removeChild(app.firstChild);
+        }
+
+        // Remove previous error messages
+        const errors = document.querySelectorAll('.error');
+        errors.forEach(err => err.remove());
+
+        hostToken = event.data.token || hostToken
+        hostApi.setHostToken(hostToken)
+        currentRunId = event.data.runId || null;
+        const runStartedAt = Date.now();
+        // Hydrate persisted localStorage before app code runs (no-op after the first run).
+        await setupPersistentStorage();
+        try {
+          // event.data.code is already compiled to JS by the host (AppIFrame). Just execute it.
+          const fn = new Function(event.data.code);
+          fn();
+
+          // Give async rendering (Alpine init, rAF paints) a beat before snapshotting the DOM,
+          // so the run report reflects what the user actually sees. runId is pinned in case a
+          // newer run starts during the delay.
+          const durationMs = Date.now() - runStartedAt;
+          const completedRunId = currentRunId;
+          setTimeout(function () {
+            postToParent({
+              type: 'sandbox-run-complete',
+              success: true,
+              durationMs: durationMs,
+              dom: buildDomSummary(),
+              runId: completedRunId,
+              ts: Date.now(),
+            });
+          }, 250);
+        } catch (err) {
+          const div = document.createElement('div');
+          div.className = 'error';
+          div.textContent = 'Error: ' + safeToString(err);
+          document.body.appendChild(div);
+          console.error(err);
+
+          postToParent({
+            type: 'sandbox-error',
+            kind: 'runtime',
+            message: err && err.message ? String(err.message) : safeToString(err),
+            stack: err && err.stack ? String(err.stack) : undefined,
+            position: compiledPositionFromStack(err && err.stack),
+            ts: Date.now(),
+          });
+          postToParent({
+            type: 'sandbox-run-complete',
+            success: false,
+            durationMs: Date.now() - runStartedAt,
+            dom: buildDomSummary(),
+            ts: Date.now(),
+          });
+        }
+      }
+    });
+
+    // Signal ready
+    if (window.parent !== window) {
+      // We don't know the parent origin yet; it will be captured on first message.
+      window.parent.postMessage({ type: 'sandbox-ready' }, '*');
+    }
+  </script>
+</body>
+</html>

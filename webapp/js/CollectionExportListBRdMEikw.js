@@ -1,0 +1,1 @@
+import{d as e,z as o,D as r,x as n}from"./@vueB-twyghJ.js";const c=e({__name:"CollectionExportList",props:{exportList:{}},setup(t){return(s,p)=>(r(),o("pre",null,n(t.exportList),1))}});export{c as default};

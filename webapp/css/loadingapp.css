@@ -14,18 +14,19 @@
     justify-content: center;
     align-items: center;
     /* background-color: rgba(255, 255, 255, 0.8); */
-    animation: fadeIn 4s ease-in 1 forwards;
+    /* The app mounts ~1.5s into a cold load, and the old 4s ramp only reached
+       full opacity at 2s — so this splash was never more than a faint ghost
+       before Vue replaced it. Hold it invisible briefly (a warm load should not
+       flash a splash nobody needed), then come up fast and stay up. */
+    animation: fadeIn 0.3s ease-out 0.2s both;
     z-index: 9999;
   }
   
   @keyframes fadeIn {
-    0% {
+    from {
       opacity: 0;
     }
-    10% {
-      opacity: 0;
-    }
-    50% {
+    to {
       opacity: 1;
     }
   }

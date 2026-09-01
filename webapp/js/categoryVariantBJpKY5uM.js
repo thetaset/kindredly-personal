@@ -1,0 +1,1 @@
+const n=["primary","success","info","warning","danger","secondary"];function e(t){let r=0;for(let a=0;a<t.length;a++)r=r*31+t.charCodeAt(a)|0;return n[Math.abs(r)%n.length]}function s(t){const r=e(t);return`bg-${r}-subtle text-${r}-emphasis border border-${r}-subtle`}function i(t){return`category-grid__gradient--${e(t)}`}export{s as b,i as g};

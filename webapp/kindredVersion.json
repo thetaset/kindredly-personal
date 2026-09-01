@@ -1,0 +1,27 @@
+{
+  "_comment": "Deployed to the site root by deploy_static_content.yml and fetched as /kindredVersion.json. 'latestVersion' is the LEGACY field: already-deployed clients compare it against a constant '3.0.0', so raising it fires an 'update available' banner on every installed client at once. Leave it at 3.0.0 and set 'latestAppVersion' (a real build number, e.g. '3.0.246') instead — only builds new enough to read that field react to it.",
+  "webapp": {
+    "latestVersion": "3.0.0",
+    "lastUpdated": "2026-01-29"
+  },
+  "extension": {
+    "latestVersion": "3.0.0",
+    "lastUpdated": "2026-01-29"
+  },
+  "electron": {
+    "latestVersion": "3.0.0",
+    "lastUpdated": "2026-01-29"
+  },
+  "android": {
+    "latestVersion": "3.0.0",
+    "lastUpdated": "2026-01-29"
+  },
+  "ios": {
+    "latestVersion": "3.0.0",
+    "lastUpdated": "2026-01-29"
+  },
+  "thetaserver": {
+    "latestVersion": "3.0.0",
+    "lastUpdated": "2026-01-29"
+  }
+}
