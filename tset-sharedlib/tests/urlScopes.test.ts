@@ -6,6 +6,7 @@ import {
   getRegistrableDomain,
   inferLinkScope,
   registrableHost,
+  resolveAssistantScope,
 } from '../src/url.utils';
 import { URLIndexer } from '../src/URLIndexer';
 
@@ -249,5 +250,43 @@ describe('URLIndexer', () => {
 
     idx.remove('a');
     expect(idx.getMatches('https://narrow.example.com/only/deep')).toHaveLength(0);
+  });
+});
+
+/**
+ * The cap on what the assistant may grant.
+ *
+ * The model proposes and this decides, so the tests that matter are the ones where
+ * the two disagree.
+ */
+describe('resolveAssistantScope', () => {
+  it('honours a proposal it is allowed to honour', () => {
+    expect(resolveAssistantScope('site', 'https://khanacademy.org')).toBe('site');
+    expect(resolveAssistantScope('page', 'https://example.com/lessons/one')).toBe('specific');
+  });
+
+  it('never widens beyond the proposal', () => {
+    // A bare address would default to the whole site; an explicit "page" outranks that.
+    expect(resolveAssistantScope('page', 'https://khanacademy.org')).toBe('specific');
+  });
+
+  it('refuses a whole site on a host where the path says whose content it is', () => {
+    // Granting sites.google.com would hand over every Google Site on the web, so
+    // this outranks even a confident proposal.
+    expect(resolveAssistantScope('site', 'https://sites.google.com/view/someones-page')).toBe('specific');
+    expect(resolveAssistantScope('site', 'https://medium.com/@someone/an-article')).toBe('specific');
+    expect(resolveAssistantScope('site', 'https://docs.google.com/document/d/abc')).toBe('specific');
+  });
+
+  it('treats silence as narrow, except for a bare address', () => {
+    expect(resolveAssistantScope(null, 'https://example.com/lessons/one')).toBe('specific');
+    expect(resolveAssistantScope(undefined, 'https://example.com/lessons/one')).toBe('specific');
+    expect(resolveAssistantScope('nonsense', 'https://example.com/lessons/one')).toBe('specific');
+    expect(resolveAssistantScope(null, 'https://example.com')).toBe('site');
+  });
+
+  it('never returns the whole domain, however it is asked', () => {
+    expect(resolveAssistantScope('domain', 'https://shop.example.co.uk/x')).not.toBe('domain');
+    expect(resolveAssistantScope('site', 'https://shop.example.co.uk/x')).toBe('site');
   });
 });

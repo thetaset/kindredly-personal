@@ -1,0 +1,107 @@
+{
+  "id": "12-safety-floor",
+  "behaviour": "The safety floor is never blocked: not by an all-apps limit, and not by a guardian blocking Settings.",
+  "clock": {
+    "nowMs": 1789491600000,
+    "familyTimeZone": "America/Los_Angeles",
+    "deviceTimeZone": "America/Los_Angeles"
+  },
+  "settings": {
+    "usageLimitsData": {
+      "contentUsageLimits": [
+        {
+          "id": "r-all-apps",
+          "name": "All apps",
+          "type": "advanced",
+          "conditions": [
+            {
+              "type": "appId",
+              "values": [
+                "all-device-apps"
+              ]
+            }
+          ],
+          "timeLimits": [
+            {
+              "hours": 1,
+              "daysOfWeek": [
+                0,
+                1,
+                2,
+                3,
+                4,
+                5,
+                6
+              ]
+            }
+          ]
+        }
+      ],
+      "temporaryRules": []
+    },
+    "ruleOverrideSettings": {
+      "ruleOverrides": []
+    },
+    "accessControlSettings": {},
+    "appPolicy": {
+      "version": 1,
+      "blockedCategories": [],
+      "entries": {
+        "com.android.settings": {
+          "pkg": "com.android.settings",
+          "decision": "block",
+          "updatedAt": 1
+        }
+      },
+      "updatedAt": 1
+    },
+    "appPolicyStatus": "readable"
+  },
+  "installedApps": [
+    {
+      "pkg": "com.roblox.client",
+      "label": "Roblox",
+      "platform": "android"
+    },
+    {
+      "pkg": "com.android.settings",
+      "label": "Settings",
+      "platform": "android",
+      "isSystem": true
+    }
+  ],
+  "floor": [
+    "com.android.settings",
+    "com.android.launcher3"
+  ],
+  "usage": {
+    "appMsByPkg": {
+      "com.roblox.client": 7200000
+    },
+    "webLogs": []
+  },
+  "usageSeed": {
+    "perRuleUsedMs": {}
+  },
+  "expectDevice": [
+    {
+      "pkg": "com.roblox.client",
+      "action": "block",
+      "reason": "budget-exhausted",
+      "ruleId": "r-all-apps"
+    },
+    {
+      "pkg": "com.android.settings",
+      "action": "allow",
+      "reason": null,
+      "ruleId": null
+    },
+    {
+      "pkg": "com.android.launcher3",
+      "action": "allow",
+      "reason": null,
+      "ruleId": null
+    }
+  ],
+  "browserNotApplicable": "Device-only: the safety floor protects device apps."
+}

@@ -24,6 +24,7 @@ import NotificationService from './notification.service';
 import {RequestContext} from '../base/request_context';
 import {container} from '@/inversify.config';
 import {AuditLogService} from './audit_log.service';
+import {HttpException} from '@/exceptions/HttpException';
 
 // interface ItemPermissionDetails {
 //   userId: string;
@@ -641,7 +642,7 @@ class PermissionService {
     await ctx.verifyAdminPermissions(targetUserId);
 
     if (!(await this._hasEditPermissionDirectOrAsAdmin(ctx, itemId))) {
-      throw Error('User does not have permission to edit this item');
+      throw new HttpException(403, 'User does not have permission to edit this item');
     }
 
     await this._setUserPermission(ctx, targetUserId, itemId, permission);
@@ -888,7 +889,7 @@ class PermissionService {
     // check permission to item
     const hasPermission = await this._hasSharePermissionDirectOrAsAdmin(ctx, itemId);
     if (!hasPermission) {
-      throw Error("User doesn't have permission to share this item");
+      throw new HttpException(403, "User doesn't have permission to share this item");
     }
 
     for (const targetUserId of targetUserIds) {

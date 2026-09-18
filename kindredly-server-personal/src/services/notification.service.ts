@@ -27,9 +27,11 @@ const typeToTitle = {
   FRIEND_REQUEST: 'New Friend Request',
   ACCESS_REQUEST: 'New Request',
   ACCESS_REQUEST_UPDATE: 'Request Update',
-  LIBRARY_AUTO_APPROVAL_APPROVED: 'Auto Approval Granted',
-  LIBRARY_AUTO_APPROVAL_DENIED: 'Auto Approval Denied',
-  LIBRARY_AUTO_APPROVAL_REVIEW: 'Auto Approval Needs Review',
+  // The push title comes from here, not from the caller's `data.title`, and this
+  // one type now covers two things: approving a site and recategorizing a page.
+  // Naming either one in the title would make the other push say something untrue.
+  // Which of the two it was is in the body, from `shortMessage`.
+  LIBRARY_AUTO_APPROVAL_APPROVED: 'AI answered a request',
   NEW_POST: 'New Post',
   NEW_COMMENT: 'New Comment',
   NEW_ITEM: 'New Item Added to Your Library',
@@ -270,9 +272,6 @@ class NotificationService {
         NotificationType.FRIEND_REQUEST,
         NotificationType.ACCESS_REQUEST,
         NotificationType.ACCESS_REQUEST_UPDATE,
-        NotificationType.LIBRARY_AUTO_APPROVAL_APPROVED,
-        NotificationType.LIBRARY_AUTO_APPROVAL_DENIED,
-        NotificationType.LIBRARY_AUTO_APPROVAL_REVIEW,
         NotificationType.NEW_POST,
         NotificationType.SHARED_ITEM,
         NotificationType.FOLLOWING_UPDATE,
@@ -634,6 +633,14 @@ class NotificationService {
       }
       title = 'Website access request';
       summary = `${requesterName} wants to open ${site}.`;
+      // When the assistant looked and stepped aside, its reading is the most
+      // useful thing in the notification — it is the difference between "someone
+      // wants something" and "here is what it appears to be".
+      const assistantReason =
+        typeof details?.aiReview?.reasonForParent === 'string' ? details.aiReview.reasonForParent.trim() : '';
+      if (assistantReason) {
+        summary += ` Assistant: ${assistantReason}`;
+      }
     } else {
       title = 'Access request';
       summary = `${requesterName} requested access.`;

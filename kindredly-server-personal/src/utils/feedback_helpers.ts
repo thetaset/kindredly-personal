@@ -16,6 +16,7 @@ export const feedbackFields = [
   'lastVisit',
   'visitCount',
   'neverRemindDate',
+  'keepFromCleanupDate',
 ] as const;
 
 export type FeedbackField = (typeof feedbackFields)[number];
@@ -42,6 +43,7 @@ export function getFeedbackData(v: any): ItemFeedbackView {
     isReadDate: v.isReadDate,
     isReadLaterDate: v.isReadLaterDate,
     neverRemindDate: v.neverRemindDate,
+    keepFromCleanupDate: v.keepFromCleanupDate,
     snoozeUntilDate: v.snoozeUntilDate,
     starredDate: v.starredDate,
     isHidden: v.isHidden == true,

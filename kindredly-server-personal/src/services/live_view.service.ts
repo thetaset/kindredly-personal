@@ -123,10 +123,13 @@ class LiveViewService {
   }
 
   /**
-   * Four independent gates, all required: the guardian manages this child, the
-   * child is a restricted user, the account is paid and has the feature on, and
-   * this specific child has been opted in. Mirrors
-   * `ClientInfoService.verifyManagedRemoteActionAccess`.
+   * Three independent gates, all required: the guardian manages this child, the
+   * child is a restricted user and the account is paid, and this specific child
+   * has been opted in. Mirrors `ClientInfoService.verifyManagedRemoteActionAccess`.
+   *
+   * There was a fourth — an account-wide `extendedFeatures.liveView` flag — until Live View
+   * became a per-child setting only. Watching is a consent conversation with one child, and an
+   * account-wide switch above it meant the child's own switch was never the whole answer.
    */
   private async verifyLiveViewAccess(ctx: RequestContext, targetUserId: string) {
     await ctx.verifyAdminOverUser(targetUserId);
@@ -141,11 +144,6 @@ class LiveViewService {
     }
     if (!this.isPaidAccountType(account?.accountType || null)) {
       throw new Error('Live View requires Plus');
-    }
-
-    const featureEnabled = account?.sysOptions?.extendedFeatures?.['extendedFeatures.liveView'] === true;
-    if (!featureEnabled) {
-      throw new Error('Live View is disabled for this account');
     }
 
     const liveViewSettings = this.getLiveViewSettings(targetUser);
@@ -175,6 +173,10 @@ class LiveViewService {
     guardianUserId: string;
     watchedUserIds: string[];
     cadenceMs: number;
+    /** The one device being captured. Absent means the guardian is only looking at the list. */
+    clientId?: string;
+    /** Which child owns that device. Only their watched key is written. */
+    clientUserId?: string;
     lastNudgeAtMs?: Record<string, number>;
   } | null> {
     const raw = await this.redis.get(this.sessionKey(sessionId));
@@ -209,18 +211,32 @@ class LiveViewService {
     guardianUserId: string;
     watchedUserIds: string[];
     cadenceMs: number;
+    clientId?: string;
+    clientUserId?: string;
     lastNudgeAtMs?: Record<string, number>;
   }): Promise<void> {
     const payload = JSON.stringify(session);
 
+    // No chosen device means nothing is being watched: the session exists so the guardian can
+    // see the device list, and the watched key — the child-side authority for "am I being
+    // captured" — is deliberately not written. Without a watched key `pushFrame` answers
+    // `keepGoing: false`, so any device that was capturing stops on its next push.
+    // Exactly one child is marked watched: the one who owns the chosen device. Every other child
+    // in the session has their key cleared, so their devices stop on their next push.
     await Promise.all([
       this.redis.setex(this.sessionKey(session.sessionId), LiveViewService.SESSION_TTL_SECONDS, payload),
       ...session.watchedUserIds.map((childUserId) =>
-        this.redis.setex(
-          this.watchedKey(childUserId),
-          LiveViewService.SESSION_TTL_SECONDS,
-          JSON.stringify({sessionId: session.sessionId, cadenceMs: session.cadenceMs}),
-        ),
+        session.clientId && childUserId === session.clientUserId
+          ? this.redis.setex(
+              this.watchedKey(childUserId),
+              LiveViewService.SESSION_TTL_SECONDS,
+              JSON.stringify({
+                sessionId: session.sessionId,
+                cadenceMs: session.cadenceMs,
+                clientId: session.clientId,
+              }),
+            )
+          : this.redis.del(this.watchedKey(childUserId)),
       ),
     ]);
   }
@@ -323,11 +339,27 @@ class LiveViewService {
     }
 
     const cadenceMs = this.clampCadence(input?.cadenceMs);
+    const clientId = String(input?.clientId || '').trim() || undefined;
+
+    // A device id from the guardian names a screen on someone else's machine, so it is checked
+    // against that child's own devices rather than trusted. An unknown id would otherwise write
+    // a watched key no device can satisfy, and the guardian would wait on a tile forever.
+    let clientUserId: string | undefined;
+    if (clientId) {
+      const devices = await this.buildDeviceViews(childUserIds, {clientId, includeFrames: false});
+      if (!devices.length) {
+        throw new Error("That device is not one of this child's");
+      }
+      clientUserId = devices[0].userId;
+    }
+
     const session = {
       sessionId: 'lvs_' + uuidv4(),
       guardianUserId: String(ctx.currentUserId || ''),
       watchedUserIds: childUserIds,
       cadenceMs,
+      clientId,
+      clientUserId,
     };
 
     // Written BEFORE anything starts capturing, and deliberately allowed to
@@ -339,18 +371,24 @@ class LiveViewService {
     // was watched. If we cannot write that record, we do not do the watching.
     // The child's on-screen notice is the live guarantee; this is the one that
     // survives the session, and an unaccountable session is worse than none.
-    await this.recordWatchStart(ctx, childUserIds);
+    //
+    // Only when a device was picked: listing a child's devices captures nothing and shows the
+    // guardian nothing of theirs, so a row saying their screen was watched would be false.
+    if (clientId && clientUserId) {
+      await this.recordWatchStart(ctx, [clientUserId]);
+    }
 
     await this.persistSession(session);
 
-    await Promise.all(
-      childUserIds.map((childUserId) =>
-        this.sseManager.broadcastToUser(childUserId, 'liveViewStart', {
-          cadenceMs,
-          startedAt: new Date().toISOString(),
-        }),
-      ),
-    );
+    // Told to the ONE chosen device, not to everything the child owns. Broadcasting to the user
+    // woke every phone, tablet and browser they were signed into, and each one captured,
+    // encrypted and uploaded a screen the guardian was not looking at.
+    if (clientId && clientUserId) {
+      await this.sseManager.broadcastToClient(`${clientUserId}-${clientId}`, 'liveViewStart', {
+        cadenceMs,
+        startedAt: new Date().toISOString(),
+      });
+    }
 
     return {
       session: this.toSessionView(session, LiveViewService.SESSION_TTL_SECONDS),
@@ -469,14 +507,27 @@ class LiveViewService {
   private async nudgeSilentChildren(
     childUserIds: string[],
     devices: LiveViewDeviceView[],
-    session: {cadenceMs: number; lastNudgeAtMs?: Record<string, number>},
+    session: {
+      cadenceMs: number;
+      clientId?: string;
+      clientUserId?: string;
+      lastNudgeAtMs?: Record<string, number>;
+    },
   ): Promise<Record<string, number>> {
     const now = Date.now();
     const lastNudgeAtMs: Record<string, number> = {...(session.lastNudgeAtMs || {})};
 
+    // Nothing is capturing when no device was picked, so silence is the correct state and
+    // there is nobody to nudge.
+    if (!session.clientId || !session.clientUserId) return lastNudgeAtMs;
+
     await Promise.all(
       childUserIds.map(async (childUserId) => {
-        const childDevices = devices.filter((device) => device.userId === childUserId);
+        if (childUserId !== session.clientUserId) return;
+
+        const childDevices = devices.filter(
+          (device) => device.userId === childUserId && device.clientId === session.clientId,
+        );
 
         // Nothing online to nudge, or already sending frames.
         const hasOnlineDevice = childDevices.some(
@@ -489,7 +540,7 @@ class LiveViewService {
 
         lastNudgeAtMs[childUserId] = now;
         await this.sseManager
-          .broadcastToUser(childUserId, 'liveViewStart', {
+          .broadcastToClient(`${session.clientUserId}-${session.clientId}`, 'liveViewStart', {
             cadenceMs: session.cadenceMs,
             startedAt: new Date(now).toISOString(),
           })
@@ -549,8 +600,11 @@ class LiveViewService {
     }
 
     let cadenceMs = LiveViewService.DEFAULT_CADENCE_MS;
+    let watchedClientId: string | undefined;
     try {
-      cadenceMs = this.clampCadence(JSON.parse(watchedRaw)?.cadenceMs);
+      const watched = JSON.parse(watchedRaw);
+      cadenceMs = this.clampCadence(watched?.cadenceMs);
+      watchedClientId = watched?.clientId ? String(watched.clientId) : undefined;
     } catch {
       /* fall back to the default cadence */
     }
@@ -558,6 +612,14 @@ class LiveViewService {
     const clientId = String(ctx.getClientId() || '').trim();
     if (!clientId) {
       throw new Error('Client is required');
+    }
+
+    // A guardian watches one screen at a time. Any other device of this child that is still
+    // looping — one that missed a stop, or was watched a moment ago — is told to stop here
+    // rather than having its frame stored. Second line of defence: the start event now goes to
+    // the chosen device alone, so no other device should be capturing in the first place.
+    if (watchedClientId && watchedClientId !== clientId) {
+      return {keepGoing: false, cadenceMs: LiveViewService.DEFAULT_CADENCE_MS};
     }
 
     const encryptedFrame = String(input?.encryptedFrame || '');

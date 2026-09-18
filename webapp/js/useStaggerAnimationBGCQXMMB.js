@@ -1,0 +1,1 @@
+import{r as s}from"./vue-runtimeX1uKV5L1.js";function c(e=50){const t=s(!1);function i(){t.value=!1}async function a(){await new Promise(n=>setTimeout(n,e)),t.value=!0}async function r(n){i();const o=await n();return await a(),o}return{isReady:t,resetAnimation:i,triggerAnimation:a,withAnimation:r}}export{c as u};

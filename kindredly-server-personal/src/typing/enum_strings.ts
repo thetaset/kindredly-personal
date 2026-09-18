@@ -10,9 +10,24 @@ export enum NotificationType {
   NEW_ITEM = 'NEW_ITEM',
   USER_JOINED_ACCOUNT = 'USER_JOINED_ACCOUNT',
   ACCESS_REQUEST_UPDATE = 'ACCESS_REQUEST_UPDATE',
+  /**
+   * The assistant acted on a request without the parent: it approved a site
+   * against their written guidelines, or it counted a page as a different kind of
+   * screen time. One type for both, because it answers one parent question —
+   * "tell me when the assistant acted". The name is about the library and the
+   * second case is not; it is persisted on every notification row ever written,
+   * so it is deliberately not renamed, and the settings row is labelled by hand.
+   *
+   * Quiet by default rather than by rule: `userPrefDefaults` starts this category
+   * with email and push both off, so it is a record to read later unless a parent
+   * asks otherwise. It used to be sent with `sendPush = false`, which made that
+   * preference unable to do anything.
+   *
+   * The DENIED/REVIEW siblings were removed with the feature that declared and
+   * never sent them — the assistant cannot deny, and a hand-off to the parent is
+   * an ACCESS_REQUEST like any other.
+   */
   LIBRARY_AUTO_APPROVAL_APPROVED = 'LIBRARY_AUTO_APPROVAL_APPROVED',
-  LIBRARY_AUTO_APPROVAL_DENIED = 'LIBRARY_AUTO_APPROVAL_DENIED',
-  LIBRARY_AUTO_APPROVAL_REVIEW = 'LIBRARY_AUTO_APPROVAL_REVIEW',
   NEW_POST = 'NEW_POST',
   FRIEND_REQUEST = 'FRIEND_REQUEST',
   ACCESS_REQUEST = 'ACCESS_REQUEST',
@@ -49,6 +64,12 @@ export enum NotificationType {
    * ordinary families (it has no userPrefDefaults category on purpose).
    */
   PLATFORM_ALERT = 'PLATFORM_ALERT',
+
+  /**
+   * A curator finished the curation review a person's catalog report opened: what they found.
+   * Its own category so a family can switch it without touching anything else.
+   */
+  CURATION_REVIEW_RESULT = 'CURATION_REVIEW_RESULT',
 }
 
 export enum EventRecordName {
@@ -77,9 +98,12 @@ export enum TaskRunnerJobTypes {
   runDataRetention = 'dataRetention.runPurge',
   runCompanionTamperWatch = 'companionTamperWatch.run',
   runSecurityDigest = 'securityDigest.run',
+  runRealmBackup = 'realmBackup.run',
   subscribe = 'publishedService.subscribe',
   updateSubscription = 'publishedService.updateSubscription',
   publishedModerationAiReview = 'publishedService.publishedModerationAiReview',
+  curationReviewAiDraft = 'curationReview.aiDraft',
+  runDueCurationReviews = 'curationReview.runDue',
   getBannerImageDataForUrl = 'getBannerImageDataForUrl',
   TASKRUNNER_TEST = 'TASKRUNNER_TEST',
   fetchMetadata = 'fetchMetadata',

@@ -56,6 +56,11 @@ export interface UsageStatus {
   reqsMet?: boolean;
   usage?: number;
   timeLeft?: number;
+  /**
+   * This rule blocks right now. NOT "the time is used up": it is also true outside the allowed
+   * hours with the whole budget left (`reasonCode: 'out-of-time-range'`). Words about running out
+   * of time read `reasonCode === 'time-exceeded'` or `timeLeft <= 0`, never this.
+   */
   limitExceeded: boolean;
   reasonCode?: ReasonCode;
   selectedByFilter?: boolean;
@@ -78,7 +83,15 @@ export interface UsageSummaryData {
   eduValueUsage?: Partial<Record<EduValue, number>>;
   filterContext?: ActivityEventContext;
   noUsageLimits?: boolean;
+  /** No limit applies right now: usage limits are paused, or all restrictions are (`restrictionsPaused`). */
   usageLimitsDisabled?: boolean;
+  /** Set with `usageLimitsDisabled` when the reason is a restrictions pause, so a place can name it. */
+  restrictionsPaused?: boolean;
+  /**
+   * The limits only remind (`usageLimitsRemindOnly`): the time states still hold, but nothing is
+   * blocked, so no place may say "blocked", "blocking" or "unavailable until".
+   */
+  usageLimitsRemindOnly?: boolean;
 }
 
 /**

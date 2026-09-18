@@ -1,0 +1,89 @@
+{
+  "id": "13-reminder-mode",
+  "behaviour": "In reminder mode a spent allowance warns instead of blocking.",
+  "clock": {
+    "nowMs": 1789491600000,
+    "familyTimeZone": "America/Los_Angeles",
+    "deviceTimeZone": "America/Los_Angeles"
+  },
+  "settings": {
+    "usageLimitsData": {
+      "contentUsageLimits": [
+        {
+          "id": "r-fun",
+          "name": "Fun",
+          "type": "advanced",
+          "conditions": [
+            {
+              "type": "eduValue",
+              "values": [
+                "eduval_fun"
+              ]
+            }
+          ],
+          "timeLimits": [
+            {
+              "hours": 1,
+              "daysOfWeek": [
+                0,
+                1,
+                2,
+                3,
+                4,
+                5,
+                6
+              ]
+            }
+          ]
+        }
+      ],
+      "temporaryRules": []
+    },
+    "ruleOverrideSettings": {
+      "ruleOverrides": []
+    },
+    "accessControlSettings": {
+      "usageLimitInterventionMode": "reminder"
+    },
+    "appPolicy": null,
+    "appPolicyStatus": "absent"
+  },
+  "installedApps": [
+    {
+      "pkg": "com.roblox.client",
+      "label": "Roblox",
+      "platform": "android"
+    }
+  ],
+  "floor": [],
+  "usage": {
+    "appMsByPkg": {},
+    "webLogs": [
+      {
+        "url": "https://example.com/eduval_fun/70",
+        "eduValue": "eduval_fun",
+        "minutes": 70
+      }
+    ]
+  },
+  "usageSeed": {
+    "perRuleUsedMs": {
+      "r-fun": 4200000
+    }
+  },
+  "expectDevice": [
+    {
+      "pkg": "com.roblox.client",
+      "action": "warn",
+      "reason": "budget-exhausted",
+      "ruleId": "r-fun"
+    }
+  ],
+  "expectBrowser": [
+    {
+      "ruleId": "r-fun",
+      "exceeded": true,
+      "reason": "budget-exhausted"
+    }
+  ]
+}

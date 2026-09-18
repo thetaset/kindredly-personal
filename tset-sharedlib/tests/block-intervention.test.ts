@@ -11,6 +11,7 @@ import type { ReasonCode } from '../src/types/activity.types';
 // Every code the union admits. Kept as a literal list rather than derived from a
 // map, so that adding a ReasonCode without deciding its stance fails here.
 const ALL_REASON_CODES: ReasonCode[] = [
+  'family-downtime',
   'restrict-all',
   'inappropriate',
   'adult-content',

@@ -27,6 +27,8 @@ export default  interface ItemFeedback {
 
   neverRemindDate?: Date | null;
 
+  keepFromCleanupDate?: Date | null;
+
   notes?: unknown | null;
 
   visitCount?: number | null;

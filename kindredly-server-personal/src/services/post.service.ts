@@ -154,21 +154,17 @@ class PostService {
     }
 
     const currentUser = await ctx.getCurrentUser();
-    // Bundles carry post-only link data rather than a saved library item. Reject them for
-    // library-only users even when a client claims a library match: otherwise a modified or
-    // stale client could turn an arbitrary URL into a shareable attachment without it ever
-    // becoming a real library item. The composer attaches exact saved items and leaves every
-    // other URL as ordinary post text.
-    const hasRestrictedLibraryOnlyBundle =
-      this.isRestrictedLibraryOnlyUser(currentUser) &&
-      (attachedItems || []).some((attachment) => attachment?.type === 'libItemBundle');
-
-    if (hasRestrictedLibraryOnlyBundle) {
-      throw new HttpException(
-        403,
-        'You can only share links already saved in your library. Remove the attachment or save it first.',
-      );
-    }
+    // Bundles carry post-only link data rather than a saved library item, and they grant
+    // the recipient nothing: the permission loop below only ever runs for 'libItem'. A
+    // library-only user may attach one for any URL, so a child can share a video from a
+    // channel they have saved without a copy of that video existing in their library.
+    //
+    // The wall is on the receiving side, where it does not depend on the sender's client
+    // being honest: a library-only recipient is granted temp access only for their own or
+    // an account admin's post (ViewPost.canGrantSharedBundleTempAccess), and their save
+    // attempt is answered by saveAttachmentToLibrary with an access request rather than a
+    // save. A modified sender cannot make itself an admin, so refusing the sender here
+    // bought nothing the recipient checks do not already cover.
 
     if (!recipientUserIds?.length) {
       return;

@@ -287,13 +287,30 @@ class UserRoute implements Routes {
       authenticateJWT,
       errorHelper(async (req: ApiReq<'/user/client/heartbeat'>, res) => {
         const ctx = RequestContext.instance(req);
+        /**
+         * Device-token only, and the row is keyed by the TOKEN's device id (DCP-2).
+         *
+         * This used to key the status row by the body's `deviceId` and accept any signed-in
+         * session, so a child's own browser session could post "running, all permissions granted"
+         * for a phone whose Guard was stopped, and the parent's card would say protected. Only
+         * Guard's `UploadWorker` and the desktop Companion's `heartbeat.ts` call this, both with
+         * the device-agent token minted for that device id, so refusing everything else breaks
+         * no real caller.
+         */
+        const tokenDeviceId = ctx.getTokenDeviceId();
+        if (!tokenDeviceId) {
+          return res.json({success: false, message: 'Only a linked device can report its status.', status: 403});
+        }
         const status = req.body?.status;
+        if (status && status.deviceId && status.deviceId !== tokenDeviceId) {
+          return res.json({success: false, message: 'This status is for a different device.', status: 403});
+        }
         if (status && status.deviceId) {
           await this.refStateService.upsert(ctx, 'user', {
             refType: 'device-guard',
             refId: 'companion',
             stateKey: 'status',
-            stateSubKey: status.deviceId,
+            stateSubKey: tokenDeviceId,
             data: status as any,
           });
           // A device reporting a tamper event is still alive and won't be for long

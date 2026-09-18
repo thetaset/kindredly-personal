@@ -20,6 +20,13 @@ export interface UserFileAccessProvider {
 
   getUserDataStream(refType: string, refId: string, filename: string): Promise<Readable>;
 
+  /**
+   * Whether a user-file object exists. Checked before a response commits: both implementations
+   * return streams that only error once read, so a missing object cannot be detected by opening
+   * it, and a missing preview must fall back to the original rather than truncate a 200.
+   */
+  userFileExists(refType: string, refId: string, filename: string): Promise<boolean>;
+
   getImageStream(filename): Promise<Readable>;
 
   removeFile(refType: string, refId: string, filename: string): Promise<void>;

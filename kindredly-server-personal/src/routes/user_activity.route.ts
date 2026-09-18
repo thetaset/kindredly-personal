@@ -199,11 +199,7 @@ class UserActivityRoute implements Routes {
         // only applies to `undefined` -- so this used to write `{type: null, items: [...]}`, which
         // sync.service.ts treats as a corrupt row and answers with a FULL library reset. With
         // `strict: false` in this package, `strictNullChecks` is off and nothing flagged it.
-        await this.changeLogService.logItemChangeForUserIds(
-          [ctx.currentUserId],
-          itemIds,
-          SyncType.itemUpdate,
-        );
+        await this.changeLogService.logItemChangeForUserIds([ctx.currentUserId], itemIds, SyncType.itemUpdate);
 
         const result = {
           success: true,

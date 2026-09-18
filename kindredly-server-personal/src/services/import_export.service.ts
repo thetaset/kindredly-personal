@@ -90,11 +90,6 @@ class ImportExportService {
     return require('./_internal/internal_published.service').publishedItemSchemaUpdater;
   }
 
-  //
-  async exportCollections(_ctx: RequestContext, _options: unknown) {}
-
-  async loadImport(_ctx: RequestContext, _importData: unknown) {}
-
   async exportPublishedDataPackage(
     request: AdminPublishedPackageExportRequest,
   ): Promise<AdminPublishedPackageExportResponse> {

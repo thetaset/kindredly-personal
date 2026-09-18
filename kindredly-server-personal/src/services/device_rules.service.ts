@@ -5,14 +5,16 @@ import {applyOverrides, compileDeviceRules} from 'tset-sharedlib/deviceguard/dev
 import type {CategoryExpansion} from 'tset-sharedlib/deviceguard/deviceRuleCompiler';
 import {buildAppCatalog, compileAppPolicy} from 'tset-sharedlib/deviceguard/deviceAppPolicy';
 import type {AppCatalogEntry} from 'tset-sharedlib/deviceguard/deviceAppPolicy';
-import type {
-  CompiledDeviceRuleSet,
-  DeviceAppInventory,
-  DeviceAppPolicy,
-} from 'tset-sharedlib/types/device-guard.types';
+import type {CompiledDeviceRuleSet, DeviceAppInventory, DeviceAppPolicy} from 'tset-sharedlib/types/device-guard.types';
 import type {LimitRule} from 'tset-sharedlib/types/usage-limits.types';
 
 /**
+ * ⚠️ NO CALLER since DCP-2 (2026-09-13). `/companion/rules/current` answers with no ruleset
+ * because this compile could not read `appPolicy` or `appInventory`: both are end-to-end
+ * encrypted, so its ruleset never held an app block, and Guard replacing its sealed set with it
+ * lifted every block (UX-063). Kept only until DCP-5 deletes it; D2 moves the compile onto each
+ * device. Do not wire it back up. See docs/trackers/device-control-plane-tracker.md.
+ *
  * Compile a child's device ruleset here, so Guard never needs the main app running.
  *
  * A parent's block used to reach a child's phone only through that child opening Kindredly:
@@ -107,9 +109,7 @@ export class DeviceRulesService {
       // Absent falls back to 'block': a family that never chose reminder mode must not be
       // handed it by a missing field.
       mode:
-        accessControlSettings?.usageLimitInterventionMode ||
-        accessControlSettings?.defaultInterventionMode ||
-        'block',
+        accessControlSettings?.usageLimitInterventionMode || accessControlSettings?.defaultInterventionMode || 'block',
       ...(policy ? {appPolicy: compileAppPolicy(policy, appCatalog)} : {}),
     });
   }
@@ -128,8 +128,10 @@ export class DeviceRulesService {
       ownerId,
       limit: 1,
     });
-    const entry = result?.entries?.[0];
-    return (entry?.state as T) ?? null;
+    // `data` is the row's payload. This read `entry.state`, which no row has, so the inventory and
+    // policy were always null; an encrypted row's `data` is still ciphertext.
+    const entry = result?.entries?.[0] as {data?: unknown} | undefined;
+    return (entry?.data as T) ?? null;
   }
 }
 

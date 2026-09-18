@@ -1,0 +1,179 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no" />
+
+    <style>
+      html {
+        -webkit-text-size-adjust: 100%;
+        -webkit-tap-highlight-color: rgba(0, 0, 0, 0);
+      }
+
+      body {
+        margin: 0;
+        padding: 0;
+        background: #f6f8fc;
+        font-family: Helvetica, Arial, sans-serif;
+        color: #2f3640 !important;
+      }
+
+      a {
+        color: #2f90cc !important;
+        text-decoration: none;
+      }
+
+      .logoContainer {
+        height: 52px;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+      }
+
+      .logoLink {
+        margin-left: 12px;
+        margin-right: 12px;
+        text-decoration: none;
+      }
+
+      .logoBanner {
+        font-size: 36px !important;
+        font-weight: 700 !important;
+        letter-spacing: 0.2px;
+        color: #2f90cc !important;
+        text-decoration: none;
+        height: 36px;
+      }
+
+      .spacer {
+        height: 18px;
+      }
+
+      .spacer1 {
+        height: 28px;
+      }
+
+      .container {
+        margin-top: 0;
+        padding-top: 24px;
+        padding-bottom: 8px;
+        margin: auto;
+        border-radius: 14px !important;
+        border: 1px solid #e6ebf3;
+        background: #ffffff;
+        box-shadow: 0 8px 30px rgba(20, 37, 63, 0.08);
+      }
+
+      .container-body {
+        margin-top: 10px;
+      }
+
+      .text-body {
+        margin-top: 8px;
+        margin-left: 24px;
+        margin-right: 24px;
+        line-height: 1.6;
+        font-size: 15px;
+      }
+
+      .container {
+        width: 100%;
+      }
+
+      .footer {
+        padding: 8px 20px 16px 20px;
+        text-align: center;
+        color: #64748b !important;
+        font-size: 13px;
+      }
+
+      .footer a {
+        color: #2f90cc !important;
+        font-weight: 600;
+      }
+
+      .button,
+      .button a {
+        background-color: #2f90cc;
+        border: none;
+        color: white !important;
+        padding-top: 10px;
+        padding-bottom: 10px;
+        padding-left: 20px;
+        padding-right: 20px;
+        text-align: center;
+        text-decoration: none;
+        display: inline-block;
+        border-radius: 8px !important;
+        font-weight: 600;
+        letter-spacing: 0.2px;
+        margin: 4px 2px;
+        cursor: pointer;
+      }
+
+      .header-note {
+        text-align: center;
+        color: #64748b;
+        font-size: 13px;
+        margin: 0 24px;
+      }
+
+      /* Tablet */
+      @media (min-width: 800px) {
+        .container {
+          width: 84%;
+        }
+      }
+
+      /* Desktop */
+      @media (min-width: 1200px) {
+        .container {
+          width: 760px;
+        }
+      }
+
+      hr {
+        border-top: 0px;
+        border-bottom: 1px solid #ecf1f8;
+        margin-left: 24px;
+        margin-right: 24px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="spacer1"></div>
+    <div class="container">
+      <div class="spacer"></div>
+
+      <div class="logoContainer text-center">
+        <a href="SERVER_HOSTNAME" class="logoLink"
+          ><span class="logoBanner">Kindredly</span>
+        </a>
+      </div>
+      <div class="header-note"></div>
+      <div class="spacer"></div>
+
+      <hr />
+      <div class="spacer"></div>
+
+      <div class="text-body">CONTENT_BODY</div>
+      <div class="spacer"></div>
+      <hr />
+      <div class="footer">
+        <div>
+          You have received this message from
+          <a href="SERVER_HOSTNAME/">Kindredly.ai</a>
+        </div>
+        <div class="spacer"></div>
+
+        <div><a href="SERVER_HOSTNAME/kindredapp/#/settings/notifications">Notification Settings</a></div>
+
+        <div class="spacer"></div>
+        <div>
+          <a href="SERVER_HOSTNAME/notmyaccount">This isn't my account</a>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>

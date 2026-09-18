@@ -40,6 +40,51 @@ export class ReportProblemRepo extends BaseRepo<ReportProblem> {
     return await this.query().whereIn('_id', vals);
   }
 
+  /** How many reports of a kind one person sent since a time. */
+  async countForUserSince(userId: string, category: string, since: Date): Promise<number> {
+    const row: any = await this.query()
+      .where({userId, category})
+      .andWhere('createdAt', '>', since)
+      .count({count: '*'})
+      .first();
+    return Number(row?.count ?? 0);
+  }
+
+  /** Whether this person already reported into this curation review. */
+  async userReportedReview(userId: string, reviewId: string): Promise<boolean> {
+    return !!(await this.query().where({userId, curationReviewId: reviewId}).first());
+  }
+
+  /** Catalog reports from one account since a time that took an item out of recommendations. */
+  async countPullsForAccountSince(accountId: string, since: Date): Promise<number> {
+    const row: any = await this.query()
+      .where({category: 'flagPublished'})
+      .andWhere('createdAt', '>', since)
+      .whereRaw(`"details"->>'accountId' = ?`, [accountId])
+      .whereRaw(`"details"->>'pulled' = 'true'`)
+      .count({count: '*'})
+      .first();
+    return Number(row?.count ?? 0);
+  }
+
+  /** The reports attached to curation reviews, oldest first. */
+  async listForCurationReviews(reviewIds: string[]): Promise<ReportProblem[]> {
+    if (reviewIds.length === 0) return [];
+    return (await this.query()
+      .whereIn('curationReviewId', reviewIds)
+      .orderBy('createdAt', 'asc')
+      .orderBy('_id', 'asc')) as any;
+  }
+
+  /** Marks every report a finished curation review answered as resolved. */
+  async resolveForCurationReview(reviewId: string, info: Record<string, any>): Promise<number> {
+    return Number(
+      await this.query()
+        .where({curationReviewId: reviewId})
+        .update({adminStatus: 'resolved', adminStatusInfo: info} as any),
+    );
+  }
+
   async findLatestBySource(params: {
     category: string;
     sourceType: string;

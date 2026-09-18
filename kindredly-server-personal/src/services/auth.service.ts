@@ -595,9 +595,7 @@ class AuthService {
     // Verification proves the ACTING user. A guardian cannot produce a child's passkey, and
     // should not have to type a child's password to act on their behalf.
     const actingUser = actingForSelf ? user : await ctx.getCurrentUser();
-    const actingPasskeys = actingForSelf
-      ? targetPasskeys
-      : await this.passkeyService.listPasskeys(ctx.currentUserId);
+    const actingPasskeys = actingForSelf ? targetPasskeys : await this.passkeyService.listPasskeys(ctx.currentUserId);
 
     if (!actingUser?.password && actingPasskeys.length === 0) {
       throw new HttpException(400, 'Add a password or passkey to your own account before turning this off.');

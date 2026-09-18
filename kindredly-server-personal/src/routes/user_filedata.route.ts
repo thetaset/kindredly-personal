@@ -114,11 +114,12 @@ class UserFileDataRoute implements Routes {
       authenticateJWT,
       errorHelper(async (req: ApiReq<'/userfile/getById'>, res, next) => {
         try {
-          const {userFile, stream} = await this.userFileService.getUserFileStreamById(
-            RequestContext.instance(req),
-            req.body.fileId,
-            req.body.previewId,
-          );
+          const {userFile, stream, requestedPreviewId, resolvedPreviewId} =
+            await this.userFileService.getUserFileStreamById(
+              RequestContext.instance(req),
+              req.body.fileId,
+              req.body.previewId,
+            );
 
           const fileDataBase64 = await streamToBase64(stream);
 
@@ -127,6 +128,9 @@ class UserFileDataRoute implements Routes {
             results: {
               userFile,
               fileDataBase64,
+              // Which bytes these are: the preview asked for, or null for the original.
+              requestedPreviewId,
+              resolvedPreviewId,
             },
           };
 
@@ -200,7 +204,7 @@ class UserFileDataRoute implements Routes {
       authenticateJWT,
       errorHelper(async (req, res, next) => {
         try {
-          const {userFile, stream} = await this.userFileService.getUserFileStreamById(
+          const {userFile, stream, resolvedPreviewId} = await this.userFileService.getUserFileStreamById(
             RequestContext.instance(req),
             req.params.id,
             req.query.previewId,
@@ -212,6 +216,9 @@ class UserFileDataRoute implements Routes {
 
           res.set('Content-Type', 'application/octet-stream');
           res.set('X-UserFile-Encrypted', userFile.encInfo ? 'true' : 'false');
+          // "original" when the bytes are the file itself (no preview asked for, or none stored).
+          // Exposed through CORS in app.ts; a browser cannot read it otherwise.
+          res.set('X-UserFile-Resolved-Preview-Id', resolvedPreviewId ?? 'original');
           stream.pipe(res);
         } catch (error) {
           console.error('Error unable to get user file ciphertext', error);
@@ -229,11 +236,12 @@ class UserFileDataRoute implements Routes {
       authenticateJWT,
       errorHelper(async (req, res, next) => {
         try {
-          const {userFile, stream} = await this.userFileService.getUserFileStreamById(
-            RequestContext.instance(req),
-            req.params.id,
-            req.query.previewId,
-          );
+          const {userFile, stream, requestedPreviewId, resolvedPreviewId} =
+            await this.userFileService.getUserFileStreamById(
+              RequestContext.instance(req),
+              req.params.id,
+              req.query.previewId,
+            );
 
           stream.on('error', function (e) {
             next(e);
@@ -245,7 +253,7 @@ class UserFileDataRoute implements Routes {
           // Part 1: JSON metadata
           res.write(`--${boundary}\r\n`);
           res.write(`Content-Type: application/json; charset=utf-8\r\n\r\n`);
-          res.write(JSON.stringify({userFile}));
+          res.write(JSON.stringify({userFile, requestedPreviewId, resolvedPreviewId}));
           res.write(`\r\n`);
 
           // Part 2: ciphertext bytes

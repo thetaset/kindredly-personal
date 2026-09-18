@@ -1,0 +1,1 @@
+import{bz as o}from"./appLifecycle.storeDGO0E0kx.js";import"./vue-runtimeX1uKV5L1.js";import"./cjs-helpersC4iS2aBk.js";import"./dexie2jmnBxhj.js";import"./bootstrap-vue-nextBnWKdfvs.js";const a=[];a.push({path:"/audit_log/list",handler:async(i,t,p)=>await o("/audit_log/list",t)});export{a as default};

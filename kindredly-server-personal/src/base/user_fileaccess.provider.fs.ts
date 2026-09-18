@@ -3,45 +3,24 @@ import fs from 'fs';
 import path from 'path';
 import {saveURLDatatoFile} from '../utils/binary_utils';
 import {UserFileAccessProvider} from './user_fileaccess.provider';
+import {resolveWithinRoot} from './storage_path';
 
 /**
- * Resolve `segments` under `root` and refuse anything that lands outside it.
+ * Path containment for this provider.
  *
- * Every path in this provider is built from client-supplied values: `filename` comes straight
- * off the URL or request body, and `refType`/`refId` are route params. `path.join` happily
- * normalises `..` away, so a request for `../../etc/passwd` used to resolve to a real file
- * outside the storage root — readable on the unauthenticated GET routes in
- * `user_filedata.route.ts`, and writable/deletable on the upload and remove paths.
+ * Every path here is built from client-supplied values: `filename` comes straight off the URL or
+ * request body, and `refType`/`refId` are route params. `path.join` happily normalises `..` away,
+ * so a request for `../../etc/passwd` used to resolve to a real file outside the storage root —
+ * readable on the unauthenticated GET routes in `user_filedata.route.ts`, and writable/deletable
+ * on the upload and remove paths.
  *
- * Containment is checked on the RESOLVED path rather than by rejecting `..` in the input,
- * because legitimate filenames are derived (`<name>__chunk_3`, `<name>_preview_<id>`) and a
- * blacklist both misses encodings and breaks real names. `path.resolve` also absorbs an
- * absolute segment — `resolve(root, '/etc/passwd')` is `/etc/passwd` — which the same check
- * catches.
- *
- * This affects the `fs` storage backend, used by self-hosted / personal-server and local dev.
- * Production runs `USER_STORAGE_TYPE=s3` (see `config.ts`), which resolves keys differently.
+ * The check itself now lives in `base/storage_path.ts` so the backup target shares it rather than
+ * carrying a second copy. This affects the `fs` storage backend, used by self-hosted /
+ * personal-server and local dev. Production runs `USER_STORAGE_TYPE=s3` (see `config.ts`), which
+ * resolves keys differently.
  */
-function resolveWithinRoot(root: string, ...segments: string[]): string {
-  const resolvedRoot = path.resolve(String(root));
 
-  for (const segment of segments) {
-    if (segment === undefined || segment === null || segment === '') {
-      throw new Error('Invalid storage path: empty segment');
-    }
-  }
-
-  const fullpath = path.resolve(resolvedRoot, ...segments.map(String));
-
-  if (fullpath !== resolvedRoot && !fullpath.startsWith(resolvedRoot + path.sep)) {
-    // Deliberately does not echo the resolved path back to the caller.
-    throw new Error('Invalid storage path: resolves outside the storage root');
-  }
-
-  return fullpath;
-}
-
-/** Exported for tests. */
+/** Exported for tests; the implementation is `base/storage_path.ts`. */
 export const __resolveWithinRootForTests = resolveWithinRoot;
 
 export class UserFileAccessProviderFS implements UserFileAccessProvider {
@@ -124,6 +103,16 @@ export class UserFileAccessProviderFS implements UserFileAccessProvider {
     const fullpath = resolveWithinRoot(this.userRoot(), refType, refId, filename);
     const s = fs.createReadStream(fullpath);
     return s;
+  }
+
+  async userFileExists(refType: string, refId: string, filename: string) {
+    const fullpath = resolveWithinRoot(this.userRoot(), refType, refId, filename);
+    try {
+      await fs.promises.access(fullpath, fs.constants.R_OK);
+      return true;
+    } catch {
+      return false;
+    }
   }
 
   async getImageStream(filename) {

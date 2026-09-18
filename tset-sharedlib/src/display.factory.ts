@@ -21,7 +21,7 @@ import {
   normalizeSubTypeForType,
   resolveDisplaySubType,
 } from './content.types';
-import { resolveAbsoluteUrl } from './extraction.utils';
+import { resolveAbsoluteUrl } from './extraction.pure.utils';
 
 function isIterable(value: unknown): value is Iterable<unknown> {
   return !!value && typeof (value as { [Symbol.iterator]?: unknown })[Symbol.iterator] === 'function';
@@ -439,7 +439,9 @@ export function createPublishedDisplayItem(
     curatedDate: curation?.curatedDate ?? undefined,
     curatorId: curation?.curatorId,
     curatorComment: curation?.curatorComment,
-    
+    underReview: !!curation?.underReviewAt,
+    nextReviewAt: curation?.nextReviewAt ?? undefined,
+
     inLibrary,
     
     // Nested parent relation

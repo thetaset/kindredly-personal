@@ -1,1 +1,0 @@
-import{ih as n,aw as p}from"./appLifecycle.storeDfGeWjhE.js";function f(t,e){if(n(t))return!1;const r=p(t);if(!r)return!0;const i=String(e||"").trim();return i?r.sourceKind==="item"&&String(r.sourceId||"").trim()===i:!1}export{f as i};

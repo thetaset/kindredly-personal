@@ -1,0 +1,1 @@
+import{a9 as r}from"./appLifecycle.storeDGO0E0kx.js";import{e as t}from"./regexCcuTG5WM.js";const o=[...r],c=o.map(e=>`^https?:\\/\\/([^\\/?#]*\\.)?${t(e)}(?:[\\/:?#]|$).*`);function p(e){if(!e)return!1;const a=e.toLowerCase().replace(/\.$/,"");return o.some(s=>a===s||a.endsWith(`.${s}`))}export{o as S,c as a,p as i};

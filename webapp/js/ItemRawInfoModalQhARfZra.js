@@ -1,0 +1,1 @@
+import{d as e,s as t,z as o,p as n}from"./vue-runtimeX1uKV5L1.js";import"./cjs-helpersC4iS2aBk.js";const l=e({__name:"ItemRawInfoModal",props:{data:{}},setup(a){return(r,p)=>(o(),t("pre",null,n(a.data),1))}});export{l as default};

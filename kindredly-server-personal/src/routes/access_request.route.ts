@@ -33,6 +33,23 @@ class AccessRequestRoute implements Routes {
 
     // SCH-OK
     this.router.post(
+      '/access_request/reviewStatus',
+      authenticateJWT,
+      errorHelper(async (req: ApiReq<'/access_request/reviewStatus'>, res) => {
+        const results = await this.accessRequestService.getAssistantReviewStatus(
+          RequestContext.instance(req),
+          getTargetUserId(req),
+        );
+        const result = {
+          success: true,
+          results: results,
+        };
+        res.json(result);
+      }),
+    );
+
+    // SCH-OK
+    this.router.post(
       '/access_request/listForUser',
       authenticateJWT,
       errorHelper(async (req: ApiReq<'/access_request/listForUser'>, res) => {
@@ -71,6 +88,9 @@ class AccessRequestRoute implements Routes {
       body('key').notEmpty().isString(),
       body('message').isString().escape(),
       errorHelper(async (req: ApiReq<'/access_request/add'>, res) => {
+        // `results` used to be the bare id string. Every caller reads only
+        // `success` or `results.aiReview`, and the Companion's IPC proxy reads
+        // only `success`, so widening it to an object is backward compatible.
         const results = await this.accessRequestService.addAccessRequest(
           RequestContext.instance(req),
           req.body.key,

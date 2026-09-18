@@ -15,6 +15,7 @@ export interface FeedbackUpdate {
   archivedDate?: Date | null;
   snoozeUntilDate?: Date | null;
   neverRemindDate?: Date | null;
+  keepFromCleanupDate?: Date | null;
   reaction?: string | null;
   isHidden?: boolean | null;
   updatedAt?: Date | null;
@@ -32,6 +33,7 @@ export const FEEDBACK_ATTRIBUTES = [
   'starredDate',
   'snoozeUntilDate',
   'neverRemindDate',
+  'keepFromCleanupDate',
   'archivedDate',
   'isHidden',
 ] as const;
@@ -84,6 +86,16 @@ export function computeFeedbackUpdate(
     feedback.starredDate = value ? now : null;
   }
 
+  // Read Later is a queue and Complete is its exit: finishing an item takes it out of the
+  // queue, and putting an item back in the queue un-finishes it. One rule here rather than
+  // two client calls, so the Complete toggle in any list does the same thing as "Done" on
+  // the Today "Next up" card.
+  if (attrName === 'isRead' && value) {
+    feedback.isReadLaterDate = null;
+  } else if (attrName === 'isReadLater' && value) {
+    feedback.isReadDate = null;
+  }
+
   // Direct value attributes
   if (['reaction', 'isHidden'].includes(attrName)) {
     (feedback as any)[attrName] = value;
@@ -93,6 +105,12 @@ export function computeFeedbackUpdate(
   if (attrName === 'snoozeUntilDate') {
     feedback.snoozeUntilDate = value ? new Date(value) : null;
     feedback.neverRemindDate = null;
+  }
+
+  // Keep out of Cleanup. Deliberately touches nothing else: keeping an item is not
+  // hiding it from Rediscover, which is why this stopped sharing neverRemindDate.
+  if (attrName === 'keepFromCleanupDate') {
+    feedback.keepFromCleanupDate = value ? new Date(value) : null;
   }
 
   // Never remind handling - clears snooze when set

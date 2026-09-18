@@ -29,6 +29,7 @@ import {isGuardianOnlyPrefKey} from 'tset-sharedlib/types/client.types';
 import {UpdatePublicProfileRequest} from 'tset-sharedlib/api';
 import type {CopyUserSettingsRequest, CopyUserSettingsResponse, UserSettingsCopyGroup} from 'tset-sharedlib/api';
 import {isUnderAge} from 'tset-sharedlib/date.utils';
+import {effectiveHistoryRetentionDays} from 'tset-sharedlib/plan-policy';
 import {buildCheckpointRelease, resolveCheckpointMode} from 'tset-sharedlib/restrictions/checkpoint';
 import type {AccessControlSettings, CheckpointRelease} from 'tset-sharedlib/types';
 import {isAppCapabilityId} from 'tset-sharedlib/types/item.types';
@@ -48,7 +49,8 @@ import UserFileService from './user_file.service';
 import VerificationService from './verification.service';
 import {container} from '@/inversify.config';
 import SSEManager from './sse.manager';
-import NotificationService from './notification.service';
+import {deviceSettingsChanged, notifyDeviceSettingsChanged} from './device_settings.service';
+import {nextDeviceSettingsVersionSql} from '@/db/device_settings_version.repo';
 
 const publicAttributes = ['username', 'fullName', 'enabled', 'about', 'profileImage'];
 
@@ -65,22 +67,8 @@ const MAX_APP_CAPABILITY_GRANT_APPS = 200;
 const MAX_APP_CAPABILITY_REF_ID_LENGTH = 200;
 const MAX_EMAIL_ALLOWED_SENDERS = 500;
 const MAX_EMAIL_ADDRESS_LENGTH = 254;
-
-/**
- * Whether an options write can change what a child's PHONE enforces.
- *
- * Only these three feed the device rule compiler. Pushing on every options write would wake a
- * child's device for a display preference; not pushing on these would leave the phone on its
- * 15-minute backstop for the one thing a parent expects to be immediate (UX-019).
- *
- * Errs toward sending: an unrecognised shape returns false, but each key is checked for
- * PRESENCE rather than for having changed, so re-saving the same limits still pushes. An extra
- * push costs one authenticated fetch of identical rules, which Guard then declines to re-seal.
- */
-function touchesDeviceRules(options: any): boolean {
-  if (!options || typeof options !== 'object') return false;
-  return 'usageLimitsData' in options || 'accessControlSettings' in options || 'ruleOverrideSettings' in options;
-}
+/** A Blocked message is a sentence or two on a block screen, not a letter. */
+const BLOCKED_MESSAGE_MAX = 500;
 
 class UserService {
   private userRepo = new UserRepo();
@@ -99,7 +87,6 @@ class UserService {
   private fileService = container.resolve(UserFileService);
 
   private verficationService = new VerificationService();
-  private notificationService = container.resolve(NotificationService);
 
   private buildOfficialPublisherProfile(): UserPublic {
     return {
@@ -557,25 +544,30 @@ class UserService {
       throw new HttpException(404, 'User not found');
     }
 
-    const updatedOptions = this._mergeUserOptions(targetUser, options);
+    // The plan caps "Keep history for", so the merge needs to know it. The target is in the caller's
+    // account: verifyAdminPermissions refuses anyone else.
+    const account =
+      options && typeof options === 'object' && 'historyRetentionDays' in options ? await ctx.getAccount() : null;
+    const updatedOptions = this._mergeUserOptions(targetUser, options, {accountType: (account as any)?.accountType});
 
-    await this._updateUserWithId(targetUserId, {options: updatedOptions});
+    // A device-relevant change raises the device settings version in the SAME statement as the
+    // options, so no device can read the new version with the old settings (DCP-5). A display
+    // preference changes nothing a device reads and wakes no device. Neither does re-saving
+    // identical limits: the version tells a device nothing changed.
+    const deviceChanged = deviceSettingsChanged(targetUser.options, updatedOptions);
+    await this._updateUserWithId(targetUserId, {
+      options: updatedOptions,
+      ...(deviceChanged ? {deviceSettingsVersion: nextDeviceSettingsVersionSql(this.userRepo.knex)} : {}),
+    });
     this.broadcastUserSettingsRefresh(targetUserId, {
       refreshCurrentUser: true,
       refreshUserPrefs: false,
       source: 'options-update',
     });
 
-    // Only when the change can actually change what the phone enforces. Pushing on every
-    // options write would wake a child's device for things like a display preference.
-    if (touchesDeviceRules(options)) {
-      // Fire-and-forget on purpose: the parent's save must not fail, or appear to fail,
-      // because a push provider was slow. Guard's 15-minute pull is the backstop if it
-      // never lands (UX-019).
-      void this.notificationService
-        .sendSilentDeviceRuleSync(targetUserId)
-        .catch((e) => console.error('device rule sync push failed', e?.message || e));
-    }
+    // The one device nudge (SSE + silent push). Fire-and-forget: the parent's save must not fail,
+    // or appear to fail, because a push provider was slow.
+    if (deviceChanged) notifyDeviceSettingsChanged([targetUserId]);
 
     return null;
   }
@@ -632,6 +624,67 @@ class UserService {
     });
 
     return {release};
+  }
+
+  /**
+   * Give every family member with no Blocked message this one. Anyone who has their own keeps it.
+   *
+   * Server-side and field-level on purpose. `setUserOptions` replaces `accessControlSettings`
+   * wholesale, so the obvious client version (read each member, set the message, send it back)
+   * would, for every member at once, carry the same risk that once wiped a child's check-in
+   * (UX-023). Here the family's rows are read under a lock and only `usageGuidanceMessage` is set.
+   *
+   * The message is also the note on a device's downtime shield, so a changed member's device
+   * settings version moves with it.
+   */
+  // ROUTE-METHOD
+  async fillBlankBlockedMessages(ctx: RequestContext, message: unknown): Promise<{updatedUserIds: string[]}> {
+    if (!(await ctx.isAdmin())) {
+      throw new Error('Not authorized');
+    }
+    const text = typeof message === 'string' ? message.trim().slice(0, BLOCKED_MESSAGE_MAX) : '';
+    if (!text) {
+      throw new Error('Write a message first.');
+    }
+
+    const updatedUserIds: string[] = [];
+    const trx = await this.userRepo.createTransaction();
+    try {
+      const members = (await trx('user')
+        .where({accountId: ctx.accountId})
+        .forUpdate()
+        .select('_id', 'options', 'deleted')) as Array<{_id: string; options: any; deleted?: boolean}>;
+
+      for (const member of members) {
+        if (member.deleted) continue;
+        const options = (member.options || {}) as Record<string, any>;
+        const access = (options.accessControlSettings || {}) as AccessControlSettings;
+        const existing = typeof access.usageGuidanceMessage === 'string' ? access.usageGuidanceMessage.trim() : '';
+        if (existing) continue;
+
+        await trx('user')
+          .where({_id: member._id})
+          .update({
+            options: {...options, accessControlSettings: {...access, usageGuidanceMessage: text}},
+            deviceSettingsVersion: nextDeviceSettingsVersionSql(trx),
+          });
+        updatedUserIds.push(member._id);
+      }
+      await trx.commit();
+    } catch (error) {
+      await trx.rollback();
+      throw error;
+    }
+
+    for (const userId of updatedUserIds) {
+      this.broadcastUserSettingsRefresh(userId, {
+        refreshCurrentUser: true,
+        refreshUserPrefs: false,
+        source: 'options-update',
+      });
+    }
+    notifyDeviceSettingsChanged(updatedUserIds);
+    return {updatedUserIds};
   }
 
   async copyUserSettings(ctx: RequestContext, input: CopyUserSettingsRequest): Promise<CopyUserSettingsResponse> {
@@ -717,6 +770,7 @@ class UserService {
       }
     }
 
+    let deviceChanged = false;
     const tx = await this.userRepo.createTransaction();
     try {
       const txUserRepo = this.userRepo.withTransaction(tx) as UserRepo;
@@ -724,7 +778,12 @@ class UserService {
 
       if (Object.keys(optionPatches).length > 0) {
         const updatedOptions = this._mergeUserOptions(targetUser, optionPatches);
-        await txUserRepo.where({_id: targetUserId}).update({options: updatedOptions});
+        // Copying usage limits is a device settings change for the target (DCP-5).
+        deviceChanged = deviceSettingsChanged(targetUser.options, updatedOptions);
+        await txUserRepo.where({_id: targetUserId}).update({
+          options: updatedOptions,
+          ...(deviceChanged ? {deviceSettingsVersion: nextDeviceSettingsVersionSql(tx)} : {}),
+        } as any);
       }
 
       if (Object.keys(preferenceUpdates).length > 0) {
@@ -750,6 +809,7 @@ class UserService {
       refreshUserPrefs: Object.keys(preferenceUpdates).length > 0,
       source: 'settings-copy',
     });
+    if (deviceChanged) notifyDeviceSettingsChanged([targetUserId]);
 
     return {
       targetUserId,
@@ -809,15 +869,26 @@ class UserService {
     return null;
   }
 
-  private _mergeUserOptions(targetUser: Pick<User, 'options' | 'type' | 'dob'>, options: any) {
+  private _mergeUserOptions(
+    targetUser: Pick<User, 'options' | 'type' | 'dob'>,
+    options: any,
+    plan: {accountType?: string | null} = {},
+  ) {
     const prevOptions = (targetUser.options as unknown as Record<string, unknown> | null) ?? {
       whitelistingEnabled: false,
       codeInjectionEnabled: false,
       contentFilteringEnabled: false,
       logActivity: false,
       aiChatEnabled: false,
+      assistantReviewEnabled: false,
       appEditorEnabled: false,
       explorePublishedEnabled: false,
+      emailEnabled: false,
+      speechModeEnabled: false,
+      wakeWordEnabled: false,
+      communityContentEnabled: false,
+      companionDevicesEnabled: false,
+      remoteChildActionsEnabled: false,
       accessControlSettings: null,
       usageLimitsData: null,
       ruleOverrideSettings: null,
@@ -844,11 +915,36 @@ class UserService {
       if ('aiChatEnabled' in options) {
         updatedOptions.aiChatEnabled = !!options.aiChatEnabled;
       }
+      if ('assistantReviewEnabled' in options) {
+        updatedOptions.assistantReviewEnabled = !!options.assistantReviewEnabled;
+      }
       if ('appEditorEnabled' in options) {
         updatedOptions.appEditorEnabled = !!options.appEditorEnabled;
       }
       if ('explorePublishedEnabled' in options) {
         updatedOptions.explorePublishedEnabled = !!options.explorePublishedEnabled;
+      }
+      // The optional features that used to be one family-wide switch on the account. They are
+      // per person now, and they are options rather than userPrefs for the reason every
+      // permission here is: a restricted user can write their own prefs, so a child could
+      // otherwise grant themselves an inbox, a microphone, or the community catalog.
+      if ('emailEnabled' in options) {
+        updatedOptions.emailEnabled = !!options.emailEnabled;
+      }
+      if ('speechModeEnabled' in options) {
+        updatedOptions.speechModeEnabled = !!options.speechModeEnabled;
+      }
+      if ('wakeWordEnabled' in options) {
+        updatedOptions.wakeWordEnabled = !!options.wakeWordEnabled;
+      }
+      if ('communityContentEnabled' in options) {
+        updatedOptions.communityContentEnabled = !!options.communityContentEnabled;
+      }
+      if ('companionDevicesEnabled' in options) {
+        updatedOptions.companionDevicesEnabled = !!options.companionDevicesEnabled;
+      }
+      if ('remoteChildActionsEnabled' in options) {
+        updatedOptions.remoteChildActionsEnabled = !!options.remoteChildActionsEnabled;
       }
       if ('accessControlSettings' in options) {
         updatedOptions.accessControlSettings = options.accessControlSettings;
@@ -864,6 +960,20 @@ class UserService {
       }
       if ('emailAllowedSenders' in options) {
         updatedOptions.emailAllowedSenders = this._sanitizeEmailAllowedSenders(options.emailAllowedSenders);
+      }
+      // "Keep history for" (PLN-9). An option, not a pref, for the same reason as the permissions
+      // above: a child must never be able to shorten their own history and erase what their
+      // guardians see. Stored already capped at the plan's maximum; null goes back to the default.
+      // The purge caps it again at run time, so a family that later moves to Standard keeps 14 days.
+      if ('historyRetentionDays' in options) {
+        if (options.historyRetentionDays === null) {
+          delete updatedOptions.historyRetentionDays;
+        } else {
+          updatedOptions.historyRetentionDays = effectiveHistoryRetentionDays(
+            plan.accountType,
+            options.historyRetentionDays,
+          );
+        }
       }
     }
 
@@ -1227,7 +1337,8 @@ class UserService {
   }
 
   // ROUTE-METHOD
-  // TODO: Account owner?
+  // There is no account owner. "Who may remove whom" is settled by the two guards below and
+  // documented in docs/architecture/31-MEMBER-LIFECYCLE.md (S1, S2, S3).
   async softDeleteUser(ctx: RequestContext, userIdToDelete) {
     if (!(await ctx.isAdmin())) {
       throw new Error('You must be an admin to delete a user');
@@ -1235,6 +1346,14 @@ class UserService {
     await ctx.verifyAdminPermissions(userIdToDelete);
 
     const user = await this.getUserById(userIdToDelete);
+    const isSelf = userIdToDelete == ctx.currentUserId;
+
+    // An adult leaves under their own name; one guardian never evicts another. Losing a
+    // co-guardian is a transfer of what they hold, not a delete — see doc 31 (S3, S5).
+    if (user.type != UserType.restricted && !isSelf) {
+      throw new Error('Only a child can be removed from the family. An adult has to leave the family themselves.');
+    }
+
     const users = await this._getUsers(user.accountId);
     if (users.length > 1) {
       let hasAdmin = false;
@@ -1245,7 +1364,28 @@ class UserService {
         throw Error(
           "Your current account has other users.  At least one user in your account must be an Admin before you can continue.  You must do one of the following before continuing, make an existing 'restricted user' an 'admin user'.  Migrate or delete all other users in this account.",
         );
+    } else if (isSelf) {
+      // The last user standing cannot leave an account behind with nobody in it — that is a
+      // Delete Account, and it lives on its own page with its own confirmation.
+      throw new Error('You are the only user in this account. Delete the account instead of leaving the family.');
     }
+
+    return await this.markUserDeleted(userIdToDelete);
+  }
+
+  /**
+   * The tombstone itself: move the identity columns out of the way so the address can be
+   * reused, and set `deleted`.
+   *
+   * Separate from softDeleteUser because the two callers mean different things. Removing one
+   * member from a family answers "who may remove whom" — the guards above. Deleting the whole
+   * account answers nothing: every user goes, including the admin doing it, so those guards
+   * would only ever refuse. AccountService.deleteAccountForPersonalServer used to call
+   * softDeleteUser and hit exactly that — the last admin is always `isSelf` with nobody left,
+   * so account deletion failed with "You are the only user in this account".
+   */
+  async markUserDeleted(userIdToDelete) {
+    const user = await this.getUserById(userIdToDelete);
 
     await this._updateUserWithId(userIdToDelete, {
       accountId: `deleted_` + user.accountId,
@@ -1262,7 +1402,9 @@ class UserService {
   async disableUser(ctx: RequestContext, userIdToDisable) {
     const user = await this.getUserById(userIdToDisable);
     const currentUser = await ctx.getCurrentUser();
-    if (user.accountId != ctx.accountId && currentUser.type == 'admin') {
+    // Was `!= accountId && type == admin`, which let a non-admin through and blocked the admin
+    // it meant to allow. No route reaches this yet; fixed so wiring one is not a hole.
+    if (user.accountId != ctx.accountId || currentUser.type != UserType.admin) {
       throw new Error('Something went wrong');
     }
 

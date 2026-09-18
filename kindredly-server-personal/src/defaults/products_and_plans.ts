@@ -23,7 +23,7 @@ function createProductDetailsFromPolicy(policy: ReturnType<typeof getSharedPlanP
     quotaWarnAtPercent: policy.files.warnAtPercent,
     quotaUrgentWarnAtPercent: policy.files.urgentWarnAtPercent,
     quotaBlockAtPercent: policy.files.blockAtPercent,
-    historyRetentionDays: policy.history.retentionDays,
+    historyRetentionDays: policy.history.maxRetentionDays,
     publicLabel: policy.publicLabel,
     publicLabelWithFree: policy.publicLabelWithFree || policy.publicLabel,
     marketingTier: policy.marketingTier,

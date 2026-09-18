@@ -1,1 +1,0 @@
-import{aJ as r}from"./appLifecycle.storeDfGeWjhE.js";import{A as t}from"./searchTargetswMPZt2Eo.js";const o=[...r],A=o.map(e=>`^https?:\\/\\/([^\\/?#]*\\.)?${t(e)}(?:[\\/:?#]|$).*`);function c(e){if(!e)return!1;const a=e.toLowerCase().replace(/\.$/,"");return o.some(s=>a===s||a.endsWith(`.${s}`))}export{A as S,o as a,c as i};

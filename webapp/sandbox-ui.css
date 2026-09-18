@@ -72,6 +72,42 @@ body {
 .knd-grid-2 { grid-template-columns: repeat(2, 1fr); }
 .knd-grid-3 { grid-template-columns: repeat(3, 1fr); }
 
+/* ===== game surface (built by knd.game) =====
+   Colors here are literal on purpose: these controls sit ON a game canvas, whose background is
+   app content rather than a theme token, so a themed color would be unreadable half the time. */
+.knd-game { position: relative; margin: 0 auto; touch-action: none; }
+.knd-game canvas { display: block; width: 100%; height: 100%; }
+.knd-game-overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--knd-space-2);
+  padding: var(--knd-space-3);
+}
+.knd-game-overlay > * { pointer-events: auto; }
+
+/* A round on-screen control for a touch game. */
+.knd-pad {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 56px;
+  height: 56px;
+  padding: 0;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  background: rgba(0, 0, 0, 0.38);
+  color: #fff;
+  font-size: 22px;
+  line-height: 1;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
 /* ============================ surfaces ============================ */
 
 .knd-card {

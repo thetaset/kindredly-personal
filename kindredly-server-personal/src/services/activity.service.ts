@@ -1,4 +1,5 @@
 import {UserActivityRepo} from '@/db/user_activity.repo';
+import {resolveReporterRole, type ReporterRole} from '@/utils/reporter_role';
 import {UserPrefRepo} from '@/db/user_pref.repo';
 import {ItemFeedbackRepo} from '@/db/item_feedback.repo';
 import {DynObj} from '@/types';
@@ -300,22 +301,9 @@ class ActivityService {
     return {enabled: true, reason: 'enabled'};
   }
 
-  /**
-   * Who is reporting, decided from the session rather than the request body.
-   *
-   * A restricted user's report is evidence, not ground truth — they have an
-   * obvious interest in a different answer — so downstream must be able to
-   * weight it. Letting the client name its own role would defeat that.
-   */
-  private async resolveReporterRole(ctx: RequestContext): Promise<'restricted' | 'guardian' | 'admin'> {
-    try {
-      if (await ctx.isAdmin()) return 'admin';
-      const user = ctx.currentUserId ? await ctx.getUserById(ctx.currentUserId) : null;
-      return (user as any)?.type === 'restricted' ? 'restricted' : 'guardian';
-    } catch {
-      // Unknown provenance is the least trustworthy case, not the most.
-      return 'restricted';
-    }
+  /** Who is reporting, from the session (utils/reporter_role.ts, shared with catalog reports). */
+  private async resolveReporterRole(ctx: RequestContext): Promise<ReporterRole> {
+    return resolveReporterRole(ctx);
   }
 
   /**

@@ -13,6 +13,13 @@ function toItemMetaOrNull(value: ItemMeta | Record<string, never> | null | undef
 }
 
 function resolveCanonicalUrl(requestUrl: string, meta: ItemMeta | null): string {
+  // A file URL is its own canonical form. Its metadata may have been recovered from
+  // a sibling landing page, and adopting that page's URL here would silently save
+  // the abstract instead of the file the person asked for.
+  if (meta?.fileInfo) {
+    return requestUrl;
+  }
+
   const recognizedCanonicalUrl = meta?.tsExtractedInfo?.recognized?.canonicalUrl;
   if (typeof recognizedCanonicalUrl === 'string' && recognizedCanonicalUrl.trim().length > 0) {
     return recognizedCanonicalUrl.trim();
@@ -102,6 +109,7 @@ export default class ContentLookupService {
       return {
         canonicalUrl: '',
         meta: null,
+        fileInfo: null,
         resourceInfo: null,
         classification: null,
         lookupMeta: {
@@ -157,6 +165,7 @@ export default class ContentLookupService {
     return {
       canonicalUrl,
       meta,
+      fileInfo: meta?.fileInfo || null,
       resourceInfo: resolvedResourceInfo,
       classification,
       lookupMeta: {

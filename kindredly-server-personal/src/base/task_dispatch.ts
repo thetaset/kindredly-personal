@@ -68,6 +68,11 @@ export const taskHandlers: Record<TaskRunnerJobTypes, TaskHandler> = {
     return await SecurityDigestService.instance.run();
   },
 
+  [TaskRunnerJobTypes.runRealmBackup]: async () => {
+    const {RealmBackupService} = require('../services/realm_bundle/realm_backup.service');
+    return await RealmBackupService.instance.runScheduledBackup();
+  },
+
   [TaskRunnerJobTypes.runCompanionTamperWatch]: async () => {
     const {CompanionTamperWatchService} = require('../services/companion_tamper_watch.service');
     return await CompanionTamperWatchService.instance.run();
@@ -101,6 +106,18 @@ export const taskHandlers: Record<TaskRunnerJobTypes, TaskHandler> = {
     // personal-optional: guarded, never reached on a self-hosted server
     const {PublishedModerationReporter} = require('../services/_internal/published_moderation_reporter.service');
     return await PublishedModerationReporter.instance.runAiReviewJob(ctxFor(data), data);
+  },
+
+  [TaskRunnerJobTypes.curationReviewAiDraft]: async (data) => {
+    // personal-optional: guarded, never reached on a self-hosted server
+    const CurationReviewService = require('../services/_internal/curation_review.service').default;
+    return await new CurationReviewService().runAiDraftJob(data);
+  },
+
+  [TaskRunnerJobTypes.runDueCurationReviews]: async () => {
+    // personal-optional: guarded, never reached on a self-hosted server
+    const CurationReviewService = require('../services/_internal/curation_review.service').default;
+    return await new CurationReviewService().runDue();
   },
 };
 

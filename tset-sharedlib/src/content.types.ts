@@ -1624,14 +1624,17 @@ export const eduTagList: TagOptionDetail<EduValue>[] = [
 
 // Min age = the youngest age the content is suitable for (a floor). Labels read as "Min age N+"
 // so they are never confused with the target-audience tags below (which read as "For …").
+// `selectedName` drops the "Min age" prefix for places that already label the
+// row — every other list here carries one; this was the only dimension without.
+// `name` is unchanged, so anything showing the full label still reads the same.
 export const minAgeTagList: TagOptionDetail<MinAgeGroup>[] = [
-  { key: 'minage_na', name: 'Min age: N/A' },
-  { key: 'minage_unknown', name: 'Min age: Unassigned' },
-  { key: 'minage_prek', name: 'Min age 0+ (Pre-K)' },
-  { key: 'minage_kids', name: 'Min age 5+ (Young Kids)' },
-  { key: 'minage_preteen', name: 'Min age 10+ (Pre-Teens)' },
-  { key: 'minage_teen', name: 'Min age 13+ (Teens)' },
-  { key: 'minage_adult', name: 'Min age 18+ (Adults)' },
+  { key: 'minage_na', name: 'Min age: N/A', selectedName: 'N/A' },
+  { key: 'minage_unknown', name: 'Min age: Unassigned', selectedName: 'Unassigned' },
+  { key: 'minage_prek', name: 'Min age 0+ (Pre-K)', selectedName: '0+ (Pre-K)' },
+  { key: 'minage_kids', name: 'Min age 5+ (Young Kids)', selectedName: '5+ (Young Kids)' },
+  { key: 'minage_preteen', name: 'Min age 10+ (Pre-Teens)', selectedName: '10+ (Pre-Teens)' },
+  { key: 'minage_teen', name: 'Min age 13+ (Teens)', selectedName: '13+ (Teens)' },
+  { key: 'minage_adult', name: 'Min age 18+ (Adults)', selectedName: '18+ (Adults)' },
 ];
 
 // Target audience = who the content is designed/marketed for. Labels read as "For …" to stay

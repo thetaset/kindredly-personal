@@ -1,11 +1,18 @@
 import {config} from '@/config';
 
+// Response headers a browser client may read on user-file streams. Without an explicit CORS
+// exposure the client sees neither, even on a 200.
+const USERFILE_EXPOSED_HEADERS = ['X-UserFile-Encrypted', 'X-UserFile-Resolved-Preview-Id'];
+
 import {startRecurringJobs} from '@/base/recurring_jobs';
 import SystemRoute from '@/routes/system.route';
 import {logger, stream} from '@/utils/logger';
 import {Routes} from '@interfaces/routes.interface';
 import errorMiddleware from '@middlewares/error.middleware';
 import {serveWebapp} from '@/base/webapp_static';
+import {loadBoxTls} from '@/base/box_tls';
+import {createBoxListener, mountBoxTrustRoutes} from '@/base/box_trust_page';
+import {startBoxAnnounce} from '@/base/box_announce';
 import {requestShapeObserverMiddleware} from '@middlewares/request_shape_observer.middleware';
 import {authorizationObserverMiddleware} from '@middlewares/authorization_observer.middleware';
 import AuthRoute from '@routes/auth.route';
@@ -40,6 +47,7 @@ import UserNotificationsRoute from './routes/user_notifications.route';
 import UserPrefsRoute from './routes/user_prefs.route';
 import RefStateRoute from './routes/ref_state.route';
 import DeviceGuardRoute from './routes/device_guard.route';
+import RealmRecoveryRoute from './routes/realm_recovery.route';
 import StandaloneAppRoute from './routes/standalone_app.route';
 import PluginService from './services/plugin.service';
 import {asPath} from './utils/crypto_util';
@@ -69,6 +77,8 @@ class App {
   public app: express.Application;
   public env: string;
   public port: string | number;
+  /** The mDNS name this box took (BOX-1), without `.local`; null until announced or on the cloud. */
+  private boxHostname: string | null = null;
 
   constructor(routes: Routes[] = []) {
     this.app = express();
@@ -103,6 +113,7 @@ class App {
         new CommentRoute(),
         new ContentBundleRoute(),
         new DeviceGuardRoute(),
+        new RealmRecoveryRoute(),
         new SetupCatalogRoute(),
         new EmbeddingCacheRoute(),
         new ExternalDataRoute(),
@@ -166,12 +177,36 @@ class App {
   }
 
   public listen() {
-    this.app.listen(this.port, () => {
+    const port = Number(this.port);
+    const ready = () => {
       logger.info(`=================================`);
       logger.info(`======= ENV: ${this.env} =======`);
       logger.info(`🚀 App listening on the port ${this.port}`);
       logger.info(`=================================`);
+    };
+
+    // A box certifies itself and announces itself (BOX-1/3). Both are null on the cloud.
+    const tls = loadBoxTls({hostname: config.box.hostname || undefined});
+    if (tls) {
+      const listener = createBoxListener({app: this.app, tls});
+      listener.server.listen(port, () => {
+        ready();
+        logger.info(`[box-tls] https on ${port}; authority sha256 ${tls.caSha256}; trust page at /box/trust`);
+      });
+    } else {
+      this.app.listen(this.port, ready);
+    }
+    void startBoxAnnounce({port, caSha256: tls?.caSha256}).then((announced) => {
+      if (announced) this.boxHostname = announced.hostname;
     });
+    if (config.profile === 'lite') {
+      // Read and reported, not yet acted on: the tunnel client lands with BOX-15/16.
+      logger.info(
+        config.box.tunnel
+          ? `[box-remote] tunnel requested through ${config.box.relayUrl} — the relay client is not built yet; this box is reachable on the home network only`
+          : '[box-remote] remote access off: this box is reachable on the home network only',
+      );
+    }
 
     // `lite` has no task-server process, so the repeatables have nowhere else to
     // be scheduled. A no-op under `cloud`, where scheduling them here as well
@@ -248,7 +283,9 @@ class App {
 
     if (config.origin === '*' && !config.credentials) {
       console.log('Cors with origin(s):', config.origin);
-      this.app.use(cors({origin: config.origin, credentials: config.credentials}));
+      this.app.use(
+        cors({origin: config.origin, credentials: config.credentials, exposedHeaders: USERFILE_EXPOSED_HEADERS}),
+      );
     } else {
       const origins = config.origins;
       console.log('Usering cors with orgin', origins, ' credentials: ', config.credentials);
@@ -257,6 +294,7 @@ class App {
         cors({
           origin: origins,
           credentials: config.credentials,
+          exposedHeaders: USERFILE_EXPOSED_HEADERS,
         }),
       );
     }
@@ -297,6 +335,13 @@ class App {
         // includeSubDomains is off on purpose: it would force HTTPS on every subdomain of
         // the apex, including any that are not TLS-terminated yet. Scope it to this host.
         hsts: {maxAge: 15552000, includeSubDomains: false, preload: false},
+
+        // A box serves the webapp itself, and the extension runs standalone apps by framing
+        // that webapp from a chrome-extension:// page — which is never same-origin, so
+        // X-Frame-Options: SAMEORIGIN refused the frame before any of our code ran (BOX-5).
+        // On `lite` the HTML responses carry a `frame-ancestors` policy naming the extension
+        // origins instead (base/webapp_static.ts). Cloud is unchanged: it never serves HTML.
+        frameguard: config.profile !== 'lite',
       }),
     );
     // Configure compression to skip SSE streams and flagged requests
@@ -326,6 +371,7 @@ class App {
       asPath('/item/attachment/add'),
       asPath('/item/save'),
       asPath('/item/update'),
+      asPath('/item/duplicates/merge'),
       asPath('/post/create'),
       asPath('/user/publicProfileImage/upload'),
       asPath('/ref_state/user/upsert'),
@@ -523,6 +569,10 @@ class App {
     } else {
       logger.warn(`[downloads] directory missing: ${downloadArtifactsDir}`);
     }
+
+    // The trust page and the authority download (BOX-3), ahead of /downloads' static mount. They
+    // answer only once listen() has loaded material, so the cloud never serves them.
+    mountBoxTrustRoutes(this.app, {port: Number(this.port), hostname: () => this.boxHostname});
 
     this.app.use('/', new HealthCheckRouter().router);
     routes.forEach((route) => {

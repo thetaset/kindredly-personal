@@ -101,4 +101,13 @@ export default interface Published {
   sourceInfo?: Record<string, any> | null;
 
   availableAt?: Date | null;
+
+  /**
+   * Set while an open curation review has taken this row out of recommendations. The page still
+   * opens. Never expressed through `curated`, which would hide a family's row entirely.
+   */
+  underReviewAt?: Date | null;
+
+  /** When the last finished curation review said to check it again. */
+  nextReviewAt?: Date | null;
 }

@@ -11,6 +11,7 @@ import ItemListService from '@/services/item.list.service';
 import ItemRelationService from '@/services/item.relations';
 import ChangeLogService from '@/services/change_log.service';
 import ItemQueryService from '@/services/item.query.service';
+import ItemMergeService from '@/services/item.merge.service';
 import {RefStateRepo} from '@/db/ref_state.repo';
 import {RefStateService} from '@/services/ref_state.service';
 import type {ItemImageApproval} from 'tset-sharedlib/api';
@@ -67,6 +68,8 @@ class ItemRoute implements Routes {
   private itemRelationService = new ItemRelationService();
 
   private itemQueryService = new ItemQueryService();
+
+  private itemMergeService = new ItemMergeService();
 
   private refStateService = new RefStateService();
 
@@ -126,6 +129,16 @@ class ItemRoute implements Routes {
           results: results || {},
         };
         res.json(removeNullFields(result));
+      }),
+    );
+
+    this.router.post(
+      '/item/duplicates/merge',
+      express.json({limit: '70mb'}),
+      authenticateJWT,
+      errorHelper(async (req: ApiReq<'/item/duplicates/merge'>, res) => {
+        const results = await this.itemMergeService.merge(RequestContext.instance(req), req.body);
+        res.json({success: true, results});
       }),
     );
 

@@ -34,6 +34,14 @@ class SSEManager {
    */
   private bus: EventBus;
   private localConnections = new Map<string, Response>();
+  /**
+   * Connections that may receive only the events named here. A connection with no entry receives
+   * everything addressed to its user, as every browser stream always has.
+   *
+   * The desktop Companion's settings stream is the one user (DCP-8): its device token is allowed the
+   * content-free "settings changed" nudge and nothing else a child's browsers are sent.
+   */
+  private eventFilters = new Map<string, ReadonlySet<string>>();
   private serverId: string;
   private channelName = 'sse_broadcasts';
   private systemsInitialized = false;
@@ -162,14 +170,14 @@ class SSEManager {
     if (message.targetClientId) {
       // Specific client targeting
       const connection = this.localConnections.get(message.targetClientId);
-      if (connection) {
+      if (connection && this.receives(message.targetClientId, message.event)) {
         this.sendSSEMessage(connection, message.event, message.data, true, message.targetClientId);
       }
     } else if (message.targetUserId) {
       // User-specific broadcast
       this.localConnections.forEach((res, clientId) => {
         console.log('Checking clientId:', clientId, 'for userId:', message.targetUserId);
-        if (clientId.startsWith(`${message.targetUserId}-`)) {
+        if (clientId.startsWith(`${message.targetUserId}-`) && this.receives(clientId, message.event)) {
           console.log(`Sending event '${message.event}' to user ${message.targetUserId} on client ${clientId}`);
           this.sendSSEMessage(res, message.event, message.data, true, clientId);
         }
@@ -177,9 +185,17 @@ class SSEManager {
     } else {
       // Broadcast to all local connections
       this.localConnections.forEach((res, clientId) => {
-        this.sendSSEMessage(res, message.event, message.data, true, clientId);
+        if (this.receives(clientId, message.event)) {
+          this.sendSSEMessage(res, message.event, message.data, true, clientId);
+        }
       });
     }
+  }
+
+  /** Whether this connection may be sent `event`. See `eventFilters`. */
+  private receives(clientId: string, event: string): boolean {
+    const allowed = this.eventFilters.get(clientId);
+    return !allowed || allowed.has(event);
   }
 
   /**
@@ -237,13 +253,19 @@ class SSEManager {
    *
    * Returns false when the client was already gone by the time registration
    * completed — the caller should stop and not write to res.
+   *
+   * `options.events` limits the connection to those events (see `eventFilters`). Set before the
+   * connection is reachable, so nothing outside the list can slip through while it registers.
    */
   async registerConnection(
     clientId: string,
     userId: string,
     req: {on(event: string, listener: (...args: any[]) => void): unknown},
     res: Response,
+    options: {events?: readonly string[]} = {},
   ): Promise<boolean> {
+    if (options.events) this.eventFilters.set(clientId, new Set(options.events));
+    else this.eventFilters.delete(clientId);
     let closed = false;
     const cleanup = () => {
       if (closed) return;
@@ -291,6 +313,7 @@ class SSEManager {
 
     // Remove locally
     this.localConnections.delete(clientId);
+    this.eventFilters.delete(clientId);
 
     // Get connection info to find userId
     const connectionData = await this.redis.get(`sse_connection:${clientId}`);
@@ -760,6 +783,7 @@ class SSEManager {
       }
     });
     this.localConnections.clear();
+    this.eventFilters.clear();
 
     console.info(
       `Cleared all SSE data: ${connectionKeys.length} connections, ${heartbeatKeys.length} heartbeats, ${userConnectionKeys.length} user sets, ${localConnectionsCount} local connections`,

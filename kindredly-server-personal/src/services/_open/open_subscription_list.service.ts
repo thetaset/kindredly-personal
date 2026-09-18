@@ -37,7 +37,7 @@ class OpenSubscriptionManagerService implements SubscriptionManagerService {
           ...sub,
           item: item,
         });
-      } else if (sub.refType == 'custom') {
+      } else if (sub.refType == 'custom' || sub.refType == 'rediscover') {
         subWithDetailsList.push({
           ...sub,
         });

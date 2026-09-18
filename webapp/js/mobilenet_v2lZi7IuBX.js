@@ -1,0 +1,1 @@
+import{bC as r}from"./appLifecycle.storeDGO0E0kx.js";import"./vue-runtimeX1uKV5L1.js";import"./cjs-helpersC4iS2aBk.js";import"./dexie2jmnBxhj.js";import"./bootstrap-vue-nextBnWKdfvs.js";var m=function(){return r(()=>import("./model.minCdqdRUPQ.js"),[])},n=[function(){return r(()=>import("./group1-shard1of1.minDUujGfpw.js"),[])}];export{m as modelJson,n as weightBundles};

@@ -27,6 +27,13 @@ describe('isLikelyFeedUrl', () => {
     'https://feeds.npr.org/510355/podcast.xml',
     'https://feeds.example.com/show/podcast.rss',
     'https://rss.example.com/show.xml',
+    // Feed-only podcast hosts: the feed URL is an opaque id with no feed-shaped path.
+    'https://feeds.simplecast.com/kwWc0lhf',
+    'https://feeds.megaphone.fm/sciencevs',
+    'https://feeds.acast.com/public/shows/616934d546b8410012930740',
+    'https://rss.art19.com/big-fib',
+    'https://feeds.feedburner.com/TechCrunch',
+    'https://feeds.publicradio.org/public_feeds/brains-on',
     'https://example.com/everything.atom',
     'https://www.youtube.com/feeds/videos.xml?channel_id=UCsXVk37bltHxD1rDPwtNM8Q',
     'https://blogger-site.blogspot.com/feeds/posts/default',
@@ -57,6 +64,12 @@ describe('isLikelyFeedUrl', () => {
     // A feed-hosting subdomain is only a cue when it serves a data file.
     'https://feeds.example.com/about',
     'https://feeds.example.com/',
+    // A feed-only host's root is not a feed (`feeds.publicradio.org/` is an HTML
+    // page), and the podcast company's own site is not its feed host.
+    'https://feeds.simplecast.com/',
+    'https://feeds.publicradio.org/',
+    'https://simplecast.com/podcasts/some-show',
+    'https://notfeeds.simplecast.com/kwWc0lhf',
     // Words that merely start with "feed".
     'https://example.com/feedback',
     'https://example.com/feedback/form',

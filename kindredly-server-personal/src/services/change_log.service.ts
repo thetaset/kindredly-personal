@@ -95,6 +95,17 @@ class ChangeLogService {
     // harmless: sync.service.ts unions changed ids into a Set. SYNC-5.
     await this.changeLogRepo.addChangeLogEntries(userIds, data);
 
+    this.broadcastItemChangeForUserIds(userIds, itemIds, changeType);
+
+    return true;
+  }
+
+  /** Broadcast-only half used after a transaction has already committed its journal rows. */
+  broadcastItemChangeForUserIds(
+    userIds: string[],
+    itemIds: string[],
+    changeType: SyncType.itemUpdate = SyncType.itemUpdate,
+  ) {
     // SSE is only a nudge -- the client's next poll converges without it.
     // DELIBERATELY NOT AWAITED: a Redis blip must never fail an item save.
     for (const userId of userIds) {
@@ -109,8 +120,6 @@ class ChangeLogService {
           logger.error('Error broadcasting item change via SSE', e, {userId, changeType, itemIds});
         });
     }
-
-    return true;
   }
 }
 

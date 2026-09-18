@@ -73,7 +73,7 @@ export const COLLECTION_TEMPLATE_SEED: CollectionTemplate[] = [
   },
   {
     id: 'personal.health.symbols.v1',
-    name: 'Health – Visual',
+    name: 'Health Info',
     group: 'Personal Admin',
     description: 'A symbolic health board — big tiles, tap one to see what’s inside.',
     tags: ['health'],

@@ -52,7 +52,11 @@ class ClientInfoService {
   ) {
     await ctx.verifyAdminOverUser(targetUserId);
 
-    const [targetUser, account] = await Promise.all([ctx.getUserById(targetUserId), ctx.getAccount()]);
+    const [targetUser, account, actingUser] = await Promise.all([
+      ctx.getUserById(targetUserId),
+      ctx.getAccount(),
+      ctx.getCurrentUser(),
+    ]);
 
     if (!targetUser || targetUser.deleted) {
       throw new Error('Target user not found');
@@ -64,9 +68,19 @@ class ClientInfoService {
       throw new Error('Remote child actions require Plus');
     }
 
-    const featureEnabled = account?.sysOptions?.extendedFeatures?.['extendedFeatures.remoteChildActions'] === true;
+    // Per person, on the adult sending the action. This read the account-wide
+    // `extendedFeatures.remoteChildActions` flag until 2026-09-10, when every optional feature
+    // became per person and nothing could write that flag any more — leaving this gate shut for
+    // good. The legacy account value is still honoured as the default, exactly as the client
+    // resolves it, so a family that switched this on before the move keeps it.
+    const actingOptions = (actingUser?.options as Record<string, any> | null | undefined) || null;
+    const legacyAccountValue = account?.sysOptions?.extendedFeatures?.['extendedFeatures.remoteChildActions'];
+    const featureEnabled =
+      actingOptions?.remoteChildActionsEnabled === undefined || actingOptions?.remoteChildActionsEnabled === null
+        ? legacyAccountValue === true
+        : actingOptions.remoteChildActionsEnabled === true;
     if (!featureEnabled) {
-      throw new Error('Remote child actions are disabled for this account');
+      throw new Error('Remote child actions are turned off for you');
     }
 
     const remoteActionSettings = this.getRemoteActionSettings(targetUser);
@@ -175,7 +189,7 @@ class ClientInfoService {
     if (!client) {
       throw new Error('Unknown client');
     }
-    if (!this.supportsRemoteCommands(client.appType || null)) {
+    if (!this.canExecuteRemoteActions(client.appType || null)) {
       throw new Error('Target client does not support remote actions');
     }
 
@@ -191,8 +205,22 @@ class ClientInfoService {
     };
   }
 
+  /**
+   * Clients the parent-facing surfaces list, and which can receive a pushed command of any kind.
+   * A debug toast is handled generically in the client's SSEService, so it does reach a phone.
+   */
   private supportsRemoteCommands(appType: string | null | undefined): boolean {
     return appType === 'extension' || appType === 'ios' || appType === 'android';
+  }
+
+  /**
+   * Clients that can actually *run* a remote action. Only the extension has a
+   * RemoteActionExecutorService; ios and android connect and receive the command, then drop it.
+   * Kept separate from supportsRemoteCommands so tightening the action path does not also stop
+   * debug toasts, which work everywhere.
+   */
+  private canExecuteRemoteActions(appType: string | null | undefined): boolean {
+    return appType === 'extension';
   }
 
   private resolveManagedSessionStatus(input: {
@@ -265,10 +293,30 @@ class ClientInfoService {
     }
 
     const _id = this.clientInfoRepo.createId(currentUserId, clientId);
-    await this.clientInfoRepo.updateWithId(_id, {
+    const now = new Date();
+    const updated = await this.clientInfoRepo.updateWithId(_id, {
       deviceToken: deviceToken,
-      updatedAt: new Date(),
+      updatedAt: now,
     });
+    // A client's row is created by `logClientActivity` without waiting, so a token sent on one of a
+    // new client's first requests can arrive before its row does. The update then touched nothing and
+    // still reported success, and Guard (DCP-7) would not send the token again for a day.
+    if (!updated) {
+      try {
+        await this.clientInfoRepo.create({
+          _id,
+          userId: currentUserId,
+          clientId,
+          deviceToken,
+          lastSeen: now,
+          createdAt: now,
+          updatedAt: now,
+        });
+      } catch {
+        // Created in the meantime by that same request's activity log: set the token on it.
+        await this.clientInfoRepo.updateWithId(_id, {deviceToken, updatedAt: now});
+      }
+    }
   }
 
   // ROUTE-METHOD
@@ -331,6 +379,7 @@ class ClientInfoService {
           status,
           supportsRemoteCommands: true,
           remoteCommandReady: status === 'online-unverified' || status === 'verified-live',
+          canExecuteRemoteActions: this.canExecuteRemoteActions(client.appType || null),
         } satisfies ManagedClientSessionView;
       });
   }

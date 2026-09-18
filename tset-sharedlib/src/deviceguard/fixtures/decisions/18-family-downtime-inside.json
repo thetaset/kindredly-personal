@@ -1,0 +1,139 @@
+{
+  "id": "18-family-downtime-inside",
+  "behaviour": "While Family Downtime is on, every app is closed except the family allowlist and the safety floor. A pause and bonus time do not lift it, and it outranks an app block.",
+  "clock": {
+    "nowMs": 1789448400000,
+    "familyTimeZone": "America/Los_Angeles",
+    "deviceTimeZone": "America/Los_Angeles"
+  },
+  "settings": {
+    "usageLimitsData": {
+      "contentUsageLimits": [
+        {
+          "id": "r-all-apps",
+          "name": "All apps",
+          "type": "advanced",
+          "conditions": [
+            {
+              "type": "appId",
+              "values": [
+                "all-device-apps"
+              ]
+            }
+          ],
+          "timeLimits": [
+            {
+              "hours": 1,
+              "daysOfWeek": [
+                0,
+                1,
+                2,
+                3,
+                4,
+                5,
+                6
+              ]
+            }
+          ]
+        }
+      ],
+      "temporaryRules": []
+    },
+    "ruleOverrideSettings": {
+      "ruleOverrides": [
+        {
+          "ruleId": "r-all-apps",
+          "timeLimit": {
+            "hours": 24,
+            "daysOfWeek": [
+              1
+            ]
+          },
+          "expiresAt": 1789520400000
+        }
+      ]
+    },
+    "accessControlSettings": {
+      "disableUsageLimits": true,
+      "disableUsageLimitsExpires": 0
+    },
+    "appPolicy": {
+      "version": 1,
+      "blockedCategories": [
+        "browsers"
+      ],
+      "entries": {},
+      "updatedAt": 1
+    },
+    "appPolicyStatus": "readable",
+    "familyDowntime": {
+      "intervals": [
+        {
+          "startMs": 1789444800000,
+          "endMs": 1789480800000
+        }
+      ],
+      "horizonEndMs": 1791867600000,
+      "allowAppIds": [
+        "com.audible.application"
+      ],
+      "note": "Screens are resting."
+    }
+  },
+  "installedApps": [
+    {
+      "pkg": "com.roblox.client",
+      "label": "Roblox",
+      "platform": "android"
+    },
+    {
+      "pkg": "com.audible.application",
+      "label": "Audible",
+      "platform": "android"
+    },
+    {
+      "pkg": "com.android.chrome",
+      "label": "Chrome",
+      "platform": "android"
+    }
+  ],
+  "floor": [
+    "com.android.settings"
+  ],
+  "usage": {
+    "appMsByPkg": {
+      "com.roblox.client": 7200000
+    },
+    "webLogs": []
+  },
+  "usageSeed": {
+    "perRuleUsedMs": {}
+  },
+  "expectDevice": [
+    {
+      "pkg": "com.roblox.client",
+      "action": "block",
+      "reason": "family-downtime",
+      "ruleId": null
+    },
+    {
+      "pkg": "com.android.chrome",
+      "action": "block",
+      "reason": "family-downtime",
+      "ruleId": null
+    },
+    {
+      "pkg": "com.audible.application",
+      "action": "allow",
+      "reason": null,
+      "ruleId": null
+    },
+    {
+      "pkg": "com.android.settings",
+      "action": "allow",
+      "reason": null,
+      "ruleId": null
+    }
+  ],
+  "browserNotApplicable": "Device-only here: the browser locks for Family Downtime through FamilyDowntimeService, tested in ActivityService.familyDowntime.test.ts."
+}

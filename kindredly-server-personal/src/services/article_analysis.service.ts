@@ -1,6 +1,8 @@
 import {ContentExtractionService, type ExtractedArticle} from './content_extraction.service';
 import {SourceReputationService, normalizeHost} from './source_reputation.service';
 import {getArticleInferenceProvider} from './inference/article_inference';
+import type {RequestContext} from '@/base/request_context';
+import {familyAiSetting, familyAllowsHostedAi} from 'tset-sharedlib/family-ai';
 import type {
   ArticleAnalyzeRequest,
   ArticleSignal,
@@ -300,7 +302,18 @@ class ArticleAnalysisService {
     return records.filter((r): r is ReputationRecord => r !== null);
   }
 
-  async analyze(req: ArticleAnalyzeRequest): Promise<ArticleTrustResult> {
+  /**
+   * The hosted summary goes to Kindredly.ai, so a family gets one only when its AI setting is On
+   * (PLN-3). Without a family (no account on `ctx`) it is not a family's request.
+   */
+  private async familyAllowsHostedSummary(ctx?: RequestContext): Promise<boolean> {
+    if (!ctx?.accountId) return true;
+    const account = (await ctx.getAccount().catch(() => null)) as {options?: {aiSetting?: unknown} | null} | null;
+    return familyAllowsHostedAi(familyAiSetting(account?.options));
+  }
+
+  /** `ctx` is the family asking; an optional hosted summary is charged to them. */
+  async analyze(req: ArticleAnalyzeRequest, ctx?: RequestContext): Promise<ArticleTrustResult> {
     const url = String(req?.url || '');
     const domain = normalizeHost(url);
 
@@ -341,8 +354,8 @@ class ArticleAnalysisService {
 
     let llm = null;
     const provider = getArticleInferenceProvider();
-    if (provider.isEnabled()) {
-      llm = await provider.analyze({url, title: extraction.title, text: extraction.text, source, signals});
+    if (provider.isEnabled() && (await this.familyAllowsHostedSummary(ctx))) {
+      llm = await provider.analyze({url, title: extraction.title, text: extraction.text, source, signals}, ctx);
     }
 
     return {

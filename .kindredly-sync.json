@@ -1,10 +1,10 @@
 {
-  "internalSha": "90883aca33d5bd445b4430daae80949d646064ff",
-  "internalShaShort": "90883aca33d5",
+  "internalSha": "e854797c8f1fb94ed311f0bb9ea7c40c37960264",
+  "internalShaShort": "e854797c8f1f",
   "internalBranch": "main",
-  "internalDirty": false,
-  "clientVersion": "3.0.258",
-  "syncedAt": "2026-09-01T18:36:43Z",
+  "internalDirty": true,
+  "clientVersion": "3.1.1",
+  "syncedAt": "2026-09-18T15:47:07Z",
   "phase": "bundle",
   "syncScript": "scripts/sync_personal_repo.sh"
 }

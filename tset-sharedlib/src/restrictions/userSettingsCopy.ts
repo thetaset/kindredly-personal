@@ -1,11 +1,10 @@
-import type { LibraryAutoApprovalSettings, UserSettingsCopySourceSnapshot } from '../api';
+import type { UserSettingsCopySourceSnapshot } from '../api';
 
 export const USER_SETTINGS_COPY_FILTERING_PREF_KEYS = [
   'filters.strictnessPresetId',
   'filters.contentFilters',
   'filters.blockedUrlPatterns',
   'filters.serverDeepLookupEnabled',
-  'filters.autoApprovalSettings',
 ] as const;
 
 export const USER_SETTINGS_COPY_WEBSITE_PREF_KEYS = [
@@ -94,19 +93,6 @@ const RESTRICTED_OVERRIDES: Partial<ResolvedContentFilters> = {
   censorBadWords: true,
 };
 
-const DEFAULT_AUTO_APPROVAL_SETTINGS: LibraryAutoApprovalSettings = {
-  enabled: false,
-  experimental: true,
-  criteria: {
-    enabled: false,
-    requireTrustedDomain: false,
-    trustedDomains: [],
-    requireEducational: false,
-    allowedAgeBands: ['child', 'teen', 'adult'],
-    customPolicyPrompt: '',
-  },
-};
-
 function cloneValue<T>(value: T): T {
   if (value == null) return value;
   return JSON.parse(JSON.stringify(value)) as T;
@@ -193,69 +179,6 @@ function normalizeBlockedPatternList(raw: unknown): string[] {
   return Array.from(new Set(normalized)).sort((a, b) => a.localeCompare(b));
 }
 
-function normalizeTrustedDomain(input: string): string | null {
-  const trimmed = String(input || '').trim().toLowerCase();
-  if (!trimmed) return null;
-
-  const candidate = trimmed
-    .replace(/^https?:\/\//, '')
-    .replace(/^www\./, '')
-    .replace(/[/?#].*$/, '')
-    .replace(/:\d+$/, '')
-    .trim();
-
-  if (!candidate || candidate.startsWith('.')) return null;
-  if (!/^[a-z0-9.-]+$/.test(candidate)) return null;
-  if (!candidate.includes('.') && candidate !== 'localhost') return null;
-  return candidate;
-}
-
-function normalizeTrustedDomainList(raw: unknown): string[] {
-  const values = Array.isArray(raw)
-    ? raw
-    : String(raw || '').split('\n');
-
-  const normalized = values
-    .map((value) => normalizeTrustedDomain(String(value || '')))
-    .filter((value): value is string => !!value);
-
-  return Array.from(new Set(normalized)).sort((a, b) => a.localeCompare(b));
-}
-
-function normalizeAutoApprovalSettings(raw: unknown): LibraryAutoApprovalSettings {
-  const input = raw && typeof raw === 'object' ? (raw as Record<string, unknown>) : {};
-  const inputCriteria = input.criteria && typeof input.criteria === 'object'
-    ? (input.criteria as Record<string, unknown>)
-    : {};
-
-  const trustedDomains = normalizeTrustedDomainList(inputCriteria.trustedDomains);
-
-  const allowedAgeBandsRaw = Array.isArray(inputCriteria.allowedAgeBands)
-    ? inputCriteria.allowedAgeBands
-    : DEFAULT_AUTO_APPROVAL_SETTINGS.criteria.allowedAgeBands;
-  const allowedAgeBands = Array.from(new Set(
-    allowedAgeBandsRaw
-      .map((value) => String(value || '').trim().toLowerCase())
-      .filter((value) => value === 'child' || value === 'teen' || value === 'adult')
-  )) as Array<'child' | 'teen' | 'adult'>;
-
-  const customPolicyPrompt = typeof inputCriteria.customPolicyPrompt === 'string'
-    ? inputCriteria.customPolicyPrompt.trim().slice(0, 1200)
-    : '';
-
-  return {
-    enabled: input.enabled === true,
-    experimental: input.experimental !== false,
-    criteria: {
-      enabled: inputCriteria.enabled === true,
-      requireTrustedDomain: inputCriteria.requireTrustedDomain === true,
-      trustedDomains,
-      requireEducational: inputCriteria.requireEducational === true,
-      allowedAgeBands: allowedAgeBands.length > 0 ? allowedAgeBands : DEFAULT_AUTO_APPROVAL_SETTINGS.criteria.allowedAgeBands,
-      customPolicyPrompt,
-    },
-  };
-}
 
 function resolveContentFilters(
   rawFilters?: Record<string, unknown> | null,
@@ -412,7 +335,6 @@ export function buildContentFilteringCopySnapshot(
 
   const strictnessPresetId = sourcePrefs?.['filters.strictnessPresetId'];
   const blockedPatterns = normalizeBlockedPatternList(sourcePrefs?.['filters.blockedUrlPatterns']);
-  const autoApprovalSettings = normalizeAutoApprovalSettings(sourcePrefs?.['filters.autoApprovalSettings']);
   const normalizedFilters = resolveContentFilters(
     effective.contentFilters as Record<string, unknown>,
     restrictedTarget,
@@ -426,6 +348,11 @@ export function buildContentFilteringCopySnapshot(
     optionsPatch: {
       whitelistingEnabled,
       contentFilteringEnabled,
+      // The assistant-review switch is a per-child grant on user.options, so it
+      // copies here rather than as a pref. Its guidelines are family-wide and so
+      // need no copying; a per-child override deliberately does NOT travel, since
+      // "judge this child differently" is the one thing that is about the child.
+      assistantReviewEnabled: sourceOptions?.assistantReviewEnabled === true,
     },
     preferenceUpdates: {
       'filters.strictnessPresetId': strictnessPresetId === 'strict' || strictnessPresetId === 'moderate' || strictnessPresetId === 'relaxed'
@@ -434,7 +361,6 @@ export function buildContentFilteringCopySnapshot(
       'filters.contentFilters': normalizedFilters,
       'filters.blockedUrlPatterns': blockedPatterns,
       'filters.serverDeepLookupEnabled': sourcePrefs?.['filters.serverDeepLookupEnabled'] === true,
-      'filters.autoApprovalSettings': autoApprovalSettings,
     },
   };
 }

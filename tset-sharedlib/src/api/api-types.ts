@@ -1,5 +1,6 @@
 import { UsageStatus, UsageSummaryData, TakeBreakAdvisory } from '../types';
 import type { CategorySet } from '../types/categoryExplorer.types';
+import type { FamilyDowntimeAdvisory } from '../restrictions/familyDowntime';
 import type { SiteStyleEntryV1 } from '../types/item.types';
 import type {
   AccountType,
@@ -14,6 +15,7 @@ import type {
   ItemInfoView,
   ItemMatchTypes,
   ItemMeta,
+  ItemMetaFileInfo,
   ItemPermissionDetails,
   ItemRelTypes,
   ItemReaction,
@@ -599,6 +601,10 @@ export type AdminAiPromptKey =
   | 'reorganizeCollections'
   | 'discussSite'
   | 'contentClassification'
+  // Judges a child's site request against the parent's written guidelines.
+  // Unlike contentClassification, this one returns a VERDICT, so its output is
+  // parsed strictly and a malformed answer defers to the parent.
+  | 'accessRequestReview'
   | 'feedGenOutline'
   | 'feedGenPost'
   | 'feedGenExtract'
@@ -606,7 +612,10 @@ export type AdminAiPromptKey =
   | 'lessonGradeAnswer'
   // The collection builder's copy/paste authoring prompt. Only `prompt` is used
   // (it carries the JSON format spec); `system` is unused.
-  | 'collectionAuthoring';
+  | 'collectionAuthoring'
+  // Drafts a curation review's answers for a curator to confirm. Framing only: the checks and
+  // their instructions are always appended from tset-sharedlib/src/curation.checklist.ts.
+  | 'curationReviewDraft';
 
 export interface AdminAiPromptOverride {
   system?: string;
@@ -631,29 +640,53 @@ export interface AdminAiImageGenSettings {
 export interface AdminAiModelPrice {
   inputPerMillion: number; // USD per 1M prompt tokens
   outputPerMillion: number; // USD per 1M completion tokens
+  /**
+   * Where the rates came from: the list price shipped in code (`stamped`, dated by
+   * `AdminAiPricing.pricesAsOf`) or a figure an admin typed. Set on configs the server returns.
+   */
+  source?: 'stamped' | 'admin';
 }
 
 /** Per-image price for image generation, which bills per image rather than per token. */
 export interface AdminAiImagePrice {
   perImage: number; // USD
+  /**
+   * Price for a named image model, used before `perImage`. Two hosted image models do not
+   * cost the same, and a family is shown the dollars this produces, so one blended price
+   * would report the cheaper model's spend as the dearer one's and back.
+   *
+   * Always present on a config the server returns — `mergePricing` fills every known model,
+   * so a config saved before this existed comes back complete rather than half-typed.
+   */
+  byModel: Record<string, number>;
 }
 
 export interface AdminAiPricing {
   models: Record<string, AdminAiModelPrice>;
   image: AdminAiImagePrice;
+  /** When an admin last saved prices. */
   updatedAt: string | null;
+  /** The date the list prices shipped in code were checked against the provider's pricing page. */
+  pricesAsOf?: string | null;
+}
+
+/** One plan's hosted AI limits, in USD of spend. */
+export interface AdminAiPlanLimits {
+  /** Spend allowed in a 5-hour window, which starts with the first request and lasts 5 hours. */
+  fiveHourUsd: number;
+  /** Spend allowed in a weekly window, which starts with the first request and lasts 7 days. */
+  weeklyUsd: number;
 }
 
 /**
- * Monthly AI spend allowance per plan, in USD.
- *
- * Chosen to sit under the plan price: Plus is $5/month, so a $3 allowance keeps the
- * margin positive even for a family that exhausts it.
+ * The hosted AI limits per plan. A family may spend while both windows have room; past either,
+ * requests use the family's extra AI usage balance, and without one they are refused until the
+ * window resets.
  */
-export interface AdminAiBudgets {
-  standardUsdMonthly: number;
-  plusUsdMonthly: number;
-  /** Percent of budget at which the user is warned. */
+export interface AdminAiLimits {
+  standard: AdminAiPlanLimits;
+  plus: AdminAiPlanLimits;
+  /** Percent of a limit at which the family is warned. */
   warnAtPercent: number;
   urgentWarnAtPercent: number;
 }
@@ -664,7 +697,7 @@ export interface AdminAiConfig {
   policyPrompt: string; // global enrichment/classification policy guidance
   imageGen: AdminAiImageGenSettings;
   pricing: AdminAiPricing;
-  budgets: AdminAiBudgets;
+  limits: AdminAiLimits;
 }
 
 // Returned by get/save/reset — the effective config plus the metadata the UI
@@ -682,7 +715,12 @@ export interface AdminAiConfigSaveRequest {
   policyPrompt?: string;
   imageGen?: Partial<AdminAiImageGenSettings>;
   pricing?: Partial<AdminAiPricing>;
-  budgets?: Partial<AdminAiBudgets>;
+  limits?: {
+    standard?: Partial<AdminAiPlanLimits>;
+    plus?: Partial<AdminAiPlanLimits>;
+    warnAtPercent?: number;
+    urgentWarnAtPercent?: number;
+  };
 }
 
 // Lightweight aggregated counts for the admin dashboard landing page.
@@ -755,6 +793,11 @@ export interface RemoveItemFromUserLibraryRequest {
 
 export interface AddItemToUserLibraryRequest {
   itemIds: string[];
+  /**
+   * Whose library. The server reads it through getTargetUserId: absent, the caller's own;
+   * set, an admin approving a child's access request adds the item to the child's library.
+   */
+  userId?: string;
 }
 
 export interface StandaloneAppBootstrapRequest {
@@ -970,6 +1013,13 @@ export interface ContentLookupRequest {
 export interface ContentLookupResponse {
   canonicalUrl: string;
   meta?: ItemMeta | null;
+  /**
+   * Present when the URL serves a file rather than a page — a PDF, a zip, a direct
+   * image. Lifted out of `meta` so callers that only need "is this a file?" do not
+   * have to reach into metadata. Populated from the metadata fetch already being
+   * made, so it costs no extra request.
+   */
+  fileInfo?: ItemMetaFileInfo | null;
   resourceInfo?: ResourceFetchInfoResponse | null;
   classification?: SourcePriorityClassificationResponse | null;
   lookupMeta: {
@@ -1115,6 +1165,8 @@ export interface UsageInsightsLeaderboardEntry extends UsageInsightsMetricSummar
   entityType: UsageInsightsEntityType;
   resolverSource: UsageInsightsResolverSource;
   visitUrl?: string | null;
+  /** A creator's display name, when the log, the library or an earlier lookup on this device knows it. */
+  displayName?: string | null;
 }
 
 export interface GetUsageInsightsReportResponse {
@@ -1238,37 +1290,155 @@ export interface GetUrlRuleExplanationResponse {
 
 export type AccessEvaluationState = 'allowed' | 'blocked' | 'unknown';
 
-export type LibraryAutoApprovalDecision = 'approved' | 'denied' | 'review';
-
-export type LibraryAutoApprovalCriteria = {
-  enabled: boolean;
-  requireTrustedDomain: boolean;
-  trustedDomains: string[];
-  requireEducational: boolean;
-  allowedAgeBands: Array<'child' | 'teen' | 'adult'>;
-  customPolicyPrompt?: string;
-};
-
+/**
+ * "Assistant reviews requests", per child. Stored at `filters.autoApprovalSettings`
+ * (the key predates the feature's current shape and is kept so existing rows and
+ * the settings-copy list keep working).
+ *
+ * Two fields on purpose. The retired shape carried a criteria object of checkboxes
+ * beside a prompt that could not affect the outcome; the guidelines ARE the
+ * criteria now, so there is nothing for a second field to say.
+ */
 export interface LibraryAutoApprovalSettings {
   enabled: boolean;
-  experimental: boolean;
-  criteria: LibraryAutoApprovalCriteria;
+  /** The parent's own words. Capped at ASSISTANT_GUIDELINES_MAX by the normalizer. */
+  guidelines: string;
 }
 
-export interface LibraryAutoApprovalEvaluateRequest {
-  userId?: string;
-  url: string;
-  meta?: any;
+/**
+ * The assistant approves or steps aside. It has no verdict for "no".
+ *
+ * A model that could deny would be making the decision a parent is entitled to
+ * make, and a child would have no way to reach a person past it. Everything that
+ * is not a confident yes therefore lands in the parent's queue exactly as it does
+ * with the feature turned off.
+ */
+export type AccessRequestAiDecision =
+  /** The site goes into the child's library, as a parent's own yes would. */
+  | 'approve'
+  /**
+   * The page was charged to the wrong category, and the category is corrected for
+   * this child only. Not an approval: nothing is added to the library and no
+   * other block is lifted. A page that is really a lesson stops being spent out
+   * of an entertainment budget, and if that budget was the only thing in the way
+   * the child carries on.
+   */
+  | 'reclassify'
+  | 'leave_for_parent';
+
+/**
+ * Why the review came out the way it did — which is not the same as what the model
+ * said, because most `leave_for_parent` outcomes never reach a model.
+ *
+ * Recorded so a parent reading their history can tell "the assistant looked and
+ * was not sure" from "the assistant never looked", and so we can see which guard
+ * is firing without instrumenting each one separately.
+ */
+export type AccessRequestAiReviewSource =
+  /** A model ran and returned a usable verdict. */
+  | 'model'
+  /** Same question, already answered within the cache window. */
+  | 'cached'
+  /** This host was left for the parent recently; not asked again. */
+  | 'cooldown'
+  /** The child has used this week's reviews. */
+  | 'weekly-cap'
+  /** The family's AI budget is spent. */
+  | 'budget'
+  /** Our own content check already flagged this URL. */
+  | 'unsafe-cache'
+  /** Timeout, malformed output, or a failure applying an approval. */
+  | 'error';
+
+/**
+ * What the assistant did, stored on the request row and shown to the parent.
+ *
+ * Written for EVERY outcome, including the ones where no model ran, because
+ * "nothing was checked, and here is why" is information the parent needs in order
+ * to trust the ones that were.
+ */
+export interface AccessRequestAiReview {
+  decision: AccessRequestAiDecision;
+  source: AccessRequestAiReviewSource;
+  /** The model's own confidence, or null when no model ran. */
+  confidence: number | null;
+  /** One sentence for the parent, <= 240 chars. Always present. */
+  reasonForParent: string;
+  /** One kind sentence for the child, <= 120 chars. Null when no model ran. */
+  reasonForChild: string | null;
+  /** The guideline line the model says decided it, when it named one. */
+  matchedGuideline?: string | null;
+  /**
+   * How wide the assistant acted, after `resolveAssistantScope` capped what the
+   * model proposed: what an approval opened, or what a `reclassify` recategorized.
+   * Null on a hand-off, which changed nothing.
+   *
+   * Stored rather than re-derived so a parent reading the record sees the scope
+   * that was actually written, even after the capping rules change underneath it.
+   */
+  grantedScope?: 'specific' | 'site' | null;
+  /**
+   * A rule the parent could add so this kind of request answers itself next time,
+   * in their own voice and ready to paste. Present only on a hand-off — an
+   * approval means the guidelines already covered it.
+   */
+  suggestedGuideline?: string | null;
+  /**
+   * The category written for this child, on a `reclassify` only.
+   *
+   * Narrowed to the two the assistant may move a page INTO. The asymmetry is the
+   * same one that stops the model saying no: it may widen what a child can reach,
+   * never narrow it, so a proposal outside this pair is not applied at all.
+   */
+  reclassifiedEduValue?: 'eduval_educational' | 'eduval_task' | null;
+  /** The rule id the reclassify wrote, so a parent can undo exactly that rule. */
+  reclassifyRuleId?: string | null;
+  model: string | null;
+  checkedAt: string;
+  /**
+   * First 16 hex of sha256 over the guidelines the verdict was judged against.
+   * Lets a cached verdict be discarded once the parent rewrites their rules,
+   * without storing the rules themselves twice.
+   */
+  guidelinesHash: string;
+  /** Exactly what the model was shown about the page, for the parent's record. */
+  inputs: {
+    title: string | null;
+    description: string | null;
+    siteName: string | null;
+    labels: string[];
+  };
 }
 
-export interface LibraryAutoApprovalEvaluateResponse {
-  enabled: boolean;
-  settingsApplied: boolean;
-  decision: LibraryAutoApprovalDecision;
-  reason: string;
-  confidence?: number;
-  addedToLibrary?: boolean;
-  accessRequestId?: string | null;
+/**
+ * What `/access_request/add` now answers with.
+ *
+ * `aiReview` is absent when the assistant had no business looking (feature off,
+ * a reason it may not review, a request that is not for a site). `checked: false`
+ * with a decision present means a guard answered without a model — see
+ * `AccessRequestAiReviewSource`. The child-facing copy is the only part of the
+ * review that crosses to the requester; the parent's reasoning stays on the row.
+ */
+export interface AccessRequestAddResponse {
+  /** Absent when nothing was filed — see `limited`. */
+  requestId?: string;
+  /**
+   * The ask was not filed because this child has already asked too many times
+   * today. Not an error: the child is told, in `message`, and can ask again
+   * tomorrow or find a parent now.
+   */
+  limited?: {
+    reason: 'daily-cap';
+    /** One sentence for the child. */
+    message: string;
+  };
+  aiReview?: {
+    checked: boolean;
+    decision: AccessRequestAiDecision | null;
+    reasonForChild: string | null;
+    /** Reviews left in this child's week, after this one. Null when not counted. */
+    remainingThisWeek: number | null;
+  };
 }
 
 export interface AccessEvaluateRequest {
@@ -1306,8 +1476,17 @@ export interface AccessEvaluateResponse {
   selectedUsage?: UsageStatus | null;
   noUsageLimits?: boolean;
   takeBreakAdvisory?: TakeBreakAdvisory | null;
-  autoApprovalDecision?: LibraryAutoApprovalDecision | null;
-  autoApprovalReason?: string | null;
+  /**
+   * Family Downtime for this person, whatever the verdict above. Null when the family has none
+   * coming up. An open page sets one timer for `nextChangeMs` from it instead of polling faster.
+   */
+  familyDowntime?: FamilyDowntimeAdvisory | null;
+  /**
+   * The usage-status script on the asking page is there only because Family Downtime is scheduled:
+   * nothing else about this person needs it. The page then keeps its downtime timer and does not
+   * poll usage.
+   */
+  onlyFamilyDowntime?: boolean;
 }
 
 export interface LogVisitRequest {
@@ -1853,14 +2032,119 @@ export interface AIUsageGetSummaryResponse {
   /** Null means no limit configured yet. */
   limitTokens: number | null;
   /**
-   * Month-to-date spend in dollars, which is what the budget is actually denominated in.
-   *
-   * Tokens are still reported above because they are the only measure available until an
-   * admin sets model prices. `pricingConfigured: false` means the dollar figures here are
-   * not a real zero — nobody has said what a call costs — and the UI must not present them
-   * as spend.
+   * Kept only for installed clients from before the AI limits (2026-09-13), which render a monthly
+   * dollar budget from it. Families never see what AI costs Kindredly (PLN-7), so the server sends
+   * every dollar as zero and `pricingConfigured: false`, which makes those clients show token and
+   * picture counts instead. Current clients read `limits`.
    */
   spend?: AIUsageSpendSummary;
+  /**
+   * The same window, split by what the money went on. The settings page reports each figure
+   * beside the control that spends it — a family that is out of budget needs to know whether
+   * it was the assistant or the pictures.
+   */
+  breakdown?: AIUsageBreakdown;
+  /**
+   * The family's 5-hour and weekly AI limits and extra AI usage, which is what requests are
+   * actually admitted against, in AI requests. Null on a device-only install.
+   */
+  limits?: AiRequestLimitState | null;
+}
+
+/** Which hosted AI limit window. */
+export type AiLimitWindowKind = '5h' | 'week';
+
+export interface AiLimitWindowState {
+  limitUsd: number;
+  /** Plan spend in the open window. Zero when the window has not started. */
+  usedUsd: number;
+  /** Rounded; 100 or more means this limit is reached. */
+  percentUsed: number;
+  /** When the open window ends, ISO. Null when no window is open — the next request starts one. */
+  resetsAt: string | null;
+}
+
+export interface AiLimitState {
+  plan: 'standard' | 'plus';
+  /** Kindredly staff turned hosted AI off for this family. */
+  hostedStopped: boolean;
+  fiveHour: AiLimitWindowState;
+  weekly: AiLimitWindowState;
+  /** The limit that currently stops plan usage, or null while both have room. */
+  limitReached: AiLimitWindowKind | null;
+  extraUsage: {
+    /** What is left across grants that have not expired or been revoked. */
+    balanceUsd: number;
+    /** The soonest expiry among grants with a balance left, ISO. */
+    nextExpiresAt: string | null;
+    /** Whether the family has ever been given extra AI usage, so the page knows to show the row. */
+    hasGrants: boolean;
+  };
+  warnAtPercent: number;
+  urgentWarnAtPercent: number;
+}
+
+/** One limit window as a family's device receives it: AI requests, never dollars (PLN-7). */
+export interface AiRequestWindowState {
+  /** How many AI requests the window holds. */
+  limitRequests: number;
+  /** Requests used in the open window, rounded down, and `limitRequests` once the limit is reached. */
+  usedRequests: number;
+  /** 0 to 100; 100 means this limit is reached. */
+  percentUsed: number;
+  /** When the open window ends, ISO. Null when no window is open — the next request starts one. */
+  resetsAt: string | null;
+}
+
+/**
+ * A family's hosted AI limits as its devices receive them.
+ *
+ * Families never see what AI costs Kindredly (founder decision 2026-09-15, PLN-7), so every amount
+ * is in AI requests. The admin console reads `AiLimitState`, in dollars, through an admin route.
+ */
+export interface AiRequestLimitState {
+  plan: 'standard' | 'plus';
+  /** Kindredly staff turned hosted AI off for this family. */
+  hostedStopped: boolean;
+  /** False when a hosted model has no price, so use cannot be counted and must not read as zero. */
+  measured: boolean;
+  fiveHour: AiRequestWindowState;
+  weekly: AiRequestWindowState;
+  /** The limit that currently stops plan usage, or null while both have room. */
+  limitReached: AiLimitWindowKind | null;
+  extraUsage: {
+    /** AI requests left across grants that have not expired or been revoked, rounded down. */
+    requestsLeft: number;
+    /** The soonest expiry among grants with a balance left, ISO. */
+    nextExpiresAt: string | null;
+    /** Whether the family has ever been given extra AI usage, so the page knows to show the row. */
+    hasGrants: boolean;
+  };
+  warnAtPercent: number;
+  urgentWarnAtPercent: number;
+}
+
+/** A grant of extra AI usage, as the admin console lists it. */
+export interface AiExtraUsageGrantView {
+  _id: string;
+  accountId: string;
+  source: 'staff' | 'purchase';
+  amountUsd: number;
+  remainingUsd: number;
+  expiresAt: string | null;
+  note: string | null;
+  grantedBy: string | null;
+  revokedAt: string | null;
+  createdAt: string;
+}
+
+export interface AIUsageBreakdown {
+  /** Everything that is not image generation: chat, suggestions, enrichment. */
+  textSpendUsd: number;
+  textTokens: number;
+  /** Image generation calls in the window, and what they cost. */
+  imageSpendUsd: number;
+  imageCount: number;
 }
 
 export interface AIUsageSpendSummary {
@@ -1995,6 +2279,11 @@ export interface StreamCompleteEvent {
 
 export interface GenerateImageRequest {
   prompt: string;
+  /**
+   * A hosted image model from `AI_IMAGE_MODELS`. Outside that list, or absent, the server
+   * uses the default — the allowlist is a ceiling, exactly as it is for text models.
+   */
+  model?: string;
   options?: any;
   userId?: string;
 }
@@ -3352,6 +3641,12 @@ export type RefStateUpsertRequest = {
   stateSubKey?: string | null;
   data?: any;
   ownerId?: string;
+  /**
+   * Write only if the stored row is still end-to-end encrypted; otherwise change nothing and return
+   * the stored row. For a one-time rewrite of an old encrypted row as readable (DCP-5), so the
+   * rewrite can never overwrite a newer readable save. Honoured for `device-guard` `appPolicy`.
+   */
+  onlyIfEncrypted?: boolean;
 };
 
 export type SiteStyleListRequest = {
@@ -3691,9 +3986,15 @@ export interface AckManagedRemoteActionResponse {
 }
 
 export interface StartLiveViewRequest {
-  /** Children to watch. Every live, capture-capable client of each child joins the session. */
+  /** Children whose devices are listed. */
   userIds: string[];
   cadenceMs?: number;
+  /**
+   * The ONE device to watch. Omitted lists the child's devices and captures nothing at all —
+   * a guardian picks a screen, and only that screen is captured and sent. Watching every device
+   * a child owns at once spent their battery and our bandwidth on pictures nobody asked to see.
+   */
+  clientId?: string;
 }
 
 export interface StartLiveViewResponse {
@@ -4055,23 +4356,11 @@ export interface AccessRequestView {
   details?: AccessRequestDetails;
 }
 
-export interface AccessRequestDetails {
-  url?: string;
-  srcId?: string;
-  srcType?: string;
-  /** Optional user-friendly title for srcId (e.g. collection title) */
-  srcTitle?: string;
-  ts?: number;
-  limitId?: string;
-  reasonCode?: ReasonCode;
-  contentInfo?: ActivityContentInfo;
-  /** For non-URL access requests (e.g., approve a specific in-app action). */
-  actionCode?: string;
-  /** Optional visibility/variant for the action (e.g. link-only vs friends & family). */
-  publishVisibilityCode?: number;
-  /** For published-catalog add requests (type 'publishedItem'): the Published item id. */
-  publishId?: string;
-}
+// One definition, in types/activity.types.ts. A second copy lived here until 2026-09-02 and
+// had already drifted (no checkpointNote, no emailSender fields, no item fields), so which
+// fields a component could see depended on which module it happened to import from.
+import type { AccessRequestDetails } from '../types/activity.types';
+export type { AccessRequestDetails };
 
 // ============================================================================
 // MISSING API REQUEST/RESPONSE TYPES
@@ -4202,6 +4491,9 @@ export interface CheckServerUrlResponse {
   origin?: string;
   /** The address that was actually tested -- normalized to the versioned API base. */
   apiURL?: string;
+  /** A personal box says who it is (BOX-1/3): the `.local` name it announced, and its own authority's SHA-256. */
+  boxName?: string;
+  boxCaSha256?: string;
 }
 
 
@@ -4294,6 +4586,57 @@ export interface LibraryCleanupCandidatesRequest {
   includeReadLater?: boolean,
   includeStarred?: boolean,
   onlyKept?: boolean,
+}
+
+/** One exact canonical-URL duplicate set surfaced by the stable cleanup flow. */
+export interface LibraryDuplicateGroup {
+  key: string;
+  items: ItemInfoView[];
+  recommendedSurvivorId: string;
+  supported: boolean;
+  unsupportedReason?: string;
+}
+
+export interface LibraryDuplicateCandidatesRequest {
+  includeArchived?: boolean;
+  /** Groups per page. Defaults to 20; the detector always scans the whole library. */
+  limit?: number;
+  /** Zero-based index of the first group on the requested page. */
+  offset?: number;
+}
+
+export interface LibraryDuplicateCandidatesResponse {
+  groups: LibraryDuplicateGroup[];
+  totalGroups: number;
+  /** True when groups exist beyond this page. */
+  truncated: boolean;
+  /** The page actually returned, which is clamped into range when the caller overshoots. */
+  offset: number;
+  limit: number;
+}
+
+export interface MergeLibraryDuplicatesRequest {
+  survivorItemId: string;
+  duplicateItemIds: string[];
+  /**
+   * The client can read plaintext item content; the server often cannot. The encryption
+   * request wrapper encrypts these unioned details before they cross the wire.
+   */
+  mergedDetails?: Partial<Item>;
+}
+
+export interface MergeLibraryDuplicatesResponse {
+  survivorItemId: string;
+  /** Everything the caller should now treat as gone, including copies removed by an earlier merge. */
+  removedItemIds: string[];
+  /**
+   * The subset that was already absent server-side. A client whose local index still lists them
+   * prunes them from this, rather than re-offering a group that can never merge.
+   */
+  alreadyGoneItemIds?: string[];
+  mergedCollectionIds: string[];
+  permissionCount: number;
+  feedbackCount: number;
 }
 
 export interface ReadLaterFeedRequest {
@@ -4792,4 +5135,246 @@ export interface PublishResult {
   status: 'live' | 'held';
   /** Human-readable reason, present only when held. */
   heldReason?: string | null;
+}
+
+/**
+ * Where the caller's own publish of a collection stands. Read by the publish page and the
+ * collection page so a family can see Submitted / In review / Added / Not added after a reload
+ * -- the publish response used to be the only place 'held' existed.
+ */
+export type OwnerPublishStatusCode = 'none' | 'pending' | 'held' | 'live' | 'declined' | 'blocked';
+
+export interface OwnerPublishStatus {
+  status: OwnerPublishStatusCode;
+  publishId?: string | null;
+  visibilityCode?: number | null;
+  /** The curator's line when declined, or the safety check's reason when held. */
+  reason?: string | null;
+  /** Short reason code when declined (see DECLINE_REASONS). */
+  declineReason?: string | null;
+  curatedDate?: string | null;
+  updatedAt?: string | null;
+}
+
+/** One pending suggestion in a curator's queue: enough to pick it, not the whole row. */
+export interface CurationQueueEntry {
+  _id: string;
+  name: string | null;
+  imageFilename?: string | null;
+  username?: string | null;
+  publicUserId?: string | null;
+  itemCount?: number | null;
+  updatedAt?: string | null;
+  /** The safety check held it before any curator saw it; approving overrides that. */
+  flagged: boolean;
+  heldReason?: string | null;
+}
+
+// ── Curation review (docs/specs/curation-review.md) ────────────────────────────────────────────
+
+export type CurationReviewStatus = 'open' | 'finalized' | 'closed';
+export type CurationReviewOpenReason = 'report' | 'scheduled' | 'backfill' | 'suggestion' | 'curator';
+/** Where the curator's answer started: their own, an AI suggestion they confirmed, or the last review's. */
+export type CurationReviewAnswerSource = 'human' | 'ai_confirmed' | 'previous_confirmed';
+
+/** One check's answer as a review stores it. `value` follows tset-sharedlib/src/curation.checklist.ts. */
+export interface CurationReviewStoredAnswer {
+  value: string | string[];
+  comment?: string | null;
+  screenshots?: string[];
+  source?: CurationReviewAnswerSource;
+  /** On a finished review answered by several curators: each curator's comment, in finish order. */
+  comments?: string[];
+}
+
+/** The AI's suggestions for an open review. Curators only; never returned to families. */
+export interface CurationReviewAiDraft {
+  status: 'queued' | 'running' | 'done' | 'failed' | 'skipped';
+  /** Why it failed or was skipped, in words a curator can act on. */
+  reason?: string | null;
+  model?: string | null;
+  requestedAt?: string | null;
+  completedAt?: string | null;
+  answers?: Record<
+    string,
+    {value: string | string[]; confidence?: number | null; rationale?: string | null; suggestedComment?: string | null}
+  >;
+  summary?: string | null;
+  suggestedOutcome?: 'curate' | 'decline' | 'unsure' | null;
+  suggestedDeclineReason?: string | null;
+  reviewAgainMonths?: number | null;
+}
+
+/** A review as a curator sees it. */
+export interface CurationReviewCuratorView {
+  _id: string;
+  publishedId: string;
+  checklistVersion: number;
+  status: CurationReviewStatus;
+  openReason: CurationReviewOpenReason;
+  underReview: boolean;
+  answers: Record<string, CurationReviewStoredAnswer>;
+  aiDraft: CurationReviewAiDraft | null;
+  outcome: 'curate' | 'decline' | null;
+  declineReason: string | null;
+  summary: string | null;
+  internalNote: string | null;
+  reviewAgainMonths: number | null;
+  nextReviewAt: string | null;
+  curatorId: string | null;
+  openedAt: string | null;
+  finalizedAt: string | null;
+  version: number;
+}
+
+/** A family's report as a curator sees it: what they said, never who they are. */
+export interface CurationReviewReportView {
+  reason: string | null;
+  comment: string | null;
+  /** 'guardian' | 'restricted' | 'admin' when known. */
+  reporterRole: string | null;
+  createdAt: string | null;
+}
+
+export interface CurationReviewForCuratorResponse {
+  review: CurationReviewCuratorView | null;
+  /** Finished reviews, newest first. */
+  previous: CurationReviewCuratorView[];
+  /** Reports attached to the open review. */
+  reports: CurationReviewReportView[];
+  /** A curator cannot finish a review of their own family's suggestion; the form says so. */
+  ownSuggestion: boolean;
+  /** How many curators this item needs, and where this curator's own answers stand. */
+  signoffs?: CurationReviewSignoffState;
+}
+
+/** One curator's own answers to a review. Adding an item takes several (curation.signoff.ts). */
+export type CurationSignoffStatus = 'draft' | 'finished' | 'superseded';
+
+export interface CurationSignoffView {
+  _id: string;
+  status: CurationSignoffStatus;
+  curatorId: string;
+  /** The curator's public name. Sent to other curators only once they disagree. */
+  curatorName?: string | null;
+  answers: Record<string, CurationReviewStoredAnswer>;
+  outcome: 'curate' | 'decline' | null;
+  declineReason: string | null;
+  summary: string | null;
+  internalNote: string | null;
+  reviewAgainMonths: number | null;
+  version: number;
+  finishedAt: string | null;
+}
+
+/** One check two curators answered differently. */
+export interface CurationSignoffDifference {
+  key: string;
+  label: string;
+  answers: Array<{signoffId: string; value: string | string[]}>;
+}
+
+export interface CurationReviewSignoffState {
+  /** Curators needed to decide this item: the policy for a new item, 1 for one already curated. */
+  required: number;
+  finishedCount: number;
+  mine: CurationSignoffView | null;
+  /** Enough curators have finished and their answers differ. Only then are answers shared. */
+  disagree: boolean;
+  others: CurationSignoffView[];
+  differences: CurationSignoffDifference[];
+  /** My finished answers went back to a draft because the item changed since I read it. */
+  stale: boolean;
+  /** Another curator decided the review while I had a draft. */
+  superseded: boolean;
+}
+
+export type CurationReviewFinishResult =
+  | 'waiting'
+  | 'disagree'
+  | 'added'
+  | 'not_added'
+  | 'kept'
+  | 'removed'
+  | 'already_decided';
+
+export interface CurationReviewFinishResponse {
+  result: CurationReviewFinishResult;
+  signoffs: CurationReviewSignoffState;
+  review: CurationReviewCuratorView | null;
+}
+
+/** How many curators must agree before an item is added. An admin changes it. */
+export interface CurationPolicyView {
+  curatorsToAdd: number;
+}
+
+export interface AdminCurationPolicyResponse {
+  policy: CurationPolicyView;
+  defaults: CurationPolicyView;
+  /** Curators whose profile is enabled and not blocked. */
+  activeCurators: number;
+  /** On a save: open reviews the new number added straight away. */
+  addedCount?: number;
+}
+
+export interface CurationReviewSaveRequest {
+  reviewId: string;
+  /** The version the curator last read; a save against an older one is refused. */
+  version: number;
+  answers: Record<string, CurationReviewStoredAnswer>;
+  outcome?: 'curate' | 'decline' | null;
+  declineReason?: string | null;
+  summary?: string | null;
+  internalNote?: string | null;
+  reviewAgainMonths?: number | null;
+}
+
+/** One open review in a curator's queue. */
+export interface CurationReviewQueueEntry {
+  reviewId: string;
+  publishedId: string;
+  name: string | null;
+  imageFilename: string | null;
+  type: string | null;
+  openReason: CurationReviewOpenReason;
+  underReview: boolean;
+  openedAt: string | null;
+  reportCount: number;
+  reportReasons: string[];
+  aiDraftStatus: CurationReviewAiDraft['status'] | null;
+  /** Curators who have finished, and how many this item needs. */
+  signoffsFinished?: number;
+  signoffsRequired?: number;
+  /** Where this curator stands on it. */
+  mySignoff?: CurationSignoffStatus | 'none';
+  /** Enough curators finished and their answers differ; it needs one of them to change. */
+  disagree?: boolean;
+}
+
+/** A finished review as families read it: the answers a curator confirmed, nothing about who. */
+export interface CurationReviewPublicView {
+  _id: string;
+  checklistVersion: number;
+  outcome: 'curate' | 'decline' | null;
+  declineReason: string | null;
+  summary: string | null;
+  finalizedAt: string | null;
+  openReason: CurationReviewOpenReason;
+  /** A curator confirmed at least one answer an AI suggested. */
+  aiAssisted: boolean;
+  answers: Record<
+    string,
+    {value: string | string[]; comment?: string | null; comments?: string[]; screenshots?: string[]}
+  >;
+  /** Curators who agreed on this review. Older reviews, finished by one curator, say 1. */
+  curatorCount?: number;
+}
+
+export interface CurationReviewListForItemResponse {
+  /** Finished reviews, newest first. Empty for an item no one has reviewed yet. */
+  reviews: CurationReviewPublicView[];
+  /** The review being worked now, if any. `reasons` are the report reason codes that opened it. */
+  open: {openedAt: string | null; underReview: boolean; reasons: string[]} | null;
+  nextReviewAt: string | null;
 }

@@ -14,6 +14,7 @@
  * parents learn to ignore us, at which point the real alert is worthless too.
  */
 
+import {isDesktopPlatform} from 'tset-sharedlib/restrictions/deviceAppIds';
 import {DEVICE_GUARD_QUIET_GAP_MS} from 'tset-sharedlib/types/device-guard.types';
 import type {DeviceTamperKind} from 'tset-sharedlib/types/device-guard.types';
 
@@ -45,12 +46,20 @@ export type TamperIncident = {
   lastNotifiedAt?: number;
   notifyCount: number;
   resolvedAt?: number;
+  /**
+   * The newest tamper event (`tamper.lastEventAt`) already reported to the parents. Carried into
+   * every later incident, including a gap incident and a resolved one, because the device keeps
+   * reporting that same event until a newer one replaces it.
+   */
+  reportedEventAt?: number;
 };
 
 export type DeviceSnapshot = {
   deviceId: string;
   /** Parent-visible device name, for the message. */
   deviceLabel?: string;
+  /** From the status row. Absent means Android, as every Guard build before the field. */
+  platform?: string;
   provisioned?: boolean;
   /** ref_state row updatedAt — when the device last checked in. */
   lastSeenAt: number | null;
@@ -85,16 +94,20 @@ export function evaluateDevice(
   if (snapshot.provisioned !== true) return {action: 'none', incident: incident ?? undefined};
 
   const open = incident && !incident.resolvedAt ? incident : null;
+  // Every new incident keeps the newest event already reported, whatever kind the incident is.
+  const alreadyReported = reportedEventAt(incident);
+  const carried = alreadyReported === undefined ? {} : {reportedEventAt: alreadyReported};
 
   // An explicit tamper event beats everything: the device was still alive when it
   // reported, so this is unambiguous and worth an immediate push.
-  if (isNewEvent(snapshot, open)) {
+  if (isNewEvent(snapshot, incident)) {
     const next: TamperIncident = {
       openedAt: snapshot.tamperLastEventAt!,
       kind: 'event',
       lastEventKind: snapshot.tamperLastEventKind,
       lastNotifiedAt: now,
       notifyCount: (open?.notifyCount ?? 0) + 1,
+      reportedEventAt: snapshot.tamperLastEventAt!,
     };
     return {
       action: 'notify',
@@ -113,7 +126,9 @@ export function evaluateDevice(
     return {
       action: 'resolve',
       incident: {...open, resolvedAt: now},
-      notifyRecovery: open.notifyCount > 0,
+      // "Reporting again" only answers a gap alert. After an event alert the device never stopped
+      // reporting, so telling the parent it is "back online" is untrue.
+      notifyRecovery: open.kind === 'gap' && open.notifyCount > 0,
     };
   }
 
@@ -123,11 +138,11 @@ export function evaluateDevice(
   // yet. Most of these close themselves overnight.
   if (!open) {
     if (gap < GAP_FIRST_ALERT_MS) {
-      return {action: 'open', incident: {openedAt: snapshot.lastSeenAt!, kind: 'gap', notifyCount: 0}};
+      return {action: 'open', incident: {openedAt: snapshot.lastSeenAt!, kind: 'gap', notifyCount: 0, ...carried}};
     }
     // Already past the alert threshold when first observed (e.g. the job was
     // down): open and alert in the same tick rather than waiting another cycle.
-    const opened: TamperIncident = {openedAt: snapshot.lastSeenAt!, kind: 'gap', notifyCount: 0};
+    const opened: TamperIncident = {openedAt: snapshot.lastSeenAt!, kind: 'gap', notifyCount: 0, ...carried};
     return gapNotification(opened, gap, now, tzOffsetMinutes);
   }
 
@@ -135,14 +150,28 @@ export function evaluateDevice(
   return gapNotification(open, gap, now, tzOffsetMinutes);
 }
 
-function isNewEvent(snapshot: DeviceSnapshot, open: TamperIncident | null): boolean {
+/**
+ * The newest tamper event this device's parents were already told about. Rows written before
+ * `reportedEventAt` existed fall back to an event incident's `openedAt`, which is that event.
+ */
+function reportedEventAt(incident: TamperIncident | null): number | undefined {
+  if (!incident) return undefined;
+  return incident.reportedEventAt ?? (incident.kind === 'event' ? incident.openedAt : undefined);
+}
+
+function isNewEvent(snapshot: DeviceSnapshot, incident: TamperIncident | null): boolean {
   const at = snapshot.tamperLastEventAt;
   if (!at) return false;
-  // Only fire on an event we haven't already reported: compare against the
-  // incident we opened for it, not against wall-clock recency, so a replayed
-  // heartbeat carrying the same timestamp can't re-alert.
-  if (!open) return true;
-  return open.kind !== 'event' || at > open.openedAt;
+  // Only fire on an event we haven't already reported: compare against what was
+  // reported, not against wall-clock recency, so a replayed heartbeat carrying the
+  // same timestamp can't re-alert.
+  //
+  // Compared against the incident whether or not it is still open. A device keeps sending its
+  // last event in every heartbeat, indefinitely. Comparing only against an OPEN incident re-sent
+  // the alert after every close: a September 5 "Usage access was turned off" reached a guardian
+  // again on September 13, with usage access on (OnePlus 6T, DCP device run).
+  const reported = reportedEventAt(incident);
+  return reported === undefined || at > reported;
 }
 
 function gapNotification(incident: TamperIncident, gap: number, now: number, tzOffsetMinutes: number): TamperDecision {
@@ -184,18 +213,57 @@ export function accountIsDark(snapshots: DeviceSnapshot[], now: number): boolean
   return linked.every((s) => s.lastSeenAt == null || now - s.lastSeenAt >= GAP_OPEN_INCIDENT_MS);
 }
 
+/**
+ * The app and the kind of device, for copy sent about either. A computer runs the Companion, a phone
+ * runs Guard (DCP-17).
+ */
+function deviceWords(platform: string | undefined): {app: string; short: string; kind: string} {
+  return isDesktopPlatform(platform)
+    ? {app: 'Kindredly Companion', short: 'the Companion', kind: 'computer'}
+    : {app: 'Kindredly Guard', short: 'Guard', kind: 'phone'};
+}
+
 /** Parent-facing copy. Kept here so the wording is unit-testable alongside the thresholds. */
-export function describeReason(reason: TamperReason, deviceLabel: string): {title: string; body: string} {
+export function describeReason(
+  reason: TamperReason,
+  deviceLabel: string,
+  platform?: string,
+): {title: string; body: string} {
   if (reason.kind === 'event') {
     const body = EVENT_COPY[reason.eventKind] ?? 'Something changed in the protection settings.';
     return {title: `Protection changed on ${deviceLabel}`, body};
   }
   const hours = Math.floor(reason.sinceMs / HOUR);
   const since = hours >= 48 ? `${Math.floor(hours / 24)} days` : `${hours} hours`;
+  const words = deviceWords(platform);
   return {
     title: reason.final ? `${deviceLabel} still hasn't checked in` : `${deviceLabel} hasn't checked in`,
-    body: `Kindredly Guard hasn't reported for ${since}. The phone may be off, or Guard may have been removed.`,
+    body: `${words.app} hasn't reported for ${since}. The ${words.kind} may be off, or ${words.short} may have been removed.`,
   };
+}
+
+/**
+ * The new-app notice, saying phone or computer from the device whose app list it came from. `listed`
+ * is the names already joined and capped by the caller.
+ */
+export function describeNewApps(input: {total: number; listed: string; childName: string; platform?: unknown}): {
+  title: string;
+  message: string;
+  shortMessage: string;
+} {
+  const {kind} = deviceWords(typeof input.platform === 'string' ? input.platform : undefined);
+  const {total, childName} = input;
+  return {
+    title: total === 1 ? `New app on a ${kind}` : `${total} new apps on a ${kind}`,
+    message: `${input.listed} appeared on ${childName}'s ${kind}. Review what's allowed.`,
+    shortMessage: `${total} new app${total === 1 ? '' : 's'} on ${childName}'s ${kind}.`,
+  };
+}
+
+/** Sent when a device that had gone quiet reports again. */
+export function describeRecovery(deviceLabel: string, platform?: string): {title: string; body: string} {
+  const words = deviceWords(platform);
+  return {title: `${deviceLabel} is reporting again`, body: `${words.app} is back online on this ${words.kind}.`};
 }
 
 const EVENT_COPY: Record<DeviceTamperKind, string> = {
@@ -203,7 +271,9 @@ const EVENT_COPY: Record<DeviceTamperKind, string> = {
   adminDisabled: 'Uninstall protection was turned off. Guard can now be removed.',
   screenGuardDisabled: 'The screen guard was switched off in accessibility settings.',
   uninstallScreen: 'Someone opened the screen used to remove apps.',
-  usageAccessRevoked: "Usage access was turned off, so app time isn't being recorded.",
+  // Android's setting name alone told a guardian nothing (founder, 2026-09-14): the effect, then where to fix it.
+  usageAccessRevoked:
+    "Kindredly Guard was turned off in the phone's Usage access settings, so app time isn't being recorded.",
   mainAppMissing: 'The Kindredly app was removed from the phone.',
   // Desktop. Says what happened AND that it is already fixed, because the alert would otherwise
   // read as "your child's computer is unprotected right now", which it is not.

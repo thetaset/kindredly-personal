@@ -3,6 +3,7 @@ import {Router} from 'express';
 import {ApiReq} from '@/types/api-types';
 import {authenticateJWT, errorHelper} from '../utils/auth_utils';
 import {ArticleAnalysisService} from '@/services/article_analysis.service';
+import {RequestContext} from '@/base/request_context';
 
 /**
  * Article-trust route. Source-reputation lookup + rule-based analysis, owned by
@@ -25,7 +26,7 @@ class ArticleTrustRoute implements Routes {
       '/article/analyze',
       authenticateJWT,
       errorHelper(async (req: ApiReq<'/article/analyze'>, res) => {
-        const result = await this.articleAnalysisService.analyze(req.body);
+        const result = await this.articleAnalysisService.analyze(req.body, RequestContext.instance(req));
         res.json({success: true, results: result});
       }),
     );

@@ -9,6 +9,7 @@ import {
   deviceBlockCopy,
   deviceBlockSubtitle,
   deviceNoun,
+  downtimeUntilSentence,
   isDeviceBlockReason,
   localClock,
 } from '../src/restrictions/deviceBlockCopy';
@@ -91,6 +92,19 @@ describe('deviceBlockCopy', () => {
 
   it('never renders a bare app id when the label is missing', () => {
     expect(deviceBlockCopy({ ...base, appLabel: '', reason: 'app-blocked' }).headline).toBe('This app is turned off');
+  });
+});
+
+describe('Family Downtime until', () => {
+  const at = (hoursFromNoon: number) => ({ ...base, reason: 'family-downtime' as const, unlockAtMs: NOON + hoursFromNoon * 3_600_000 });
+
+  // A weekend one-off used to say "Until tomorrow." on Friday.
+  it('says the day when it does not end today', () => {
+    expect(downtimeUntilSentence(at(6))).toBe('Until 18:00.');
+    expect(downtimeUntilSentence(at(19))).toBe('Until tomorrow at 07:00.');
+    expect(downtimeUntilSentence(at(54))).toBe('Until Friday at 18:00.'); // 2026-08-19 is a Wednesday
+    expect(downtimeUntilSentence(at(10 * 24))).toBe('Until Aug 29 at 12:00.');
+    expect(downtimeUntilSentence({ ...base, reason: 'family-downtime' })).toBe('');
   });
 });
 

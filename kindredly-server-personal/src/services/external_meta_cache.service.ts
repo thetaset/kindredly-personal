@@ -202,7 +202,10 @@ class ExternalMetaCacheService {
 
     const {meta, extendedInfo} = await this.fetchFreshMetadata(url, resource.resourceType, resource.externalId);
 
-    const hasContent = !!(meta?.title || meta?.description || meta?.imageSrc || extendedInfo);
+    // `fileInfo` counts as content: a PDF whose filename yields no usable title is
+    // still a fully recognised file, not a parse failure, and negative-caching it
+    // for an hour would hide that from the popup.
+    const hasContent = !!(meta?.title || meta?.description || meta?.imageSrc || meta?.fileInfo || extendedInfo);
     await this.store(
       {
         resourceType: resource.resourceType,
@@ -365,6 +368,7 @@ class ExternalMetaCacheService {
         pageType: ItemResourceType.YT_VIDEO,
         videoId,
         channelId,
+        channelName: videoMeta.snippet?.channelTitle || null,
         youtubeChannelIds: channelId ? [channelId] : [],
         sourceId: 'yt_api',
       },

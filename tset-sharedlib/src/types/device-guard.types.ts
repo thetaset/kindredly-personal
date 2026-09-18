@@ -9,6 +9,9 @@
 
 import type { EncInfoKey } from './encryption.types';
 import type { InterventionMode } from './activity.types';
+import type { LimitRule, RuleOverride } from './usage-limits.types';
+import type { TemporaryLimitRule } from './reward.types';
+import type { DeviceHealth } from '../deviceguard/deviceHealth';
 
 /** Marker-URL base for device app sessions in activity logs (…/device-app/android/<pkg>). */
 export const DEVICE_APP_MARKER_BASE = 'https://kindredly.ai/device-app/';
@@ -123,10 +126,14 @@ export interface DeviceAppPolicyEntry {
  * Per-CHILD, not per-device: a parent decides "Roblox is off" about their kid,
  * not about a handset, and package names are stable across phones.
  *
- * Stored E2E-encrypted in ref_state (stateKey 'appPolicy', stateSubKey '') beside
- * the inventory, NOT in UserOptions — a plaintext row enumerating a child's
- * packages would defeat the reason the inventory is encrypted, and UserOptions is
- * SSE-broadcast to every client on every change.
+ * Stored in ref_state (stateKey 'appPolicy', stateSubKey '') beside the inventory,
+ * NOT in UserOptions, which is SSE-broadcast to every client on every change.
+ *
+ * READABLE since DCP-5 (decision D1, 2026-09-13): settings are not encrypted, history is. It was
+ * end-to-end encrypted, which is why the server's ruleset never held an app block (UX-063).
+ * Consequence accepted in the review: a blocked package reveals that the app exists, while the
+ * inventory itself stays encrypted. Rows written before DCP-5 stay encrypted until a guardian's
+ * client rewrites them (`DeviceAppPolicyService`).
  *
  * BLOCKLIST ONLY, deliberately. An allowlist's mistakes are omissions — forget
  * the Clock app and the phone breaks in a way the parent cannot diagnose, because
@@ -217,6 +224,14 @@ export interface DeviceGuardStatus {
   deviceId: string;
   companionVersion: string;
   serviceRunning: boolean;
+  /**
+   * Android Guard: why Android refused the last attempt to start monitoring, e.g.
+   * `ForegroundServiceStartNotAllowedException (status)`. Empty or absent once a start goes through.
+   * Recorded instead of crashing (DCP-3).
+   */
+  monitorStartRefused?: string;
+  /** When that refusal happened; 0 when there is none. */
+  monitorStartRefusedAt?: number;
   /** True once the device-agent token + key have been handed over (Companion is linked). */
   provisioned?: boolean;
   lastPollAt?: number;
@@ -262,8 +277,10 @@ export interface DeviceGuardStatus {
   /** Desktop only: foreground-app monitoring is running. */
   monitorRunning?: boolean;
   /**
-   * Desktop only: the child this computer is linked to. The parent's UI needs it to say WHOSE app
-   * time this machine reports; it is not a secret (the row is already the child's).
+   * The child this computer or phone is linked to. The parent's UI needs it to say WHOSE app
+   * time this device reports, and the rule push needs it to compile that child's limits rather than
+   * the signed-in user's; it is not a secret (the row is already the child's). Guard on Android
+   * reports it from 2026-09-13; an older Guard build omits it.
    */
   linkedUserId?: string;
   /**
@@ -276,6 +293,21 @@ export interface DeviceGuardStatus {
    * attached. A rename leaves this stale until the next link; the id is the truth, this is a label.
    */
   linkedUserName?: string;
+  // --- DCP-10 heartbeat fields (redesign §4.7). Absent on older builds; `deviceHealth` treats absent as unknown. ---
+  /** The monitor loop's real last tick, from the device clock. Stale against the receive time: stopped. */
+  lastTickAt?: number;
+  /** The settings version the sealed ruleset was compiled from; -1 when never compiled from fetched settings. */
+  appliedSettingsVersion?: number;
+  /** Age of today's web time (usage seed) on the device. Sent from DCP-9. */
+  usageSeedAgeMs?: number;
+  /** How the device notices the app in front: OS events, or polling at an interval. */
+  detection?: { kind: 'events' | 'poll'; intervalMs?: number };
+  /** The device's timezone differs from the family's (D3). Schedules still follow the family's. */
+  timeZoneMismatch?: boolean;
+  /** The device clock is far from the server's, which a child can do to slide a schedule. */
+  clockJump?: boolean;
+  /** What this build can do: `settingsFetch` (compiles its own rules, DCP-7), `guardPush` (the server holds Guard's own FCM token, DCP-7). */
+  capabilities?: string[];
 }
 
 /** Which Android surface to open from the setup wizard (main app deep-links to it). */
@@ -357,9 +389,10 @@ export interface CompanionDeviceView {
   provisioning: CompanionProvisioningRecord | null;
   status: DeviceGuardStatus | null;
   inventoryCount: number;
+  /** When the server last received this device's heartbeat. Null: never. */
   lastSeenAt: number | null;
-  /** 'ok' reporting recently; 'stale' provisioned but silent; 'setup' provisioned, never reported. */
-  health: 'ok' | 'stale' | 'setup';
+  /** The one health verdict every surface shows (`deviceguard/deviceHealth.ts`, DCP-10). */
+  deviceHealth: DeviceHealth;
 }
 
 // --- Compiled rules (graduated from the Phase-0 spike compiler; enforcement lands in Phase 2) ---
@@ -416,6 +449,11 @@ export interface CompiledDeviceRuleSet {
    */
   appPolicy?: CompiledAppPolicy;
   /**
+   * Family Downtime, passed through from the settings unchanged apart from dropping stretches that
+   * have already ended. Not gated on a pause. Absent from an older compile, which behaves as before.
+   */
+  familyDowntime?: DeviceFamilyDowntime;
+  /**
    * The linked child's display name, so a Companion can name them with no browser attached.
    *
    * It rides on the ruleset rather than only on the provisioning handshake because the handshake
@@ -446,3 +484,89 @@ export type DesktopBridgeStatus = {
   lastUnavailableReason: string;
   nativePortId: string;
 };
+
+// ── Device settings contract (DCP-5, device control plane redesign §4.1/§4.3) ────────────────
+
+/**
+ * Whether the settings response could include the app policy.
+ * - `readable`: `appPolicy` is the policy.
+ * - `unreadable`: the stored row is still end-to-end encrypted. D1 moved it to readable, but only a
+ *   guardian's client can rewrite an old row, on its next open of that child's app policy.
+ * - `absent`: no policy row exists.
+ *
+ * **A device keeps its sealed app blocks whenever `appPolicy` is null**, whatever the status. A
+ * missing input is never "nothing blocked" (tracker Gotchas). A guardian clearing every block
+ * writes a readable policy with nothing in it, not a missing row.
+ */
+export type DeviceAppPolicyStatus = 'readable' | 'unreadable' | 'absent';
+
+/**
+ * The inputs a device compiles its rules from: the same settings the browser enforces, read from
+ * the user's options, plus the app policy. Field names match `UserOptions` so each device reads
+ * the types the browser already uses.
+ */
+export interface DeviceSettings {
+  /**
+   * `contentUsageLimits` are the authored rules. `temporaryRules` are reward-minted rules, each with
+   * its own `expiresAtMs`; a device applies the unexpired ones on top of `contentUsageLimits`, as the
+   * browser does (`ActivityLogDataService._getUsageLimitsData`).
+   */
+  usageLimitsData: { contentUsageLimits: LimitRule[]; temporaryRules: TemporaryLimitRule[] };
+  /** Bonus time. Each override carries an absolute `expiresAt`, evaluated on the device. */
+  ruleOverrideSettings: { ruleOverrides: RuleOverride[] };
+  /** Pause (with its expiry) and intervention mode. Only these fields reach a device. */
+  accessControlSettings: {
+    disableUsageLimits?: boolean;
+    disableUsageLimitsExpires?: number;
+    usageLimitInterventionMode?: InterventionMode;
+    defaultInterventionMode?: InterventionMode;
+  };
+  appPolicy: DeviceAppPolicy | null;
+  appPolicyStatus: DeviceAppPolicyStatus;
+  /**
+   * Family Downtime, as actual start and end times for the next 28 days, worked out by the server in
+   * the family timezone (`familyDowntimeForDevice`). A device checks "is now inside one" and nothing
+   * else. Not gated on a pause: a pause does not lift downtime.
+   *
+   * These times move with the clock while the version does not, so a device refetches without its
+   * `knownVersion` before `horizonEndMs` comes near. Absent from a server that predates it, and
+   * `intervals` is empty for a family with no downtime.
+   */
+  familyDowntime?: DeviceFamilyDowntime;
+}
+
+/**
+ * Family Downtime as a device enforces it: actual start and end times, never a schedule. A device
+ * checks "is now inside one" and nothing else, so no device re-implements the family's midnight and
+ * daylight-saving rules. Past `horizonEndMs` the device treats it as absent and fetches again.
+ */
+export interface DeviceFamilyDowntime {
+  intervals: Array<{ startMs: number; endMs: number }>;
+  horizonEndMs: number;
+  /** Apps the family left open during downtime, `<platform>:<id>` or a bare id. */
+  allowAppIds: string[];
+  /** The person's Blocked message, for the shield. Absent when they have none. */
+  note?: string;
+}
+
+/** `POST /companion/settings/current`. Device-agent token only; takes no user or device id. */
+export interface DeviceSettingsCurrentRequest {
+  /** The version the device last applied. Absent on a device that has never fetched. */
+  knownVersion?: number;
+}
+
+/**
+ * `settings` and `familyTimeZone` are present only when `version` differs from `knownVersion`.
+ *
+ * **Compare with `!==`, never `>`.** The version is `GREATEST(previous + 1, epoch ms)`, so it never
+ * repeats, but a restored database serves an older value until its next write, and a device that
+ * refused a lower number would keep settings the server no longer holds.
+ */
+export interface DeviceSettingsCurrentResponse {
+  version: number;
+  /** Server clock at response time, for the device's trusted time (§4.2). */
+  serverTimeMs: number;
+  settings?: DeviceSettings;
+  /** IANA id a guardian set for the family (D3), e.g. `America/Los_Angeles`. Null until one is set. */
+  familyTimeZone?: string | null;
+}

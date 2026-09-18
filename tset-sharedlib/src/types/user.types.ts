@@ -43,8 +43,44 @@ export interface UserOptions {
   /** Keep all links inside the in-app browser instead of opening external apps. */
   containLinksInternally?: boolean;
   aiChatEnabled?: boolean;
+  /**
+   * "Assistant reviews requests": whether blocked-site requests from this child get
+   * checked against the family's guidelines before reaching a parent.
+   *
+   * Deliberately independent of `aiChatEnabled` and of hosted-AI availability. AI
+   * Chat governs something the child talks to; this answers on the parent's behalf
+   * using words the parent wrote, and a family that did not want a chatbot has not
+   * thereby declined it.
+   *
+   * On user.options rather than a userPref so a child cannot grant it to
+   * themselves. Unlike the guidelines text, this one is safe for them to READ —
+   * the block page has to know whether to promise a check.
+   */
+  assistantReviewEnabled?: boolean;
   /** App Builder: create and edit the code behind Kindredly apps. Admin-granted per child. */
   appEditorEnabled?: boolean;
+  /**
+   * Curated email: whether this person has the Email app at all. Admin-granted per person, so a
+   * child cannot switch their own inbox on — the reason every permission below lives here rather
+   * than in a userPref the person it describes can write.
+   */
+  emailEnabled?: boolean;
+  /** Speech mode: talk to the assistant and hear the reply. Admin-granted per person. */
+  speechModeEnabled?: boolean;
+  /** The wake word inside speech mode. Admin-granted per person. */
+  wakeWordEnabled?: boolean;
+  /**
+   * "Keep history for", in days: how long this person's activity history is kept. Admin-written, so
+   * a child can never shorten their own history. Absent means the plan's default (14); always read
+   * through `effectiveHistoryRetentionDays`, which caps it at the plan's maximum (PLN-9).
+   */
+  historyRetentionDays?: number;
+  /** Explore's Community scope — collections other families published. Admin-granted per person. */
+  communityContentEnabled?: boolean;
+  /** Kindredly Guard: app time and limits on a child's phone. Admin-granted per person. */
+  companionDevicesEnabled?: boolean;
+  /** Remote actions into a managed child browser session. Admin-granted per person. */
+  remoteChildActionsEnabled?: boolean;
   /** Library-mode kids: allow browsing the published catalog and requesting adds. */
   explorePublishedEnabled?: boolean;
   accessControlSettings?: any;
@@ -174,8 +210,19 @@ export interface UserPrefsData {
    * not silently flip on a birthday.
    */
   'appearance.bigSimple.enabled'?: boolean | null;
+  /**
+   * Big and Simple on phones, kept apart from the key above because the scale
+   * does not fit a phone's width well. Never derived from age and never seeded:
+   * unset means off, and only turning it on from a phone sets it.
+   */
+  'appearance.bigSimple.mobile.enabled'?: boolean | null;
   'features.searchSidekick.enabled'?: boolean | null;
   'features.monitorWidget.enabled'?: boolean | null;
+  'features.categoryExplorer.enabled'?: boolean | null;
+  'features.today.enabled'?: boolean | null;
+  'features.topicInsights.enabled'?: boolean | null;
+  'features.entityNotes.enabled'?: boolean | null;
+  'features.entityNotesAI.enabled'?: boolean | null;
   'features.unifiedFeedHome.enabled'?: boolean | null;
   'features.learnedClassifier.mode'?: 'off' | 'shadow' | 'on' | null;
   /**
@@ -262,8 +309,15 @@ export interface ManagedClientSessionView extends ClientInfoView {
   lastHeartbeatAt?: DateString | null;
   lastVerifiedAt?: DateString | null;
   status: ManagedSessionStatus;
+  /** Can receive a pushed command of any kind, including a debug toast. True for phones too. */
   supportsRemoteCommands: boolean;
   remoteCommandReady: boolean;
+  /**
+   * Can actually run a remote action. Only the browser extension has an executor; a phone
+   * connects, receives the command and drops it. Absent from an older server's response, where
+   * the client falls back to reading appType.
+   */
+  canExecuteRemoteActions?: boolean;
 }
 
 export interface ManagedRemoteActionCommandView {

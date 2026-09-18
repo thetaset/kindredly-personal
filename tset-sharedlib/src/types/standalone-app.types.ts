@@ -20,7 +20,6 @@ export type StandaloneAppManifest = StandaloneAppPublicInfo & {
   featureGate?: string | null;
   allowedRoles?: UserType[];
   allowedAccountTypes?: AccountType[];
-  extensionEmbeddingAllowed?: boolean;
 };
 
 export type StandaloneAppCatalogEntry = StandaloneAppPublicInfo & {

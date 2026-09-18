@@ -82,7 +82,21 @@ export interface ClientSettings {
  * setting meant to constrain a restricted user has to be listed here or it is advisory
  * only — the UI disabling a control is not enforcement.
  */
-export const GUARDIAN_ONLY_PREF_KEYS = ['siteStyleLocks'] as const;
+export const GUARDIAN_ONLY_PREF_KEYS = [
+  'siteStyleLocks',
+  /*
+   * Retired home of the "Assistant reviews requests" guidelines, kept guarded
+   * rather than merely unused.
+   *
+   * The server no longer reads this key — the guidelines moved to
+   * `account.options.assistantReview`, out of the child's reach entirely. Listing
+   * it here closes the window on dev accounts that still have the old pref
+   * written, and stops it becoming a live policy input again by accident. Note
+   * this list only blocks WRITES: a read block would break `siteStyleLocks`,
+   * which the child's own SiteStyleService legitimately reads.
+   */
+  'filters.autoApprovalSettings',
+] as const;
 
 export type GuardianOnlyPrefKey = (typeof GUARDIAN_ONLY_PREF_KEYS)[number];
 
@@ -110,14 +124,6 @@ export interface SharedClientSettings {
   installVersion?: string;
   offlineFallbackEnabled?: boolean;
   storageCleanup?: StorageCleanupSettings;
-  /**
-   * Offer the experimental encryption-password choice during Google/Apple signup.
-   *
-   * Device-level and pre-auth on purpose: the choice has to be made before an account
-   * exists, so it cannot live on a user pref or an account feature flag. Same shape as
-   * Custom Server Settings, which is reachable from the sign-in screen for the same reason.
-   */
-  encryptionPasswordAtSignup?: boolean;
 }
 
 // Deprecated types - kept for backward compatibility

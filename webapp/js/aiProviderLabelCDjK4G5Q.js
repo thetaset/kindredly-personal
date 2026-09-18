@@ -1,0 +1,1 @@
+function e(r){return r.provider==="ollama"?r.ollamaModel?`Ollama · ${r.ollamaModel}`:"Ollama":r.provider==="browser"||r.provider==="browser-ff"?r.isFirefoxBuild?"Firefox built-in":"Chrome/Edge built-in":"Kindredly.ai server"}function l(r){return r==="ollama"||r==="browser"||r==="browser-ff"}export{e as a,l as i};

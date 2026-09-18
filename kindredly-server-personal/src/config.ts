@@ -126,6 +126,12 @@ const config = {
     // constraint, which matches today's effective behavior. Only builds new enough to read this
     // field are affected, so it can be populated once the fleet has aged.
     supportedAppVersions: [] as string[],
+    // Additive server capabilities. A client that does not know a key ignores it; removing a key
+    // is the rollback for that feature. imageRenditions: user-file reads accept a logical
+    // previewId in `variants`, and the response says which bytes came back (PERF-3).
+    capabilities: {
+      imageRenditions: {version: 1, variants: ['list', 'card'] as string[]},
+    },
   },
   requireInviteCode: process.env.REQUIRE_INVITE_CODE === 'true',
   classificationEvalAllowedUserIds: (process.env.CLASSIFICATION_EVAL_ALLOWED_USER_IDS || '')
@@ -138,6 +144,26 @@ const config = {
     process.env.ENABLE_EMAIL_MESSAGING != null ? process.env.ENABLE_EMAIL_MESSAGING === 'true' : environment !== 'test',
   firebaseConfig: process.env.FIREBASE_CONFIG,
   awsRegion: process.env.AWS_REGION || 'us-west-2',
+
+  /**
+   * SMTP is how a self-hosted box sends mail; the cloud uses SES. Which one a
+   * process actually uses is decided in `base/email_transport.ts`, not here.
+   *
+   * Environment variables are the FLOOR, deliberately. A box owner who has
+   * locked themselves out of the UI - or whose box cannot mail them a reset
+   * link precisely because mail is misconfigured - can always fix it from the
+   * shell. Server-side settings layer on top of these, never under them.
+   */
+  smtp: {
+    host: process.env.SMTP_HOST || '',
+    port: Number(process.env.SMTP_PORT || 587),
+    // Implicit TLS on connect, i.e. port 465. Port 587 leaves this false and
+    // upgrades with STARTTLS instead.
+    secure: process.env.SMTP_SECURE === 'true',
+    user: process.env.SMTP_USER || '',
+    password: process.env.SMTP_PASSWORD || '',
+    from: process.env.SMTP_FROM || '',
+  },
   port: process.env.PORT || 3000,
   serverHostname: serverHostname,
   apiPath: API_PATH,
@@ -164,6 +190,31 @@ const config = {
    * looks at all under the `lite` profile. Cloud serves its bundle from a CDN.
    */
   webappDir: process.env.KND_WEBAPP_DIR || '',
+  /**
+   * The box's own identity (BOX-1/3): where its authority lives, whether it serves HTTPS and
+   * announces `kindredly.local`. Every field is ignored under `cloud`; the modules gate on the
+   * profile themselves (`base/box_tls.ts`, `base/box_announce.ts`). `hostname` is a preferred
+   * name without `.local`; the box still falls back to the standard names on a collision.
+   */
+  box: {
+    dataDir: process.env.KND_DATA_DIR || path.join(os.homedir(), 'ThetaSetData'),
+    tls: process.env.KND_BOX_TLS !== 'off',
+    mdns: process.env.KND_BOX_MDNS !== 'off',
+    hostname:
+      (process.env.KND_BOX_HOSTNAME || '')
+        .trim()
+        .toLowerCase()
+        .replace(/\.local$/, '') || null,
+    /**
+     * Remote access (BOX-16). `tunnel` off means this box is reachable on the home network only —
+     * a real tier, not an absence. `relayUrl` is whichever relay the family chooses; the default is
+     * Kindredly's, and a community can run its own (docs/proposals/home-server-remote-access-webrtc.md).
+     * The tunnel client itself waits on the binding design's review (BOX-15); until it lands these
+     * settings are read, logged at start, and do nothing else.
+     */
+    tunnel: process.env.KND_BOX_TUNNEL === 'on',
+    relayUrl: (process.env.KND_RELAY_URL || 'https://relay.box.kindredly.ai').trim().replace(/\/+$/, ''),
+  },
 
   embeddedDb: {
     enabled: process.env.KND_EMBEDDED_DB === 'true',
@@ -221,6 +272,20 @@ const config = {
    * production server onto an in-memory store.
    */
   profile: (process.env.KND_PROFILE === 'lite' ? 'lite' : 'cloud') as 'cloud' | 'lite',
+  /**
+   * Where realm backup bundles go. `target` selects the adapter
+   * (`base/backup_target.ts`); unset means backups are off, which is a box's
+   * normal first-boot state and not an error.
+   *
+   * `path` is only read by the `fs` adapter and is deliberately not defaulted to
+   * somewhere under the home directory: a backup written to the same disk as the
+   * database is not a backup, and a silent default would hide that. A USB stick,
+   * an external drive and a NAS mount are all just this path.
+   */
+  backup: {
+    target: process.env.KND_BACKUP_TARGET || '',
+    path: process.env.KND_BACKUP_PATH || '',
+  },
   redis: {
     host: process.env.REDIS_HOST || 'localhost',
     port: process.env.REDIS_PORT || 6379,
@@ -236,13 +301,8 @@ const config = {
   aiConfig: {
     type: process.env.AI_CONFIG_TYPE || 'openai',
     secretKey: process.env.AI_CONFIG_SECRET_KEY || 'sk-1234',
-    // Per-account monthly token budget. Unset/0 = unlimited (current prod
-    // behavior). When set, AI chat requests are rejected with
-    // AI_BUDGET_EXCEEDED once the account's month-to-date total crosses it.
-    monthlyTokenLimit: (() => {
-      const raw = parseInt(process.env.AI_MONTHLY_TOKEN_LIMIT || '0', 10);
-      return Number.isFinite(raw) && raw > 0 ? raw : null;
-    })(),
+    // Hosted AI limits are per plan, in Admin AI Tools (ai_config.store.ts DEFAULT_LIMITS). The
+    // AI_MONTHLY_TOKEN_LIMIT env var they replaced is no longer read.
   },
   // Content-safety gate for the published library. When the gate is enabled,
   // content that trips moderation at or above `threshold` is NOT published —
@@ -327,7 +387,16 @@ const config = {
     webhookSigningSecret: process.env.STRIPE_WEBHOOK_SIGNING_SECRET || '',
   },
 
-  adminEmail: process.env.ADMIN_EMAIL || 'thetaset1@gmail.com',
+  /**
+   * Where "ADMIN NOTICE" mail goes. On a self-hosted box this deliberately has
+   * NO default, because the fallback is OUR inbox: a box that inherited it would
+   * mail us every time somebody else's family created a user. That is the whole
+   * phone-home risk, and an empty address is what makes it structural rather
+   * than a flag somebody has to remember to leave off.
+   *
+   * A box owner who wants these notices sets ADMIN_EMAIL to their own address.
+   */
+  adminEmail: process.env.ADMIN_EMAIL || (privateServer ? '' : 'thetaset1@gmail.com'),
   adminWatchNotifications: process.env.ADMIN_WATCH_NOTIFICATIONS === 'true',
   adminConsoleEnabled: devMode || process.env.ADMIN_CONSOLE_ENABLED === 'true',
   adminConsoleUser: 'admin',
@@ -432,6 +501,10 @@ const config = {
     'https://thetaset.com',
     /moz-extension:\/\//,
     /safari-web-extension:\/\//,
+    // The ID the `key` in tset-client/src/manifest_chrome.json derives to (sha256 → a-p), and the one
+    // tset-electron's deviceLockdown pins. The line below it predates the pinned key; kept in case an
+    // older build still runs. base/webapp_static.ts builds a box's frame-ancestors from this list.
+    'chrome-extension://kekfgmohihmjcmalpkpmpaeiehcmkgbj',
     'chrome-extension://egngcfemcdnimdmgjimkninagffejjco',
     'capacitor://localhost', // IOS
 

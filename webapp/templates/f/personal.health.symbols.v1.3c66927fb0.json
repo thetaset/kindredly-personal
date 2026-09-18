@@ -1,0 +1,1 @@
+{"id":"personal.health.symbols.v1","name":"Health Info","kindTemplateId":"kindtpl.health.symbols.v1","description":"A symbolic health board — big tiles, tap one to see what’s inside.","group":"Personal Admin","seedText":"health insurance physician dentist pharmacy provider patient portal coverage","icon":"grid","tags":["health"],"minAgeGroups":["minage_adult"]}

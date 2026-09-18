@@ -1,6 +1,14 @@
 import type { DeviceGrant } from "../restrictions/deviceGrants";
-import type { SiteStyleEntryV1 } from "../types/item.types";
 import type {
+  FamilyDowntimeAllow,
+  FamilyDowntimeSchedule,
+  FamilyDowntimeSettings,
+  FamilyDowntimeView,
+} from "../restrictions/familyDowntime";
+import type { SiteStyleEntryV1 } from "../types/item.types";
+import type { AiImageCredits } from "../ai-image-credits";
+import type {
+  AccessRequestAddResponse,
   AccountInfoResponse,
   SiteStyleForUrlRequest,
   SiteStyleGenerateRequest,
@@ -28,6 +36,8 @@ import type {
   AITextResponse,
   AIUsageGetSummaryRequest,
   AIUsageGetSummaryResponse,
+  AiExtraUsageGrantView,
+  AiLimitState,
   AttachmentAddResponse,
   AccessEvaluateRequest,
   AccessEvaluateResponse,
@@ -102,8 +112,6 @@ import type {
   AdminPublishedApproveBatchRequest,
   AdminPublishedApproveBatchResponse,
   AdminUpdateContentBundleCatalogRequest,
-  LibraryAutoApprovalEvaluateRequest,
-  LibraryAutoApprovalEvaluateResponse,
   ChatStreamCompleteEvent,
   CollectionListByIdsRequest,
   CollectionListByUserRequest,
@@ -162,6 +170,10 @@ import type {
   GetPublishedViewRequest,
   RemoveItemFromUserLibraryRequest,
   LibraryCleanupCandidatesRequest,
+  LibraryDuplicateCandidatesRequest,
+  LibraryDuplicateCandidatesResponse,
+  MergeLibraryDuplicatesRequest,
+  MergeLibraryDuplicatesResponse,
   RecommendContentBundlesRequest,
   RecommendContentBundlesResponse,
   GetRankedMatchesForURLRequest,
@@ -312,6 +324,14 @@ import type {
   EmbeddingCachePutResponse,
   EmbeddingCacheStatsRequest,
   EmbeddingCacheStatsResponse,
+  CurationQueueEntry,
+  CurationReviewAiDraft,
+  CurationReviewCuratorView,
+  CurationReviewForCuratorResponse,
+  CurationReviewListForItemResponse,
+  CurationReviewQueueEntry,
+  CurationReviewSaveRequest,
+  OwnerPublishStatus,
   PublishResult,
   GetServerSettingsRequest,
   ServerSettingsView,
@@ -323,7 +343,8 @@ import type {
 } from "./api-types";
 
 import type { AccountType } from "../types/user.types";
-import type { DeviceGuardStatus, DeviceAppInventory, DeviceAppPolicy, CompanionDeviceView, CompanionProbeResult, CompanionOpenTarget, DesktopBridgeStatus, CompiledDeviceRuleSet } from "../types/device-guard.types";
+import type { StoredFamilyPolicyRule } from "../types/family-policy.types";
+import type { DeviceGuardStatus, DeviceAppInventory, DeviceAppPolicy, CompanionDeviceView, CompanionProbeResult, CompanionOpenTarget, DesktopBridgeStatus, CompiledDeviceRuleSet, DeviceSettingsCurrentRequest, DeviceSettingsCurrentResponse } from "../types/device-guard.types";
 import type { LessonGenRequest, LessonGenResponse, LessonGradeRequest, LessonGradeResponse } from "../lesson.utils";
 
 import type { KeyEntry } from "../shared.types";
@@ -386,6 +407,26 @@ import type {DailyRewardStates, RewardSettings} from '../types/reward.types';
 import type {CheckpointRelease, CheckpointTaskGateStatus} from '../types/usage-limits.types';
 import type {TaskCompletionStatus} from '../types/task.types';
 import type {ArtifactDeleteRequest, ArtifactDeleteResponse, ArtifactGetRequest, ArtifactGetResponse, ArtifactListRequest, ArtifactListResponse, ArtifactSyncPendingRequest, ArtifactSyncPendingResponse, ArtifactUpsertRequest, ArtifactUpsertResponse, GetClassificationEvalProgramStatusRequest, GetClassificationEvalProgramStatusResponse, GetGroupedEntriesSinceRequest, GetGroupedEntriesSinceResponse, PlatformAlertReceiverView, GetSessionSummarySnapshotRequest, GetSessionSummarySnapshotResponse, GetTopicAttentionRequest, GetTopicAttentionResponse, GetUsageInsightsReportRequest, GetUsageInsightsReportResponse, GetUsageSessionsSinceRequest, GetUsageSessionsSinceResponse, InvalidateActivityMonitorsRequest, InvalidateActivityMonitorsResponse, LearnedClassifierArtifact, ReportClassificationIssueRequest, ReportClassificationIssueResponse, SaveUserActivityLogResponse, UploadClassificationDatasetSamplesRequest, UploadClassificationDatasetSamplesResponse, UploadImageClassificationSamplesRequest, UploadImageClassificationSamplesResponse, UsageLogCollapseMode, UserActivityLogListResponse} from './api-types';
+
+/** Queue widths as the classifier currently has them, with the build's defaults alongside. */
+export type ImageClassifyQueueWidths = {
+  maxConcurrentFetches: number;
+  maxConcurrentClassifications: number;
+  defaults: {maxConcurrentFetches: number; maxConcurrentClassifications: number};
+};
+
+/** Durable verdict cache state. `supported` is the browser; `available` is this profile. */
+export type ImageVerdictCacheStatus = {
+  supported: boolean;
+  available: boolean;
+  disabled: boolean;
+  entries: number;
+  schema: number;
+  /** The cache's key namespace: schema + runtime + model tag, or null before it is published. */
+  namespace: {schema: number; runtime: string; modelTag: string} | null;
+  lastSweepAt: number;
+  stats: {lookups: number; hits: number; writes: number; swept: number};
+};
 
 export interface ApiRouteMap {
   "/": { request: {}; response: void };
@@ -684,6 +725,17 @@ export interface ApiRouteMap {
     request: { taskId: string };
     response: { assignees: Array<{ _id: string; label: string }> };
   };
+  // The collections each task is in, for the Tasks page's labels and collection filters.
+  // Client background route only. Only collections the signed-in person can read are
+  // returned, so a collection they cannot open is never named. `collectionIds` names
+  // extra collections (a remembered filter) that no listed task is in.
+  "/task_items/collections": {
+    request: { taskIds: string[]; collectionIds?: string[] };
+    response: {
+      collectionIdsByTaskId: Record<string, string[]>;
+      collections: Array<{ _id: string; name: string }>;
+    };
+  };
 
   // Task completion via RefState (user-owned)
   "/task_completion/upsert": {
@@ -779,7 +831,7 @@ export interface ApiRouteMap {
   };
   "/access_request/add": {
     request: { key: string; type?: string; details?: any; message?: string };
-    response: void;
+    response: AccessRequestAddResponse;
   };
   "/access_request/listall": {
     request: {};
@@ -804,15 +856,15 @@ export interface ApiRouteMap {
     response: void;
   };
   "/access_request/remove": { request: { id: string }; response: void };
+  "/access_request/reviewStatus": {
+    request: {};
+    response: { enabled: boolean; remainingThisWeek: number | null };
+  };
   "/account/content/getTermDict": {
     request: { key: string };
     response: { terms: string[] };
   };
   "/account/delete": { request: { confirmation: string }; response: void };
-  "/account/export": {
-    request: { options: any };
-    response: { data: string; format: string };
-  };
   "/account/getSpaceUsage": {
     request: {};
     response: {
@@ -843,10 +895,6 @@ export interface ApiRouteMap {
       blockedBy?: Array<{ userId: string; displayedName: string }>;
     };
   };
-  "/account/import": {
-    request: { importData: any };
-    response: { imported: number; failed: number; errors?: string[] };
-  };
   "/account/info": {
     request: { forceSubSync?: boolean };
     response: AccountInfoResponse;
@@ -864,6 +912,69 @@ export interface ApiRouteMap {
   "/account/options/update": {
     request: { options: AccountOptions };
     response: void;
+  };
+  "/account/assistantReview/update": {
+    request: {
+      targetUserId?: string;
+      entry?: { presets: string[]; customText: string } | null;
+      /**
+       * Append one line to the existing free text instead of replacing the entry.
+       *
+       * Exists because the alternative — read the entry, concatenate, send it back —
+       * is exactly the lost-update race this route was created to close: two
+       * guardians appending at the same moment would each overwrite the other.
+       * Mutually exclusive with `entry`.
+       */
+      appendCustomText?: string;
+      /**
+       * Save or remove one reusable template. A patch for the same reason the rest of this
+       * route is: sending the whole array back would let two guardians drop each other's.
+       * Mutually exclusive with `entry` and `appendCustomText`.
+       */
+      template?:
+        | {save: {id?: string; name: string; entry: {presets: string[]; customText: string}}}
+        | {remove: string};
+    };
+    response: void;
+  };
+
+  /**
+   * Family Downtime (`restrictions/familyDowntime.ts`). Admin-only, each a patch on the account's
+   * `familyDowntime` under a row lock, so two admins saving at once keep both edits. Every write
+   * returns the stored settings.
+   *
+   * `update` replaces only the fields it is sent. Recurring schedules need the family timezone.
+   */
+  "/account/familyDowntime/update": {
+    request: { enabled?: boolean; schedules?: FamilyDowntimeSchedule[]; allow?: FamilyDowntimeAllow };
+    response: { familyDowntime: FamilyDowntimeSettings };
+  };
+  /** A one-off, including "Start now". Refused with a sentence when the times cannot be saved. */
+  "/account/familyDowntime/oneOff/add": {
+    request: { startAt: number; endAt: number };
+    response: { familyDowntime: FamilyDowntimeSettings };
+  };
+  "/account/familyDowntime/oneOff/remove": {
+    request: { id: string };
+    response: { familyDowntime: FamilyDowntimeSettings };
+  };
+  /** Ends the downtime running now, for everyone. Tomorrow's schedule is untouched. */
+  "/account/familyDowntime/endNow": {
+    request: {};
+    response: { familyDowntime: FamilyDowntimeSettings };
+  };
+  /** The calling admin only, until the downtime running now ends. Refused when it is not on. */
+  "/account/familyDowntime/dismiss": {
+    request: {};
+    response: { familyDowntime: FamilyDowntimeSettings };
+  };
+  /**
+   * Background only. The signed-in person's Family Downtime right now, from this device's account
+   * copy. `view` is null when signed out.
+   */
+  "/familyDowntime/state": {
+    request: {};
+    response: { view: FamilyDowntimeView | null };
   };
 
   // RefState: generic state storage with optional client-side encryption
@@ -990,6 +1101,10 @@ export interface ApiRouteMap {
     request: GetUsageInsightsReportRequest;
     response: GetUsageInsightsReportResponse;
   };
+  "/activity/lookupChannelNames": {
+    request: { channelIds: string[] };
+    response: { names: Record<string, string> };
+  };
   "/activity/getTopicAttention": {
     request: GetTopicAttentionRequest;
     response: GetTopicAttentionResponse;
@@ -1059,10 +1174,25 @@ export interface ApiRouteMap {
     request: { accountId: string; optionName: string; optionValue: any };
     response: void;
   };
-  /** Set or clear an AI spend override. `usdMonthly: null` clears it. */
-  "/admin/aiBudget/set": {
-    request: { scope: "account" | "user"; targetId: string; usdMonthly: number | null };
-    response: { scope: "account" | "user"; targetId: string; usdMonthly: number | null };
+  /** A family's 5-hour and weekly AI limits as they stand, and its grants of extra AI usage. */
+  "/admin/aiLimits/getAccount": {
+    request: { accountId: string };
+    response: { state: AiLimitState; grants: AiExtraUsageGrantView[] };
+  };
+  /** Give a family extra AI usage, spent once a limit is used up. `expiresAt` is ISO, or null for none. */
+  "/admin/aiExtraUsage/grant": {
+    request: { accountId: string; usd: number; expiresAt?: string | null; note?: string | null };
+    response: AiExtraUsageGrantView;
+  };
+  /** Revoke a grant: what is left of it can no longer be spent. */
+  "/admin/aiExtraUsage/revoke": {
+    request: { grantId: string };
+    response: AiExtraUsageGrantView;
+  };
+  /** Turn hosted AI off or back on for a family. */
+  "/admin/aiLimits/setHostedStopped": {
+    request: { accountId: string; stopped: boolean };
+    response: { accountId: string; stopped: boolean };
   };
   "/admin/account/changeType": {
     request: { accountId: string; accountType: AccountType };
@@ -1206,6 +1336,29 @@ export interface ApiRouteMap {
         enabled: boolean;
         source: "runtime_override" | "environment";
       };
+    };
+  };
+  "/admin/security/key0Sweep": {
+    request: {
+      /** Defaults to TRUE — mutation is opt-in. Pass false to actually tombstone. */
+      dryRun?: boolean;
+    };
+    response: {
+      dryRun: boolean;
+      /** Live password-wrapped user-secret copies examined, across all users. */
+      scanned: number;
+      /** Users with a real password — their entry is a genuine unlock method, never touched. */
+      skippedUserHasPassword: number;
+      /** Entry's owner missing or deleted — left alone. */
+      skippedUserMissing: number;
+      /** Positively identified: the payload decrypts under the KEY-0 constant. */
+      confirmedConstant: number;
+      /** Tombstoned this run (0 on a dry run). */
+      removed: number;
+      /** Password-wrapped but NOT openable with the constant — left alone. */
+      notConstant: number;
+      /** Owners of confirmed entries, capped at 200. */
+      confirmedUserIds: string[];
     };
   };
   "/admin/cache/list": {
@@ -1999,6 +2152,14 @@ export interface ApiRouteMap {
     };
     response: void;
   };
+  "/admin/user/changeVerifiedStatus": {
+    request: {
+      publicUserId: string;
+      verifiedType: "contributor" | null;
+      message?: string;
+    };
+    response: void;
+  };
   "/admin/user/changeLockStatus": {
     request: { userId: string; disabled: boolean };
     response: void;
@@ -2095,6 +2256,25 @@ export interface ApiRouteMap {
   };
   "/ai/provider/syncOriginRule": { request: {}; response: { success: boolean } };
   /**
+   * Client-only image generation. No server handler: the background decides whether this
+   * device's pictures come from Kindredly.ai (which does have a server route,
+   * `/usertask/generateImage`) or from an image server the family runs, which our server
+   * cannot reach at all.
+   */
+  "/ai/image/generate": {
+    request: { prompt: string };
+    response: { imageData?: string; imageUrl?: string; taskId: string };
+  };
+  "/ai/image/probeLocal": {
+    request: { endpoint: string };
+    response: { ok: boolean; models: string[]; error?: string };
+  };
+  /** The family's image credits: how many Kindredly.ai images are left, and when the next comes back. */
+  "/ai/image/credits": {
+    request: Record<string, never>;
+    response: AiImageCredits;
+  };
+  /**
    * The active chat provider. A route rather than a direct settings read because `scope: 'client'`
    * settings live in the CURRENT origin's storage — a hosted frame reading them sees its own empty
    * store, never the extension's — and because it lets the AI bridge proxy the answer.
@@ -2103,16 +2283,51 @@ export interface ApiRouteMap {
     request: {};
     response: {
       supported: boolean;
-      provider: "server" | "ollama";
+      provider: "server" | "ollama" | "browser" | "browser-ff";
       endpoint: string;
       model: string;
       thinking: boolean;
+      /** Firefox's on-device model id. Chrome's built-in model has no name to choose. */
+      browserModelId: string;
     };
   };
   "/ai/provider/setConfig": {
-    request: { provider?: "server" | "ollama"; endpoint?: string; model?: string; thinking?: boolean };
+    request: {
+      provider?: "server" | "ollama" | "browser" | "browser-ff";
+      endpoint?: string;
+      model?: string;
+      thinking?: boolean;
+      browserModelId?: string;
+    };
     response: { success: boolean; message?: string };
   };
+  /**
+   * Can the Chrome/Edge built-in model run here? Answered from the background, where inference
+   * happens — an extension service worker's availability can differ from a page's.
+   */
+  "/ai/provider/browserStatus": {
+    request: {};
+    response: {
+      apiPresent: boolean;
+      availability: "unavailable" | "downloadable" | "downloading" | "available";
+      contextWindow?: number;
+      reason?: string;
+    };
+  };
+  "/ai/provider/firefoxStatus": {
+    request: { modelId?: string };
+    response: { apiPresent: boolean; permissionGranted: boolean; modelId: string; reason?: string };
+  };
+  /**
+   * Downloads Firefox's on-device model. In the background, unlike Chrome's, which the settings
+   * page drives itself: `browser.trial.ml` installs one engine per extension, so a second caller
+   * would fight this one. Progress arrives on the `ai-browser-model-progress` bus event.
+   */
+  "/ai/provider/firefoxDownload": {
+    request: { modelId?: string };
+    response: { ok: boolean; error?: string };
+  };
+  "/ai/provider/firefoxDeleteModels": { request: {}; response: { ok: boolean; error?: string } };
   "/auth/checkPassword": {
     request: { password: string; userId?: string };
     response: { valid: boolean };
@@ -2303,8 +2518,8 @@ export interface ApiRouteMap {
   "/client/openAppPage": { request: { path?: string }; response: boolean };
   // Companion device-guard (client-only bg routes; Android child device)
   "/companion/provision": {
-    /** `targetUserId`: link for this child (admin on a shared/desktop device). Default: the active user. */
-    request: { deviceName?: string; targetUserId?: string };
+    /** `targetUserId`: link for this child (a guardian setting up a child's phone or computer). Default: the active user. */
+    request: { deviceName?: string; targetUserId?: string; childDisplayName?: string };
     response: { ok: boolean; deviceId?: string; error?: string };
   };
   "/companion/unlink": {
@@ -2333,7 +2548,8 @@ export interface ApiRouteMap {
   };
   "/companion/devices/list": {
     request: { childUserId: string };
-    response: { devices: CompanionDeviceView[] };
+    /** `latestSettingsVersion`: the child's current device settings version; null when unknown (DCP-10). */
+    response: { devices: CompanionDeviceView[]; latestSettingsVersion?: number | null };
   };
   /**
    * The parent's app protections for one child. `policy: null` means never
@@ -2369,25 +2585,46 @@ export interface ApiRouteMap {
    * to carry readable text, and "Roblox was installed" is not browsing history.
    */
   "/companion/apps/reportNew": {
-    request: { pkgs: string[]; labels?: string[] };
+    /** `platform` is the app list's (absent = Android), so the notice says phone or computer. */
+    request: { pkgs: string[]; labels?: string[]; platform?: string };
     response: { ok: boolean; notified?: number };
   };
   /**
-   * SERVER route: the compiled device ruleset for the CALLING device.
+   * SERVER route, device token only. Answers with NO `ruleSet` since DCP-2 (2026-09-13).
    *
-   * Guard used to get this over local IPC from the main app, which meant a parent's block
-   * landed on a child's phone only when that child next opened Kindredly (UX-019). The server
-   * can compile it because usage limits are not end-to-end encrypted and the app inventory
-   * and policy are already in ref_state — so Guard fetches a finished ruleset instead.
-   *
-   * Takes no user or device id on purpose. Both come from the token; a body-supplied id is
-   * what would let one child's Companion read a sibling's rules. `tzOffsetMinutes` is the one
-   * input the server cannot know, and it is clamped server-side.
+   * The server's compile could not read `appPolicy` or `appInventory` (end-to-end encrypted), so
+   * its ruleset never held an app block, and Guard replacing its sealed set with it lifted every
+   * block (UX-063). A missing `ruleSet` makes Guard keep what it has. An EMPTY ruleset would clear
+   * every block, so the server never sends one. Replaced by `/companion/settings/current` (DCP-5).
    */
   "/companion/rules/current": {
     request: { tzOffsetMinutes?: number };
-    response: { ruleSet: CompiledDeviceRuleSet };
+    response: { ruleSet?: CompiledDeviceRuleSet };
   };
+  /**
+   * SERVER route, device-agent token only (DCP-5). The settings a device compiles its own rules
+   * from (D2), with the per-user settings version. The user comes from the token; the body carries
+   * only the version the device last applied, and `settings` is omitted when it is unchanged.
+   * A device keeps its sealed app blocks whenever `settings.appPolicy` is null.
+   */
+  "/companion/settings/current": {
+    request: DeviceSettingsCurrentRequest;
+    response: DeviceSettingsCurrentResponse;
+  };
+  /**
+   * SERVER route (DCP-10): a user's current device settings version, for the user or a guardian over
+   * them. Compared with a device's reported `appliedSettingsVersion` to say whether a save arrived.
+   */
+  "/companion/settings/version": {
+    request: { userId?: string };
+    response: { version: number };
+  };
+  /**
+   * SERVER route, device-agent token only, GET (DCP-8): an SSE stream for the desktop Companion that
+   * carries only the content-free `deviceSettingsChanged`, answered with a fetch of
+   * `/companion/settings/current`. Returns an event stream, not JSON.
+   */
+  "/companion/settings/events": { request: {}; response: void }; // SSE endpoint - returns event stream
   /**
    * SERVER route: a parent removes one of a child's devices — disconnect and forget,
    * in that order.
@@ -2548,6 +2785,39 @@ export interface ApiRouteMap {
   "/content/imageClassifyCache/clear": {
     request: {};
     response: { clearedEntries: number };
+  };
+  /**
+   * Content-script entry point: what the classifier should do on this tab before any
+   * image is fetched. Resolved from the sender tab, so the request carries nothing.
+   */
+  "/content/imageClassifier/bootstrap": {
+    request: {};
+    response: { mode: string; reason?: string } | any;
+  };
+  /**
+   * Dev-only: the classifier's queue widths, so one page can be measured at several
+   * widths without a rebuild. `set` returns the widths as they now stand, so the caller
+   * never has to guess how a null or an out-of-range value was clamped.
+   */
+  "/content/imageClassifyQueueWidths/get": {
+    request: {};
+    response: ImageClassifyQueueWidths;
+  };
+  "/content/imageClassifyQueueWidths/set": {
+    request: {maxConcurrentFetches?: number | null; maxConcurrentClassifications?: number | null};
+    response: ImageClassifyQueueWidths;
+  };
+  /**
+   * Dev-only: the durable verdict cache — what it holds, its kill switch, and a clear.
+   * `set` returns the count it cleared alongside the status the clear left behind.
+   */
+  "/content/imageVerdictCache/status": {
+    request: {};
+    response: ImageVerdictCacheStatus;
+  };
+  "/content/imageVerdictCache/set": {
+    request: {disabled?: boolean; clear?: boolean};
+    response: {cleared: number; status: ImageVerdictCacheStatus};
   };
   /**
    * Client-only: the local image-classification decision-sample buffer (developer
@@ -2746,6 +3016,19 @@ export interface ApiRouteMap {
   "/content/familyPolicyRules/delete": {
     request: FamilyPolicyRuleDeleteRequest;
     response: FamilyPolicyRuleDeleteResponse;
+  };
+  /** A guardian's own check of an item under curation review. Encrypted; the server never reads it. */
+  "/content/familyCurationChecks/list": {
+    request: {};
+    response: { checks: StoredFamilyPolicyRule[] };
+  };
+  "/content/familyCurationChecks/set": {
+    request: { publishId: string; note?: string | null };
+    response: { ok: boolean; rule?: StoredFamilyPolicyRule; synced?: boolean; syncError?: string | null };
+  };
+  "/content/familyCurationChecks/clear": {
+    request: { publishId: string };
+    response: { ok: boolean; deleted: number; syncError?: string | null };
   };
   "/content/familyPolicyBlockRules/sync": {
     request: { patterns?: string[] };
@@ -3149,8 +3432,10 @@ export interface ApiRouteMap {
     request: { userId?: string };
     response: ListKeysResponse;
   };
+  // The handler reads `recoveryKey` and `password` (encryption.bgroute.ts:626); `secretKey` was
+  // never a field it looked at, so every real caller failed the typecheck.
   "/encryption/recoverUsingKey": {
-    request: { secretKey: string; userId?: string };
+    request: { recoveryKey: string; password?: string; userId?: string };
     response: void;
   };
   "/encryption/removeRecoveryKeyFromServer": { request: RemoveRecoveryKeyFromServerRequest; response: void };
@@ -3455,6 +3740,14 @@ export interface ApiRouteMap {
     request: LibraryCleanupCandidatesRequest;
     response: ItemInfoView[];
   };
+  "/item/duplicates/candidates": {
+    request: LibraryDuplicateCandidatesRequest;
+    response: LibraryDuplicateCandidatesResponse;
+  };
+  "/item/duplicates/merge": {
+    request: MergeLibraryDuplicatesRequest;
+    response: MergeLibraryDuplicatesResponse;
+  };
   "/item/readLaterFeed": {
     request: ReadLaterFeedRequest;
     response: ItemInfoView[];
@@ -3586,6 +3879,11 @@ export interface ApiRouteMap {
   };
   "/localstore/reset": { request: {}; response: { success: boolean } };
   "/localstore/saveMetaTemp": { request: SaveMetaTempRequest; response: void };
+  "/native/speechStart": {
+    request: { lang?: string; onDevice?: boolean; keepAlive?: boolean };
+    response: { success: boolean; message?: string };
+  };
+  "/native/speechStop": { request: {}; response: { success: boolean } };
   "/nativeClientCheck": { request: {}; response: { success: boolean } };
   "/nativeMessage": {
     request: { type: string; data?: any };
@@ -3726,8 +4024,14 @@ export interface ApiRouteMap {
     response: ThinkingPuzzlesCatalogResponse;
   };
   "/published/flag": {
-    request: { itemId: string; details?: Record<string, any> };
-    response: void;
+    /**
+     * A report of a catalog item. `reason` is a CATALOG_REPORT_REASONS code. `details.flagReason`
+     * and `details.flagComment` are still read from older clients; who is reporting comes from the
+     * session, never from the request.
+     */
+    request: { itemId: string; reason?: string; comment?: string | null; details?: Record<string, any> };
+    /** `underReview`: the item is out of recommendations until a curator finishes the review. */
+    response: { reviewOpen: boolean; underReview: boolean; alreadyReported: boolean };
   };
   "/published/get": {
     request: { itemId: string };
@@ -3736,6 +4040,42 @@ export interface ApiRouteMap {
   "/published/getGalleryGroupAndItems": {
     request: { groupId: string; dbId?: string };
     response: { group: { id: string; name: string }; items: any[] };
+  };
+  "/published/curationQueue": {
+    request: {};
+    response: CurationQueueEntry[];
+  };
+  // Curation review (docs/specs/curation-review.md). `listForItem` is public; the rest are curators only.
+  "/curationReview/listForItem": {
+    request: { itemId: string };
+    response: CurationReviewListForItemResponse;
+  };
+  "/curationReview/queue": {
+    request: {};
+    response: CurationReviewQueueEntry[];
+  };
+  "/curationReview/getForCurator": {
+    /** `ensureOpen`: open a review now if none is open, so the curator can start one. */
+    request: { itemId: string; ensureOpen?: boolean };
+    response: CurationReviewForCuratorResponse;
+  };
+  "/curationReview/saveDraft": {
+    request: CurationReviewSaveRequest;
+    response: { version: number };
+  };
+  "/curationReview/finalize": {
+    request: CurationReviewSaveRequest;
+    response: CurationReviewCuratorView;
+  };
+  "/curationReview/screenshot/upload": {
+    /** A PNG, JPEG or WebP data URL, at most 2 MB. Returns the public image filename to attach to a check. */
+    request: { reviewId: string; imageData: string };
+    response: { filename: string };
+  };
+  "/curationReview/requestAiDraft": {
+    /** At most once every ten minutes per review. */
+    request: { reviewId: string };
+    response: CurationReviewAiDraft;
   };
   "/published/info/update": {
     request: { itemId: string; data: any };
@@ -3779,6 +4119,10 @@ export interface ApiRouteMap {
     response: Array<{ id: string; title: string; items?: any[] }>;
   };
   "/published/matchForURL": { request: { url: string }; response: Published[] };
+  "/published/ownerStatus": {
+    request: { itemId: string };
+    response: OwnerPublishStatus;
+  };
   "/published/publishCollection": {
     request: {
       itemId: string;
@@ -3879,7 +4223,13 @@ export interface ApiRouteMap {
   };
   "/published/unpublish": { request: { publishId: string }; response: void };
   "/published/updateCurationStatus": {
-    request: { itemId: string; approved: boolean; comment?: string };
+    request: {
+      itemId: string;
+      approved: boolean;
+      comment?: string | null;
+      /** Required when a family's suggestion is not added; one of DECLINE_REASONS. */
+      declineReason?: string | null;
+    };
     response: void;
   };
   "/published/updateEasyId": {
@@ -3932,6 +4282,25 @@ export interface ApiRouteMap {
   };
   "/search/embedded": { request: any; response: any };
   "/search/status": { request: {}; response: { indexRebuilding: boolean } };
+  /**
+   * Local lookup (bg handler only) — the search engines and reference sites this person
+   * has, by kind marker or by their homepage being in the library URL index. `kinds` is
+   * encrypted and the index is on-device, so the server can never answer this.
+   */
+  "/search/lookupProviders": {
+    request: {};
+    response: {
+      providers: Array<{
+        id: string;
+        role: "engine" | "reference";
+        displayName: string;
+        iconName: string;
+        origin: string;
+        marked: boolean;
+      }>;
+      indexHydrated: boolean;
+    };
+  };
   // Read-only telemetry: library size (sampled, not scanned) plus a rolling
   // sample of recent search timings split by phase. Never carries query text.
   "/search/diagnostics": {
@@ -4072,10 +4441,6 @@ export interface ApiRouteMap {
     request: AccessEvaluateRequest;
     response: AccessEvaluateResponse;
   };
-  "/user/libraryAutoApproval/evaluate": {
-    request: LibraryAutoApprovalEvaluateRequest;
-    response: LibraryAutoApprovalEvaluateResponse;
-  };
   "/sentry/clearTempDisableBlocking": { request: {}; response: void };
   "/sentry/getTempDisableBlockingStatus": {
     request: {};
@@ -4213,6 +4578,83 @@ export interface ApiRouteMap {
     // urgent: bug reports only — marks the platform alert high-priority.
     request: { contactType?: string; userInfo?: any; message: string; diagnostics?: any; urgent?: boolean };
     response: void;
+  };
+  // --- Realm recovery on a home box (REALM-8 / REALM-14) --------------------
+  // Unauthenticated by necessity: an empty box has nobody to sign in as, and after a restore
+  // nobody has a credential yet. The recovery phrase is the authority for everything that reads
+  // family data, and the whole surface is refused unless the server is running the `lite` profile.
+  "/realm/restore/list": {
+    request: {};
+    response: {
+      available: boolean;
+      snapshots: Array<{
+        objectName: string;
+        realmId: string;
+        snapshotId: string;
+        createdAt: string;
+        bundleFormatVersion: number;
+        sizeBytes: number;
+      }>;
+    };
+  };
+  "/realm/restore/preflight": {
+    request: { objectName: string; phrase: string };
+    response: {
+      realmId: string;
+      snapshotId: string;
+      createdAt: string;
+      isLatest: boolean;
+      memberCount: number;
+      recordCount: number;
+      blobCount: number;
+      excluded: string[];
+      verifyOk: boolean;
+      verifyProblems: string[];
+      authorityOk: boolean;
+      destinationHasRealm: boolean;
+      ahead: Array<{ userId: string; liveRevision: number; bundleRevision: number }>;
+      unlockMethods: {
+        byPassword: string[];
+        byRecoveryKey: string[];
+        strandedMembers: string[];
+        none: boolean;
+      };
+    };
+  };
+  "/realm/restore/run": {
+    request: { objectName: string; phrase: string; acceptNoUnlockMethod?: boolean; allowUnverified?: boolean };
+    response: {
+      realmId: string;
+      snapshotId: string;
+      createdAt: string;
+      memberIds: string[];
+      recordsWritten: number;
+      recordsSkipped: Array<{ table: string; recordId: string; reason: string }>;
+      droppedColumns: string[];
+      blobsWritten: number;
+      blobsMissing: string[];
+      excluded: string[];
+      restoredWithoutUnlockMethod?: boolean;
+      claimWindowExpiresAt: string;
+    };
+  };
+  "/realm/claim/list": {
+    request: { realmId: string };
+    response: {
+      windowOpen: boolean;
+      members: Array<{
+        userId: string;
+        username: string | null;
+        displayedName: string | null;
+        type: string | null;
+        passwordClaimable: boolean;
+        alreadyHasCredential: boolean;
+      }>;
+    };
+  };
+  "/realm/claim/withPassword": {
+    request: { realmId: string; userId: string; password: string };
+    response: { userId: string; username: string };
   };
   "/system/status": {
     request: {};
@@ -4559,6 +5001,15 @@ export interface ApiRouteMap {
     request: CopyUserSettingsRequest;
     response: CopyUserSettingsResponse;
   };
+  /**
+   * Admin-only. Writes `message` as the Blocked message of every family member who has none, and
+   * leaves every message someone already wrote alone. Changes that one field and nothing else in
+   * `accessControlSettings`. Returns who was changed.
+   */
+  "/user/blockedMessage/fillBlank": {
+    request: { message: string };
+    response: { updatedUserIds: string[] };
+  };
   "/user/plugin/list": {
     request: { userId?: string };
     response:  PluginListResponse;
@@ -4619,7 +5070,19 @@ export interface ApiRouteMap {
   };
   "/userfile/getById": {
     request: { fileId: string; previewId?: string };
-    response: { data: any; userFile?: UserFile } | null;
+    response: {
+      data: any;
+      userFile?: UserFile;
+      /** Which bytes came back: the preview's id, or null for the original. Absent from servers older than PERF-3. */
+      resolvedPreviewId?: string | null;
+      deliveryMetrics?: {
+        source: 'account-db' | 'remote-multipart' | 'remote-binary' | 'remote-legacy' | 'remote-chunked';
+        remoteFetchMs: number;
+        decryptMs: number;
+        remoteTransferredBytes: number;
+        totalMs: number;
+      };
+    } | null;
   };
   "/userfile/getMetaById": {
     request: { fileId: string; previewId?: string };
@@ -4835,6 +5298,11 @@ export interface ApiRouteMap {
     // Binary octet-stream (framed chunks). Use RemoteRequester.remoteRequestRaw().
     response: any;
   };
+  /** Server side of `/ai/image/credits`. Calls no model. */
+  "/usertask/imageCredits": {
+    request: Record<string, never>;
+    response: AiImageCredits;
+  };
   "/usertask/generateImage": {
     request: GenerateImageRequest;
     response: GenerateImageResponse;
@@ -5007,6 +5475,8 @@ export const authOptionalRoutes: Array<keyof ApiRouteMap> = [
   "/published/listWithIds",
   "/published/listWithChild",
   "/published/collectionItemFeed",
+  // A finished curation review is read wherever the item page is
+  "/curationReview/listForItem",
 
   // Thinking Puzzles catalog — the app is `requiresLogin: false`, so guest play reads it too
   "/thinkingPuzzles/catalog",
@@ -5016,6 +5486,14 @@ export const authOptionalRoutes: Array<keyof ApiRouteMap> = [
 
   // Reviews (can view without auth)
   "/review/listForItem",
+
+  // Realm recovery on a home box: an empty box has nobody to authenticate as, and after a restore
+  // nobody has a credential yet. Gated on the `lite` profile and on the recovery phrase instead.
+  "/realm/restore/list",
+  "/realm/restore/preflight",
+  "/realm/restore/run",
+  "/realm/claim/list",
+  "/realm/claim/withPassword",
 
   // System routes
   "/system/status",

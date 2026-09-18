@@ -65,9 +65,29 @@ export interface ItemMetaExtracted {
   videoId?: string | null;
   channelId?: string | null;
   handleId?: string | null;
+  /** The YouTube channel's display name, when the page or API named it. */
+  channelName?: string | null;
   discoveredFeedLinks?: ExtractedFeedLink[];
   message?: string | null;
-  sourceId?: 'yt_api' | 'parser_1' | 'parser_err' | 'html_parser' | 'published' | 'published_curated' | 'oembed' | 'live_dom';
+  /**
+   * Which extractor produced this metadata. The `pdf_*` / `file_*` ids mark a URL
+   * that serves a file: `pdf_landing_page` came from the publisher's abstract page,
+   * `pdf_embedded` from the PDF's own XMP/Info dictionary, `file_name` from the
+   * filename, and `file_headers` from the response headers alone (no title found).
+   */
+  sourceId?:
+    | 'yt_api'
+    | 'parser_1'
+    | 'parser_err'
+    | 'html_parser'
+    | 'published'
+    | 'published_curated'
+    | 'oembed'
+    | 'live_dom'
+    | 'pdf_landing_page'
+    | 'pdf_embedded'
+    | 'file_name'
+    | 'file_headers';
   redditScore?: number;
   redditComments?: number;
   redditSubreddit?: string;
@@ -119,7 +139,26 @@ export interface ItemMeta {
   /** For a depth post: the easyId of the parent post it hangs under. */
   parentKey?: string;
 
+  /**
+   * Set when the URL serves a file rather than a page (a PDF, a zip, a direct
+   * image). Present means "the popup may offer to include this file"; absent means
+   * an ordinary page. Cached alongside the rest of the metadata so recognising a
+   * file costs no extra request after the first lookup.
+   */
+  fileInfo?: ItemMetaFileInfo;
+
   resolved?: boolean;
+}
+
+/** What a file URL is, as far as saving it is concerned. */
+export interface ItemMetaFileInfo {
+  kind: 'file';
+  /** Response `Content-Type`, normalized and without parameters (e.g. `application/pdf`). */
+  contentType: string;
+  /** From `Content-Disposition`, else the last URL path segment. */
+  filename: string | null;
+  /** From `Content-Length`; null when the server did not declare one. */
+  sizeBytes: number | null;
 }
 
 export interface ItemFeedbackView {
@@ -134,7 +173,10 @@ export interface ItemFeedbackView {
   reaction?: string;
   archivedDate?: DateString;
   snoozeUntilDate?: DateString;
+  /** Hidden from Rediscover. */
   neverRemindDate?: DateString;
+  /** Kept out of Library Cleanup. Its own flag: keeping is not the same intent as hiding. */
+  keepFromCleanupDate?: DateString;
   notes?: unknown | null;
   visitCount?: number | null;
   visitTime?: DateString;

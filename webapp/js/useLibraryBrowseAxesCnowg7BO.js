@@ -1,0 +1,1 @@
+import{c as t,a5 as o}from"./vue-runtimeX1uKV5L1.js";import{L as u}from"./libraryNav_FIR8IzF.js";import{d as a}from"./appHandoffGuestDCHbyMJj.js";function n(r){return u.filter(e=>!e.requiresExtendedFeature||a(e.requiresExtendedFeature)).map(e=>({key:e.key,label:e.label,icon:e.icon,to:e.to,active:r===e.to}))}function c(){const r=o();return t(()=>n(r.path))}export{n as b,c as u};

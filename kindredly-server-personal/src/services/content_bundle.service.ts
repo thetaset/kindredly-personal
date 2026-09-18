@@ -356,7 +356,10 @@ class ContentBundleService {
       if (sectionSource === 'manual') {
         const itemIds = this.dedupeIds(section.itemIds).slice(0, sectionItemLimit);
         if (itemIds.length > 0) {
-          const manualItems = await this.publishedService.getPublishedWithIdsForView(ctx, itemIds);
+          // A starter bundle recommends, so a row under curation review is left out.
+          const manualItems = await this.publishedService.getPublishedWithIdsForView(ctx, itemIds, {
+            recommendableOnly: true,
+          });
           const itemLookup = new Map(manualItems.filter((item) => !!item?._id).map((item) => [item._id, item]));
           sectionItems = itemIds.map((itemId) => itemLookup.get(itemId)).filter((item): item is Published => !!item);
         }

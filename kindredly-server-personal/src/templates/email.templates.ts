@@ -1,5 +1,6 @@
 import {config} from '@/config';
 import fs from 'fs';
+import path from 'path';
 
 export function getContactUsEmailTemplate(type, refId) {
   if (type == 'waitinglist') {
@@ -82,11 +83,36 @@ export function getContactUsEmailTemplate(type, refId) {
 }
 export const KEY_DIL = '_0-0_';
 
+/**
+ * The HTML wrapper every templated email is rendered into. `CONTENT_BODY` is the
+ * substitution marker `sendEmail` replaces, so the fallback below is not a
+ * disabled template - it is the message with no wrapper around it.
+ *
+ * RESOLVED AGAINST __dirname, NOT THE WORKING DIRECTORY. This used to read
+ * `'src/templates/...'`, which only worked because the Dockerfile happens to
+ * leave the CWD at the package root; it broke under any other launcher. The .html
+ * is not compiled into `dist/`, so the compiled build has to reach back into
+ * `src/` for it - hence two candidates rather than one.
+ */
+const TEMPLATE_CANDIDATES = [
+  path.resolve(__dirname, 'kindred_email_template.html'), // ts-node / dev, running out of src/
+  path.resolve(__dirname, '../../src/templates/kindred_email_template.html'), // dist/templates -> src/templates
+  path.resolve(process.cwd(), 'src/templates/kindred_email_template.html'), // the historical path
+];
+
 export let MAIN_EMAIL_TEMPLATE = 'CONTENT_BODY';
-try {
-  MAIN_EMAIL_TEMPLATE = fs.readFileSync('src/templates/kindred_email_template.html').toString();
-} catch (error) {
-  if (!config.privateServer) console.error('Failed to load email template');
+const templatePath = TEMPLATE_CANDIDATES.find((candidate) => fs.existsSync(candidate));
+if (templatePath) {
+  try {
+    MAIN_EMAIL_TEMPLATE = fs.readFileSync(templatePath).toString();
+  } catch (error) {
+    console.error(`Failed to read the email template at ${templatePath}`, error);
+  }
+} else {
+  // Previously silenced on a self-hosted box, because the file was excluded from
+  // the sync and so was guaranteed missing there. It is synced now, so a box
+  // missing it is a real problem and says so.
+  console.error('Failed to load email template; emails will be sent without their wrapper');
 }
 
 export const friendRequestTemplate = {

@@ -205,6 +205,41 @@ export function inferLinkScope(
   return 'site';
 }
 
+/**
+ * How wide a grant the assistant is allowed to write, given what it asked for.
+ *
+ * The model proposes and this decides. It proposes because only the model knows
+ * whether the child asked for a site or for one article on it; this decides
+ * because a model that could widen its own grant is a model that can be argued
+ * into one. Four caps, in order of how much they matter:
+ *
+ * - **Never `domain`.** The broadest scope stays a human answer. It is not even
+ *   offered to the model, so this is a floor rather than a rejection.
+ * - **Never a whole site on a path-tenant host.** `PATH_TENANT_HOSTS` is shared
+ *   with `inferLinkScope` rather than re-listed, because two copies of "whose
+ *   content is this?" is how one of them goes stale. Note this outranks an
+ *   explicit `site` proposal: on `sites.google.com` the host is not the site.
+ * - **Never wider than proposed.** A `page` proposal cannot become a site.
+ * - **Silence means narrow**, except for a bare address, which has no page to be
+ *   narrow about — that keeps the pre-existing behaviour and matches what the
+ *   parent's own picker recommends by default.
+ *
+ * Returns a `UrlScopeKind` so it can be handed straight to
+ * `buildPatternsForUrlScope`.
+ */
+export type AssistantGrantScope = Exclude<UrlScopeKind, 'domain'>;
+
+export function resolveAssistantScope(proposed: unknown, url: string): AssistantGrantScope {
+  const host = hostnameOf(url);
+
+  if (host && PATH_TENANT_HOSTS.has(host)) return 'specific';
+
+  if (proposed === 'site') return 'site';
+  if (proposed === 'page') return 'specific';
+
+  return isRootWebsiteURL(url) ? 'site' : 'specific';
+}
+
 
 
 

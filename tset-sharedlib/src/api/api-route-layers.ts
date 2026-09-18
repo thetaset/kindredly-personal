@@ -54,7 +54,10 @@ export const serverOnlyRoutes: Array<keyof ApiRouteMap> = [
   '/admin/rateLimit/get',
   '/admin/rateLimit/set',
   '/admin/security/summary',
-  '/admin/aiBudget/set',
+  '/admin/aiLimits/getAccount',
+  '/admin/aiExtraUsage/grant',
+  '/admin/aiExtraUsage/revoke',
+  '/admin/aiLimits/setHostedStopped',
   '/admin/getGalleryDBs',
   '/admin/getItems',
   '/admin/item/list',
@@ -76,6 +79,7 @@ export const serverOnlyRoutes: Array<keyof ApiRouteMap> = [
   '/admin/published/replaceImage',
   '/admin/published/itemsSchemaUpdate',
   '/admin/published/list',
+  '/admin/security/key0Sweep',
   '/admin/signin',
   '/admin/sse/clearAllData',
   '/admin/sse/clearHeartbeats',
@@ -85,6 +89,7 @@ export const serverOnlyRoutes: Array<keyof ApiRouteMap> = [
   '/admin/updateGallerys',
   '/admin/user/changeBlockedStatus',
   '/admin/user/changeCuratorStatus',
+  '/admin/user/changeVerifiedStatus',
   '/admin/user/changeLockStatus',
   '/admin/user/info',
   '/admin/user/list',
@@ -120,6 +125,8 @@ export const serverOnlyRoutes: Array<keyof ApiRouteMap> = [
 export const clientOnlyRoutes: Array<keyof ApiRouteMap> = [
   '/client/hometab',
   '/client/widget/status',
+  '/native/speechStart',
+  '/native/speechStop',
   '/nativeClientCheck',
   '/nativeDesktopStatus',
   '/nativeDesktopBridgeState',
@@ -157,6 +164,9 @@ export const clientOnlyRoutes: Array<keyof ApiRouteMap> = [
   '/serverSettings/refresh',
   '/serverSettings/discover',
   '/serverSettings/checkUrl',
+  // Whether THIS person is locked right now depends on the device's clock and its account copy;
+  // the server stores the schedule, the device answers the question.
+  '/familyDowntime/state',
 ];
 
 /**

@@ -159,6 +159,14 @@ export default class ItemQueryService {
         // item.list.service.ts for the sibling that always had it right.
         this.select('*').from('item_relation').whereRaw('item_relation."itemId" = item._id');
       });
+      // A collection is never uncategorized, even when nothing holds it: a collection IS
+      // the filing, so a top-level one is organized by definition. The Unorganized page
+      // listed every root collection until this was here. NULL-type parity, and the same
+      // rule as getUncategorizedList in item.list.service.ts and the client's
+      // queryFromIndexLocal — all three must keep saying it.
+      query = query.where(function () {
+        this.whereNot('item.type', 'col').orWhereNull('item.type');
+      });
     }
 
     // Item type filters

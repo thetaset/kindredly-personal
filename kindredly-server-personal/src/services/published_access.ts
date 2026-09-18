@@ -20,7 +20,11 @@ import type Published from 'tset-sharedlib/schemas/public/Published';
  */
 export interface PublishedReader {
   getPublishedWithIds(ids: string[]): Promise<Published[]>;
-  getPublishedWithIdsForView(ctx: RequestContext, ids: string[]): Promise<Published[]>;
+  getPublishedWithIdsForView(
+    ctx: RequestContext,
+    ids: string[],
+    options?: {recommendableOnly?: boolean},
+  ): Promise<Published[]>;
   filteredSearchPublished(
     ctx: RequestContext,
     searchData: unknown,

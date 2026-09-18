@@ -4,6 +4,7 @@ import axios from 'axios';
 import * as cheerio from 'cheerio';
 import {ItemResourceType} from 'tset-sharedlib/constants';
 import {
+  classifyFetchedContentKind,
   extractMetadata,
   extractMetadataFromOEmbed,
   extractMetadataFromRedditJson,
@@ -13,7 +14,13 @@ import {
   mergeMetadataPreferPrimary,
   type SocialOEmbedResponse,
 } from 'tset-sharedlib/extraction.utils';
-import {ItemMeta, ItemMetaExtracted} from 'tset-sharedlib/shared.types';
+import {
+  deriveTitleFromFileName,
+  extractPdfEmbeddedMetadata,
+  getFileNameForUrl,
+  getPdfLandingPageCandidates,
+} from 'tset-sharedlib/pdf-metadata.utils';
+import {ItemMeta, ItemMetaExtracted, ItemMetaFileInfo} from 'tset-sharedlib/shared.types';
 import {extractYTChannelInfo} from 'tset-sharedlib/text.utils';
 import {
   getSocialMetadataProvider,
@@ -269,6 +276,7 @@ export async function fetchYoutubeChannelMetaWithAPIById(
         tsExtractedInfo: {
           youtubeChannelIds: [channelId],
           channelId: channelId,
+          channelName: channelData.snippet.title || null,
           pageType: ItemResourceType.YT_CHANNEL,
           sourceId: 'yt_api',
         } as ItemMetaExtracted,
@@ -473,17 +481,40 @@ export async function fetchGenericHtmlMeta(url: string, options: FetchOptions = 
     console.log('Fetching generic HTML metadata for URL:', url);
     const defaultHeaders = buildDefaultBrowserHeaders();
 
-    const response = await axiosCall<string>(url, {
+    // Buffered as bytes, not as a string. A PDF (or any binary) decoded to UTF-8
+    // becomes mojibake that cheerio happily parses into empty metadata, which then
+    // gets negative-cached — the bug this branch exists to prevent. `safe_fetch`
+    // caps the buffer at 25MB.
+    const response = await axiosCall<ArrayBuffer>(url, {
       timeout: 18000,
       ...options,
+      // After the spread on purpose: the branching below reads raw bytes, so a
+      // caller must not be able to hand us a decoded string or a stream instead.
+      responseType: 'arraybuffer',
       headers: {
         ...defaultHeaders,
         ...(options as any)?.headers,
       },
     });
-    const data = response.data;
 
-    if (typeof data === 'string' && isBotBlockPage(data)) {
+    const bytes = toUint8Array(response.data);
+    const contentType = getHeaderValue(response.headers, 'content-type');
+    const kind = classifyFetchedContentKind({contentType, bytes: peekAsText(bytes)});
+
+    if (kind === 'pdf' || kind === 'binary') {
+      return await buildFileMetadata(url, {
+        bytes,
+        contentType,
+        contentDisposition: getHeaderValue(response.headers, 'content-disposition'),
+        contentLength: getHeaderValue(response.headers, 'content-length'),
+        kind,
+        options,
+      });
+    }
+
+    const data = decodeTextBody(bytes, contentType);
+
+    if (isBotBlockPage(data)) {
       console.warn(`Bot-challenge page detected for URL: ${url} — returning empty metadata`);
       return getDefaultMetadata(url, 'blocked');
     }
@@ -494,6 +525,143 @@ export async function fetchGenericHtmlMeta(url: string, options: FetchOptions = 
     console.error(`Error fetching generic HTML metadata for URL: ${url}`, error);
     return getDefaultMetadata(url, error.message);
   }
+}
+
+/** Axios header bags are case-insensitive maps in v1 but plain objects in mocks. */
+function getHeaderValue(headers: any, name: string): string {
+  if (!headers) return '';
+  const direct = typeof headers.get === 'function' ? headers.get(name) : headers[name];
+  const value = direct ?? headers[name] ?? headers[name.toLowerCase()];
+  return typeof value === 'string' ? value : value == null ? '' : String(value);
+}
+
+function toUint8Array(data: any): Uint8Array {
+  if (!data) return new Uint8Array(0);
+  if (data instanceof Uint8Array) return data;
+  if (Buffer.isBuffer(data)) return new Uint8Array(data);
+  if (data instanceof ArrayBuffer) return new Uint8Array(data);
+  if (typeof data === 'string') return new Uint8Array(Buffer.from(data, 'binary'));
+  return new Uint8Array(0);
+}
+
+/** Enough of the head to sniff a feed, without stringifying a 25MB body. */
+function peekAsText(bytes: Uint8Array): string {
+  return Buffer.from(bytes.subarray(0, 2048)).toString('latin1');
+}
+
+function decodeTextBody(bytes: Uint8Array, contentType: string): string {
+  const declared = /charset\s*=\s*["']?([\w-]+)/i.exec(contentType || '')?.[1]?.toLowerCase();
+  const encoding = declared && Buffer.isEncoding(declared as BufferEncoding) ? declared : 'utf8';
+  return Buffer.from(bytes).toString(encoding as BufferEncoding);
+}
+
+/**
+ * Metadata for a URL that serves a file rather than a page.
+ *
+ * For a PDF this is where the three title sources are tried (landing page →
+ * embedded metadata → filename). For any other binary we record only what the file
+ * *is*, so the item at least shows a sensible name and the popup can offer to
+ * include it — nothing here ever reaches the HTML parser.
+ */
+async function buildFileMetadata(
+  url: string,
+  args: {
+    bytes: Uint8Array;
+    contentType: string;
+    contentDisposition: string;
+    contentLength: string;
+    kind: 'pdf' | 'binary';
+    options: FetchOptions;
+  },
+): Promise<ItemMeta> {
+  const normalizedContentType = (args.contentType || '').split(';')[0].trim().toLowerCase();
+  const filename = getFileNameForUrl(url, args.contentDisposition);
+  const declaredSize = Number.parseInt(args.contentLength, 10);
+  const sizeBytes = Number.isFinite(declaredSize) && declaredSize > 0 ? declaredSize : args.bytes.length || null;
+
+  const fileInfo: ItemMetaFileInfo = {
+    kind: 'file',
+    contentType: normalizedContentType || (args.kind === 'pdf' ? 'application/pdf' : 'application/octet-stream'),
+    filename,
+    sizeBytes,
+  };
+
+  let title: string | null = null;
+  let description: string | null = null;
+  let imageSrc: string | undefined;
+  let siteName: string | undefined;
+  let sourceId: NonNullable<ItemMetaExtracted['sourceId']> = 'file_headers';
+
+  if (args.kind === 'pdf') {
+    // Source 1: the publisher's landing page for this file. It carries the real
+    // title and abstract; the PDF itself usually carries neither.
+    const landing = await fetchPdfLandingPageMeta(url, args.options);
+    if (landing?.title) {
+      title = landing.title;
+      description = landing.description || null;
+      imageSrc = landing.imageSrc || undefined;
+      siteName = landing.siteName || undefined;
+      sourceId = 'pdf_landing_page';
+    }
+
+    // Source 2: what the PDF says about itself.
+    if (!title || !description) {
+      const embedded = extractPdfEmbeddedMetadata(args.bytes);
+      if (!title && embedded.title) {
+        title = embedded.title;
+        sourceId = 'pdf_embedded';
+      }
+      if (!description && embedded.description) {
+        description = embedded.description;
+      }
+    }
+  }
+
+  // Source 3: the filename. A title only — a filename is not a description.
+  if (!title && filename) {
+    const fromName = deriveTitleFromFileName(filename);
+    if (fromName) {
+      title = fromName;
+      sourceId = sourceId === 'file_headers' ? 'file_name' : sourceId;
+    }
+  }
+
+  return {
+    url,
+    title: title || undefined,
+    description: description || undefined,
+    imageSrc,
+    siteName,
+    fileInfo,
+    tsExtractedInfo: {
+      pageType: ItemResourceType.SITE_ITEM,
+      sourceId,
+    },
+  };
+}
+
+/**
+ * Fetch the sibling landing page for a PDF and return its metadata, or null.
+ *
+ * Its `url` is deliberately dropped: `ContentLookupService.resolveCanonicalUrl`
+ * prefers `meta.url`, so leaving it in would make the popup save the abstract page
+ * instead of the file the person asked for.
+ */
+async function fetchPdfLandingPageMeta(url: string, options: FetchOptions): Promise<ItemMeta | null> {
+  for (const candidate of getPdfLandingPageCandidates(url)) {
+    try {
+      const meta = await fetchGenericHtmlMeta(candidate, options);
+      // A host that 404s into a generic shell, or redirects back to the file, gives
+      // a title that is worse than none — require a real one before trusting it.
+      if (meta?.title && !meta.fileInfo) {
+        const {url: _landingUrl, ...withoutUrl} = meta;
+        return withoutUrl;
+      }
+    } catch (error) {
+      console.warn(`PDF landing-page lookup failed for ${candidate}`, error);
+    }
+  }
+  return null;
 }
 
 /**
@@ -556,6 +724,97 @@ export async function fetchPageBodyTextResult(
   // treat as "no body" so the Features indicator stays honest.
   if (text.length < 30) return {text: null, reason: 'too-short'};
   return {text: text.length > maxChars ? text.slice(0, maxChars) : text, reason: null};
+}
+
+export type PageFetchForReview = {
+  /** HTTP status of the final response, or null when no response came back. */
+  status: number | null;
+  /** Where the request ended after redirects, or null when it is not known. */
+  finalUrl: string | null;
+  text: string | null;
+  /** Null on success; otherwise the same codes as fetchPageBodyTextResult. */
+  reason: string | null;
+  /** Hosts of external scripts and frames on the page, before they are stripped from the text. */
+  scriptHosts: string[];
+};
+
+/**
+ * One fetch of a catalog item's page for a curation review: whether it loads, where it ends up,
+ * its readable text, and which outside hosts its scripts and frames come from (the evidence the
+ * Ads check starts from). Same SSRF guard and bot-block detection as fetchPageBodyTextResult,
+ * which is left as it is for its callers.
+ */
+export async function fetchPageForReview(url: string, maxChars = 20000): Promise<PageFetchForReview> {
+  const empty = (reason: string, status: number | null = null, finalUrl: string | null = null) => ({
+    status,
+    finalUrl,
+    text: null,
+    reason,
+    scriptHosts: [] as string[],
+  });
+  const trimmed = (url || '').trim();
+  if (!trimmed) return empty('no-url');
+  try {
+    assertSafeExternalUrl(trimmed);
+  } catch {
+    return empty('unsafe-url');
+  }
+
+  let response: AxiosResponse<string>;
+  try {
+    response = await axios.get<string>(
+      trimmed,
+      safeFetchConfig({timeout: 18000, headers: buildDefaultBrowserHeaders(), validateStatus: () => true}),
+    );
+  } catch (error: any) {
+    const msg = String(error?.message || error || '');
+    return empty(error?.code === 'ECONNABORTED' || /timeout/i.test(msg) ? 'timeout' : 'network-error');
+  }
+
+  const finalUrl: string | null = (response.request as any)?.res?.responseUrl || null;
+  if (response.status >= 400) return empty(`http-${response.status}`, response.status, finalUrl);
+  const data = response.data;
+  if (typeof data !== 'string' || !data.trim()) return empty('empty-response', response.status, finalUrl);
+  if (isBotBlockPage(data)) return empty('bot-blocked', response.status, finalUrl);
+
+  try {
+    const $ = cheerio.load(data);
+    const pageHost = (() => {
+      try {
+        return new URL(finalUrl || trimmed).hostname.toLowerCase();
+      } catch {
+        return '';
+      }
+    })();
+    const hosts = new Set<string>();
+    $('script[src], iframe[src]').each((_i, el) => {
+      const src = $(el).attr('src') || '';
+      try {
+        const host = new URL(src, finalUrl || trimmed).hostname.toLowerCase();
+        if (host && host !== pageHost) hosts.add(host);
+      } catch {
+        // A malformed src is not evidence of anything.
+      }
+    });
+
+    $('script, style, noscript, template, svg, iframe, nav, header, footer, aside, form, button').remove();
+    const root = $('main').length ? $('main') : $('body').length ? $('body') : $('html');
+    const text = root
+      .text()
+      .replace(/[ \t\f\v]+/g, ' ')
+      .replace(/\s*\n\s*/g, '\n')
+      .replace(/\n{3,}/g, '\n\n')
+      .trim();
+    return {
+      status: response.status,
+      finalUrl,
+      text: text.length < 30 ? null : text.slice(0, maxChars),
+      reason: text.length < 30 ? 'too-short' : null,
+      scriptHosts: [...hosts].sort(),
+    };
+  } catch {
+    return empty('parse-fail', response.status, finalUrl);
+  }
 }
 
 /**

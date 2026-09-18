@@ -40,6 +40,15 @@ export type KindDefinition = {
   searchHints?: string[]
 }
 
+/**
+ * Kind carried by a search engine site (Google, Bing, DuckDuckGo, ...). Search reads it to
+ * answer "which engines does this person actually have?" — see search-provider.utils.ts.
+ */
+export const SEARCH_ENGINE_KIND_ID = 'apps.search'
+
+/** Kind carried by a look-it-up reference site (Wikipedia, ...). */
+export const REFERENCE_SITE_KIND_ID = 'apps.reference'
+
 export const KIND_DEFINITIONS: KindDefinition[] = [
   // ---- Apps — unifies datadefaults/taskbar.ts button names + SetupTaskbarTarget ----
   { id: 'apps.search', label: 'Search', group: 'Apps', icon: 'search', appLike: true, taskbarTarget: 'search', cardinality: 'single', searchHints: ['google', 'duckduckgo', 'bing', 'search engine'] },
@@ -51,6 +60,8 @@ export const KIND_DEFINITIONS: KindDefinition[] = [
   { id: 'apps.music', label: 'Music', group: 'Apps', icon: 'headphones', appLike: true, taskbarTarget: 'music', cardinality: 'single', searchHints: ['spotify', 'apple music', 'youtube music', 'playlist'] },
   { id: 'apps.notes', label: 'Notes', group: 'Apps', icon: 'journal-text', appLike: true, taskbarTarget: 'notes', cardinality: 'single', searchHints: ['notion', 'keep', 'obsidian', 'notepad'] },
   { id: 'apps.ai', label: 'AI Assistant', group: 'Apps', icon: 'stars', appLike: true, taskbarTarget: 'ai', cardinality: 'single', searchHints: ['chatgpt', 'claude', 'gemini', 'assistant'] },
+  // Not appLike and no taskbarTarget: a reference site is a slot to fill, not a taskbar button.
+  { id: 'apps.reference', label: 'Reference', group: 'Apps', icon: 'book', expectedTypes: ['website'], searchHints: ['wikipedia', 'encyclopedia', 'dictionary', 'britannica'] },
 
   // ---- Health — first slot-dashboard domain ----
   { id: 'health.insurance.medical', label: 'Health insurance', group: 'Health', icon: 'shield-check', cardinality: 'single', expectedTypes: ['information', 'website'], searchHints: ['insurance', 'member portal', 'coverage', 'aetna', 'blue cross'] },

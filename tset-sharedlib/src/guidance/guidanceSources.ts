@@ -13,9 +13,12 @@ export type GuidanceSourceId =
   | 'S1' | 'S2' | 'S3' | 'S4' | 'S5' | 'S6' | 'S7' | 'S8' | 'S9' | 'S10'
   | 'S11' | 'S12' | 'S13' | 'S14' | 'S15' | 'S16' | 'S17' | 'S18' | 'S19' | 'S20'
   | 'S21' | 'S22' | 'S23' | 'S24' | 'S25' | 'S26' | 'S27' | 'S28' | 'S29' | 'S30'
-  | 'S31' | 'S32' | 'S33' | 'S34' | 'S35' | 'S36' | 'S37'
+  | 'S31' | 'S32' | 'S33' | 'S34' | 'S35' | 'S36' | 'S37' | 'S38' | 'S39' | 'S40'
+  | 'S41' | 'S42' | 'S43' | 'S44' | 'S45' | 'S46' | 'S47' | 'S48' | 'S49' | 'S50'
+  | 'S51' | 'S52'
 
-export type GuidanceSourceKind = 'guideline' | 'advisory' | 'meta-analysis' | 'study' | 'review' | 'survey'
+/** `policy` is a law or regulation cited as a fact about the world, never as evidence. */
+export type GuidanceSourceKind = 'guideline' | 'advisory' | 'meta-analysis' | 'study' | 'review' | 'survey' | 'policy'
 
 export interface GuidanceSource {
   id: GuidanceSourceId
@@ -521,6 +524,211 @@ export const GUIDANCE_SOURCES: Record<GuidanceSourceId, GuidanceSource> = {
       'Sleep 7–9 hours, with consistent bed and wake times; healthy sleep hygiene',
       'Sedentary time ≤8 hours, including no more than 3 hours of recreational screen time — the only published adult screen figure',
       'Break up long periods of sitting; several hours of light activity including standing',
+    ],
+  },
+  // S38–S52 were added 2026-09-11 for the Open questions page. Each was verified
+  // against the primary source, its publisher's abstract, or the open-access full
+  // text on Europe PMC where the publisher blocks automated access.
+  S38: {
+    id: 'S38',
+    citeKey: 'NASEM 2023',
+    org: 'National Academies of Sciences, Engineering, and Medicine',
+    title: 'Social Media and Adolescent Health (consensus study report)',
+    year: 2023,
+    url: 'https://www.nationalacademies.org/read/27396',
+    kind: 'review',
+    supports: [
+      'The committee’s review of the literature did not support the conclusion that social media causes changes in adolescent health at the population level',
+      'Effects are small and weak; use may influence health as often as health influences use, and benefits and harms accrue differently to different users',
+    ],
+  },
+  S39: {
+    id: 'S39',
+    citeKey: 'Sanders 2024',
+    org: 'Sanders T., Noetel M., Parker P. et al.',
+    title: 'An umbrella review of the benefits and risks associated with youths’ interactions with electronic screens (Nature Human Behaviour)',
+    year: 2024,
+    url: 'https://www.nature.com/articles/s41562-023-01712-8',
+    kind: 'meta-analysis',
+    supports: [
+      '102 meta-analyses, 2,451 studies, 1.9 million participants: small effects in both directions (r from −0.14 to 0.33); social media ↔ depression r = 0.12',
+      'Screen use ↔ literacy is negative overall (r = −0.14) but positive when a parent watches with the child (r = 0.15) — content and company change the sign',
+      '95 of 102 meta-analyses at medium-to-high risk of bias; the authors ask families to weigh specific types of screen use, not screen time as a whole',
+    ],
+  },
+  S40: {
+    id: 'S40',
+    citeKey: 'Beyens 2020',
+    org: 'Beyens I., Pouwels J.L., van Driel I.I., Keijsers L., Valkenburg P.M.',
+    title: 'The effect of social media on well-being differs from adolescent to adolescent (Scientific Reports)',
+    year: 2020,
+    url: 'https://www.nature.com/articles/s41598-020-67727-7',
+    kind: 'study',
+    supports: [
+      '63 adolescents (about 15 years old) reported how they felt six times a day for a week, 2,155 assessments in all',
+      'After passive social media use 44% felt no different, 46% felt better and 10% felt worse — effects are person-specific',
+    ],
+  },
+  S41: {
+    id: 'S41',
+    citeKey: 'Valkenburg 2022',
+    org: 'Valkenburg P.M., van Driel I.I., Beyens I.',
+    title: 'The associations of active and passive social media use with well-being: A critical scoping review (New Media & Society)',
+    year: 2022,
+    url: 'https://journals.sagepub.com/doi/10.1177/14614448211065425',
+    kind: 'review',
+    supports: [
+      '40 survey studies using 36 different definitions of active and passive use, 172 associations; most did not support the claim that passive use harms and active use helps',
+      'Time spent on either is too coarse a measure; content, sender and receiver matter — why passive-vs-active stays a hypothesis here',
+    ],
+  },
+  S42: {
+    id: 'S42',
+    citeKey: 'Vuorre 2022',
+    org: 'Vuorre M., Johannes N., Magnusson K., Przybylski A.K.',
+    title: 'Time spent playing video games is unlikely to impact well-being (Royal Society Open Science)',
+    year: 2022,
+    url: 'https://royalsocietypublishing.org/doi/10.1098/rsos.220411',
+    kind: 'study',
+    supports: [
+      'Six weeks of logged play from 38,935 adult players, provided by seven publishers and matched to three waves of well-being surveys',
+      'Little to no evidence of a causal link between time played and well-being; the average player would need about ten more hours a day to notice a change. Motivation for playing did matter',
+      'Adults (median age 34) — cited for logged-versus-remembered use and for games, not as a finding about children',
+    ],
+  },
+  S43: {
+    id: 'S43',
+    citeKey: 'Goodyear 2025',
+    org: 'Goodyear V.A., Randhawa A., Adab P. et al.',
+    title: 'School phone policies and their association with mental wellbeing, phone use, and social media use (SMART Schools) (The Lancet Regional Health – Europe)',
+    year: 2025,
+    url: 'https://www.thelancet.com/journals/lanepe/article/PIIS2666-7762(25)00003-1/fulltext',
+    kind: 'study',
+    supports: [
+      '1,227 pupils aged 12–15 in 30 English schools, 20 with restrictive phone policies and 10 permissive: no difference in mental well-being, sleep, activity or attainment',
+      'Restrictive policies cut phone use in school hours by about 40 minutes and social media by about 32, but not use across the whole day',
+      'More overall phone and social media time went with worse well-being, anxiety, depression, sleep, activity and attainment in both kinds of school — cross-sectional, so association only',
+    ],
+  },
+  S44: {
+    id: 'S44',
+    citeKey: 'Allcott 2020',
+    org: 'Allcott H., Braghieri L., Eichmeyer S., Gentzkow M.',
+    title: 'The Welfare Effects of Social Media (American Economic Review)',
+    year: 2020,
+    url: 'https://www.aeaweb.org/articles?id=10.1257/aer.20190658',
+    kind: 'study',
+    supports: [
+      'Randomised experiment: 2,743 adult Facebook users, some paid to deactivate for the four weeks before the 2018 US midterm election',
+      'Deactivation improved a subjective well-being index by 0.09 standard deviations and increased offline socialising — small, on adults, on one platform',
+    ],
+  },
+  S45: {
+    id: 'S45',
+    citeKey: 'Braghieri 2022',
+    org: 'Braghieri L., Levy R., Makarin A.',
+    title: 'Social Media and Mental Health (American Economic Review)',
+    year: 2022,
+    url: 'https://www.aeaweb.org/articles?id=10.1257/aer.20211218',
+    kind: 'study',
+    supports: [
+      'Natural experiment: Facebook’s staggered arrival at US colleges in the mid-2000s, matched to student health surveys',
+      'The index of poor mental health rose by 0.085 standard deviations, about 22% of the effect of losing a job; equivalent to two more students in a hundred meeting a depression threshold over a baseline of 25%',
+      'The strongest causal evidence of harm in the literature, and it is small, on college students, and about the Facebook of the mid-2000s',
+    ],
+  },
+  S46: {
+    id: 'S46',
+    citeKey: 'Ferguson 2024',
+    org: 'Ferguson C.J.',
+    title: 'Do social media experiments prove a link with mental health? A methodological and meta-analytic review (Psychology of Popular Media)',
+    year: 2024,
+    url: 'https://psycnet.apa.org/doi/10.1037/ppm0000541',
+    kind: 'meta-analysis',
+    supports: [
+      'Pooled 27 experiments that reduced social media use or exposed people to it: no average effect on mental health',
+      'Disputed — the pooling mixes minutes-long lab exposures with month-long reductions; see the reanalysis (Thrul 2025)',
+    ],
+  },
+  S47: {
+    id: 'S47',
+    citeKey: 'Thrul 2025',
+    org: 'Thrul J., Devkota J., AlJuboori D., Regan T., Alomairah S., Vidal C.',
+    title: 'Social media reduction or abstinence interventions are providing mental health benefits — reanalysis of a published meta-analysis (Psychology of Popular Media)',
+    year: 2025,
+    url: 'https://pmc.ncbi.nlm.nih.gov/articles/PMC12125955/',
+    kind: 'meta-analysis',
+    supports: [
+      'Reanalysis of the 20 reduction and abstinence studies in Ferguson 2024, split by length',
+      'Breaks shorter than a week went with slightly worse mental health (d = −0.18); breaks of a week or longer with slightly better (d = 0.16). Small either way, and the experts still disagree',
+    ],
+  },
+  S48: {
+    id: 'S48',
+    citeKey: 'Twenge 2022',
+    org: 'Twenge J.M., Haidt J., Lozano J., Cummins K.M.',
+    title: 'Specification curve analysis shows that social media use is linked to poor mental health, especially among girls (Acta Psychologica)',
+    year: 2022,
+    url: 'https://www.sciencedirect.com/science/article/pii/S0001691822000270',
+    kind: 'study',
+    supports: [
+      'Reanalysis of three large surveys, separating social media from other screen use and girls from boys',
+      'Among girls the association with poor mental health is consistent and larger (median betas −0.11 to −0.24) than for binge drinking or hard drug use in the same data',
+      'Cited for the disagreement: the same kind of data reads as "tiny" (Orben 2019) or "substantial" (here) depending on analytic choices',
+    ],
+  },
+  S49: {
+    id: 'S49',
+    citeKey: 'Odgers 2024',
+    org: 'Odgers C.L.',
+    title: 'The great rewiring: is social media really behind an epidemic of teenage mental illness? (Nature)',
+    year: 2024,
+    url: 'https://www.nature.com/articles/d41586-024-00902-2',
+    kind: 'review',
+    supports: [
+      'Review of the case made in The Anxious Generation: the evidence does not show that platforms are rewiring children’s brains or driving an epidemic of mental illness',
+      'Platform reforms are still warranted; age-based restrictions and device bans are judged unlikely to be effective and could backfire',
+    ],
+  },
+  S50: {
+    id: 'S50',
+    citeKey: 'Kaye 2020',
+    org: 'Kaye L.K., Orben A., Ellis D.A., Hunter S.C., Houghton S.',
+    title: 'The Conceptual and Methodological Mayhem of “Screen Time” (International Journal of Environmental Research and Public Health)',
+    year: 2020,
+    url: 'https://www.mdpi.com/1660-4601/17/10/3661',
+    kind: 'review',
+    supports: [
+      '"Screen time" has no standard definition and is measured mostly by non-standardised self-report; findings are mixed and longitudinal evidence for causal or long-term effects is lacking',
+      'Recommends studying what screens are used for rather than how long — why time is sorted by usage type here',
+    ],
+  },
+  S51: {
+    id: 'S51',
+    citeKey: 'Pew 2025',
+    org: 'Pew Research Center',
+    title: 'Teens, Social Media and Mental Health',
+    year: 2025,
+    url: 'https://www.pewresearch.org/internet/2025/04/22/teens-social-media-and-mental-health/',
+    kind: 'survey',
+    contextOnly: true,
+    supports: [
+      'Survey of 1,391 US teens aged 13–17 and their parents, autumn 2024: 48% say social media is mostly bad for people their age, 14% say it is bad for them (32% and 9% in 2022)',
+      '45% say it hurts their sleep and 19% their mental health; 74% say it makes them feel more connected to friends, 63% that it gives them a place to show their creative side',
+      'Context only — what teenagers report, never a target',
+    ],
+  },
+  S52: {
+    id: 'S52',
+    citeKey: 'Australia 2024',
+    org: 'Parliament of Australia',
+    title: 'Online Safety Amendment (Social Media Minimum Age) Act 2024',
+    year: 2024,
+    url: 'https://www.legislation.gov.au/C2024A00127/asmade',
+    kind: 'policy',
+    supports: [
+      'Platforms must take reasonable steps to keep Australians under 16 from holding social media accounts; in force from 10 December 2025 — the first country-scale minimum-age law',
+      'Cited as a policy fact, not as evidence: no evaluation of its effects exists yet',
     ],
   },
 }

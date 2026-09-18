@@ -89,6 +89,15 @@ export interface ServerVersionInfo {
    * builds that understand it.
    */
   supportedAppVersions?: string[];
+  /**
+   * Additive server capabilities. Absent on servers older than the field; a client treats a
+   * missing key as "not supported" and keeps the pre-capability behaviour. Removing a key is
+   * the functional rollback for the feature it advertises.
+   */
+  capabilities?: {
+    /** Encrypted user-file reads may ask for a logical rendition: `previewId` in `variants`. */
+    imageRenditions?: { version: number; variants: string[] };
+  };
 }
 
 /** Entry in kindredVersion.json for a specific app type */

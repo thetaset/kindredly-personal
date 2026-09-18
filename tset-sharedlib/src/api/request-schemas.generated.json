@@ -1,8 +1,8 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "generatedFrom": "src/api/api-route-map.ts",
-  "routeCount": 825,
-  "validatedRouteCount": 825,
+  "routeCount": 875,
+  "validatedRouteCount": 875,
   "unrepresentableTypes": {},
   "routes": {
     "/": "#/definitions/InlineRequest_",
@@ -66,18 +66,24 @@
     "/access_request/listForUser": "#/definitions/InlineRequest_access_request_listForUser",
     "/access_request/process": "#/definitions/InlineRequest_access_request_process",
     "/access_request/remove": "#/definitions/InlineRequest_access_request_remove",
+    "/access_request/reviewStatus": "#/definitions/InlineRequest_access_request_reviewStatus",
     "/account/content/getTermDict": "#/definitions/InlineRequest_account_content_getTermDict",
     "/account/delete": "#/definitions/InlineRequest_account_delete",
-    "/account/export": "#/definitions/InlineRequest_account_export",
     "/account/getSpaceUsage": "#/definitions/InlineRequest_account_getSpaceUsage",
     "/account/extendedFeatures/get": "#/definitions/InlineRequest_account_extendedFeatures_get",
     "/account/extendedFeatures/update": "#/definitions/InlineRequest_account_extendedFeatures_update",
     "/account/keyStoragePolicy/update": "#/definitions/InlineRequest_account_keyStoragePolicy_update",
-    "/account/import": "#/definitions/InlineRequest_account_import",
     "/account/info": "#/definitions/InlineRequest_account_info",
     "/account/invites/cancel": "#/definitions/InlineRequest_account_invites_cancel",
     "/account/invites/list": "#/definitions/InlineRequest_account_invites_list",
     "/account/options/update": "#/definitions/InlineRequest_account_options_update",
+    "/account/assistantReview/update": "#/definitions/InlineRequest_account_assistantReview_update",
+    "/account/familyDowntime/update": "#/definitions/InlineRequest_account_familyDowntime_update",
+    "/account/familyDowntime/oneOff/add": "#/definitions/InlineRequest_account_familyDowntime_oneOff_add",
+    "/account/familyDowntime/oneOff/remove": "#/definitions/InlineRequest_account_familyDowntime_oneOff_remove",
+    "/account/familyDowntime/endNow": "#/definitions/InlineRequest_account_familyDowntime_endNow",
+    "/account/familyDowntime/dismiss": "#/definitions/InlineRequest_account_familyDowntime_dismiss",
+    "/familyDowntime/state": "#/definitions/InlineRequest_familyDowntime_state",
     "/ref_state/user/upsert": "#/definitions/RefStateUpsertRequest",
     "/ref_state/user/list": "#/definitions/RefStateListRequest",
     "/ref_state/user/delete": "#/definitions/RefStateDeleteRequest",
@@ -108,6 +114,7 @@
     "/activity/expireRemoteState": "#/definitions/InlineRequest_activity_expireRemoteState",
     "/activity/getCurrentUsageSummary": "#/definitions/GetUsageSummaryRequest",
     "/activity/getUsageInsightsReport": "#/definitions/GetUsageInsightsReportRequest",
+    "/activity/lookupChannelNames": "#/definitions/InlineRequest_activity_lookupChannelNames",
     "/activity/getTopicAttention": "#/definitions/GetTopicAttentionRequest",
     "/activity/getUrlRuleExplanation": "#/definitions/GetUrlRuleExplanationRequest",
     "/activity/getPipelineSettings": "#/definitions/InlineRequest_activity_getPipelineSettings",
@@ -126,7 +133,10 @@
     "/activityMonitor/update": "#/definitions/UpdateActivityLogRequest",
     "/activityMonitor/recordInApp": "#/definitions/RecordInAppActivityRequest",
     "/admin/account/changeSysOptions": "#/definitions/InlineRequest_admin_account_changeSysOptions",
-    "/admin/aiBudget/set": "#/definitions/InlineRequest_admin_aiBudget_set",
+    "/admin/aiLimits/getAccount": "#/definitions/InlineRequest_admin_aiLimits_getAccount",
+    "/admin/aiExtraUsage/grant": "#/definitions/InlineRequest_admin_aiExtraUsage_grant",
+    "/admin/aiExtraUsage/revoke": "#/definitions/InlineRequest_admin_aiExtraUsage_revoke",
+    "/admin/aiLimits/setHostedStopped": "#/definitions/InlineRequest_admin_aiLimits_setHostedStopped",
     "/admin/account/changeType": "#/definitions/InlineRequest_admin_account_changeType",
     "/admin/account/info": "#/definitions/InlineRequest_admin_account_info",
     "/admin/rollout/readiness": "#/definitions/InlineRequest_admin_rollout_readiness",
@@ -141,6 +151,7 @@
     "/admin/rateLimit/get": "#/definitions/InlineRequest_admin_rateLimit_get",
     "/admin/rateLimit/set": "#/definitions/InlineRequest_admin_rateLimit_set",
     "/admin/security/summary": "#/definitions/InlineRequest_admin_security_summary",
+    "/admin/security/key0Sweep": "#/definitions/InlineRequest_admin_security_key0Sweep",
     "/admin/cache/list": "#/definitions/InlineRequest_admin_cache_list",
     "/admin/cache/info": "#/definitions/InlineRequest_admin_cache_info",
     "/admin/cache/stats": "#/definitions/InlineRequest_admin_cache_stats",
@@ -255,6 +266,7 @@
     "/admin/updateGallerys": "#/definitions/InlineRequest_admin_updateGallerys",
     "/admin/user/changeBlockedStatus": "#/definitions/InlineRequest_admin_user_changeBlockedStatus",
     "/admin/user/changeCuratorStatus": "#/definitions/InlineRequest_admin_user_changeCuratorStatus",
+    "/admin/user/changeVerifiedStatus": "#/definitions/InlineRequest_admin_user_changeVerifiedStatus",
     "/admin/user/changeLockStatus": "#/definitions/InlineRequest_admin_user_changeLockStatus",
     "/admin/user/info": "#/definitions/InlineRequest_admin_user_info",
     "/admin/user/list": "#/definitions/InlineRequest_admin_user_list",
@@ -282,8 +294,15 @@
     "/ai/collectionAuthoringPrompt": "#/definitions/InlineRequest_ai_collectionAuthoringPrompt",
     "/ai/provider/listOllamaModels": "#/definitions/InlineRequest_ai_provider_listOllamaModels",
     "/ai/provider/syncOriginRule": "#/definitions/InlineRequest_ai_provider_syncOriginRule",
+    "/ai/image/generate": "#/definitions/InlineRequest_ai_image_generate",
+    "/ai/image/probeLocal": "#/definitions/InlineRequest_ai_image_probeLocal",
+    "/ai/image/credits": "#/definitions/Record%3Cstring%2Cnever%3E",
     "/ai/provider/getConfig": "#/definitions/InlineRequest_ai_provider_getConfig",
     "/ai/provider/setConfig": "#/definitions/InlineRequest_ai_provider_setConfig",
+    "/ai/provider/browserStatus": "#/definitions/InlineRequest_ai_provider_browserStatus",
+    "/ai/provider/firefoxStatus": "#/definitions/InlineRequest_ai_provider_firefoxStatus",
+    "/ai/provider/firefoxDownload": "#/definitions/InlineRequest_ai_provider_firefoxDownload",
+    "/ai/provider/firefoxDeleteModels": "#/definitions/InlineRequest_ai_provider_firefoxDeleteModels",
     "/auth/checkPassword": "#/definitions/InlineRequest_auth_checkPassword",
     "/auth/client/info": "#/definitions/InlineRequest_auth_client_info",
     "/auth/completeEmailVerification": "#/definitions/InlineRequest_auth_completeEmailVerification",
@@ -342,6 +361,9 @@
     "/companion/protection/authorizeRemoval": "#/definitions/InlineRequest_companion_protection_authorizeRemoval",
     "/companion/apps/reportNew": "#/definitions/InlineRequest_companion_apps_reportNew",
     "/companion/rules/current": "#/definitions/InlineRequest_companion_rules_current",
+    "/companion/settings/current": "#/definitions/DeviceSettingsCurrentRequest",
+    "/companion/settings/version": "#/definitions/InlineRequest_companion_settings_version",
+    "/companion/settings/events": "#/definitions/InlineRequest_companion_settings_events",
     "/companion/devices/remove": "#/definitions/InlineRequest_companion_devices_remove",
     "/companion/protection/disable": "#/definitions/InlineRequest_companion_protection_disable",
     "/companion/protection/enable": "#/definitions/InlineRequest_companion_protection_enable",
@@ -380,6 +402,11 @@
     "/content/imageClassifyRequestPerf/get": "#/definitions/InlineRequest_content_imageClassifyRequestPerf_get",
     "/content/imageClassifyRequestPerf/reset": "#/definitions/InlineRequest_content_imageClassifyRequestPerf_reset",
     "/content/imageClassifyCache/clear": "#/definitions/InlineRequest_content_imageClassifyCache_clear",
+    "/content/imageClassifier/bootstrap": "#/definitions/InlineRequest_content_imageClassifier_bootstrap",
+    "/content/imageClassifyQueueWidths/get": "#/definitions/InlineRequest_content_imageClassifyQueueWidths_get",
+    "/content/imageClassifyQueueWidths/set": "#/definitions/InlineRequest_content_imageClassifyQueueWidths_set",
+    "/content/imageVerdictCache/status": "#/definitions/InlineRequest_content_imageVerdictCache_status",
+    "/content/imageVerdictCache/set": "#/definitions/InlineRequest_content_imageVerdictCache_set",
     "/content/imageClassifySamples/list": "#/definitions/InlineRequest_content_imageClassifySamples_list",
     "/content/imageClassifySamples/markReported": "#/definitions/InlineRequest_content_imageClassifySamples_markReported",
     "/content/imageClassifySamples/clear": "#/definitions/InlineRequest_content_imageClassifySamples_clear",
@@ -402,6 +429,9 @@
     "/content/familyPolicyRules/list": "#/definitions/FamilyPolicyRuleListRequest",
     "/content/familyPolicyRules/upsert": "#/definitions/FamilyPolicyRuleUpsertRequest",
     "/content/familyPolicyRules/delete": "#/definitions/FamilyPolicyRuleDeleteRequest",
+    "/content/familyCurationChecks/list": "#/definitions/InlineRequest_content_familyCurationChecks_list",
+    "/content/familyCurationChecks/set": "#/definitions/InlineRequest_content_familyCurationChecks_set",
+    "/content/familyCurationChecks/clear": "#/definitions/InlineRequest_content_familyCurationChecks_clear",
     "/content/familyPolicyBlockRules/sync": "#/definitions/InlineRequest_content_familyPolicyBlockRules_sync",
     "/content/fixPipelineClassification": "#/definitions/InlineRequest_content_fixPipelineClassification",
     "/content/classificationLab": "#/definitions/InlineRequest_content_classificationLab",
@@ -537,6 +567,8 @@
     "/item/reactions/list": "#/definitions/InlineRequest_item_reactions_list",
     "/item/query": "#/definitions/ItemQueryRequest",
     "/item/cleanupCandidates": "#/definitions/LibraryCleanupCandidatesRequest",
+    "/item/duplicates/candidates": "#/definitions/LibraryDuplicateCandidatesRequest",
+    "/item/duplicates/merge": "#/definitions/MergeLibraryDuplicatesRequest",
     "/item/readLaterFeed": "#/definitions/ReadLaterFeedRequest",
     "/item/listByKinds": "#/definitions/InlineRequest_item_listByKinds",
     "/item/listLibraryApps": "#/definitions/InlineRequest_item_listLibraryApps",
@@ -566,6 +598,8 @@
     "/localstore/lookupMetaTemp": "#/definitions/InlineRequest_localstore_lookupMetaTemp",
     "/localstore/reset": "#/definitions/InlineRequest_localstore_reset",
     "/localstore/saveMetaTemp": "#/definitions/SaveMetaTempRequest",
+    "/native/speechStart": "#/definitions/InlineRequest_native_speechStart",
+    "/native/speechStop": "#/definitions/InlineRequest_native_speechStop",
     "/nativeClientCheck": "#/definitions/InlineRequest_nativeClientCheck",
     "/nativeMessage": "#/definitions/InlineRequest_nativeMessage",
     "/nativeDesktopStatus": "#/definitions/InlineRequest_nativeDesktopStatus",
@@ -598,6 +632,14 @@
     "/published/flag": "#/definitions/InlineRequest_published_flag",
     "/published/get": "#/definitions/InlineRequest_published_get",
     "/published/getGalleryGroupAndItems": "#/definitions/InlineRequest_published_getGalleryGroupAndItems",
+    "/published/curationQueue": "#/definitions/InlineRequest_published_curationQueue",
+    "/curationReview/listForItem": "#/definitions/InlineRequest_curationReview_listForItem",
+    "/curationReview/queue": "#/definitions/InlineRequest_curationReview_queue",
+    "/curationReview/getForCurator": "#/definitions/InlineRequest_curationReview_getForCurator",
+    "/curationReview/saveDraft": "#/definitions/CurationReviewSaveRequest",
+    "/curationReview/finalize": "#/definitions/CurationReviewSaveRequest",
+    "/curationReview/screenshot/upload": "#/definitions/InlineRequest_curationReview_screenshot_upload",
+    "/curationReview/requestAiDraft": "#/definitions/InlineRequest_curationReview_requestAiDraft",
     "/published/info/update": "#/definitions/InlineRequest_published_info_update",
     "/published/item/importFromPublished": "#/definitions/ImportFromPublishedRequest",
     "/published/listForMap": "#/definitions/InlineRequest_published_listForMap",
@@ -608,6 +650,7 @@
     "/published/listWithChild": "#/definitions/InlineRequest_published_listWithChild",
     "/published/listWithIds": "#/definitions/InlineRequest_published_listWithIds",
     "/published/matchForURL": "#/definitions/InlineRequest_published_matchForURL",
+    "/published/ownerStatus": "#/definitions/InlineRequest_published_ownerStatus",
     "/published/publishCollection": "#/definitions/InlineRequest_published_publishCollection",
     "/published/publishCollectionClient/init": "#/definitions/InlineRequest_published_publishCollectionClient_init",
     "/published/publishCollectionClient/addChild": "#/definitions/InlineRequest_published_publishCollectionClient_addChild",
@@ -631,12 +674,12 @@
     "/search/browser-address-autocomplete": "#/definitions/InlineRequest_search_browser_address_autocomplete",
     "/search/embedded": "#/definitions/InlineRequest_search_embedded",
     "/search/status": "#/definitions/InlineRequest_search_status",
+    "/search/lookupProviders": "#/definitions/InlineRequest_search_lookupProviders",
     "/search/diagnostics": "#/definitions/InlineRequest_search_diagnostics",
     "/search/setShadowEnabled": "#/definitions/InlineRequest_search_setShadowEnabled",
     "/search/setCorpusEngineEnabled": "#/definitions/InlineRequest_search_setCorpusEngineEnabled",
     "/search/terms": "#/definitions/InlineRequest_search_terms",
     "/access/evaluate": "#/definitions/AccessEvaluateRequest",
-    "/user/libraryAutoApproval/evaluate": "#/definitions/LibraryAutoApprovalEvaluateRequest",
     "/sentry/clearTempDisableBlocking": "#/definitions/InlineRequest_sentry_clearTempDisableBlocking",
     "/sentry/getTempDisableBlockingStatus": "#/definitions/InlineRequest_sentry_getTempDisableBlockingStatus",
     "/sentry/giveTempAccess": "#/definitions/InlineRequest_sentry_giveTempAccess",
@@ -676,6 +719,11 @@
     "/sync/trigger": "#/definitions/InlineRequest_sync_trigger",
     "/sync/update": "#/definitions/InlineRequest_sync_update",
     "/system/contactRequest": "#/definitions/InlineRequest_system_contactRequest",
+    "/realm/restore/list": "#/definitions/InlineRequest_realm_restore_list",
+    "/realm/restore/preflight": "#/definitions/InlineRequest_realm_restore_preflight",
+    "/realm/restore/run": "#/definitions/InlineRequest_realm_restore_run",
+    "/realm/claim/list": "#/definitions/InlineRequest_realm_claim_list",
+    "/realm/claim/withPassword": "#/definitions/InlineRequest_realm_claim_withPassword",
     "/system/status": "#/definitions/InlineRequest_system_status",
     "/system/version": "#/definitions/InlineRequest_system_version",
     "/test/client/dbtest": "#/definitions/InlineRequest_test_client_dbtest",
@@ -759,6 +807,7 @@
     "/user/options/update": "#/definitions/InlineRequest_user_options_update",
     "/user/checkpoint/clear": "#/definitions/InlineRequest_user_checkpoint_clear",
     "/user/settings/copy": "#/definitions/CopyUserSettingsRequest",
+    "/user/blockedMessage/fillBlank": "#/definitions/InlineRequest_user_blockedMessage_fillBlank",
     "/user/plugin/list": "#/definitions/InlineRequest_user_plugin_list",
     "/user/plugin/update": "#/definitions/InlineRequest_user_plugin_update",
     "/user/prefs/defaultsByKey": "#/definitions/InlineRequest_user_prefs_defaultsByKey",
@@ -822,6 +871,7 @@
     "/userfile/uploadChunkedInit": "#/definitions/InlineRequest_userfile_uploadChunkedInit",
     "/userfile/uploadPreview": "#/definitions/InlineRequest_userfile_uploadPreview",
     "/userfile/getCiphertextChunkRange": "#/definitions/InlineRequest_userfile_getCiphertextChunkRange",
+    "/usertask/imageCredits": "#/definitions/Record%3Cstring%2Cnever%3E",
     "/usertask/generateImage": "#/definitions/GenerateImageRequest",
     "/usertask/request": "#/definitions/UserTaskRequest",
     "/usertask/stream": "#/definitions/UserTaskStreamRequest",
@@ -2631,6 +2681,9 @@
         "parentKey": {
           "type": "string"
         },
+        "fileInfo": {
+          "$ref": "#/definitions/ItemMetaFileInfo"
+        },
         "resolved": {
           "type": "boolean"
         }
@@ -2673,6 +2726,12 @@
             "null"
           ]
         },
+        "channelName": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
         "discoveredFeedLinks": {
           "type": "array",
           "items": {
@@ -2695,7 +2754,11 @@
             "published",
             "published_curated",
             "oembed",
-            "live_dom"
+            "live_dom",
+            "pdf_landing_page",
+            "pdf_embedded",
+            "file_name",
+            "file_headers"
           ]
         },
         "redditScore": {
@@ -2845,6 +2908,36 @@
         "unknown"
       ]
     },
+    "ItemMetaFileInfo": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "file"
+        },
+        "contentType": {
+          "type": "string"
+        },
+        "filename": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "sizeBytes": {
+          "type": [
+            "number",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "kind",
+        "contentType",
+        "filename",
+        "sizeBytes"
+      ]
+    },
     "ItemAttachment": {
       "type": "object",
       "properties": {
@@ -2948,6 +3041,9 @@
             },
             "t": {
               "type": "number"
+            },
+            "previewMeta": {
+              "$ref": "#/definitions/Record%3Cstring%2Cstructure-1776665922-605-637-1776665922-590-638-1776665922-462-639-1776665922-361-645-1776665922-176-668-1776665922-153-669-1776665922-0-1648%3E"
             }
           },
           "required": [
@@ -2985,6 +3081,20 @@
         "wrappingKeyId",
         "unwrappingKeyId"
       ]
+    },
+    "Record<string,structure-1776665922-605-637-1776665922-590-638-1776665922-462-639-1776665922-361-645-1776665922-176-668-1776665922-153-669-1776665922-0-1648>": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "iv": {
+            "type": "string"
+          },
+          "bytes": {
+            "type": "number"
+          }
+        }
+      }
     },
     "InlineRequest_collection_showcase_create": {
       "type": "object",
@@ -3541,6 +3651,9 @@
         "id"
       ]
     },
+    "InlineRequest_access_request_reviewStatus": {
+      "type": "object"
+    },
     "InlineRequest_account_content_getTermDict": {
       "type": "object",
       "properties": {
@@ -3561,15 +3674,6 @@
       },
       "required": [
         "confirmation"
-      ]
-    },
-    "InlineRequest_account_export": {
-      "type": "object",
-      "properties": {
-        "options": {}
-      },
-      "required": [
-        "options"
       ]
     },
     "InlineRequest_account_getSpaceUsage": {
@@ -3601,15 +3705,6 @@
         "noServerKeyStorage"
       ]
     },
-    "InlineRequest_account_import": {
-      "type": "object",
-      "properties": {
-        "importData": {}
-      },
-      "required": [
-        "importData"
-      ]
-    },
     "InlineRequest_account_info": {
       "type": "object",
       "properties": {
@@ -3637,8 +3732,293 @@
       "properties": {
         "setupComplete": {
           "type": "boolean"
+        },
+        "assistantReview": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/AssistantReviewConfig"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "familyTimeZone": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "familyDowntime": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/FamilyDowntimeSettings"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "aiSetting": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/FamilyAiSetting"
+            },
+            {
+              "type": "null"
+            }
+          ]
         }
       }
+    },
+    "AssistantReviewConfig": {
+      "type": "object",
+      "properties": {
+        "overrides": {
+          "$ref": "#/definitions/Record%3Cstring%2CAssistantReviewEntry%3E"
+        },
+        "templates": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/AssistantReviewTemplate"
+          }
+        },
+        "presets": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "customText": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "customText",
+        "presets"
+      ]
+    },
+    "Record<string,AssistantReviewEntry>": {
+      "type": "object",
+      "additionalProperties": {
+        "$ref": "#/definitions/AssistantReviewEntry"
+      }
+    },
+    "AssistantReviewEntry": {
+      "type": "object",
+      "properties": {
+        "presets": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "customText": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "presets",
+        "customText"
+      ]
+    },
+    "AssistantReviewTemplate": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "entry": {
+          "$ref": "#/definitions/AssistantReviewEntry"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "entry"
+      ]
+    },
+    "FamilyDowntimeSettings": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "schedules": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/FamilyDowntimeSchedule"
+          }
+        },
+        "oneOffs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/FamilyDowntimeOneOff"
+          }
+        },
+        "exceptions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/FamilyDowntimeException"
+          }
+        },
+        "dismissals": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/FamilyDowntimeDismissal"
+          }
+        },
+        "allow": {
+          "$ref": "#/definitions/FamilyDowntimeAllow"
+        },
+        "updatedAt": {
+          "type": "number"
+        },
+        "updatedBy": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "enabled",
+        "schedules",
+        "oneOffs",
+        "exceptions",
+        "dismissals",
+        "allow",
+        "updatedAt",
+        "updatedBy"
+      ]
+    },
+    "FamilyDowntimeSchedule": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "daysOfWeek": {
+          "type": "array",
+          "items": {
+            "type": "number"
+          }
+        },
+        "start": {
+          "type": "string"
+        },
+        "end": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "daysOfWeek",
+        "start",
+        "end"
+      ]
+    },
+    "FamilyDowntimeOneOff": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "startAt": {
+          "type": "number"
+        },
+        "endAt": {
+          "type": "number"
+        },
+        "createdBy": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "startAt",
+        "endAt",
+        "createdBy"
+      ]
+    },
+    "FamilyDowntimeException": {
+      "type": "object",
+      "properties": {
+        "fromMs": {
+          "type": "number"
+        },
+        "untilMs": {
+          "type": "number"
+        },
+        "kind": {
+          "type": "string",
+          "enum": [
+            "ended",
+            "skipped"
+          ]
+        },
+        "byUserId": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "fromMs",
+        "untilMs",
+        "kind",
+        "byUserId"
+      ]
+    },
+    "FamilyDowntimeDismissal": {
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string"
+        },
+        "untilMs": {
+          "type": "number"
+        }
+      },
+      "required": [
+        "userId",
+        "untilMs"
+      ]
+    },
+    "FamilyDowntimeAllow": {
+      "type": "object",
+      "properties": {
+        "urlPatterns": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "itemIds": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "appIds": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "urlPatterns",
+        "itemIds",
+        "appIds"
+      ]
+    },
+    "FamilyAiSetting": {
+      "type": "string",
+      "enum": [
+        "off",
+        "privateOnly",
+        "settingsOnly",
+        "on"
+      ]
     },
     "InlineRequest_account_options_update": {
       "type": "object",
@@ -3650,6 +4030,150 @@
       "required": [
         "options"
       ]
+    },
+    "InlineRequest_account_assistantReview_update": {
+      "type": "object",
+      "properties": {
+        "targetUserId": {
+          "type": "string"
+        },
+        "entry": {
+          "anyOf": [
+            {
+              "type": "object",
+              "properties": {
+                "presets": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "customText": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "presets",
+                "customText"
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "appendCustomText": {
+          "type": "string"
+        },
+        "template": {
+          "anyOf": [
+            {
+              "type": "object",
+              "properties": {
+                "save": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "entry": {
+                      "type": "object",
+                      "properties": {
+                        "presets": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "customText": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "presets",
+                        "customText"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "name",
+                    "entry"
+                  ]
+                }
+              },
+              "required": [
+                "save"
+              ]
+            },
+            {
+              "type": "object",
+              "properties": {
+                "remove": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "remove"
+              ]
+            }
+          ]
+        }
+      }
+    },
+    "InlineRequest_account_familyDowntime_update": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "schedules": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/FamilyDowntimeSchedule"
+          }
+        },
+        "allow": {
+          "$ref": "#/definitions/FamilyDowntimeAllow"
+        }
+      }
+    },
+    "InlineRequest_account_familyDowntime_oneOff_add": {
+      "type": "object",
+      "properties": {
+        "startAt": {
+          "type": "number"
+        },
+        "endAt": {
+          "type": "number"
+        }
+      },
+      "required": [
+        "startAt",
+        "endAt"
+      ]
+    },
+    "InlineRequest_account_familyDowntime_oneOff_remove": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id"
+      ]
+    },
+    "InlineRequest_account_familyDowntime_endNow": {
+      "type": "object"
+    },
+    "InlineRequest_account_familyDowntime_dismiss": {
+      "type": "object"
+    },
+    "InlineRequest_familyDowntime_state": {
+      "type": "object"
     },
     "RefStateUpsertRequest": {
       "type": "object",
@@ -3672,6 +4196,9 @@
         "data": {},
         "ownerId": {
           "type": "string"
+        },
+        "onlyIfEncrypted": {
+          "type": "boolean"
         }
       },
       "required": [
@@ -3841,6 +4368,12 @@
         "note": {
           "type": "string"
         },
+        "userIds": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
         "createdAt": {
           "type": "string"
         },
@@ -3867,6 +4400,12 @@
         },
         "eduValue": {
           "$ref": "#/definitions/EduValue"
+        },
+        "terms": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
         }
       },
       "required": [
@@ -3884,7 +4423,8 @@
         "manual",
         "migration_classification_override",
         "migration_blocked_pattern",
-        "server_sync"
+        "server_sync",
+        "assistant_review"
       ]
     },
     "FamilyPolicyRuleTargetKind": {
@@ -3893,7 +4433,8 @@
         "domain",
         "url_prefix",
         "channel_id",
-        "item_id"
+        "item_id",
+        "published_id"
       ]
     },
     "FamilyPolicyRuleDecisionKind": {
@@ -3901,7 +4442,8 @@
       "enum": [
         "classify",
         "block",
-        "skip_image_scanning"
+        "skip_image_scanning",
+        "curation_checked"
       ]
     },
     "EduValue": {
@@ -3951,6 +4493,12 @@
         },
         "note": {
           "type": "string"
+        },
+        "userIds": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
         },
         "createdAt": {
           "type": "string"
@@ -4398,6 +4946,20 @@
       "enum": [
         "7d",
         "30d"
+      ]
+    },
+    "InlineRequest_activity_lookupChannelNames": {
+      "type": "object",
+      "properties": {
+        "channelIds": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "channelIds"
       ]
     },
     "GetTopicAttentionRequest": {
@@ -5350,30 +5912,68 @@
         "optionValue"
       ]
     },
-    "InlineRequest_admin_aiBudget_set": {
+    "InlineRequest_admin_aiLimits_getAccount": {
       "type": "object",
       "properties": {
-        "scope": {
-          "type": "string",
-          "enum": [
-            "account",
-            "user"
-          ]
-        },
-        "targetId": {
+        "accountId": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "accountId"
+      ]
+    },
+    "InlineRequest_admin_aiExtraUsage_grant": {
+      "type": "object",
+      "properties": {
+        "accountId": {
           "type": "string"
         },
-        "usdMonthly": {
+        "usd": {
+          "type": "number"
+        },
+        "expiresAt": {
           "type": [
-            "number",
+            "string",
+            "null"
+          ]
+        },
+        "note": {
+          "type": [
+            "string",
             "null"
           ]
         }
       },
       "required": [
-        "scope",
-        "targetId",
-        "usdMonthly"
+        "accountId",
+        "usd"
+      ]
+    },
+    "InlineRequest_admin_aiExtraUsage_revoke": {
+      "type": "object",
+      "properties": {
+        "grantId": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "grantId"
+      ]
+    },
+    "InlineRequest_admin_aiLimits_setHostedStopped": {
+      "type": "object",
+      "properties": {
+        "accountId": {
+          "type": "string"
+        },
+        "stopped": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "accountId",
+        "stopped"
       ]
     },
     "AccountType": {
@@ -5526,6 +6126,14 @@
       "properties": {
         "hours": {
           "type": "number"
+        }
+      }
+    },
+    "InlineRequest_admin_security_key0Sweep": {
+      "type": "object",
+      "properties": {
+        "dryRun": {
+          "type": "boolean"
         }
       }
     },
@@ -8540,6 +9148,31 @@
         "curator"
       ]
     },
+    "InlineRequest_admin_user_changeVerifiedStatus": {
+      "type": "object",
+      "properties": {
+        "publicUserId": {
+          "type": "string"
+        },
+        "verifiedType": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "enum": [
+            "contributor",
+            null
+          ]
+        },
+        "message": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "publicUserId",
+        "verifiedType"
+      ]
+    },
     "InlineRequest_admin_user_changeLockStatus": {
       "type": "object",
       "properties": {
@@ -9052,6 +9685,28 @@
     "InlineRequest_ai_provider_syncOriginRule": {
       "type": "object"
     },
+    "InlineRequest_ai_image_generate": {
+      "type": "object",
+      "properties": {
+        "prompt": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "prompt"
+      ]
+    },
+    "InlineRequest_ai_image_probeLocal": {
+      "type": "object",
+      "properties": {
+        "endpoint": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "endpoint"
+      ]
+    },
     "InlineRequest_ai_provider_getConfig": {
       "type": "object"
     },
@@ -9062,7 +9717,9 @@
           "type": "string",
           "enum": [
             "server",
-            "ollama"
+            "ollama",
+            "browser",
+            "browser-ff"
           ]
         },
         "endpoint": {
@@ -9073,8 +9730,33 @@
         },
         "thinking": {
           "type": "boolean"
+        },
+        "browserModelId": {
+          "type": "string"
         }
       }
+    },
+    "InlineRequest_ai_provider_browserStatus": {
+      "type": "object"
+    },
+    "InlineRequest_ai_provider_firefoxStatus": {
+      "type": "object",
+      "properties": {
+        "modelId": {
+          "type": "string"
+        }
+      }
+    },
+    "InlineRequest_ai_provider_firefoxDownload": {
+      "type": "object",
+      "properties": {
+        "modelId": {
+          "type": "string"
+        }
+      }
+    },
+    "InlineRequest_ai_provider_firefoxDeleteModels": {
+      "type": "object"
     },
     "InlineRequest_auth_checkPassword": {
       "type": "object",
@@ -9972,7 +10654,31 @@
         "aiChatEnabled": {
           "type": "boolean"
         },
+        "assistantReviewEnabled": {
+          "type": "boolean"
+        },
         "appEditorEnabled": {
+          "type": "boolean"
+        },
+        "emailEnabled": {
+          "type": "boolean"
+        },
+        "speechModeEnabled": {
+          "type": "boolean"
+        },
+        "wakeWordEnabled": {
+          "type": "boolean"
+        },
+        "historyRetentionDays": {
+          "type": "number"
+        },
+        "communityContentEnabled": {
+          "type": "boolean"
+        },
+        "companionDevicesEnabled": {
+          "type": "boolean"
+        },
+        "remoteChildActionsEnabled": {
           "type": "boolean"
         },
         "explorePublishedEnabled": {
@@ -10726,6 +11432,9 @@
         },
         "targetUserId": {
           "type": "string"
+        },
+        "childDisplayName": {
+          "type": "string"
         }
       }
     },
@@ -10905,6 +11614,9 @@
           "items": {
             "type": "string"
           }
+        },
+        "platform": {
+          "type": "string"
         }
       },
       "required": [
@@ -10918,6 +11630,25 @@
           "type": "number"
         }
       }
+    },
+    "DeviceSettingsCurrentRequest": {
+      "type": "object",
+      "properties": {
+        "knownVersion": {
+          "type": "number"
+        }
+      }
+    },
+    "InlineRequest_companion_settings_version": {
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string"
+        }
+      }
+    },
+    "InlineRequest_companion_settings_events": {
+      "type": "object"
     },
     "InlineRequest_companion_devices_remove": {
       "type": "object",
@@ -11511,6 +12242,43 @@
     "InlineRequest_content_imageClassifyCache_clear": {
       "type": "object"
     },
+    "InlineRequest_content_imageClassifier_bootstrap": {
+      "type": "object"
+    },
+    "InlineRequest_content_imageClassifyQueueWidths_get": {
+      "type": "object"
+    },
+    "InlineRequest_content_imageClassifyQueueWidths_set": {
+      "type": "object",
+      "properties": {
+        "maxConcurrentFetches": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "maxConcurrentClassifications": {
+          "type": [
+            "number",
+            "null"
+          ]
+        }
+      }
+    },
+    "InlineRequest_content_imageVerdictCache_status": {
+      "type": "object"
+    },
+    "InlineRequest_content_imageVerdictCache_set": {
+      "type": "object",
+      "properties": {
+        "disabled": {
+          "type": "boolean"
+        },
+        "clear": {
+          "type": "boolean"
+        }
+      }
+    },
     "InlineRequest_content_imageClassifySamples_list": {
       "type": "object",
       "properties": {
@@ -11804,6 +12572,37 @@
     },
     "InlineRequest_content_classificationOverrides_reload": {
       "type": "object"
+    },
+    "InlineRequest_content_familyCurationChecks_list": {
+      "type": "object"
+    },
+    "InlineRequest_content_familyCurationChecks_set": {
+      "type": "object",
+      "properties": {
+        "publishId": {
+          "type": "string"
+        },
+        "note": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "publishId"
+      ]
+    },
+    "InlineRequest_content_familyCurationChecks_clear": {
+      "type": "object",
+      "properties": {
+        "publishId": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "publishId"
+      ]
     },
     "InlineRequest_content_familyPolicyBlockRules_sync": {
       "type": "object",
@@ -12764,7 +13563,10 @@
     "InlineRequest_encryption_recoverUsingKey": {
       "type": "object",
       "properties": {
-        "secretKey": {
+        "recoveryKey": {
+          "type": "string"
+        },
+        "password": {
           "type": "string"
         },
         "userId": {
@@ -12772,7 +13574,7 @@
         }
       },
       "required": [
-        "secretKey"
+        "recoveryKey"
       ]
     },
     "InlineRequest_encryption_saveRecoveryKeyOnServer": {
@@ -14007,6 +14809,41 @@
         }
       }
     },
+    "LibraryDuplicateCandidatesRequest": {
+      "type": "object",
+      "properties": {
+        "includeArchived": {
+          "type": "boolean"
+        },
+        "limit": {
+          "type": "number"
+        },
+        "offset": {
+          "type": "number"
+        }
+      }
+    },
+    "MergeLibraryDuplicatesRequest": {
+      "type": "object",
+      "properties": {
+        "survivorItemId": {
+          "type": "string"
+        },
+        "duplicateItemIds": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "mergedDetails": {
+          "$ref": "#/definitions/Partial%3CItem%3E"
+        }
+      },
+      "required": [
+        "survivorItemId",
+        "duplicateItemIds"
+      ]
+    },
     "ReadLaterFeedRequest": {
       "type": "object",
       "properties": {
@@ -14269,6 +15106,9 @@
           "items": {
             "type": "string"
           }
+        },
+        "userId": {
+          "type": "string"
         }
       },
       "required": [
@@ -14439,6 +15279,23 @@
         "url",
         "meta"
       ]
+    },
+    "InlineRequest_native_speechStart": {
+      "type": "object",
+      "properties": {
+        "lang": {
+          "type": "string"
+        },
+        "onDevice": {
+          "type": "boolean"
+        },
+        "keepAlive": {
+          "type": "boolean"
+        }
+      }
+    },
+    "InlineRequest_native_speechStop": {
+      "type": "object"
     },
     "InlineRequest_nativeClientCheck": {
       "type": "object"
@@ -14865,6 +15722,15 @@
         "itemId": {
           "type": "string"
         },
+        "reason": {
+          "type": "string"
+        },
+        "comment": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
         "details": {
           "$ref": "#/definitions/Record%3Cstring%2Cany%3E"
         }
@@ -14896,6 +15762,173 @@
       },
       "required": [
         "groupId"
+      ]
+    },
+    "InlineRequest_published_curationQueue": {
+      "type": "object"
+    },
+    "InlineRequest_curationReview_listForItem": {
+      "type": "object",
+      "properties": {
+        "itemId": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "itemId"
+      ]
+    },
+    "InlineRequest_curationReview_queue": {
+      "type": "object"
+    },
+    "InlineRequest_curationReview_getForCurator": {
+      "type": "object",
+      "properties": {
+        "itemId": {
+          "type": "string"
+        },
+        "ensureOpen": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "itemId"
+      ]
+    },
+    "CurationReviewSaveRequest": {
+      "type": "object",
+      "properties": {
+        "reviewId": {
+          "type": "string"
+        },
+        "version": {
+          "type": "number"
+        },
+        "answers": {
+          "$ref": "#/definitions/Record%3Cstring%2CCurationReviewStoredAnswer%3E"
+        },
+        "outcome": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "enum": [
+            "curate",
+            "decline",
+            null
+          ]
+        },
+        "declineReason": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "summary": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "internalNote": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "reviewAgainMonths": {
+          "type": [
+            "number",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "reviewId",
+        "version",
+        "answers"
+      ]
+    },
+    "Record<string,CurationReviewStoredAnswer>": {
+      "type": "object",
+      "additionalProperties": {
+        "$ref": "#/definitions/CurationReviewStoredAnswer"
+      }
+    },
+    "CurationReviewStoredAnswer": {
+      "type": "object",
+      "properties": {
+        "value": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          ]
+        },
+        "comment": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "screenshots": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "source": {
+          "$ref": "#/definitions/CurationReviewAnswerSource"
+        },
+        "comments": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "value"
+      ]
+    },
+    "CurationReviewAnswerSource": {
+      "type": "string",
+      "enum": [
+        "human",
+        "ai_confirmed",
+        "previous_confirmed"
+      ]
+    },
+    "InlineRequest_curationReview_screenshot_upload": {
+      "type": "object",
+      "properties": {
+        "reviewId": {
+          "type": "string"
+        },
+        "imageData": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "reviewId",
+        "imageData"
+      ]
+    },
+    "InlineRequest_curationReview_requestAiDraft": {
+      "type": "object",
+      "properties": {
+        "reviewId": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "reviewId"
       ]
     },
     "InlineRequest_published_info_update": {
@@ -15035,6 +16068,17 @@
       },
       "required": [
         "url"
+      ]
+    },
+    "InlineRequest_published_ownerStatus": {
+      "type": "object",
+      "properties": {
+        "itemId": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "itemId"
       ]
     },
     "InlineRequest_published_publishCollection": {
@@ -15308,7 +16352,16 @@
           "type": "boolean"
         },
         "comment": {
-          "type": "string"
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "declineReason": {
+          "type": [
+            "string",
+            "null"
+          ]
         }
       },
       "required": [
@@ -15493,6 +16546,9 @@
     "InlineRequest_search_status": {
       "type": "object"
     },
+    "InlineRequest_search_lookupProviders": {
+      "type": "object"
+    },
     "InlineRequest_search_diagnostics": {
       "type": "object"
     },
@@ -15549,21 +16605,6 @@
           "type": "string",
           "const": "redirectBlockedPage"
         }
-      },
-      "required": [
-        "url"
-      ]
-    },
-    "LibraryAutoApprovalEvaluateRequest": {
-      "type": "object",
-      "properties": {
-        "userId": {
-          "type": "string"
-        },
-        "url": {
-          "type": "string"
-        },
-        "meta": {}
       },
       "required": [
         "url"
@@ -15800,7 +16841,8 @@
         "pub_col",
         "item_feed",
         "pub_item_feed",
-        "custom"
+        "custom",
+        "rediscover"
       ]
     },
     "InlineRequest_subscription_add": {
@@ -15996,6 +17038,75 @@
       },
       "required": [
         "message"
+      ]
+    },
+    "InlineRequest_realm_restore_list": {
+      "type": "object"
+    },
+    "InlineRequest_realm_restore_preflight": {
+      "type": "object",
+      "properties": {
+        "objectName": {
+          "type": "string"
+        },
+        "phrase": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "objectName",
+        "phrase"
+      ]
+    },
+    "InlineRequest_realm_restore_run": {
+      "type": "object",
+      "properties": {
+        "objectName": {
+          "type": "string"
+        },
+        "phrase": {
+          "type": "string"
+        },
+        "acceptNoUnlockMethod": {
+          "type": "boolean"
+        },
+        "allowUnverified": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "objectName",
+        "phrase"
+      ]
+    },
+    "InlineRequest_realm_claim_list": {
+      "type": "object",
+      "properties": {
+        "realmId": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "realmId"
+      ]
+    },
+    "InlineRequest_realm_claim_withPassword": {
+      "type": "object",
+      "properties": {
+        "realmId": {
+          "type": "string"
+        },
+        "userId": {
+          "type": "string"
+        },
+        "password": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "realmId",
+        "userId",
+        "password"
       ]
     },
     "InlineRequest_system_status": {
@@ -16214,6 +17325,12 @@
         "serviceRunning": {
           "type": "boolean"
         },
+        "monitorStartRefused": {
+          "type": "string"
+        },
+        "monitorStartRefusedAt": {
+          "type": "number"
+        },
         "provisioned": {
           "type": "boolean"
         },
@@ -16314,6 +17431,45 @@
         },
         "linkedUserName": {
           "type": "string"
+        },
+        "lastTickAt": {
+          "type": "number"
+        },
+        "appliedSettingsVersion": {
+          "type": "number"
+        },
+        "usageSeedAgeMs": {
+          "type": "number"
+        },
+        "detection": {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "events",
+                "poll"
+              ]
+            },
+            "intervalMs": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "kind"
+          ]
+        },
+        "timeZoneMismatch": {
+          "type": "boolean"
+        },
+        "clockJump": {
+          "type": "boolean"
+        },
+        "capabilities": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
         }
       },
       "required": [
@@ -16596,6 +17752,9 @@
         },
         "cadenceMs": {
           "type": "number"
+        },
+        "clientId": {
+          "type": "string"
         }
       },
       "required": [
@@ -17318,7 +18477,31 @@
         "aiChatEnabled": {
           "type": "boolean"
         },
+        "assistantReviewEnabled": {
+          "type": "boolean"
+        },
         "appEditorEnabled": {
+          "type": "boolean"
+        },
+        "emailEnabled": {
+          "type": "boolean"
+        },
+        "speechModeEnabled": {
+          "type": "boolean"
+        },
+        "wakeWordEnabled": {
+          "type": "boolean"
+        },
+        "historyRetentionDays": {
+          "type": "number"
+        },
+        "communityContentEnabled": {
+          "type": "boolean"
+        },
+        "companionDevicesEnabled": {
+          "type": "boolean"
+        },
+        "remoteChildActionsEnabled": {
           "type": "boolean"
         },
         "explorePublishedEnabled": {
@@ -17390,6 +18573,17 @@
         "contentFiltering",
         "usageLimits",
         "websiteSettings"
+      ]
+    },
+    "InlineRequest_user_blockedMessage_fillBlank": {
+      "type": "object",
+      "properties": {
+        "message": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "message"
       ]
     },
     "InlineRequest_user_plugin_list": {
@@ -18300,8 +19494,22 @@
         "pricing": {
           "$ref": "#/definitions/Partial%3CAdminAiPricing%3E"
         },
-        "budgets": {
-          "$ref": "#/definitions/Partial%3CAdminAiBudgets%3E"
+        "limits": {
+          "type": "object",
+          "properties": {
+            "standard": {
+              "$ref": "#/definitions/Partial%3CAdminAiPlanLimits%3E"
+            },
+            "plus": {
+              "$ref": "#/definitions/Partial%3CAdminAiPlanLimits%3E"
+            },
+            "warnAtPercent": {
+              "type": "number"
+            },
+            "urgentWarnAtPercent": {
+              "type": "number"
+            }
+          }
         }
       }
     },
@@ -18323,6 +19531,9 @@
         "contentClassification": {
           "$ref": "#/definitions/AdminAiPromptOverride"
         },
+        "accessRequestReview": {
+          "$ref": "#/definitions/AdminAiPromptOverride"
+        },
         "feedGenOutline": {
           "$ref": "#/definitions/AdminAiPromptOverride"
         },
@@ -18339,6 +19550,9 @@
           "$ref": "#/definitions/AdminAiPromptOverride"
         },
         "collectionAuthoring": {
+          "$ref": "#/definitions/AdminAiPromptOverride"
+        },
+        "curationReviewDraft": {
           "$ref": "#/definitions/AdminAiPromptOverride"
         }
       }
@@ -18388,6 +19602,12 @@
             "string",
             "null"
           ]
+        },
+        "pricesAsOf": {
+          "type": [
+            "string",
+            "null"
+          ]
         }
       }
     },
@@ -18405,6 +19625,13 @@
         },
         "outputPerMillion": {
           "type": "number"
+        },
+        "source": {
+          "type": "string",
+          "enum": [
+            "stamped",
+            "admin"
+          ]
         }
       },
       "required": [
@@ -18417,25 +19644,23 @@
       "properties": {
         "perImage": {
           "type": "number"
+        },
+        "byModel": {
+          "$ref": "#/definitions/Record%3Cstring%2Cnumber%3E"
         }
       },
       "required": [
-        "perImage"
+        "perImage",
+        "byModel"
       ]
     },
-    "Partial<AdminAiBudgets>": {
+    "Partial<AdminAiPlanLimits>": {
       "type": "object",
       "properties": {
-        "standardUsdMonthly": {
+        "fiveHourUsd": {
           "type": "number"
         },
-        "plusUsdMonthly": {
-          "type": "number"
-        },
-        "warnAtPercent": {
-          "type": "number"
-        },
-        "urgentWarnAtPercent": {
+        "weeklyUsd": {
           "type": "number"
         }
       }
@@ -18584,6 +19809,9 @@
       "type": "object",
       "properties": {
         "prompt": {
+          "type": "string"
+        },
+        "model": {
           "type": "string"
         },
         "options": {},

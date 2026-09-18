@@ -77,7 +77,7 @@ const validAttributes = new Set([
   'encrypted',
 ]);
 
-function getSanitizedItemForSaving(data: Item): Item {
+export function getSanitizedItemForSaving(data: Item): Item {
   let newData: Item = {};
   for (const [key, value] of Object.entries(data)) {
     if (validAttributes.has(key)) {
@@ -95,7 +95,7 @@ function getSanitizedItemForSaving(data: Item): Item {
   return newData;
 }
 
-function checkIfItemIsEncrypted(data: Item) {
+export function checkIfItemIsEncrypted(data: Item) {
   let encrypted = false;
   if (data?.encInfo && 'decrypt' in data.encInfo && data.encInfo.decrypt === true) {
     data.encInfo = null;
@@ -106,7 +106,7 @@ function checkIfItemIsEncrypted(data: Item) {
   return encrypted;
 }
 
-function hasValidEncInfoKeys(encInfo: any): boolean {
+export function hasValidEncInfoKeys(encInfo: any): boolean {
   return !!(encInfo && typeof encInfo === 'object' && Array.isArray(encInfo.keys) && encInfo.keys.length > 0);
 }
 
@@ -727,7 +727,7 @@ class ItemService {
 
       if (options.requireClassified) {
         if (!isEligibleForRestrictedLibraryHide((item as any).useCriteria)) {
-          throw new Error('Item is not eligible for library hiding');
+          throw new HttpException(403, 'Item is not eligible for library hiding');
         }
       }
 

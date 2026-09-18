@@ -1,0 +1,83 @@
+{
+  "id": "16-family-timezone-schedule-window",
+  "behaviour": "An allowed window follows the family's time of day: 09:00 in Los Angeles is inside 08:00–15:00, though a device set to London reads 17:00.",
+  "clock": {
+    "nowMs": 1789488000000,
+    "familyTimeZone": "America/Los_Angeles",
+    "deviceTimeZone": "Europe/London"
+  },
+  "settings": {
+    "usageLimitsData": {
+      "contentUsageLimits": [
+        {
+          "id": "r-school",
+          "name": "School hours",
+          "type": "advanced",
+          "conditions": [
+            {
+              "type": "eduValue",
+              "values": [
+                "eduval_junk"
+              ]
+            }
+          ],
+          "timeLimits": [
+            {
+              "hours": 8,
+              "daysOfWeek": [
+                1,
+                2,
+                3,
+                4,
+                5
+              ],
+              "timeRanges": [
+                {
+                  "start": "08:00",
+                  "end": "15:00"
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "temporaryRules": []
+    },
+    "ruleOverrideSettings": {
+      "ruleOverrides": []
+    },
+    "accessControlSettings": {},
+    "appPolicy": null,
+    "appPolicyStatus": "absent"
+  },
+  "installedApps": [
+    {
+      "pkg": "com.instagram.android",
+      "label": "Instagram",
+      "platform": "android"
+    }
+  ],
+  "floor": [],
+  "usage": {
+    "appMsByPkg": {},
+    "webLogs": []
+  },
+  "usageSeed": {
+    "perRuleUsedMs": {}
+  },
+  "expectDevice": [
+    {
+      "pkg": "com.instagram.android",
+      "action": "allow",
+      "reason": null,
+      "ruleId": null
+    }
+  ],
+  "expectBrowser": [
+    {
+      "ruleId": "r-school",
+      "exceeded": false,
+      "reason": null
+    }
+  ]
+}

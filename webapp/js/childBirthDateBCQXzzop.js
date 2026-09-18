@@ -1,0 +1,1 @@
+function i(t,o,r=new Date){if(!t||t<0)return null;const n=r.getMonth()+1,e=o||n;return{birthYear:r.getFullYear()-t-(e>n?1:0),birthMonth:e}}function b(t){return{y:t.birthYear,m:t.birthMonth}}export{i as b,b as d};

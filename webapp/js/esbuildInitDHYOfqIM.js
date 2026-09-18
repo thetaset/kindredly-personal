@@ -1,1 +1,0 @@
-import{b as s}from"./esbuild-wasmBZKspG3g.js";import{g as t}from"./sentryUtilsCgJrKnMC.js";let r=null;function n(){if(!r){const e=t("/esbuild.wasm");r=s.initialize({wasmURL:e,worker:!1}).catch(i=>{throw r=null,i})}return r}export{n as e};

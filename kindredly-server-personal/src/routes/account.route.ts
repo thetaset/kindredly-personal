@@ -10,7 +10,6 @@ import UserService from '@/services/user.service';
 
 import {config} from '@/config';
 import {container} from '@/inversify.config';
-import ImportExportService from '@/services/import_export.service';
 import {RequestContext} from '@/base/request_context';
 import VerificationService from '@/services/verification.service';
 
@@ -20,7 +19,6 @@ class AccountRoute implements Routes {
   private userService = new UserService();
 
   private accountService = container.resolve(AccountService);
-  private importExportService = new ImportExportService();
   private verificationService = new VerificationService();
 
   constructor() {
@@ -143,6 +141,90 @@ class AccountRoute implements Routes {
       }),
     );
 
+    // SCH-OK
+    this.router.post(
+      '/account/assistantReview/update',
+      authenticateJWT,
+      errorHelper(async (req: ApiReq<'/account/assistantReview/update'>, res) => {
+        const results = await this.accountService.updateAssistantReview(
+          RequestContext.instance(req),
+          req.body.targetUserId || null,
+          req.body.entry,
+          req.body.appendCustomText,
+          req.body.template,
+        );
+        const result = {
+          success: true,
+          results: results,
+        };
+        res.json(result);
+      }),
+    );
+
+    // Family Downtime — each an admin-only locked patch that returns the stored settings.
+    // SCH-OK
+    this.router.post(
+      '/account/familyDowntime/update',
+      authenticateJWT,
+      errorHelper(async (req: ApiReq<'/account/familyDowntime/update'>, res) => {
+        const {enabled, schedules, allow} = req.body || {};
+        const patch = {
+          ...(enabled !== undefined ? {enabled} : {}),
+          ...(schedules !== undefined ? {schedules} : {}),
+          ...(allow !== undefined ? {allow} : {}),
+        };
+        const results = await this.accountService.updateFamilyDowntime(RequestContext.instance(req), patch);
+        res.json({success: true, results});
+      }),
+    );
+
+    // SCH-OK
+    this.router.post(
+      '/account/familyDowntime/oneOff/add',
+      authenticateJWT,
+      errorHelper(async (req: ApiReq<'/account/familyDowntime/oneOff/add'>, res) => {
+        const results = await this.accountService.addFamilyDowntimeOneOff(
+          RequestContext.instance(req),
+          Number(req.body?.startAt),
+          Number(req.body?.endAt),
+        );
+        res.json({success: true, results});
+      }),
+    );
+
+    // SCH-OK
+    this.router.post(
+      '/account/familyDowntime/oneOff/remove',
+      authenticateJWT,
+      errorHelper(async (req: ApiReq<'/account/familyDowntime/oneOff/remove'>, res) => {
+        const results = await this.accountService.removeFamilyDowntimeOneOff(
+          RequestContext.instance(req),
+          String(req.body?.id || ''),
+        );
+        res.json({success: true, results});
+      }),
+    );
+
+    // SCH-OK
+    this.router.post(
+      '/account/familyDowntime/endNow',
+      authenticateJWT,
+      errorHelper(async (req: ApiReq<'/account/familyDowntime/endNow'>, res) => {
+        const results = await this.accountService.endFamilyDowntimeNow(RequestContext.instance(req));
+        res.json({success: true, results});
+      }),
+    );
+
+    // SCH-OK
+    this.router.post(
+      '/account/familyDowntime/dismiss',
+      authenticateJWT,
+      errorHelper(async (req: ApiReq<'/account/familyDowntime/dismiss'>, res) => {
+        const results = await this.accountService.dismissFamilyDowntime(RequestContext.instance(req));
+        res.json({success: true, results});
+      }),
+    );
+
     // Extended Features (Account-level)
     this.router.post(
       '/account/extendedFeatures/get',
@@ -186,38 +268,6 @@ class AccountRoute implements Routes {
         const result = {
           success: true,
           results: users,
-        };
-        res.json(result);
-      }),
-    );
-
-    this.router.post(
-      '/account/export',
-      authenticateJWT,
-      errorHelper(async (req: ApiReq<'/account/export'>, res) => {
-        const results = await this.importExportService.exportCollections(
-          RequestContext.instance(req),
-          req.body.options,
-        );
-        const result = {
-          success: true,
-          results: results,
-        };
-        res.json(result);
-      }),
-    );
-
-    this.router.post(
-      '/account/import',
-      // express.json({
-      //     limit: "50mb"
-      // }),
-      authenticateJWT,
-      errorHelper(async (req: ApiReq<'/account/import'>, res) => {
-        const results = await this.importExportService.loadImport(RequestContext.instance(req), req.body.importData);
-        const result = {
-          success: true,
-          results: results,
         };
         res.json(result);
       }),

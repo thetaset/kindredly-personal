@@ -16,6 +16,9 @@ export default  interface ReportProblem {
 
   adminStatusInfo?: Record<string, any> | null;
 
+  /** The curation review a catalog report opened or joined. */
+  curationReviewId?: string | null;
+
   /** Default value: CURRENT_TIMESTAMP */
   createdAt?: Date;
 }

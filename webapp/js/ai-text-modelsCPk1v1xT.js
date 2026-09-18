@@ -1,0 +1,1 @@
+const p={standard:["gpt-5.4-nano"],plus:["gpt-5.4-nano","gpt-5.4-mini","gpt-5.4"]},r={"gpt-5.4-nano":1,"gpt-5.4-mini":3,"gpt-5.4":10};function a(n){return n==="plus"||n==="superplus"?p.plus:p.standard}function l(n,s){const o=a(n),t=typeof s=="string"?s.trim():"";return t&&o.includes(t)?t:o[0]}export{r as A,a as m,l as r};

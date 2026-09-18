@@ -1,6 +1,7 @@
 import {config} from '@/config';
-import type {ClientOptions, OpenAI} from 'openai';
+import type {OpenAI} from 'openai';
 import type {ArticleSignal, ArticleTrustLlm, ReputationRecord} from 'tset-sharedlib/types/articleTrust.types';
+import type {RequestContext} from '@/base/request_context';
 
 /**
  * Minimal pluggable inference seam for the article-trust pipeline.
@@ -24,7 +25,8 @@ export interface ArticleInferenceProvider {
   readonly id: string;
   /** Off by default — only true when explicitly configured. */
   isEnabled(): boolean;
-  analyze(input: ArticleInferenceInput): Promise<ArticleTrustLlm | null>;
+  /** `ctx`, when given, is the family the analysis is for, and pays for any hosted call. */
+  analyze(input: ArticleInferenceInput, ctx?: RequestContext): Promise<ArticleTrustLlm | null>;
 }
 
 /** Default provider: does nothing. The baseline pipeline is fully non-LLM. */
@@ -39,8 +41,8 @@ export class NoopInferenceProvider implements ArticleInferenceProvider {
 }
 
 /**
- * Hosted provider (OpenAI). Self-contained (own client, no RequestContext needed)
- * and gated behind ARTICLE_TRUST_LLM=true so it never runs unless opted in. A
+ * Hosted provider (OpenAI), through the shared metered client from
+ * `_internal/hosted_ai_client`. Gated behind ARTICLE_TRUST_LLM=true so it never runs unless opted in. A
  * future LocalInferenceProvider implements the same interface against on-device
  * inference.
  */
@@ -54,20 +56,30 @@ export class HostedInferenceProvider implements ArticleInferenceProvider {
 
   private getClient(): OpenAI {
     if (!this.client) {
-      const opts: ClientOptions = {apiKey: config.aiConfig.secretKey, timeout: 60000, maxRetries: 1};
       // Lazy, and the `import type` above is the other half of it: this file is
       // synced to the self-hosted repo but AI is out of scope for that tier, so
-      // neither `openai` nor the withheld ai_config.store should be a package a
-      // box has to install. isEnabled() is false there, so neither is reached.
+      // neither `openai` nor the withheld hosted client factory should be a
+      // package a box has to install. isEnabled() is false there, so neither is reached.
+      // personal-optional: guarded, never reached on a self-hosted server
       // eslint-disable-next-line @typescript-eslint/no-var-requires
-      const {OpenAI: OpenAIClient} = require('openai');
-      this.client = new OpenAIClient(opts);
+      const {getHostedAiClient} = require('../_internal/hosted_ai_client');
+      this.client = getHostedAiClient('articleInference');
     }
     return this.client;
   }
 
-  async analyze(input: ArticleInferenceInput): Promise<ArticleTrustLlm | null> {
+  async analyze(input: ArticleInferenceInput, ctx?: RequestContext): Promise<ArticleTrustLlm | null> {
     if (!this.isEnabled()) return null;
+    if (ctx) {
+      // personal-optional: guarded, never reached on a self-hosted server
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
+      const {withAiMetering} = require('../_internal/ai_metering');
+      return withAiMetering(ctx, 'articleInference', () => this.analyzeHosted(input));
+    }
+    return this.analyzeHosted(input);
+  }
+
+  private async analyzeHosted(input: ArticleInferenceInput): Promise<ArticleTrustLlm | null> {
     // personal-optional: guarded, never reached on a self-hosted server
     // eslint-disable-next-line @typescript-eslint/no-var-requires
     const {AI_MODEL_ALLOWLIST} = require('../_internal/ai_config.store');

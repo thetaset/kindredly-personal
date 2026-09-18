@@ -22,6 +22,15 @@ export class KeyEntryRepo extends BaseRepo<KeyEntry> {
     return await this.where({selectId: userId, selectType: 'user'});
   }
 
+  /**
+   * Every live password-wrapped user-secret copy, across ALL users. Feeds the KEY-0
+   * sweep (see KeyEntryService.sweepKey0ConstantEntries); rows here are candidates,
+   * not confirmations — a real password-wrapped entry looks identical until decrypted.
+   */
+  async listActivePasswordWrapped() {
+    return await this.query().where({selectType: 'user', unwrappingKeyId: 'userPassword'}).whereNull('deletedAt');
+  }
+
   async listForAccount(accountId: string) {
     return await this.where({selectId: accountId, selectType: 'account'});
   }

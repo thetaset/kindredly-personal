@@ -1,0 +1,1 @@
+import{d as t,s as a,z as o,p as n}from"./vue-runtimeX1uKV5L1.js";import"./cjs-helpersC4iS2aBk.js";const c=t({__name:"CollectionDevDetails",props:{data:{}},setup(e){return(r,s)=>(o(),a("pre",null,n(e.data),1))}});export{c as default};

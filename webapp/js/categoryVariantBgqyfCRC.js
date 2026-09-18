@@ -1,0 +1,1 @@
+import{n as e}from"./TIIconDefaultCR5cipO1.js";const a=["primary","success","info","warning","danger","secondary"];function t(r){return a[e(r)%a.length]}function i(r){const n=t(r);return`bg-${n}-subtle text-${n}-emphasis border border-${n}-subtle`}function o(r){return`category-grid__gradient--${t(r)}`}export{i as b,o as g};

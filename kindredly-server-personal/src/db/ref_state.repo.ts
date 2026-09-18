@@ -1,5 +1,6 @@
 import {Knex} from 'knex';
 import knex from './knex_config';
+import {bumpDeviceSettingsVersion} from './device_settings_version.repo';
 
 export type RefStateRow = {
   _id: string;
@@ -23,9 +24,29 @@ export class RefStateRepo {
     this.knex = knexConn;
   }
 
-  async upsert(row: Omit<RefStateRow, 'createdAt' | 'updatedAt'>): Promise<RefStateRow> {
-    const now = this.knex.fn.now();
-    await this.knex('ref_state')
+  /**
+   * @param options.bumpDeviceSettingsFor raise this user's device settings version in the same
+   *   transaction as the write (DCP-5). Only for rows a device compiles from.
+   */
+  async upsert(
+    row: Omit<RefStateRow, 'createdAt' | 'updatedAt'>,
+    options: {bumpDeviceSettingsFor?: string} = {},
+  ): Promise<RefStateRow> {
+    const userId = options.bumpDeviceSettingsFor;
+    if (!userId) return await this.upsertOn(this.knex, row);
+    return await this.knex.transaction(async (trx) => {
+      const saved = await this.upsertOn(trx, row);
+      await bumpDeviceSettingsVersion(trx, [userId]);
+      return saved;
+    });
+  }
+
+  private async upsertOn(
+    db: Knex | Knex.Transaction,
+    row: Omit<RefStateRow, 'createdAt' | 'updatedAt'>,
+  ): Promise<RefStateRow> {
+    const now = db.fn.now();
+    await db('ref_state')
       .insert({
         ...row,
         createdAt: now,
@@ -39,7 +60,7 @@ export class RefStateRepo {
         updatedAt: now,
       });
 
-    const result = await this.knex<RefStateRow>('ref_state')
+    const result = await db<RefStateRow>('ref_state')
       .where({
         ownerType: row.ownerType,
         ownerId: row.ownerId,
@@ -182,15 +203,31 @@ export class RefStateRepo {
     return await query;
   }
 
-  async deleteOne(input: {
-    refType: string;
-    refId: string;
-    ownerType: string;
-    ownerId: string;
-    stateKey: string;
-    stateSubKey: string;
-  }): Promise<number> {
-    return await this.knex('ref_state')
+  async deleteOne(
+    input: {
+      refType: string;
+      refId: string;
+      ownerType: string;
+      ownerId: string;
+      stateKey: string;
+      stateSubKey: string;
+    },
+    options: {bumpDeviceSettingsFor?: string} = {},
+  ): Promise<number> {
+    const userId = options.bumpDeviceSettingsFor;
+    if (!userId) return await this.deleteOneOn(this.knex, input);
+    return await this.knex.transaction(async (trx) => {
+      const deleted = await this.deleteOneOn(trx, input);
+      if (deleted > 0) await bumpDeviceSettingsVersion(trx, [userId]);
+      return deleted;
+    });
+  }
+
+  private async deleteOneOn(
+    db: Knex | Knex.Transaction,
+    input: {refType: string; refId: string; ownerType: string; ownerId: string; stateKey: string; stateSubKey: string},
+  ): Promise<number> {
+    return await db('ref_state')
       .where({
         refType: input.refType,
         refId: input.refId,

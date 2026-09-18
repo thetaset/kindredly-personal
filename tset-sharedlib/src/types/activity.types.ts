@@ -6,12 +6,18 @@ import type { ItemResourceType } from '../constants';
 import type { DynObj, DateString } from './common.types';
 import type { ContentType, EduValue, IntentTag, MinAgeGroup, TopicTag } from '../content.types';
 import { ItemInfoView } from './item.types';
+// Type-only, so the api <-> types cycle is erased at compile time (same shape as
+// user.types.ts importing TokenData).
+import type { AccessRequestAiReview } from '../api';
 
 export type ActivitySourceType = 'tab' | 'frame' | 'page' | 'app' | 'extension' | 'other' | 'monitor';
 
 export type ItemSourceType = 'library' | 'metadata' | 'classifier' | 'unknown' | 'internal' | 'external';
 
 export type ReasonCode =
+  // Family Downtime is on (`restrictions/familyDowntime.ts`). Above every other reason: extra time,
+  // a pause and temporary access do not get past it, and a parent cannot lift it for one child.
+  | 'family-downtime'
   | 'restrict-all'
   | 'inappropriate'
   | 'adult-content'
@@ -203,6 +209,15 @@ export interface AccessRequestDetails {
    * a phone weeks after writing it.
    */
   checkpointNote?: string;
+  /**
+   * For type 'item' (a child asking for a library item): the item and its name. The
+   * approval panel links to the item and names it, and the server names it in the
+   * "Request GRANTED" notification.
+   */
+  itemId?: string;
+  name?: string;
+  /** For type 'appCapability': the app's display name, shown beside the capability asked for. */
+  itemName?: string;
   /** Optional visibility/variant for the action (e.g. link-only vs friends & family). */
   publishVisibilityCode?: number;
   /** For published-catalog add requests (type 'publishedItem'): the Published item id. */
@@ -221,6 +236,17 @@ export interface AccessRequestDetails {
   emailSubject?: string;
   emailBody?: string;
   emailDraftId?: string;
+  /**
+   * What the assistant did with this request, when the family has "Assistant
+   * reviews requests" on. Present on rows it approved AND on rows it handed to
+   * the parent, so the parent's queue can show its reasoning either way.
+   *
+   * This is the decision record: an approved row is KEPT rather than deleted
+   * (unlike a parent's approval, which closes the row) precisely so this survives.
+   */
+  aiReview?: AccessRequestAiReview;
+  /** Item created by an assistant approval, for a later undo. */
+  libraryItemId?: string;
 }
 
 export interface ActivityContentInfoCollector {

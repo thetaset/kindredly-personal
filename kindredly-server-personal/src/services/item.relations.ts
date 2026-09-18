@@ -6,6 +6,7 @@ import PermissionService from './permission.service';
 import {RequestContext} from '../base/request_context';
 import {PermissionTypeEditableList, PermissionTypeList} from 'tset-sharedlib/shared.types';
 import {AuditLogService} from './audit_log.service';
+import {HttpException} from '@/exceptions/HttpException';
 
 class ItemRelationService {
   private itemRelations = new ItemRelationRepo();
@@ -232,7 +233,7 @@ class ItemRelationService {
     const canEditItem = await this.permissionService._hasEditPermissionDirectOrAsAdmin(ctx, item._id);
 
     if (!canEditItem) {
-      throw new Error("User doesn't have permission to edit this item");
+      throw new HttpException(403, "User doesn't have permission to edit this item");
     }
 
     const relationId = this.createItemRelationId(collectionId, itemId);
@@ -291,7 +292,7 @@ class ItemRelationService {
 
     const canEditItem = await this.permissionService._hasEditPermissionDirectOrAsAdmin(ctx, itemId);
     if (!canEditItem) {
-      throw new Error("You don't have permission to edit this item");
+      throw new HttpException(403, "You don't have permission to edit this item");
     }
 
     const results = [];

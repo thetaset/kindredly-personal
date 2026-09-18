@@ -207,6 +207,23 @@ class ExternalDataService {
   }
 
   /**
+   * Has our own content check already flagged this URL as unsafe?
+   *
+   * Exposed so the assistant review can refuse to put a flagged page in front of
+   * a model at all. The full classification cascade consults the same cache, but
+   * callers that only need the yes/no should not have to run the cascade — or pay
+   * for it — to get it.
+   */
+  async hasNegativeClassification(url: string): Promise<boolean> {
+    try {
+      const cached = await this.metaCacheService.getNegativeClassification(url);
+      return cached.hit === true && !!cached.data;
+    } catch {
+      return false;
+    }
+  }
+
+  /**
    * Fetch metadata via task runner (for background processing)
    */
   async fetchMetadataTaskRunner(url: string): Promise<ItemMeta | Record<string, never>> {
@@ -273,14 +290,22 @@ class ExternalDataService {
     ctx: RequestContext,
     data: {url: string; features?: Record<string, unknown>; maxTokens?: number},
   ): Promise<SourcePriorityClassificationResult> {
-    console.log('Content classification request:', data);
-
     const currentUserId = ctx.currentUserId || 'unknown';
     const currentAccountId = ctx.accountId || 'unknown';
     const allowlist = this.parseAllowlist(this.allowlistRaw);
 
     const sourcesChecked = ['metadata_lookup'];
     const url = typeof data.url === 'string' ? data.url : '';
+
+    // The request carries a page's title, description and up to 16,000 characters of its text.
+    // None of it belongs in a server log: record which site and which account, nothing more.
+    let host = '';
+    try {
+      host = new URL(url).hostname;
+    } catch {
+      host = '(unparseable url)';
+    }
+    console.log('Content classification request:', {host, accountId: currentAccountId});
     const title = typeof data.features?.title === 'string' ? data.features.title : '';
     const description = typeof data.features?.description === 'string' ? data.features.description : '';
     const extractedTextRaw = data.features?.extractedText;

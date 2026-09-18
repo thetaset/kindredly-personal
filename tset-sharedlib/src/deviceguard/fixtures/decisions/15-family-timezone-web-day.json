@@ -1,0 +1,94 @@
+{
+  "id": "15-family-timezone-web-day",
+  "behaviour": "Web time from earlier in the family's day counts even when the device's own day began later: 90 minutes of Fun before midnight in Tokyo, on a Tuesday in Los Angeles, uses up Tuesday's hour.",
+  "clock": {
+    "nowMs": 1789491600000,
+    "familyTimeZone": "America/Los_Angeles",
+    "deviceTimeZone": "Asia/Tokyo"
+  },
+  "settings": {
+    "usageLimitsData": {
+      "contentUsageLimits": [
+        {
+          "id": "r-fun",
+          "name": "Fun",
+          "type": "advanced",
+          "conditions": [
+            {
+              "type": "eduValue",
+              "values": [
+                "eduval_fun"
+              ]
+            }
+          ],
+          "timeLimits": [
+            {
+              "hours": 1,
+              "daysOfWeek": [
+                2
+              ]
+            },
+            {
+              "hours": 0,
+              "daysOfWeek": [
+                3
+              ]
+            }
+          ]
+        }
+      ],
+      "temporaryRules": []
+    },
+    "ruleOverrideSettings": {
+      "ruleOverrides": []
+    },
+    "accessControlSettings": {},
+    "appPolicy": null,
+    "appPolicyStatus": "absent"
+  },
+  "installedApps": [
+    {
+      "pkg": "com.roblox.client",
+      "label": "Roblox",
+      "platform": "android"
+    }
+  ],
+  "floor": [],
+  "usage": {
+    "appMsByPkg": {
+      "com.roblox.client": 0
+    },
+    "webLogs": [
+      {
+        "url": "https://games.example.com/",
+        "eduValue": "eduval_fun",
+        "minutes": 90
+      },
+      {
+        "url": "https://homework.example.com/",
+        "eduValue": "eduval_task",
+        "minutes": 120
+      }
+    ]
+  },
+  "usageSeed": {
+    "perRuleUsedMs": {
+      "r-fun": 5400000
+    }
+  },
+  "expectDevice": [
+    {
+      "pkg": "com.roblox.client",
+      "action": "block",
+      "reason": "budget-exhausted",
+      "ruleId": "r-fun"
+    }
+  ],
+  "expectBrowser": [
+    {
+      "ruleId": "r-fun",
+      "exceeded": true,
+      "reason": "budget-exhausted"
+    }
+  ]
+}

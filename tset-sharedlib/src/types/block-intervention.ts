@@ -83,6 +83,14 @@ const INTERVENTIONS: Record<ReasonCode, BlockIntervention> = {
     offerOnScreenAlternatives: false,
     offscreenIdeaKeys: WIND_DOWN_IDEAS,
   },
+  // The whole family is off screens together. The allowlist is shown on the block page itself, so
+  // nothing on-screen is offered here beyond what the family already chose to leave open.
+  'family-downtime': {
+    stance: 'step-away',
+    message: 'Screens are resting for the whole family.',
+    offerOnScreenAlternatives: false,
+    offscreenIdeaKeys: WIND_DOWN_IDEAS,
+  },
 
   // --- Something of theirs is outstanding. Doing it is the way through. ---
   'checkpoint-pending': {

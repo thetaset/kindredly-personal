@@ -3,6 +3,7 @@ import {RefStateRepo} from '@/db/ref_state.repo';
 import PermissionService from '@/services/permission.service';
 import SSEManager from './sse.manager';
 import {assertEncInfoUpdateIsSafe, assertEncryptedUpdateHasEncInfo} from '@/utils/encinfo_guards';
+import {notifyDeviceSettingsChanged} from '@/services/device_settings.service';
 
 const DEFAULT_LIMIT = 50;
 const MAX_LIMIT = 200;
@@ -19,7 +20,7 @@ function approxBytes(value: any): number {
   }
 }
 
-function buildRefStateId(parts: {
+export function buildRefStateId(parts: {
   ownerType: string;
   ownerId: string;
   refType: string;
@@ -39,6 +40,7 @@ export class RefStateService {
   constructor(
     private repo = new RefStateRepo(),
     private permissionService = new PermissionService(),
+    private notifyDeviceSettings: (userIds: string[]) => void = notifyDeviceSettingsChanged,
   ) {}
 
   private async resolveOwnerForWrite(
@@ -181,6 +183,8 @@ export class RefStateService {
       ownerId?: string;
       encrypted?: boolean;
       encInfo?: any;
+      /** See `RefStateUpsertRequest.onlyIfEncrypted`. Honoured for `device-guard` `appPolicy`. */
+      onlyIfEncrypted?: boolean;
     },
   ) {
     await this.assertCanAccessRef(ctx, input.refType, input.refId, ownerType);
@@ -288,11 +292,27 @@ export class RefStateService {
     // Guardrail: ref_state uses an upsert which can overwrite an existing encrypted entry.
     // Prevent accidental encInfo corruption by enforcing additive-only encInfo changes.
     const existing = await this.repo.findById(id);
-    assertEncryptedUpdateHasEncInfo({
-      currentEncInfo: existing?.encInfo,
-      nextEncInfo: input.encInfo ?? null,
-      context: `/ref_state/${ownerType}/upsert`,
-    });
+
+    /**
+     * App policy is readable since DCP-5 (decision D1). Rows written before that are encrypted, and
+     * the server cannot decrypt them, so a guardian's client rewrites each one readable on its next
+     * open. That rewrite is the one write allowed to replace an encrypted row without encInfo.
+     *
+     * `onlyIfEncrypted` makes the rewrite a no-op once the row is readable, so a slow rewrite can
+     * never overwrite a newer readable save from another guardian device.
+     */
+    const isAppPolicy = input.refType === 'device-guard' && input.stateKey === 'appPolicy';
+    const deviceSettingsOwner = isAppPolicy && resolvedOwner.ownerType === 'user' ? resolvedOwner.ownerId : undefined;
+    if (isAppPolicy && input.onlyIfEncrypted && !existing?.encInfo && !existing?.encrypted) {
+      return existing ?? null;
+    }
+    if (!(isAppPolicy && input.encInfo == null)) {
+      assertEncryptedUpdateHasEncInfo({
+        currentEncInfo: existing?.encInfo,
+        nextEncInfo: input.encInfo ?? null,
+        context: `/ref_state/${ownerType}/upsert`,
+      });
+    }
     if (existing?.encInfo && input.encInfo != null) {
       assertEncInfoUpdateIsSafe({
         currentEncInfo: existing.encInfo,
@@ -302,7 +322,7 @@ export class RefStateService {
       });
     }
 
-    const saved = await this.repo.upsert({
+    const row = {
       _id: id,
       refType: input.refType,
       refId: input.refId,
@@ -314,7 +334,12 @@ export class RefStateService {
       // Derive from encInfo to avoid mismatches that can lead to corrupted reads.
       encrypted: input.encInfo != null,
       encInfo: input.encInfo ?? null,
-    } as any);
+    } as any;
+    // App policy is a device setting: its version moves in the same transaction (DCP-5).
+    const saved = deviceSettingsOwner
+      ? await this.repo.upsert(row, {bumpDeviceSettingsFor: deviceSettingsOwner})
+      : await this.repo.upsert(row);
+    if (deviceSettingsOwner) this.notifyDeviceSettings([deviceSettingsOwner]);
 
     /**
      * Tell the child's device a parent just changed app protections.
@@ -476,6 +501,20 @@ export class RefStateService {
   ) {
     await this.assertCanAccessRef(ctx, input.refType, input.refId, ownerType);
 
+    /**
+     * The delete half of the `appPolicy` gate in `upsert` (DCP-2).
+     *
+     * Deleting your own user-scoped row is always allowed, so without this a child could delete
+     * their own app policy and a missing policy compiles as "nothing blocked"; or delete their
+     * device's `provisioning` row, which unlinks it on the parent's page. `/companion/devices/remove`
+     * is the parent's way to do the second, and it is already admin-only.
+     */
+    if (input.refType === 'device-guard' && (input.stateKey === 'appPolicy' || input.stateKey === 'provisioning')) {
+      if (!(await ctx.isAdmin())) {
+        throw new Error('Only a guardian can remove app protections or a linked device');
+      }
+    }
+
     if (input.refType === 'item' && input.stateKey === 'task_assignment') {
       const hasEdit = await this.permissionService._hasEditPermissionDirectOrAsAdmin(ctx, input.refId);
       if (!hasEdit) {
@@ -491,14 +530,24 @@ export class RefStateService {
     });
     const stateSubKey = input.stateSubKey ?? '';
 
-    const deletedCount = await this.repo.deleteOne({
+    // Deleting the app policy is a device settings change too (DCP-5). Devices keep their sealed
+    // app blocks when the policy is absent, so this lifts nothing on its own.
+    const deviceSettingsOwner =
+      input.refType === 'device-guard' && input.stateKey === 'appPolicy' && resolvedOwner.ownerType === 'user'
+        ? resolvedOwner.ownerId
+        : undefined;
+    const target = {
       refType: input.refType,
       refId: input.refId,
       ownerType: resolvedOwner.ownerType,
       ownerId: resolvedOwner.ownerId,
       stateKey: input.stateKey,
       stateSubKey,
-    });
+    };
+    const deletedCount = deviceSettingsOwner
+      ? await this.repo.deleteOne(target, {bumpDeviceSettingsFor: deviceSettingsOwner})
+      : await this.repo.deleteOne(target);
+    if (deviceSettingsOwner && deletedCount > 0) this.notifyDeviceSettings([deviceSettingsOwner]);
     return {deletedCount};
   }
 }

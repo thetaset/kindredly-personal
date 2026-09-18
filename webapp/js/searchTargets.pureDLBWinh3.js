@@ -1,0 +1,1 @@
+const n=["explore","web","wikipedia","askai"],i=["settings"],a=[...n,...i],t="search.disabledTargets";function r(e,s){return!(s||[]).includes(e)}function E(e){return(e||[]).filter(s=>a.includes(s))}export{t as S,r as i,E as n};

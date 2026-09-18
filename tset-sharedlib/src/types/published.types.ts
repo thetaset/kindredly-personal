@@ -53,6 +53,10 @@ export interface PublishedCurationView {
   curatedDate?: DateString;
   curatorId?: string;
   curatorComment?: string;
+  /** Set while an open curation review has taken it out of recommendations. */
+  underReviewAt?: DateString;
+  /** When its last curation review said to check it again. */
+  nextReviewAt?: DateString;
 }
 
 export interface SubUnprepared {
@@ -80,6 +84,8 @@ export interface SubWithDetails {
   url?: string;
   feedURL?: string;
   lastUpdatedAt?: string;
+  /** When the subscription itself was created; the "new since you subscribed" baseline. */
+  createdAt?: string;
   selected?: boolean;
   itemsLastUpdated?: number | null;
   isTemp?: boolean;
@@ -135,6 +141,8 @@ export interface PublishedInfoView {
   curation?: PublishedCurationView;
   parentRelation?: PublishedRelationView;
   inLibrary?: boolean;
+  /** user_public.verifiedType of a family publisher ('contributor'); null for Kindredly's own rows. */
+  publisherVerifiedType?: string | null;
 }
 
 export type SubscriptionConsumeMode = 'whats_new' | 'work_through';
@@ -155,6 +163,17 @@ export type SubscriptionConsumeSettingsV1 = {
   /** Work-through release pacing: 0/undefined = own pace, 1 = daily, 3, 7 = weekly. */
   paceIntervalDays?: number;
   workThrough?: SubscriptionWorkThroughProgressV1;
+  /**
+   * Whether Today's "New from your sources" card may mention this subscription.
+   * Absent means yes; the card is the only surface that announces new items, and
+   * this is the per-source way to keep one quiet.
+   */
+  announceNew?: boolean;
+  /**
+   * ISO date: items created at or before this have been seen. Stamped only on
+   * intent (opening the source), never by rendering a list.
+   */
+  seenThroughAt?: string;
 };
 
 export type SubscriptionData = Record<string, any> & {

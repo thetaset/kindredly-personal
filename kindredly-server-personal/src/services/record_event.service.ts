@@ -16,7 +16,8 @@ class EventAuditService {
     try {
       await this.eventLogs.create(data);
 
-      if (config.adminWatchNotifications) {
+      // No admin address means no admin mail. On a box that is the default state.
+      if (config.adminWatchNotifications && config.adminEmail) {
         // Send email to admin when new account is created
         if (data.eventName == EventRecordName.CREATE_ACCOUNT) {
           sendEmail([config.adminEmail], 'ADMIN NOTICE: New Account Created', 'A new account has been created: email');

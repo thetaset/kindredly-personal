@@ -1,1 +1,0 @@
-import{a3 as r}from"./appLifecycle.storeDfGeWjhE.js";const a="/download",t="/download?companion=true#desktop-companion",d="/download?companion=android",e="https://kindredly.ai";function n(o=r.serverHostname){return String(o||e).replace(/\/$/,"")}function s(o){return`${n(o)}${a}`}function c(o){return`${n(o)}${t}`}function l(o){return`${n(o)}${d}`}export{c as a,s as d,l as g};

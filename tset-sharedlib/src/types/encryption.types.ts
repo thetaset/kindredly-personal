@@ -11,7 +11,15 @@ export interface EncInfoKey {
 export type EncInfo = 
   // v: encryption encoding version (v1 = object-level IV, v2 = per-field IV)
   // sv: encryption schema version (which fields are encrypted). Omit for sv=1 to keep payload small.
-  | { keys: EncInfoKey[]; iv: string; v?: number; sv?: number; t?: number }
+  | {
+      keys: EncInfoKey[];
+      iv: string;
+      v?: number;
+      sv?: number;
+      t?: number;
+      /** Per-preview iv and size, keyed by logical preview id. Absent before previews had their own iv. */
+      previewMeta?: Record<string, { iv?: string; bytes?: number }>;
+    }
   | { decrypt: true; };
 
 export type PropertyType = 'string' | 'array' | 'object' | 'number';

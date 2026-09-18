@@ -146,7 +146,10 @@ export interface PublishedDisplayItem extends Omit<LibraryDisplayItem, 'baseType
   curatedDate?: string;
   curatorId?: string;
   curatorComment?: string;
-  
+  /** An open curation review has taken it out of recommendations. */
+  underReview?: boolean;
+  nextReviewAt?: string;
+
   inLibrary?: boolean;
   
   // Nested parent relation (updated type)

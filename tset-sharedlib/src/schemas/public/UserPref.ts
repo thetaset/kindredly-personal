@@ -42,10 +42,6 @@ export const userPrefDefaults = {
         email: true,
         push: true,
       },
-      FEATURE_UPDATE: {
-        email: true,
-        push: false,
-      },
       // A child's Guard device was tampered with or went dark. Needs its own entry
       // because an unlisted type falls through to DEFAULT, which is push: false —
       // this alert is time-critical and must not be silent by default.
@@ -57,6 +53,23 @@ export const userPrefDefaults = {
       // it happens and worthless a day later, and routine enough that mailing every
       // batch would train parents to filter the whole sender.
       DEVICE_APP_REVIEW: {
+        email: false,
+        push: true,
+      },
+      // The assistant answering a request on a parent's behalf. Both channels
+      // start OFF, unlike every other entry here, and deliberately: a parent who
+      // switched this feature on asked for requests to stop reaching them, so
+      // mailing and pushing every one would undo what they asked for. The row
+      // exists so a parent who does want to watch it can, which is the founder's
+      // "an option to send a notification" (2026-09-07). The in-app notice is
+      // written either way and is not governed by this.
+      LIBRARY_AUTO_APPROVAL_APPROVED: {
+        email: false,
+        push: false,
+      },
+      // What a curator found after you reported a catalog item. Push on, email off: the
+      // person asked a question and is waiting on the answer, but it is not urgent mail.
+      CURATION_REVIEW_RESULT: {
         email: false,
         push: true,
       },

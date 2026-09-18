@@ -1,0 +1,81 @@
+{
+  "id": "09-family-timezone-midnight",
+  "behaviour": "The day is the family's day (D3): at 23:30 Tuesday in Los Angeles a device set to New York, where it is already Wednesday, still gets Tuesday's allowance, in apps and on the web (DCP-16).",
+  "clock": {
+    "nowMs": 1789540200000,
+    "familyTimeZone": "America/Los_Angeles",
+    "deviceTimeZone": "America/New_York"
+  },
+  "settings": {
+    "usageLimitsData": {
+      "contentUsageLimits": [
+        {
+          "id": "r-fun",
+          "name": "Fun",
+          "type": "advanced",
+          "conditions": [
+            {
+              "type": "eduValue",
+              "values": [
+                "eduval_fun"
+              ]
+            }
+          ],
+          "timeLimits": [
+            {
+              "hours": 1,
+              "daysOfWeek": [
+                2
+              ]
+            },
+            {
+              "hours": 0,
+              "daysOfWeek": [
+                3
+              ]
+            }
+          ]
+        }
+      ],
+      "temporaryRules": []
+    },
+    "ruleOverrideSettings": {
+      "ruleOverrides": []
+    },
+    "accessControlSettings": {},
+    "appPolicy": null,
+    "appPolicyStatus": "absent"
+  },
+  "installedApps": [
+    {
+      "pkg": "com.roblox.client",
+      "label": "Roblox",
+      "platform": "android"
+    }
+  ],
+  "floor": [],
+  "usage": {
+    "appMsByPkg": {
+      "com.roblox.client": 600000
+    },
+    "webLogs": []
+  },
+  "usageSeed": {
+    "perRuleUsedMs": {}
+  },
+  "expectDevice": [
+    {
+      "pkg": "com.roblox.client",
+      "action": "allow",
+      "reason": null,
+      "ruleId": null
+    }
+  ],
+  "expectBrowser": [
+    {
+      "ruleId": "r-fun",
+      "exceeded": false,
+      "reason": null
+    }
+  ]
+}

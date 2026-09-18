@@ -1,0 +1,98 @@
+{
+  "id": "01-bonus-time-before-expiry",
+  "behaviour": "Bonus time replaces today's allowance until its expiresAt.",
+  "clock": {
+    "nowMs": 1789491600000,
+    "familyTimeZone": "America/Los_Angeles",
+    "deviceTimeZone": "America/Los_Angeles"
+  },
+  "settings": {
+    "usageLimitsData": {
+      "contentUsageLimits": [
+        {
+          "id": "r-fun",
+          "name": "Fun",
+          "type": "advanced",
+          "conditions": [
+            {
+              "type": "eduValue",
+              "values": [
+                "eduval_fun"
+              ]
+            }
+          ],
+          "timeLimits": [
+            {
+              "hours": 1,
+              "daysOfWeek": [
+                0,
+                1,
+                2,
+                3,
+                4,
+                5,
+                6
+              ]
+            }
+          ]
+        }
+      ],
+      "temporaryRules": []
+    },
+    "ruleOverrideSettings": {
+      "ruleOverrides": [
+        {
+          "ruleId": "r-fun",
+          "timeLimit": {
+            "hours": 2,
+            "daysOfWeek": [
+              2
+            ]
+          },
+          "expiresAt": 1789495200000
+        }
+      ]
+    },
+    "accessControlSettings": {},
+    "appPolicy": null,
+    "appPolicyStatus": "absent"
+  },
+  "installedApps": [
+    {
+      "pkg": "com.roblox.client",
+      "label": "Roblox",
+      "platform": "android"
+    }
+  ],
+  "floor": [],
+  "usage": {
+    "appMsByPkg": {},
+    "webLogs": [
+      {
+        "url": "https://example.com/eduval_fun/70",
+        "eduValue": "eduval_fun",
+        "minutes": 70
+      }
+    ]
+  },
+  "usageSeed": {
+    "perRuleUsedMs": {
+      "r-fun": 4200000
+    }
+  },
+  "expectDevice": [
+    {
+      "pkg": "com.roblox.client",
+      "action": "allow",
+      "reason": null,
+      "ruleId": null
+    }
+  ],
+  "expectBrowser": [
+    {
+      "ruleId": "r-fun",
+      "exceeded": false,
+      "reason": null
+    }
+  ]
+}

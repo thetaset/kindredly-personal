@@ -48,7 +48,7 @@ type BucketOpts = {points: number; duration: number; blockDuration: number};
  *   `null` to record nothing. Each bucket has two limiters sharing one Redis connection, and
  *   listing both would double every row in the diagnostic to say the same thing twice.
  */
-function createLimiter(keyPrefix: string, opts: BucketOpts, reportAs: string | null = keyPrefix) {
+export function createLimiter(keyPrefix: string, opts: BucketOpts, reportAs: string | null = keyPrefix) {
   const report = (backend: RateLimiterBackend) => {
     if (reportAs) limiterBackends[reportAs] = backend;
   };

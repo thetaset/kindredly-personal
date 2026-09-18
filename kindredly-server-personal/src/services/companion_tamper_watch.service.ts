@@ -7,6 +7,7 @@ import {NotificationType, RequestTypes} from '@/typing/enum_strings';
 import {
   accountIsDark,
   describeReason,
+  describeRecovery,
   evaluateDevice,
   type DeviceSnapshot,
   type TamperIncident,
@@ -196,10 +197,7 @@ export class CompanionTamperWatchService {
       case 'resolve':
         await this.saveIncident(ownerId, snapshot.deviceId, decision.incident);
         if (decision.notifyRecovery) {
-          await this.notifyParents(ownerId, snapshot, {
-            title: `${deviceLabel(snapshot)} is reporting again`,
-            body: 'Kindredly Guard is back online on this phone.',
-          });
+          await this.notifyParents(ownerId, snapshot, describeRecovery(deviceLabel(snapshot), snapshot.platform));
         }
         return 'resolved';
 
@@ -212,7 +210,11 @@ export class CompanionTamperWatchService {
           return 'none';
         }
         await this.saveIncident(ownerId, snapshot.deviceId, decision.incident);
-        await this.notifyParents(ownerId, snapshot, describeReason(decision.reason, deviceLabel(snapshot)));
+        await this.notifyParents(
+          ownerId,
+          snapshot,
+          describeReason(decision.reason, deviceLabel(snapshot), snapshot.platform),
+        );
         return 'notified';
       }
     }
@@ -235,6 +237,7 @@ export class CompanionTamperWatchService {
     const snapshot: DeviceSnapshot = {
       deviceId: status.deviceId ?? '',
       deviceLabel: status.deviceName,
+      platform: status.platform,
       provisioned: status.provisioned === true,
       lastSeenAt: now,
       tamperLastEventAt: eventAt,
@@ -254,7 +257,11 @@ export class CompanionTamperWatchService {
       // next heartbeat won't re-alert. Losing one alert to a transient push failure is
       // better than re-alerting on every check-in for the rest of the day.
       await this.saveIncident(ownerId, snapshot.deviceId, decision.incident);
-      await this.notifyParents(ownerId, snapshot, describeReason(decision.reason, deviceLabel(snapshot)));
+      await this.notifyParents(
+        ownerId,
+        snapshot,
+        describeReason(decision.reason, deviceLabel(snapshot), snapshot.platform),
+      );
       return true;
     });
   }
@@ -351,6 +358,7 @@ function toSnapshot(row: {stateSubKey: string; data: any; updatedAt: Date}): Dev
   return {
     deviceId: row.stateSubKey || status.deviceId || '',
     deviceLabel: status.deviceName || undefined,
+    platform: status.platform || undefined,
     provisioned: status.provisioned === true,
     lastSeenAt: row.updatedAt ? new Date(row.updatedAt).getTime() : null,
     tamperLastEventAt: status.tamper?.lastEventAt,

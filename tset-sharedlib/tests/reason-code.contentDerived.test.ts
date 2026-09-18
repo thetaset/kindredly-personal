@@ -37,6 +37,7 @@ describe('isContentDerivedReason', () => {
     'out-of-time-range',
     'checkpoint-pending',
     'reqs-not-met',
+    'family-downtime',
     'restrict-all',
     'no-matching-rule',
     'other',

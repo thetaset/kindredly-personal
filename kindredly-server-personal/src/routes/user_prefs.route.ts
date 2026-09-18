@@ -5,7 +5,6 @@ import {ApiReq} from '@/types/api-types';
 import {authenticateJWT, errorHelper, getTargetUserId} from '../utils/auth_utils';
 
 import UserService from '@/services/user.service';
-import LibraryAutoApprovalService from '@/services/library_auto_approval.service';
 
 import {RequestContext} from '@/base/request_context';
 import PluginService from '@/services/plugin.service';
@@ -15,7 +14,6 @@ class UserPrefsRoute implements Routes {
 
   private userService = new UserService();
   private pluginService = new PluginService();
-  private libraryAutoApprovalService = new LibraryAutoApprovalService();
 
   constructor() {
     console.info(`Initializing routes ${this.constructor.name}`);
@@ -77,6 +75,19 @@ class UserPrefsRoute implements Routes {
           results,
         };
         res.json(result);
+      }),
+    );
+
+    // SCH-OK
+    this.router.post(
+      '/user/blockedMessage/fillBlank',
+      authenticateJWT,
+      errorHelper(async (req: ApiReq<'/user/blockedMessage/fillBlank'>, res) => {
+        const results = await this.userService.fillBlankBlockedMessages(
+          RequestContext.instance(req),
+          req.body?.message,
+        );
+        res.json({success: true, results});
       }),
     );
 
@@ -188,20 +199,6 @@ class UserPrefsRoute implements Routes {
         const result = {
           success: true,
           results: results,
-        };
-        res.json(result);
-      }),
-    );
-
-    this.router.post(
-      '/user/libraryAutoApproval/evaluate',
-      authenticateJWT,
-      errorHelper(async (req: ApiReq<'/user/libraryAutoApproval/evaluate'>, res) => {
-        const results = await this.libraryAutoApprovalService.evaluateAndApply(RequestContext.instance(req), req.body);
-
-        const result = {
-          success: true,
-          results,
         };
         res.json(result);
       }),

@@ -1,0 +1,1 @@
+function d(t){const e={...t};return delete e._id,delete e.refId,delete e.refType,delete e.item,delete e.selected,delete e.itemsLastUpdated,delete e.isTemp,delete e.createdAt,e}function a(t){return t?t.data&&typeof t.data=="object"?{...t.data}:d(t):{}}export{d as b,a as g};

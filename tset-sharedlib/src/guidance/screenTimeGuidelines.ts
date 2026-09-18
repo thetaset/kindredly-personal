@@ -34,6 +34,43 @@ export interface GuidanceClaim<T> {
 
 export type SocialMediaGuidance = 'not-recommended' | 'monitored' | 'family-decision'
 
+/**
+ * What each social-media verdict is called on screen. Written as a verdict about the
+ * child in front of the parent, not as a category name, so a row can carry it alone.
+ */
+export const SOCIAL_MEDIA_GUIDANCE_LABELS: Record<SocialMediaGuidance, string> = {
+  'not-recommended': 'Not recommended at this age',
+  monitored: 'Only alongside an adult',
+  'family-decision': 'Your call',
+}
+
+/**
+ * Why a video cap is worth setting, at any age.
+ *
+ * No band varies it, so it is one claim rather than a row on the table.
+ *
+ * This used to be an autoplay claim cited to the AAP policy statement (S3) — that one
+ * video runs into the next, so watching has no end of its own. It was dropped because it
+ * is not reliably true: plenty of watching is a chosen film that ends by itself, and a
+ * reason a parent can find a counter-example to is worse than none.
+ *
+ * What replaces it is the active-versus-passive one: skill comes from doing, and watching
+ * is the activity that displaces doing. Active skill-building is the Harvard center's
+ * framing (S33); the video deficit — children learning less from a screen than from the
+ * same thing live — is Jing 2022 (S13). The citations moved with the claim, because S3
+ * was evidence for the sentence that is gone, not for this one.
+ *
+ * It is still deliberately NOT a claim that "passive screen time" is a measured quantity,
+ * and not a claim about brain activation: no source here supports either. Note the video
+ * deficit evidence is strongest in early childhood, which is why the sentence says what
+ * children build skills from rather than putting a number or an age on it.
+ */
+export const VIDEO_LIMIT_GUIDANCE: { text: string; sourceIds: GuidanceSourceId[]; confidence: GuidanceConfidence } = {
+  text: 'Watching is passive: children build skills by doing, not viewing. A cap leaves room for the rest of the day.',
+  sourceIds: ['S33', 'S13'],
+  confidence: 'consistent',
+}
+
 export interface ScreenTimeGuideline {
   band: GuidanceAgeBand
   label: string

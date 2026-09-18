@@ -1,0 +1,2487 @@
+{
+  "generatedBy": "tset-sharedlib/tests/deviceDecisionFixtures.test.ts — regenerate, never edit by hand",
+  "cases": [
+    {
+      "id": "01-bonus-time-before-expiry",
+      "platform": "android",
+      "behaviour": "Bonus time replaces today's allowance until its expiresAt.",
+      "nowMs": 1789491600000,
+      "dateKey": "2026-09-15",
+      "floor": [],
+      "usageByPkgMs": {},
+      "ruleSet": {
+        "version": 1,
+        "generatedAt": 1789491600000,
+        "tzOffsetMinutes": -420,
+        "serverTimeSkewMs": 0,
+        "rules": [
+          {
+            "ruleId": "r-fun",
+            "name": "Fun",
+            "mode": "block",
+            "appIds": [
+              "android:com.roblox.client"
+            ],
+            "schedule": [],
+            "dailyBudgetMsByDow": {
+              "0": 3600000,
+              "1": 3600000,
+              "2": 7200000,
+              "3": 3600000,
+              "4": 3600000,
+              "5": 3600000,
+              "6": 3600000
+            },
+            "priority": 0
+          }
+        ],
+        "safetyAllowlist": [
+          "com.thetaset.companion",
+          "com.thetaset.kindred"
+        ],
+        "usageSeed": {
+          "dateKey": "2026-09-15",
+          "perRuleUsedMs": {
+            "r-fun": 4200000
+          }
+        }
+      },
+      "expect": [
+        {
+          "pkg": "com.roblox.client",
+          "action": "allow",
+          "reason": null,
+          "ruleId": null
+        }
+      ]
+    },
+    {
+      "id": "01-bonus-time-before-expiry",
+      "platform": "macos",
+      "behaviour": "Bonus time replaces today's allowance until its expiresAt.",
+      "nowMs": 1789491600000,
+      "dateKey": "2026-09-15",
+      "floor": [],
+      "usageByPkgMs": {},
+      "ruleSet": {
+        "version": 1,
+        "generatedAt": 1789491600000,
+        "tzOffsetMinutes": -420,
+        "serverTimeSkewMs": 0,
+        "rules": [
+          {
+            "ruleId": "r-fun",
+            "name": "Fun",
+            "mode": "block",
+            "appIds": [
+              "macos:com.roblox.client"
+            ],
+            "schedule": [],
+            "dailyBudgetMsByDow": {
+              "0": 3600000,
+              "1": 3600000,
+              "2": 7200000,
+              "3": 3600000,
+              "4": 3600000,
+              "5": 3600000,
+              "6": 3600000
+            },
+            "priority": 0
+          }
+        ],
+        "safetyAllowlist": [
+          "com.thetaset.companion",
+          "com.thetaset.kindred"
+        ],
+        "usageSeed": {
+          "dateKey": "2026-09-15",
+          "perRuleUsedMs": {
+            "r-fun": 4200000
+          }
+        }
+      },
+      "expect": [
+        {
+          "pkg": "com.roblox.client",
+          "action": "allow",
+          "reason": null,
+          "ruleId": null
+        }
+      ]
+    },
+    {
+      "id": "02-bonus-time-after-expiry",
+      "platform": "android",
+      "behaviour": "Expired bonus time is ignored; the authored allowance applies again.",
+      "nowMs": 1789491600000,
+      "dateKey": "2026-09-15",
+      "floor": [],
+      "usageByPkgMs": {},
+      "ruleSet": {
+        "version": 1,
+        "generatedAt": 1789491600000,
+        "tzOffsetMinutes": -420,
+        "serverTimeSkewMs": 0,
+        "rules": [
+          {
+            "ruleId": "r-fun",
+            "name": "Fun",
+            "mode": "block",
+            "appIds": [
+              "android:com.roblox.client"
+            ],
+            "schedule": [],
+            "dailyBudgetMsByDow": {
+              "0": 3600000,
+              "1": 3600000,
+              "2": 3600000,
+              "3": 3600000,
+              "4": 3600000,
+              "5": 3600000,
+              "6": 3600000
+            },
+            "priority": 0
+          }
+        ],
+        "safetyAllowlist": [
+          "com.thetaset.companion",
+          "com.thetaset.kindred"
+        ],
+        "usageSeed": {
+          "dateKey": "2026-09-15",
+          "perRuleUsedMs": {
+            "r-fun": 4200000
+          }
+        }
+      },
+      "expect": [
+        {
+          "pkg": "com.roblox.client",
+          "action": "block",
+          "reason": "budget-exhausted",
+          "ruleId": "r-fun"
+        }
+      ]
+    },
+    {
+      "id": "02-bonus-time-after-expiry",
+      "platform": "macos",
+      "behaviour": "Expired bonus time is ignored; the authored allowance applies again.",
+      "nowMs": 1789491600000,
+      "dateKey": "2026-09-15",
+      "floor": [],
+      "usageByPkgMs": {},
+      "ruleSet": {
+        "version": 1,
+        "generatedAt": 1789491600000,
+        "tzOffsetMinutes": -420,
+        "serverTimeSkewMs": 0,
+        "rules": [
+          {
+            "ruleId": "r-fun",
+            "name": "Fun",
+            "mode": "block",
+            "appIds": [
+              "macos:com.roblox.client"
+            ],
+            "schedule": [],
+            "dailyBudgetMsByDow": {
+              "0": 3600000,
+              "1": 3600000,
+              "2": 3600000,
+              "3": 3600000,
+              "4": 3600000,
+              "5": 3600000,
+              "6": 3600000
+            },
+            "priority": 0
+          }
+        ],
+        "safetyAllowlist": [
+          "com.thetaset.companion",
+          "com.thetaset.kindred"
+        ],
+        "usageSeed": {
+          "dateKey": "2026-09-15",
+          "perRuleUsedMs": {
+            "r-fun": 4200000
+          }
+        }
+      },
+      "expect": [
+        {
+          "pkg": "com.roblox.client",
+          "action": "block",
+          "reason": "budget-exhausted",
+          "ruleId": "r-fun"
+        }
+      ]
+    },
+    {
+      "id": "03-pause-active",
+      "platform": "android",
+      "behaviour": "A guardian's pause lifts every usage limit until it expires. It does not lift app blocks.",
+      "nowMs": 1789491600000,
+      "dateKey": "2026-09-15",
+      "floor": [],
+      "usageByPkgMs": {
+        "com.roblox.client": 7200000
+      },
+      "ruleSet": {
+        "version": 1,
+        "generatedAt": 1789491600000,
+        "tzOffsetMinutes": -420,
+        "serverTimeSkewMs": 0,
+        "rules": [],
+        "safetyAllowlist": [
+          "com.thetaset.companion",
+          "com.thetaset.kindred"
+        ],
+        "usageSeed": {
+          "dateKey": "2026-09-15",
+          "perRuleUsedMs": {}
+        },
+        "appPolicy": {
+          "blocked": [
+            "acr.browser.lightning",
+            "com.UCMobile.intl",
+            "com.aloha.browser",
+            "com.android.chrome",
+            "com.apple.Safari",
+            "com.brave.Browser",
+            "com.brave.browser",
+            "com.brave.browser_beta",
+            "com.chrome.beta",
+            "com.chrome.canary",
+            "com.chrome.dev",
+            "com.cloudmosa.puffinFree",
+            "com.duckduckgo.mobile.android",
+            "com.ecosia.android",
+            "com.explore.web.browser",
+            "com.google.Chrome",
+            "com.heytap.browser",
+            "com.huawei.browser",
+            "com.jio.web",
+            "com.kiwibrowser.browser",
+            "com.mi.globalbrowser",
+            "com.microsoft.edgemac",
+            "com.microsoft.emmx",
+            "com.opera.browser",
+            "com.opera.browser.beta",
+            "com.opera.gx",
+            "com.opera.mini.native",
+            "com.operasoftware.Opera",
+            "com.qwant.liberty",
+            "com.sec.android.app.sbrowser",
+            "com.sec.android.app.sbrowser.beta",
+            "com.transsion.phoenix",
+            "com.uc.browser.en",
+            "com.vivaldi.Vivaldi",
+            "com.vivaldi.browser",
+            "com.yandex.browser",
+            "company.thebrowser.Browser",
+            "io.github.forkmaintainers.iceraven",
+            "mark.via.gp",
+            "net.onecook.browser",
+            "org.adblockplus.browser",
+            "org.mozilla.firefox",
+            "org.mozilla.firefox_beta",
+            "org.mozilla.firefoxdeveloperedition",
+            "org.mozilla.focus",
+            "org.mozilla.klar",
+            "org.mozilla.nightly",
+            "org.torproject.torbrowser"
+          ]
+        }
+      },
+      "expect": [
+        {
+          "pkg": "com.roblox.client",
+          "action": "allow",
+          "reason": null,
+          "ruleId": null
+        },
+        {
+          "pkg": "com.android.chrome",
+          "action": "block",
+          "reason": "app-blocked",
+          "ruleId": null
+        }
+      ]
+    },
+    {
+      "id": "03-pause-active",
+      "platform": "macos",
+      "behaviour": "A guardian's pause lifts every usage limit until it expires. It does not lift app blocks.",
+      "nowMs": 1789491600000,
+      "dateKey": "2026-09-15",
+      "floor": [],
+      "usageByPkgMs": {
+        "com.roblox.client": 7200000
+      },
+      "ruleSet": {
+        "version": 1,
+        "generatedAt": 1789491600000,
+        "tzOffsetMinutes": -420,
+        "serverTimeSkewMs": 0,
+        "rules": [],
+        "safetyAllowlist": [
+          "com.thetaset.companion",
+          "com.thetaset.kindred"
+        ],
+        "usageSeed": {
+          "dateKey": "2026-09-15",
+          "perRuleUsedMs": {}
+        },
+        "appPolicy": {
+          "blocked": [
+            "acr.browser.lightning",
+            "com.UCMobile.intl",
+            "com.aloha.browser",
+            "com.android.chrome",
+            "com.apple.Safari",
+            "com.brave.Browser",
+            "com.brave.browser",
+            "com.brave.browser_beta",
+            "com.chrome.beta",
+            "com.chrome.canary",
+            "com.chrome.dev",
+            "com.cloudmosa.puffinFree",
+            "com.duckduckgo.mobile.android",
+            "com.ecosia.android",
+            "com.explore.web.browser",
+            "com.google.Chrome",
+            "com.heytap.browser",
+            "com.huawei.browser",
+            "com.jio.web",
+            "com.kiwibrowser.browser",
+            "com.mi.globalbrowser",
+            "com.microsoft.edgemac",
+            "com.microsoft.emmx",
+            "com.opera.browser",
+            "com.opera.browser.beta",
+            "com.opera.gx",
+            "com.opera.mini.native",
+            "com.operasoftware.Opera",
+            "com.qwant.liberty",
+            "com.sec.android.app.sbrowser",
+            "com.sec.android.app.sbrowser.beta",
+            "com.transsion.phoenix",
+            "com.uc.browser.en",
+            "com.vivaldi.Vivaldi",
+            "com.vivaldi.browser",
+            "com.yandex.browser",
+            "company.thebrowser.Browser",
+            "io.github.forkmaintainers.iceraven",
+            "macos:com.android.chrome",
+            "mark.via.gp",
+            "net.onecook.browser",
+            "org.adblockplus.browser",
+            "org.mozilla.firefox",
+            "org.mozilla.firefox_beta",
+            "org.mozilla.firefoxdeveloperedition",
+            "org.mozilla.focus",
+            "org.mozilla.klar",
+            "org.mozilla.nightly",
+            "org.torproject.torbrowser"
+          ]
+        }
+      },
+      "expect": [
+        {
+          "pkg": "com.roblox.client",
+          "action": "allow",
+          "reason": null,
+          "ruleId": null
+        },
+        {
+          "pkg": "com.android.chrome",
+          "action": "block",
+          "reason": "app-blocked",
+          "ruleId": null
+        }
+      ]
+    },
+    {
+      "id": "04-pause-expired",
+      "platform": "android",
+      "behaviour": "A pause past its expiry no longer lifts limits.",
+      "nowMs": 1789491600000,
+      "dateKey": "2026-09-15",
+      "floor": [],
+      "usageByPkgMs": {},
+      "ruleSet": {
+        "version": 1,
+        "generatedAt": 1789491600000,
+        "tzOffsetMinutes": -420,
+        "serverTimeSkewMs": 0,
+        "rules": [
+          {
+            "ruleId": "r-fun",
+            "name": "Fun",
+            "mode": "block",
+            "appIds": [
+              "android:com.roblox.client"
+            ],
+            "schedule": [],
+            "dailyBudgetMsByDow": {
+              "0": 3600000,
+              "1": 3600000,
+              "2": 3600000,
+              "3": 3600000,
+              "4": 3600000,
+              "5": 3600000,
+              "6": 3600000
+            },
+            "priority": 0
+          }
+        ],
+        "safetyAllowlist": [
+          "com.thetaset.companion",
+          "com.thetaset.kindred"
+        ],
+        "usageSeed": {
+          "dateKey": "2026-09-15",
+          "perRuleUsedMs": {
+            "r-fun": 4200000
+          }
+        }
+      },
+      "expect": [
+        {
+          "pkg": "com.roblox.client",
+          "action": "block",
+          "reason": "budget-exhausted",
+          "ruleId": "r-fun"
+        }
+      ]
+    },
+    {
+      "id": "04-pause-expired",
+      "platform": "macos",
+      "behaviour": "A pause past its expiry no longer lifts limits.",
+      "nowMs": 1789491600000,
+      "dateKey": "2026-09-15",
+      "floor": [],
+      "usageByPkgMs": {},
+      "ruleSet": {
+        "version": 1,
+        "generatedAt": 1789491600000,
+        "tzOffsetMinutes": -420,
+        "serverTimeSkewMs": 0,
+        "rules": [
+          {
+            "ruleId": "r-fun",
+            "name": "Fun",
+            "mode": "block",
+            "appIds": [
+              "macos:com.roblox.client"
+            ],
+            "schedule": [],
+            "dailyBudgetMsByDow": {
+              "0": 3600000,
+              "1": 3600000,
+              "2": 3600000,
+              "3": 3600000,
+              "4": 3600000,
+              "5": 3600000,
+              "6": 3600000
+            },
+            "priority": 0
+          }
+        ],
+        "safetyAllowlist": [
+          "com.thetaset.companion",
+          "com.thetaset.kindred"
+        ],
+        "usageSeed": {
+          "dateKey": "2026-09-15",
+          "perRuleUsedMs": {
+            "r-fun": 4200000
+          }
+        }
+      },
+      "expect": [
+        {
+          "pkg": "com.roblox.client",
+          "action": "block",
+          "reason": "budget-exhausted",
+          "ruleId": "r-fun"
+        }
+      ]
+    },
+    {
+      "id": "05-reward-rule-before-expiry",
+      "platform": "android",
+      "behaviour": "A reward-minted temporary rule applies until its expiresAtMs.",
+      "nowMs": 1789491600000,
+      "dateKey": "2026-09-15",
+      "floor": [],
+      "usageByPkgMs": {},
+      "ruleSet": {
+        "version": 1,
+        "generatedAt": 1789491600000,
+        "tzOffsetMinutes": -420,
+        "serverTimeSkewMs": 0,
+        "rules": [
+          {
+            "ruleId": "r-reward",
+            "name": "Reward rule",
+            "mode": "block",
+            "appIds": [
+              "android:com.roblox.client"
+            ],
+            "schedule": [],
+            "dailyBudgetMsByDow": {
+              "0": 1800000,
+              "1": 1800000,
+              "2": 1800000,
+              "3": 1800000,
+              "4": 1800000,
+              "5": 1800000,
+              "6": 1800000
+            },
+            "priority": 0
+          }
+        ],
+        "safetyAllowlist": [
+          "com.thetaset.companion",
+          "com.thetaset.kindred"
+        ],
+        "usageSeed": {
+          "dateKey": "2026-09-15",
+          "perRuleUsedMs": {
+            "r-reward": 2400000
+          }
+        }
+      },
+      "expect": [
+        {
+          "pkg": "com.roblox.client",
+          "action": "block",
+          "reason": "budget-exhausted",
+          "ruleId": "r-reward"
+        }
+      ]
+    },
+    {
+      "id": "05-reward-rule-before-expiry",
+      "platform": "macos",
+      "behaviour": "A reward-minted temporary rule applies until its expiresAtMs.",
+      "nowMs": 1789491600000,
+      "dateKey": "2026-09-15",
+      "floor": [],
+      "usageByPkgMs": {},
+      "ruleSet": {
+        "version": 1,
+        "generatedAt": 1789491600000,
+        "tzOffsetMinutes": -420,
+        "serverTimeSkewMs": 0,
+        "rules": [
+          {
+            "ruleId": "r-reward",
+            "name": "Reward rule",
+            "mode": "block",
+            "appIds": [
+              "macos:com.roblox.client"
+            ],
+            "schedule": [],
+            "dailyBudgetMsByDow": {
+              "0": 1800000,
+              "1": 1800000,
+              "2": 1800000,
+              "3": 1800000,
+              "4": 1800000,
+              "5": 1800000,
+              "6": 1800000
+            },
+            "priority": 0
+          }
+        ],
+        "safetyAllowlist": [
+          "com.thetaset.companion",
+          "com.thetaset.kindred"
+        ],
+        "usageSeed": {
+          "dateKey": "2026-09-15",
+          "perRuleUsedMs": {
+            "r-reward": 2400000
+          }
+        }
+      },
+      "expect": [
+        {
+          "pkg": "com.roblox.client",
+          "action": "block",
+          "reason": "budget-exhausted",
+          "ruleId": "r-reward"
+        }
+      ]
+    },
+    {
+      "id": "06-reward-rule-after-expiry",
+      "platform": "android",
+      "behaviour": "An expired reward-minted rule no longer applies.",
+      "nowMs": 1789491600000,
+      "dateKey": "2026-09-15",
+      "floor": [],
+      "usageByPkgMs": {},
+      "ruleSet": {
+        "version": 1,
+        "generatedAt": 1789491600000,
+        "tzOffsetMinutes": -420,
+        "serverTimeSkewMs": 0,
+        "rules": [],
+        "safetyAllowlist": [
+          "com.thetaset.companion",
+          "com.thetaset.kindred"
+        ],
+        "usageSeed": {
+          "dateKey": "2026-09-15",
+          "perRuleUsedMs": {}
+        }
+      },
+      "expect": [
+        {
+          "pkg": "com.roblox.client",
+          "action": "allow",
+          "reason": null,
+          "ruleId": null
+        }
+      ]
+    },
+    {
+      "id": "06-reward-rule-after-expiry",
+      "platform": "macos",
+      "behaviour": "An expired reward-minted rule no longer applies.",
+      "nowMs": 1789491600000,
+      "dateKey": "2026-09-15",
+      "floor": [],
+      "usageByPkgMs": {},
+      "ruleSet": {
+        "version": 1,
+        "generatedAt": 1789491600000,
+        "tzOffsetMinutes": -420,
+        "serverTimeSkewMs": 0,
+        "rules": [],
+        "safetyAllowlist": [
+          "com.thetaset.companion",
+          "com.thetaset.kindred"
+        ],
+        "usageSeed": {
+          "dateKey": "2026-09-15",
+          "perRuleUsedMs": {}
+        }
+      },
+      "expect": [
+        {
+          "pkg": "com.roblox.client",
+          "action": "allow",
+          "reason": null,
+          "ruleId": null
+        }
+      ]
+    },
+    {
+      "id": "07-schedule-inside-window",
+      "platform": "android",
+      "behaviour": "Inside an allowed window, a scheduled rule does not block.",
+      "nowMs": 1789491600000,
+      "dateKey": "2026-09-15",
+      "floor": [],
+      "usageByPkgMs": {},
+      "ruleSet": {
+        "version": 1,
+        "generatedAt": 1789491600000,
+        "tzOffsetMinutes": -420,
+        "serverTimeSkewMs": 0,
+        "rules": [
+          {
+            "ruleId": "r-school",
+            "name": "School hours",
+            "mode": "block",
+            "appIds": [
+              "android:com.instagram.android"
+            ],
+            "schedule": [
+              {
+                "daysOfWeek": [
+                  1,
+                  2,
+                  3,
+                  4,
+                  5
+                ],
+                "timeRanges": [
+                  {
+                    "start": "08:00",
+                    "end": "15:00"
+                  }
+                ]
+              }
+            ],
+            "dailyBudgetMsByDow": {
+              "1": 28800000,
+              "2": 28800000,
+              "3": 28800000,
+              "4": 28800000,
+              "5": 28800000
+            },
+            "priority": 0
+          }
+        ],
+        "safetyAllowlist": [
+          "com.thetaset.companion",
+          "com.thetaset.kindred"
+        ],
+        "usageSeed": {
+          "dateKey": "2026-09-15",
+          "perRuleUsedMs": {}
+        }
+      },
+      "expect": [
+        {
+          "pkg": "com.instagram.android",
+          "action": "allow",
+          "reason": null,
+          "ruleId": null
+        }
+      ]
+    },
+    {
+      "id": "07-schedule-inside-window",
+      "platform": "macos",
+      "behaviour": "Inside an allowed window, a scheduled rule does not block.",
+      "nowMs": 1789491600000,
+      "dateKey": "2026-09-15",
+      "floor": [],
+      "usageByPkgMs": {},
+      "ruleSet": {
+        "version": 1,
+        "generatedAt": 1789491600000,
+        "tzOffsetMinutes": -420,
+        "serverTimeSkewMs": 0,
+        "rules": [
+          {
+            "ruleId": "r-school",
+            "name": "School hours",
+            "mode": "block",
+            "appIds": [
+              "macos:com.instagram.android"
+            ],
+            "schedule": [
+              {
+                "daysOfWeek": [
+                  1,
+                  2,
+                  3,
+                  4,
+                  5
+                ],
+                "timeRanges": [
+                  {
+                    "start": "08:00",
+                    "end": "15:00"
+                  }
+                ]
+              }
+            ],
+            "dailyBudgetMsByDow": {
+              "1": 28800000,
+              "2": 28800000,
+              "3": 28800000,
+              "4": 28800000,
+              "5": 28800000
+            },
+            "priority": 0
+          }
+        ],
+        "safetyAllowlist": [
+          "com.thetaset.companion",
+          "com.thetaset.kindred"
+        ],
+        "usageSeed": {
+          "dateKey": "2026-09-15",
+          "perRuleUsedMs": {}
+        }
+      },
+      "expect": [
+        {
+          "pkg": "com.instagram.android",
+          "action": "allow",
+          "reason": null,
+          "ruleId": null
+        }
+      ]
+    },
+    {
+      "id": "08-schedule-outside-window",
+      "platform": "android",
+      "behaviour": "Outside every allowed window for today, a scheduled rule blocks.",
+      "nowMs": 1789513200000,
+      "dateKey": "2026-09-15",
+      "floor": [],
+      "usageByPkgMs": {},
+      "ruleSet": {
+        "version": 1,
+        "generatedAt": 1789513200000,
+        "tzOffsetMinutes": -420,
+        "serverTimeSkewMs": 0,
+        "rules": [
+          {
+            "ruleId": "r-school",
+            "name": "School hours",
+            "mode": "block",
+            "appIds": [
+              "android:com.instagram.android"
+            ],
+            "schedule": [
+              {
+                "daysOfWeek": [
+                  1,
+                  2,
+                  3,
+                  4,
+                  5
+                ],
+                "timeRanges": [
+                  {
+                    "start": "08:00",
+                    "end": "15:00"
+                  }
+                ]
+              }
+            ],
+            "dailyBudgetMsByDow": {
+              "1": 28800000,
+              "2": 28800000,
+              "3": 28800000,
+              "4": 28800000,
+              "5": 28800000
+            },
+            "priority": 0
+          }
+        ],
+        "safetyAllowlist": [
+          "com.thetaset.companion",
+          "com.thetaset.kindred"
+        ],
+        "usageSeed": {
+          "dateKey": "2026-09-15",
+          "perRuleUsedMs": {}
+        }
+      },
+      "expect": [
+        {
+          "pkg": "com.instagram.android",
+          "action": "block",
+          "reason": "outside-schedule",
+          "ruleId": "r-school"
+        }
+      ]
+    },
+    {
+      "id": "08-schedule-outside-window",
+      "platform": "macos",
+      "behaviour": "Outside every allowed window for today, a scheduled rule blocks.",
+      "nowMs": 1789513200000,
+      "dateKey": "2026-09-15",
+      "floor": [],
+      "usageByPkgMs": {},
+      "ruleSet": {
+        "version": 1,
+        "generatedAt": 1789513200000,
+        "tzOffsetMinutes": -420,
+        "serverTimeSkewMs": 0,
+        "rules": [
+          {
+            "ruleId": "r-school",
+            "name": "School hours",
+            "mode": "block",
+            "appIds": [
+              "macos:com.instagram.android"
+            ],
+            "schedule": [
+              {
+                "daysOfWeek": [
+                  1,
+                  2,
+                  3,
+                  4,
+                  5
+                ],
+                "timeRanges": [
+                  {
+                    "start": "08:00",
+                    "end": "15:00"
+                  }
+                ]
+              }
+            ],
+            "dailyBudgetMsByDow": {
+              "1": 28800000,
+              "2": 28800000,
+              "3": 28800000,
+              "4": 28800000,
+              "5": 28800000
+            },
+            "priority": 0
+          }
+        ],
+        "safetyAllowlist": [
+          "com.thetaset.companion",
+          "com.thetaset.kindred"
+        ],
+        "usageSeed": {
+          "dateKey": "2026-09-15",
+          "perRuleUsedMs": {}
+        }
+      },
+      "expect": [
+        {
+          "pkg": "com.instagram.android",
+          "action": "block",
+          "reason": "outside-schedule",
+          "ruleId": "r-school"
+        }
+      ]
+    },
+    {
+      "id": "09-family-timezone-midnight",
+      "platform": "android",
+      "behaviour": "The day is the family's day (D3): at 23:30 Tuesday in Los Angeles a device set to New York, where it is already Wednesday, still gets Tuesday's allowance, in apps and on the web (DCP-16).",
+      "nowMs": 1789540200000,
+      "dateKey": "2026-09-15",
+      "floor": [],
+      "usageByPkgMs": {
+        "com.roblox.client": 600000
+      },
+      "ruleSet": {
+        "version": 1,
+        "generatedAt": 1789540200000,
+        "tzOffsetMinutes": -420,
+        "serverTimeSkewMs": 0,
+        "rules": [
+          {
+            "ruleId": "r-fun",
+            "name": "Fun",
+            "mode": "block",
+            "appIds": [
+              "android:com.roblox.client"
+            ],
+            "schedule": [],
+            "dailyBudgetMsByDow": {
+              "2": 3600000,
+              "3": 0
+            },
+            "priority": 0
+          }
+        ],
+        "safetyAllowlist": [
+          "com.thetaset.companion",
+          "com.thetaset.kindred"
+        ],
+        "usageSeed": {
+          "dateKey": "2026-09-15",
+          "perRuleUsedMs": {}
+        }
+      },
+      "expect": [
+        {
+          "pkg": "com.roblox.client",
+          "action": "allow",
+          "reason": null,
+          "ruleId": null
+        }
+      ]
+    },
+    {
+      "id": "09-family-timezone-midnight",
+      "platform": "macos",
+      "behaviour": "The day is the family's day (D3): at 23:30 Tuesday in Los Angeles a device set to New York, where it is already Wednesday, still gets Tuesday's allowance, in apps and on the web (DCP-16).",
+      "nowMs": 1789540200000,
+      "dateKey": "2026-09-15",
+      "floor": [],
+      "usageByPkgMs": {
+        "com.roblox.client": 600000
+      },
+      "ruleSet": {
+        "version": 1,
+        "generatedAt": 1789540200000,
+        "tzOffsetMinutes": -420,
+        "serverTimeSkewMs": 0,
+        "rules": [
+          {
+            "ruleId": "r-fun",
+            "name": "Fun",
+            "mode": "block",
+            "appIds": [
+              "macos:com.roblox.client"
+            ],
+            "schedule": [],
+            "dailyBudgetMsByDow": {
+              "2": 3600000,
+              "3": 0
+            },
+            "priority": 0
+          }
+        ],
+        "safetyAllowlist": [
+          "com.thetaset.companion",
+          "com.thetaset.kindred"
+        ],
+        "usageSeed": {
+          "dateKey": "2026-09-15",
+          "perRuleUsedMs": {}
+        }
+      },
+      "expect": [
+        {
+          "pkg": "com.roblox.client",
+          "action": "allow",
+          "reason": null,
+          "ruleId": null
+        }
+      ]
+    },
+    {
+      "id": "10-category-limit-new-install",
+      "platform": "android",
+      "behaviour": "A category limit covers a seed-map app installed today with no guardian decision, and category apps share one budget.",
+      "nowMs": 1789491600000,
+      "dateKey": "2026-09-15",
+      "floor": [],
+      "usageByPkgMs": {
+        "com.mojang.minecraftpe": 3660000
+      },
+      "ruleSet": {
+        "version": 1,
+        "generatedAt": 1789491600000,
+        "tzOffsetMinutes": -420,
+        "serverTimeSkewMs": 0,
+        "rules": [
+          {
+            "ruleId": "r-games",
+            "name": "Games",
+            "mode": "block",
+            "appIds": [
+              "android:com.roblox.client",
+              "android:com.mojang.minecraftpe"
+            ],
+            "schedule": [],
+            "dailyBudgetMsByDow": {
+              "0": 3600000,
+              "1": 3600000,
+              "2": 3600000,
+              "3": 3600000,
+              "4": 3600000,
+              "5": 3600000,
+              "6": 3600000
+            },
+            "priority": 0
+          }
+        ],
+        "safetyAllowlist": [
+          "com.thetaset.companion",
+          "com.thetaset.kindred"
+        ],
+        "usageSeed": {
+          "dateKey": "2026-09-15",
+          "perRuleUsedMs": {}
+        }
+      },
+      "expect": [
+        {
+          "pkg": "com.mojang.minecraftpe",
+          "action": "block",
+          "reason": "budget-exhausted",
+          "ruleId": "r-games"
+        },
+        {
+          "pkg": "com.roblox.client",
+          "action": "block",
+          "reason": "budget-exhausted",
+          "ruleId": "r-games"
+        }
+      ]
+    },
+    {
+      "id": "10-category-limit-new-install",
+      "platform": "macos",
+      "behaviour": "A category limit covers a seed-map app installed today with no guardian decision, and category apps share one budget.",
+      "nowMs": 1789491600000,
+      "dateKey": "2026-09-15",
+      "floor": [],
+      "usageByPkgMs": {
+        "com.mojang.minecraftpe": 3660000
+      },
+      "ruleSet": {
+        "version": 1,
+        "generatedAt": 1789491600000,
+        "tzOffsetMinutes": -420,
+        "serverTimeSkewMs": 0,
+        "rules": [
+          {
+            "ruleId": "r-games",
+            "name": "Games",
+            "mode": "block",
+            "appIds": [
+              "macos:com.roblox.client",
+              "macos:com.mojang.minecraftpe"
+            ],
+            "schedule": [],
+            "dailyBudgetMsByDow": {
+              "0": 3600000,
+              "1": 3600000,
+              "2": 3600000,
+              "3": 3600000,
+              "4": 3600000,
+              "5": 3600000,
+              "6": 3600000
+            },
+            "priority": 0
+          }
+        ],
+        "safetyAllowlist": [
+          "com.thetaset.companion",
+          "com.thetaset.kindred"
+        ],
+        "usageSeed": {
+          "dateKey": "2026-09-15",
+          "perRuleUsedMs": {}
+        }
+      },
+      "expect": [
+        {
+          "pkg": "com.mojang.minecraftpe",
+          "action": "block",
+          "reason": "budget-exhausted",
+          "ruleId": "r-games"
+        },
+        {
+          "pkg": "com.roblox.client",
+          "action": "block",
+          "reason": "budget-exhausted",
+          "ruleId": "r-games"
+        }
+      ]
+    },
+    {
+      "id": "11-blocked-category-allow-exception",
+      "platform": "android",
+      "behaviour": "A blocked category blocks its apps, except one a guardian allowed individually.",
+      "nowMs": 1789491600000,
+      "dateKey": "2026-09-15",
+      "floor": [],
+      "usageByPkgMs": {},
+      "ruleSet": {
+        "version": 1,
+        "generatedAt": 1789491600000,
+        "tzOffsetMinutes": -420,
+        "serverTimeSkewMs": 0,
+        "rules": [],
+        "safetyAllowlist": [
+          "com.thetaset.companion",
+          "com.thetaset.kindred"
+        ],
+        "usageSeed": {
+          "dateKey": "2026-09-15",
+          "perRuleUsedMs": {}
+        },
+        "appPolicy": {
+          "blocked": [
+            "acr.browser.lightning",
+            "com.UCMobile.intl",
+            "com.aloha.browser",
+            "com.android.chrome",
+            "com.apple.Safari",
+            "com.brave.Browser",
+            "com.brave.browser",
+            "com.brave.browser_beta",
+            "com.chrome.beta",
+            "com.chrome.canary",
+            "com.chrome.dev",
+            "com.cloudmosa.puffinFree",
+            "com.duckduckgo.mobile.android",
+            "com.ecosia.android",
+            "com.explore.web.browser",
+            "com.google.Chrome",
+            "com.heytap.browser",
+            "com.huawei.browser",
+            "com.jio.web",
+            "com.kiwibrowser.browser",
+            "com.mi.globalbrowser",
+            "com.microsoft.edgemac",
+            "com.microsoft.emmx",
+            "com.opera.browser",
+            "com.opera.browser.beta",
+            "com.opera.gx",
+            "com.opera.mini.native",
+            "com.operasoftware.Opera",
+            "com.qwant.liberty",
+            "com.sec.android.app.sbrowser",
+            "com.sec.android.app.sbrowser.beta",
+            "com.transsion.phoenix",
+            "com.uc.browser.en",
+            "com.vivaldi.Vivaldi",
+            "com.vivaldi.browser",
+            "com.yandex.browser",
+            "company.thebrowser.Browser",
+            "io.github.forkmaintainers.iceraven",
+            "mark.via.gp",
+            "net.onecook.browser",
+            "org.adblockplus.browser",
+            "org.mozilla.firefox_beta",
+            "org.mozilla.firefoxdeveloperedition",
+            "org.mozilla.focus",
+            "org.mozilla.klar",
+            "org.mozilla.nightly",
+            "org.torproject.torbrowser"
+          ]
+        }
+      },
+      "expect": [
+        {
+          "pkg": "com.android.chrome",
+          "action": "block",
+          "reason": "app-blocked",
+          "ruleId": null
+        },
+        {
+          "pkg": "org.mozilla.firefox",
+          "action": "allow",
+          "reason": null,
+          "ruleId": null
+        }
+      ]
+    },
+    {
+      "id": "11-blocked-category-allow-exception",
+      "platform": "macos",
+      "behaviour": "A blocked category blocks its apps, except one a guardian allowed individually.",
+      "nowMs": 1789491600000,
+      "dateKey": "2026-09-15",
+      "floor": [],
+      "usageByPkgMs": {},
+      "ruleSet": {
+        "version": 1,
+        "generatedAt": 1789491600000,
+        "tzOffsetMinutes": -420,
+        "serverTimeSkewMs": 0,
+        "rules": [],
+        "safetyAllowlist": [
+          "com.thetaset.companion",
+          "com.thetaset.kindred"
+        ],
+        "usageSeed": {
+          "dateKey": "2026-09-15",
+          "perRuleUsedMs": {}
+        },
+        "appPolicy": {
+          "blocked": [
+            "acr.browser.lightning",
+            "com.UCMobile.intl",
+            "com.aloha.browser",
+            "com.android.chrome",
+            "com.apple.Safari",
+            "com.brave.Browser",
+            "com.brave.browser",
+            "com.brave.browser_beta",
+            "com.chrome.beta",
+            "com.chrome.canary",
+            "com.chrome.dev",
+            "com.cloudmosa.puffinFree",
+            "com.duckduckgo.mobile.android",
+            "com.ecosia.android",
+            "com.explore.web.browser",
+            "com.google.Chrome",
+            "com.heytap.browser",
+            "com.huawei.browser",
+            "com.jio.web",
+            "com.kiwibrowser.browser",
+            "com.mi.globalbrowser",
+            "com.microsoft.edgemac",
+            "com.microsoft.emmx",
+            "com.opera.browser",
+            "com.opera.browser.beta",
+            "com.opera.gx",
+            "com.opera.mini.native",
+            "com.operasoftware.Opera",
+            "com.qwant.liberty",
+            "com.sec.android.app.sbrowser",
+            "com.sec.android.app.sbrowser.beta",
+            "com.transsion.phoenix",
+            "com.uc.browser.en",
+            "com.vivaldi.Vivaldi",
+            "com.vivaldi.browser",
+            "com.yandex.browser",
+            "company.thebrowser.Browser",
+            "io.github.forkmaintainers.iceraven",
+            "macos:com.android.chrome",
+            "mark.via.gp",
+            "net.onecook.browser",
+            "org.adblockplus.browser",
+            "org.mozilla.firefox_beta",
+            "org.mozilla.firefoxdeveloperedition",
+            "org.mozilla.focus",
+            "org.mozilla.klar",
+            "org.mozilla.nightly",
+            "org.torproject.torbrowser"
+          ]
+        }
+      },
+      "expect": [
+        {
+          "pkg": "com.android.chrome",
+          "action": "block",
+          "reason": "app-blocked",
+          "ruleId": null
+        },
+        {
+          "pkg": "org.mozilla.firefox",
+          "action": "allow",
+          "reason": null,
+          "ruleId": null
+        }
+      ]
+    },
+    {
+      "id": "12-safety-floor",
+      "platform": "android",
+      "behaviour": "The safety floor is never blocked: not by an all-apps limit, and not by a guardian blocking Settings.",
+      "nowMs": 1789491600000,
+      "dateKey": "2026-09-15",
+      "floor": [
+        "com.android.settings",
+        "com.android.launcher3"
+      ],
+      "usageByPkgMs": {
+        "com.roblox.client": 7200000
+      },
+      "ruleSet": {
+        "version": 1,
+        "generatedAt": 1789491600000,
+        "tzOffsetMinutes": -420,
+        "serverTimeSkewMs": 0,
+        "rules": [
+          {
+            "ruleId": "r-all-apps",
+            "name": "All apps",
+            "mode": "block",
+            "appIds": "all-device-apps",
+            "schedule": [],
+            "dailyBudgetMsByDow": {
+              "0": 3600000,
+              "1": 3600000,
+              "2": 3600000,
+              "3": 3600000,
+              "4": 3600000,
+              "5": 3600000,
+              "6": 3600000
+            },
+            "priority": 0
+          }
+        ],
+        "safetyAllowlist": [
+          "com.thetaset.companion",
+          "com.thetaset.kindred"
+        ],
+        "usageSeed": {
+          "dateKey": "2026-09-15",
+          "perRuleUsedMs": {}
+        }
+      },
+      "expect": [
+        {
+          "pkg": "com.roblox.client",
+          "action": "block",
+          "reason": "budget-exhausted",
+          "ruleId": "r-all-apps"
+        },
+        {
+          "pkg": "com.android.settings",
+          "action": "allow",
+          "reason": null,
+          "ruleId": null
+        },
+        {
+          "pkg": "com.android.launcher3",
+          "action": "allow",
+          "reason": null,
+          "ruleId": null
+        }
+      ]
+    },
+    {
+      "id": "12-safety-floor",
+      "platform": "macos",
+      "behaviour": "The safety floor is never blocked: not by an all-apps limit, and not by a guardian blocking Settings.",
+      "nowMs": 1789491600000,
+      "dateKey": "2026-09-15",
+      "floor": [
+        "com.android.settings",
+        "com.android.launcher3"
+      ],
+      "usageByPkgMs": {
+        "com.roblox.client": 7200000
+      },
+      "ruleSet": {
+        "version": 1,
+        "generatedAt": 1789491600000,
+        "tzOffsetMinutes": -420,
+        "serverTimeSkewMs": 0,
+        "rules": [
+          {
+            "ruleId": "r-all-apps",
+            "name": "All apps",
+            "mode": "block",
+            "appIds": "all-device-apps",
+            "schedule": [],
+            "dailyBudgetMsByDow": {
+              "0": 3600000,
+              "1": 3600000,
+              "2": 3600000,
+              "3": 3600000,
+              "4": 3600000,
+              "5": 3600000,
+              "6": 3600000
+            },
+            "priority": 0
+          }
+        ],
+        "safetyAllowlist": [
+          "com.thetaset.companion",
+          "com.thetaset.kindred"
+        ],
+        "usageSeed": {
+          "dateKey": "2026-09-15",
+          "perRuleUsedMs": {}
+        }
+      },
+      "expect": [
+        {
+          "pkg": "com.roblox.client",
+          "action": "block",
+          "reason": "budget-exhausted",
+          "ruleId": "r-all-apps"
+        },
+        {
+          "pkg": "com.android.settings",
+          "action": "allow",
+          "reason": null,
+          "ruleId": null
+        },
+        {
+          "pkg": "com.android.launcher3",
+          "action": "allow",
+          "reason": null,
+          "ruleId": null
+        }
+      ]
+    },
+    {
+      "id": "13-reminder-mode",
+      "platform": "android",
+      "behaviour": "In reminder mode a spent allowance warns instead of blocking.",
+      "nowMs": 1789491600000,
+      "dateKey": "2026-09-15",
+      "floor": [],
+      "usageByPkgMs": {},
+      "ruleSet": {
+        "version": 1,
+        "generatedAt": 1789491600000,
+        "tzOffsetMinutes": -420,
+        "serverTimeSkewMs": 0,
+        "rules": [
+          {
+            "ruleId": "r-fun",
+            "name": "Fun",
+            "mode": "reminder",
+            "appIds": [
+              "android:com.roblox.client"
+            ],
+            "schedule": [],
+            "dailyBudgetMsByDow": {
+              "0": 3600000,
+              "1": 3600000,
+              "2": 3600000,
+              "3": 3600000,
+              "4": 3600000,
+              "5": 3600000,
+              "6": 3600000
+            },
+            "priority": 0
+          }
+        ],
+        "safetyAllowlist": [
+          "com.thetaset.companion",
+          "com.thetaset.kindred"
+        ],
+        "usageSeed": {
+          "dateKey": "2026-09-15",
+          "perRuleUsedMs": {
+            "r-fun": 4200000
+          }
+        }
+      },
+      "expect": [
+        {
+          "pkg": "com.roblox.client",
+          "action": "warn",
+          "reason": "budget-exhausted",
+          "ruleId": "r-fun"
+        }
+      ]
+    },
+    {
+      "id": "13-reminder-mode",
+      "platform": "macos",
+      "behaviour": "In reminder mode a spent allowance warns instead of blocking.",
+      "nowMs": 1789491600000,
+      "dateKey": "2026-09-15",
+      "floor": [],
+      "usageByPkgMs": {},
+      "ruleSet": {
+        "version": 1,
+        "generatedAt": 1789491600000,
+        "tzOffsetMinutes": -420,
+        "serverTimeSkewMs": 0,
+        "rules": [
+          {
+            "ruleId": "r-fun",
+            "name": "Fun",
+            "mode": "reminder",
+            "appIds": [
+              "macos:com.roblox.client"
+            ],
+            "schedule": [],
+            "dailyBudgetMsByDow": {
+              "0": 3600000,
+              "1": 3600000,
+              "2": 3600000,
+              "3": 3600000,
+              "4": 3600000,
+              "5": 3600000,
+              "6": 3600000
+            },
+            "priority": 0
+          }
+        ],
+        "safetyAllowlist": [
+          "com.thetaset.companion",
+          "com.thetaset.kindred"
+        ],
+        "usageSeed": {
+          "dateKey": "2026-09-15",
+          "perRuleUsedMs": {
+            "r-fun": 4200000
+          }
+        }
+      },
+      "expect": [
+        {
+          "pkg": "com.roblox.client",
+          "action": "warn",
+          "reason": "budget-exhausted",
+          "ruleId": "r-fun"
+        }
+      ]
+    },
+    {
+      "id": "14-track-only-mode",
+      "platform": "android",
+      "behaviour": "In track-only mode a spent allowance is recorded and neither blocks nor warns.",
+      "nowMs": 1789491600000,
+      "dateKey": "2026-09-15",
+      "floor": [],
+      "usageByPkgMs": {},
+      "ruleSet": {
+        "version": 1,
+        "generatedAt": 1789491600000,
+        "tzOffsetMinutes": -420,
+        "serverTimeSkewMs": 0,
+        "rules": [
+          {
+            "ruleId": "r-fun",
+            "name": "Fun",
+            "mode": "track-only",
+            "appIds": [
+              "android:com.roblox.client"
+            ],
+            "schedule": [],
+            "dailyBudgetMsByDow": {
+              "0": 3600000,
+              "1": 3600000,
+              "2": 3600000,
+              "3": 3600000,
+              "4": 3600000,
+              "5": 3600000,
+              "6": 3600000
+            },
+            "priority": 0
+          }
+        ],
+        "safetyAllowlist": [
+          "com.thetaset.companion",
+          "com.thetaset.kindred"
+        ],
+        "usageSeed": {
+          "dateKey": "2026-09-15",
+          "perRuleUsedMs": {
+            "r-fun": 4200000
+          }
+        }
+      },
+      "expect": [
+        {
+          "pkg": "com.roblox.client",
+          "action": "allow",
+          "reason": "budget-exhausted",
+          "ruleId": "r-fun"
+        }
+      ]
+    },
+    {
+      "id": "14-track-only-mode",
+      "platform": "macos",
+      "behaviour": "In track-only mode a spent allowance is recorded and neither blocks nor warns.",
+      "nowMs": 1789491600000,
+      "dateKey": "2026-09-15",
+      "floor": [],
+      "usageByPkgMs": {},
+      "ruleSet": {
+        "version": 1,
+        "generatedAt": 1789491600000,
+        "tzOffsetMinutes": -420,
+        "serverTimeSkewMs": 0,
+        "rules": [
+          {
+            "ruleId": "r-fun",
+            "name": "Fun",
+            "mode": "track-only",
+            "appIds": [
+              "macos:com.roblox.client"
+            ],
+            "schedule": [],
+            "dailyBudgetMsByDow": {
+              "0": 3600000,
+              "1": 3600000,
+              "2": 3600000,
+              "3": 3600000,
+              "4": 3600000,
+              "5": 3600000,
+              "6": 3600000
+            },
+            "priority": 0
+          }
+        ],
+        "safetyAllowlist": [
+          "com.thetaset.companion",
+          "com.thetaset.kindred"
+        ],
+        "usageSeed": {
+          "dateKey": "2026-09-15",
+          "perRuleUsedMs": {
+            "r-fun": 4200000
+          }
+        }
+      },
+      "expect": [
+        {
+          "pkg": "com.roblox.client",
+          "action": "allow",
+          "reason": "budget-exhausted",
+          "ruleId": "r-fun"
+        }
+      ]
+    },
+    {
+      "id": "15-family-timezone-web-day",
+      "platform": "android",
+      "behaviour": "Web time from earlier in the family's day counts even when the device's own day began later: 90 minutes of Fun before midnight in Tokyo, on a Tuesday in Los Angeles, uses up Tuesday's hour.",
+      "nowMs": 1789491600000,
+      "dateKey": "2026-09-15",
+      "floor": [],
+      "usageByPkgMs": {
+        "com.roblox.client": 0
+      },
+      "ruleSet": {
+        "version": 1,
+        "generatedAt": 1789491600000,
+        "tzOffsetMinutes": -420,
+        "serverTimeSkewMs": 0,
+        "rules": [
+          {
+            "ruleId": "r-fun",
+            "name": "Fun",
+            "mode": "block",
+            "appIds": [
+              "android:com.roblox.client"
+            ],
+            "schedule": [],
+            "dailyBudgetMsByDow": {
+              "2": 3600000,
+              "3": 0
+            },
+            "priority": 0
+          }
+        ],
+        "safetyAllowlist": [
+          "com.thetaset.companion",
+          "com.thetaset.kindred"
+        ],
+        "usageSeed": {
+          "dateKey": "2026-09-15",
+          "perRuleUsedMs": {
+            "r-fun": 5400000
+          }
+        }
+      },
+      "expect": [
+        {
+          "pkg": "com.roblox.client",
+          "action": "block",
+          "reason": "budget-exhausted",
+          "ruleId": "r-fun"
+        }
+      ]
+    },
+    {
+      "id": "15-family-timezone-web-day",
+      "platform": "macos",
+      "behaviour": "Web time from earlier in the family's day counts even when the device's own day began later: 90 minutes of Fun before midnight in Tokyo, on a Tuesday in Los Angeles, uses up Tuesday's hour.",
+      "nowMs": 1789491600000,
+      "dateKey": "2026-09-15",
+      "floor": [],
+      "usageByPkgMs": {
+        "com.roblox.client": 0
+      },
+      "ruleSet": {
+        "version": 1,
+        "generatedAt": 1789491600000,
+        "tzOffsetMinutes": -420,
+        "serverTimeSkewMs": 0,
+        "rules": [
+          {
+            "ruleId": "r-fun",
+            "name": "Fun",
+            "mode": "block",
+            "appIds": [
+              "macos:com.roblox.client"
+            ],
+            "schedule": [],
+            "dailyBudgetMsByDow": {
+              "2": 3600000,
+              "3": 0
+            },
+            "priority": 0
+          }
+        ],
+        "safetyAllowlist": [
+          "com.thetaset.companion",
+          "com.thetaset.kindred"
+        ],
+        "usageSeed": {
+          "dateKey": "2026-09-15",
+          "perRuleUsedMs": {
+            "r-fun": 5400000
+          }
+        }
+      },
+      "expect": [
+        {
+          "pkg": "com.roblox.client",
+          "action": "block",
+          "reason": "budget-exhausted",
+          "ruleId": "r-fun"
+        }
+      ]
+    },
+    {
+      "id": "16-family-timezone-schedule-window",
+      "platform": "android",
+      "behaviour": "An allowed window follows the family's time of day: 09:00 in Los Angeles is inside 08:00–15:00, though a device set to London reads 17:00.",
+      "nowMs": 1789488000000,
+      "dateKey": "2026-09-15",
+      "floor": [],
+      "usageByPkgMs": {},
+      "ruleSet": {
+        "version": 1,
+        "generatedAt": 1789488000000,
+        "tzOffsetMinutes": -420,
+        "serverTimeSkewMs": 0,
+        "rules": [
+          {
+            "ruleId": "r-school",
+            "name": "School hours",
+            "mode": "block",
+            "appIds": [
+              "android:com.instagram.android"
+            ],
+            "schedule": [
+              {
+                "daysOfWeek": [
+                  1,
+                  2,
+                  3,
+                  4,
+                  5
+                ],
+                "timeRanges": [
+                  {
+                    "start": "08:00",
+                    "end": "15:00"
+                  }
+                ]
+              }
+            ],
+            "dailyBudgetMsByDow": {
+              "1": 28800000,
+              "2": 28800000,
+              "3": 28800000,
+              "4": 28800000,
+              "5": 28800000
+            },
+            "priority": 0
+          }
+        ],
+        "safetyAllowlist": [
+          "com.thetaset.companion",
+          "com.thetaset.kindred"
+        ],
+        "usageSeed": {
+          "dateKey": "2026-09-15",
+          "perRuleUsedMs": {}
+        }
+      },
+      "expect": [
+        {
+          "pkg": "com.instagram.android",
+          "action": "allow",
+          "reason": null,
+          "ruleId": null
+        }
+      ]
+    },
+    {
+      "id": "16-family-timezone-schedule-window",
+      "platform": "macos",
+      "behaviour": "An allowed window follows the family's time of day: 09:00 in Los Angeles is inside 08:00–15:00, though a device set to London reads 17:00.",
+      "nowMs": 1789488000000,
+      "dateKey": "2026-09-15",
+      "floor": [],
+      "usageByPkgMs": {},
+      "ruleSet": {
+        "version": 1,
+        "generatedAt": 1789488000000,
+        "tzOffsetMinutes": -420,
+        "serverTimeSkewMs": 0,
+        "rules": [
+          {
+            "ruleId": "r-school",
+            "name": "School hours",
+            "mode": "block",
+            "appIds": [
+              "macos:com.instagram.android"
+            ],
+            "schedule": [
+              {
+                "daysOfWeek": [
+                  1,
+                  2,
+                  3,
+                  4,
+                  5
+                ],
+                "timeRanges": [
+                  {
+                    "start": "08:00",
+                    "end": "15:00"
+                  }
+                ]
+              }
+            ],
+            "dailyBudgetMsByDow": {
+              "1": 28800000,
+              "2": 28800000,
+              "3": 28800000,
+              "4": 28800000,
+              "5": 28800000
+            },
+            "priority": 0
+          }
+        ],
+        "safetyAllowlist": [
+          "com.thetaset.companion",
+          "com.thetaset.kindred"
+        ],
+        "usageSeed": {
+          "dateKey": "2026-09-15",
+          "perRuleUsedMs": {}
+        }
+      },
+      "expect": [
+        {
+          "pkg": "com.instagram.android",
+          "action": "allow",
+          "reason": null,
+          "ruleId": null
+        }
+      ]
+    },
+    {
+      "id": "17-no-family-timezone",
+      "platform": "android",
+      "behaviour": "A family with no timezone yet uses the device's own clock: at 23:30 Tuesday in Chicago the device and the browser both give Tuesday's allowance.",
+      "nowMs": 1789533000000,
+      "dateKey": "2026-09-15",
+      "floor": [],
+      "usageByPkgMs": {
+        "com.roblox.client": 600000
+      },
+      "ruleSet": {
+        "version": 1,
+        "generatedAt": 1789533000000,
+        "tzOffsetMinutes": -300,
+        "serverTimeSkewMs": 0,
+        "rules": [
+          {
+            "ruleId": "r-fun",
+            "name": "Fun",
+            "mode": "block",
+            "appIds": [
+              "android:com.roblox.client"
+            ],
+            "schedule": [],
+            "dailyBudgetMsByDow": {
+              "2": 3600000,
+              "3": 0
+            },
+            "priority": 0
+          }
+        ],
+        "safetyAllowlist": [
+          "com.thetaset.companion",
+          "com.thetaset.kindred"
+        ],
+        "usageSeed": {
+          "dateKey": "2026-09-15",
+          "perRuleUsedMs": {}
+        }
+      },
+      "expect": [
+        {
+          "pkg": "com.roblox.client",
+          "action": "allow",
+          "reason": null,
+          "ruleId": null
+        }
+      ]
+    },
+    {
+      "id": "17-no-family-timezone",
+      "platform": "macos",
+      "behaviour": "A family with no timezone yet uses the device's own clock: at 23:30 Tuesday in Chicago the device and the browser both give Tuesday's allowance.",
+      "nowMs": 1789533000000,
+      "dateKey": "2026-09-15",
+      "floor": [],
+      "usageByPkgMs": {
+        "com.roblox.client": 600000
+      },
+      "ruleSet": {
+        "version": 1,
+        "generatedAt": 1789533000000,
+        "tzOffsetMinutes": -300,
+        "serverTimeSkewMs": 0,
+        "rules": [
+          {
+            "ruleId": "r-fun",
+            "name": "Fun",
+            "mode": "block",
+            "appIds": [
+              "macos:com.roblox.client"
+            ],
+            "schedule": [],
+            "dailyBudgetMsByDow": {
+              "2": 3600000,
+              "3": 0
+            },
+            "priority": 0
+          }
+        ],
+        "safetyAllowlist": [
+          "com.thetaset.companion",
+          "com.thetaset.kindred"
+        ],
+        "usageSeed": {
+          "dateKey": "2026-09-15",
+          "perRuleUsedMs": {}
+        }
+      },
+      "expect": [
+        {
+          "pkg": "com.roblox.client",
+          "action": "allow",
+          "reason": null,
+          "ruleId": null
+        }
+      ]
+    },
+    {
+      "id": "18-family-downtime-inside",
+      "platform": "android",
+      "behaviour": "While Family Downtime is on, every app is closed except the family allowlist and the safety floor. A pause and bonus time do not lift it, and it outranks an app block.",
+      "nowMs": 1789448400000,
+      "dateKey": "2026-09-14",
+      "floor": [
+        "com.android.settings"
+      ],
+      "usageByPkgMs": {
+        "com.roblox.client": 7200000
+      },
+      "ruleSet": {
+        "version": 1,
+        "generatedAt": 1789448400000,
+        "tzOffsetMinutes": -420,
+        "serverTimeSkewMs": 0,
+        "rules": [],
+        "safetyAllowlist": [
+          "com.thetaset.companion",
+          "com.thetaset.kindred"
+        ],
+        "usageSeed": {
+          "dateKey": "2026-09-14",
+          "perRuleUsedMs": {}
+        },
+        "appPolicy": {
+          "blocked": [
+            "acr.browser.lightning",
+            "com.UCMobile.intl",
+            "com.aloha.browser",
+            "com.android.chrome",
+            "com.apple.Safari",
+            "com.brave.Browser",
+            "com.brave.browser",
+            "com.brave.browser_beta",
+            "com.chrome.beta",
+            "com.chrome.canary",
+            "com.chrome.dev",
+            "com.cloudmosa.puffinFree",
+            "com.duckduckgo.mobile.android",
+            "com.ecosia.android",
+            "com.explore.web.browser",
+            "com.google.Chrome",
+            "com.heytap.browser",
+            "com.huawei.browser",
+            "com.jio.web",
+            "com.kiwibrowser.browser",
+            "com.mi.globalbrowser",
+            "com.microsoft.edgemac",
+            "com.microsoft.emmx",
+            "com.opera.browser",
+            "com.opera.browser.beta",
+            "com.opera.gx",
+            "com.opera.mini.native",
+            "com.operasoftware.Opera",
+            "com.qwant.liberty",
+            "com.sec.android.app.sbrowser",
+            "com.sec.android.app.sbrowser.beta",
+            "com.transsion.phoenix",
+            "com.uc.browser.en",
+            "com.vivaldi.Vivaldi",
+            "com.vivaldi.browser",
+            "com.yandex.browser",
+            "company.thebrowser.Browser",
+            "io.github.forkmaintainers.iceraven",
+            "mark.via.gp",
+            "net.onecook.browser",
+            "org.adblockplus.browser",
+            "org.mozilla.firefox",
+            "org.mozilla.firefox_beta",
+            "org.mozilla.firefoxdeveloperedition",
+            "org.mozilla.focus",
+            "org.mozilla.klar",
+            "org.mozilla.nightly",
+            "org.torproject.torbrowser"
+          ]
+        },
+        "familyDowntime": {
+          "intervals": [
+            {
+              "startMs": 1789444800000,
+              "endMs": 1789480800000
+            }
+          ],
+          "horizonEndMs": 1791867600000,
+          "allowAppIds": [
+            "com.audible.application"
+          ],
+          "note": "Screens are resting."
+        }
+      },
+      "expect": [
+        {
+          "pkg": "com.roblox.client",
+          "action": "block",
+          "reason": "family-downtime",
+          "ruleId": null
+        },
+        {
+          "pkg": "com.android.chrome",
+          "action": "block",
+          "reason": "family-downtime",
+          "ruleId": null
+        },
+        {
+          "pkg": "com.audible.application",
+          "action": "allow",
+          "reason": null,
+          "ruleId": null
+        },
+        {
+          "pkg": "com.android.settings",
+          "action": "allow",
+          "reason": null,
+          "ruleId": null
+        }
+      ]
+    },
+    {
+      "id": "18-family-downtime-inside",
+      "platform": "macos",
+      "behaviour": "While Family Downtime is on, every app is closed except the family allowlist and the safety floor. A pause and bonus time do not lift it, and it outranks an app block.",
+      "nowMs": 1789448400000,
+      "dateKey": "2026-09-14",
+      "floor": [
+        "com.android.settings"
+      ],
+      "usageByPkgMs": {
+        "com.roblox.client": 7200000
+      },
+      "ruleSet": {
+        "version": 1,
+        "generatedAt": 1789448400000,
+        "tzOffsetMinutes": -420,
+        "serverTimeSkewMs": 0,
+        "rules": [],
+        "safetyAllowlist": [
+          "com.thetaset.companion",
+          "com.thetaset.kindred"
+        ],
+        "usageSeed": {
+          "dateKey": "2026-09-14",
+          "perRuleUsedMs": {}
+        },
+        "appPolicy": {
+          "blocked": [
+            "acr.browser.lightning",
+            "com.UCMobile.intl",
+            "com.aloha.browser",
+            "com.android.chrome",
+            "com.apple.Safari",
+            "com.brave.Browser",
+            "com.brave.browser",
+            "com.brave.browser_beta",
+            "com.chrome.beta",
+            "com.chrome.canary",
+            "com.chrome.dev",
+            "com.cloudmosa.puffinFree",
+            "com.duckduckgo.mobile.android",
+            "com.ecosia.android",
+            "com.explore.web.browser",
+            "com.google.Chrome",
+            "com.heytap.browser",
+            "com.huawei.browser",
+            "com.jio.web",
+            "com.kiwibrowser.browser",
+            "com.mi.globalbrowser",
+            "com.microsoft.edgemac",
+            "com.microsoft.emmx",
+            "com.opera.browser",
+            "com.opera.browser.beta",
+            "com.opera.gx",
+            "com.opera.mini.native",
+            "com.operasoftware.Opera",
+            "com.qwant.liberty",
+            "com.sec.android.app.sbrowser",
+            "com.sec.android.app.sbrowser.beta",
+            "com.transsion.phoenix",
+            "com.uc.browser.en",
+            "com.vivaldi.Vivaldi",
+            "com.vivaldi.browser",
+            "com.yandex.browser",
+            "company.thebrowser.Browser",
+            "io.github.forkmaintainers.iceraven",
+            "macos:com.android.chrome",
+            "mark.via.gp",
+            "net.onecook.browser",
+            "org.adblockplus.browser",
+            "org.mozilla.firefox",
+            "org.mozilla.firefox_beta",
+            "org.mozilla.firefoxdeveloperedition",
+            "org.mozilla.focus",
+            "org.mozilla.klar",
+            "org.mozilla.nightly",
+            "org.torproject.torbrowser"
+          ]
+        },
+        "familyDowntime": {
+          "intervals": [
+            {
+              "startMs": 1789444800000,
+              "endMs": 1789480800000
+            }
+          ],
+          "horizonEndMs": 1791867600000,
+          "allowAppIds": [
+            "com.audible.application"
+          ],
+          "note": "Screens are resting."
+        }
+      },
+      "expect": [
+        {
+          "pkg": "com.roblox.client",
+          "action": "block",
+          "reason": "family-downtime",
+          "ruleId": null
+        },
+        {
+          "pkg": "com.android.chrome",
+          "action": "block",
+          "reason": "family-downtime",
+          "ruleId": null
+        },
+        {
+          "pkg": "com.audible.application",
+          "action": "allow",
+          "reason": null,
+          "ruleId": null
+        },
+        {
+          "pkg": "com.android.settings",
+          "action": "allow",
+          "reason": null,
+          "ruleId": null
+        }
+      ]
+    },
+    {
+      "id": "19-family-downtime-ended",
+      "platform": "android",
+      "behaviour": "Once Family Downtime ends, each app is decided as if it had never been on: the pause still lifts the time limit, and the parent’s app block still applies.",
+      "nowMs": 1789484400000,
+      "dateKey": "2026-09-15",
+      "floor": [
+        "com.android.settings"
+      ],
+      "usageByPkgMs": {
+        "com.roblox.client": 7200000
+      },
+      "ruleSet": {
+        "version": 1,
+        "generatedAt": 1789484400000,
+        "tzOffsetMinutes": -420,
+        "serverTimeSkewMs": 0,
+        "rules": [],
+        "safetyAllowlist": [
+          "com.thetaset.companion",
+          "com.thetaset.kindred"
+        ],
+        "usageSeed": {
+          "dateKey": "2026-09-15",
+          "perRuleUsedMs": {}
+        },
+        "appPolicy": {
+          "blocked": [
+            "acr.browser.lightning",
+            "com.UCMobile.intl",
+            "com.aloha.browser",
+            "com.android.chrome",
+            "com.apple.Safari",
+            "com.brave.Browser",
+            "com.brave.browser",
+            "com.brave.browser_beta",
+            "com.chrome.beta",
+            "com.chrome.canary",
+            "com.chrome.dev",
+            "com.cloudmosa.puffinFree",
+            "com.duckduckgo.mobile.android",
+            "com.ecosia.android",
+            "com.explore.web.browser",
+            "com.google.Chrome",
+            "com.heytap.browser",
+            "com.huawei.browser",
+            "com.jio.web",
+            "com.kiwibrowser.browser",
+            "com.mi.globalbrowser",
+            "com.microsoft.edgemac",
+            "com.microsoft.emmx",
+            "com.opera.browser",
+            "com.opera.browser.beta",
+            "com.opera.gx",
+            "com.opera.mini.native",
+            "com.operasoftware.Opera",
+            "com.qwant.liberty",
+            "com.sec.android.app.sbrowser",
+            "com.sec.android.app.sbrowser.beta",
+            "com.transsion.phoenix",
+            "com.uc.browser.en",
+            "com.vivaldi.Vivaldi",
+            "com.vivaldi.browser",
+            "com.yandex.browser",
+            "company.thebrowser.Browser",
+            "io.github.forkmaintainers.iceraven",
+            "mark.via.gp",
+            "net.onecook.browser",
+            "org.adblockplus.browser",
+            "org.mozilla.firefox",
+            "org.mozilla.firefox_beta",
+            "org.mozilla.firefoxdeveloperedition",
+            "org.mozilla.focus",
+            "org.mozilla.klar",
+            "org.mozilla.nightly",
+            "org.torproject.torbrowser"
+          ]
+        },
+        "familyDowntime": {
+          "intervals": [],
+          "horizonEndMs": 1791867600000,
+          "allowAppIds": [
+            "com.audible.application"
+          ],
+          "note": "Screens are resting."
+        }
+      },
+      "expect": [
+        {
+          "pkg": "com.roblox.client",
+          "action": "allow",
+          "reason": null,
+          "ruleId": null
+        },
+        {
+          "pkg": "com.android.chrome",
+          "action": "block",
+          "reason": "app-blocked",
+          "ruleId": null
+        },
+        {
+          "pkg": "com.audible.application",
+          "action": "allow",
+          "reason": null,
+          "ruleId": null
+        }
+      ]
+    },
+    {
+      "id": "19-family-downtime-ended",
+      "platform": "macos",
+      "behaviour": "Once Family Downtime ends, each app is decided as if it had never been on: the pause still lifts the time limit, and the parent’s app block still applies.",
+      "nowMs": 1789484400000,
+      "dateKey": "2026-09-15",
+      "floor": [
+        "com.android.settings"
+      ],
+      "usageByPkgMs": {
+        "com.roblox.client": 7200000
+      },
+      "ruleSet": {
+        "version": 1,
+        "generatedAt": 1789484400000,
+        "tzOffsetMinutes": -420,
+        "serverTimeSkewMs": 0,
+        "rules": [],
+        "safetyAllowlist": [
+          "com.thetaset.companion",
+          "com.thetaset.kindred"
+        ],
+        "usageSeed": {
+          "dateKey": "2026-09-15",
+          "perRuleUsedMs": {}
+        },
+        "appPolicy": {
+          "blocked": [
+            "acr.browser.lightning",
+            "com.UCMobile.intl",
+            "com.aloha.browser",
+            "com.android.chrome",
+            "com.apple.Safari",
+            "com.brave.Browser",
+            "com.brave.browser",
+            "com.brave.browser_beta",
+            "com.chrome.beta",
+            "com.chrome.canary",
+            "com.chrome.dev",
+            "com.cloudmosa.puffinFree",
+            "com.duckduckgo.mobile.android",
+            "com.ecosia.android",
+            "com.explore.web.browser",
+            "com.google.Chrome",
+            "com.heytap.browser",
+            "com.huawei.browser",
+            "com.jio.web",
+            "com.kiwibrowser.browser",
+            "com.mi.globalbrowser",
+            "com.microsoft.edgemac",
+            "com.microsoft.emmx",
+            "com.opera.browser",
+            "com.opera.browser.beta",
+            "com.opera.gx",
+            "com.opera.mini.native",
+            "com.operasoftware.Opera",
+            "com.qwant.liberty",
+            "com.sec.android.app.sbrowser",
+            "com.sec.android.app.sbrowser.beta",
+            "com.transsion.phoenix",
+            "com.uc.browser.en",
+            "com.vivaldi.Vivaldi",
+            "com.vivaldi.browser",
+            "com.yandex.browser",
+            "company.thebrowser.Browser",
+            "io.github.forkmaintainers.iceraven",
+            "macos:com.android.chrome",
+            "mark.via.gp",
+            "net.onecook.browser",
+            "org.adblockplus.browser",
+            "org.mozilla.firefox",
+            "org.mozilla.firefox_beta",
+            "org.mozilla.firefoxdeveloperedition",
+            "org.mozilla.focus",
+            "org.mozilla.klar",
+            "org.mozilla.nightly",
+            "org.torproject.torbrowser"
+          ]
+        },
+        "familyDowntime": {
+          "intervals": [],
+          "horizonEndMs": 1791867600000,
+          "allowAppIds": [
+            "com.audible.application"
+          ],
+          "note": "Screens are resting."
+        }
+      },
+      "expect": [
+        {
+          "pkg": "com.roblox.client",
+          "action": "allow",
+          "reason": null,
+          "ruleId": null
+        },
+        {
+          "pkg": "com.android.chrome",
+          "action": "block",
+          "reason": "app-blocked",
+          "ruleId": null
+        },
+        {
+          "pkg": "com.audible.application",
+          "action": "allow",
+          "reason": null,
+          "ruleId": null
+        }
+      ]
+    }
+  ]
+}

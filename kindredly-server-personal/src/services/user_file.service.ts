@@ -11,6 +11,19 @@ import PermissionService from './permission.service';
 import {getDetailsByAccountType} from '@/defaults/products_and_plans';
 import {base64ByteSize} from '@/utils/binary_utils';
 
+/**
+ * A preview id off a query string or JSON body. `undefined`, `null`, empty, an array with no
+ * entries and the literal "undefined" (a stringified query param) all mean "the original";
+ * anything else is a logical id, including "0", which older uploads used.
+ */
+export function normalizeUserFilePreviewId(value: unknown): string | null {
+  const single = Array.isArray(value) ? value[0] : value;
+  if (single === undefined || single === null) return null;
+  const text = String(single).trim();
+  if (text === '' || text === 'undefined' || text === 'null') return null;
+  return text;
+}
+
 class UserFileService {
   constructor(@inject(TYPES.UserFileAccessProvider) public fileAccessProvider: UserFileAccessProvider) {}
 
@@ -128,8 +141,7 @@ class UserFileService {
     const id = String(previewId ?? '0');
 
     const existingEncInfo = (userFile as any).encInfo as Record<string, unknown> | null;
-    const previewMeta =
-      (existingEncInfo?.previewMeta as Record<string, {iv?: string; bytes?: number}>) || {};
+    const previewMeta = (existingEncInfo?.previewMeta as Record<string, {iv?: string; bytes?: number}>) || {};
 
     // What this preview weighed last time, so a re-upload REPLACES that number rather than
     // adding to it. Writing a thumbnail twice — replacing an item attachment's image, say —
@@ -163,10 +175,7 @@ class UserFileService {
         ...existingEncInfo,
         previewMeta: {...previewMeta, [id]: {...(iv ? {iv} : {}), bytes: previewSize}},
       };
-      update.fileSize = Math.max(
-        0,
-        Number(userFile.fileSize ?? 0) - previousPreviewSize + previewSize,
-      );
+      update.fileSize = Math.max(0, Number(userFile.fileSize ?? 0) - previousPreviewSize + previewSize);
     }
 
     await this.userFileRepo.updateWithId(userFile._id, update as any);
@@ -542,7 +551,12 @@ class UserFileService {
   }
 
   // ROUTE-METHOD
-  async getUserFileStreamById(ctx: RequestContext, id: string, previewId?: string) {
+  /**
+   * Streams a user file, or one of its logical previews when `previewId` names one that exists.
+   * `resolvedPreviewId` says which bytes came back: the preview's id, or null for the original.
+   * A client picks its AES-GCM iv from that, never from what it asked for.
+   */
+  async getUserFileStreamById(ctx: RequestContext, id: string, previewId?: unknown) {
     // IDs are stored in database with file_ prefix (e.g., file_<uuid>)
     // No transformation needed - use ID as-is
     const userFile = await this._getUserFileDataById(ctx, id);
@@ -556,23 +570,33 @@ class UserFileService {
         'UserFile is chunked and has no base object; read it via /userfile/getCiphertextChunkRange instead.',
       );
     }
-    try {
-      // check if previewId is valid, it can be zero
-      if (!!previewId && previewId != 'undefined') {
+
+    const requestedPreviewId = normalizeUserFilePreviewId(previewId);
+    if (requestedPreviewId !== null) {
+      const previewFilename = userFile.filename + '_preview_' + requestedPreviewId;
+      // Existence is decided before the response commits. The old try/catch around opening the
+      // stream never fired — both providers hand back streams that only error once read — so a
+      // missing preview used to become a 200 whose body stopped after the JSON part.
+      const previewExists = await this.fileAccessProvider.userFileExists(
+        userFile.refType,
+        userFile.refId,
+        previewFilename,
+      );
+      if (previewExists) {
         return {
           userFile,
-          stream: await this.fileAccessProvider.getUserDataStream(
-            userFile.refType,
-            userFile.refId,
-            userFile.filename + '_preview_' + previewId,
-          ),
+          stream: await this.fileAccessProvider.getUserDataStream(userFile.refType, userFile.refId, previewFilename),
+          requestedPreviewId,
+          resolvedPreviewId: requestedPreviewId as string | null,
         };
       }
-    } catch (e) {}
+    }
 
     return {
       userFile,
       stream: await this.fileAccessProvider.getUserDataStream(userFile.refType, userFile.refId, userFile.filename),
+      requestedPreviewId,
+      resolvedPreviewId: null as string | null,
     };
   }
 

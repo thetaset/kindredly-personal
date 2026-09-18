@@ -4,6 +4,36 @@ import { checkIfYTChannel, normalizeYouTubeChannelIdentifier, parseChannelIdFrom
 import { ItemMeta, ItemMetaExtracted } from './shared.types';
 import { getSocialMetadataProvider, isRootWebsiteURL, type SocialMetadataProvider } from './url.utils';
 import { recognizePage, recognizedToItemResourceType } from './page-recognition.utils';
+import {
+  normalizeTextSnippet,
+  resolveAbsoluteUrl,
+  getFeedType,
+  getFeedTypeFromText,
+  getFeedTypeFromUrl,
+  hasStrongFeedUrlCue,
+  isFeedContentType,
+  isLikelyMetadataNoise,
+  looksLikeXmlFeed,
+  normalizeItemMetaImageUrls,
+  sanitizeExtractedTitle,
+} from './extraction.pure.utils';
+// Re-exported so every existing importer of this module keeps resolving (server, background, fetchmeta).
+export {
+  sanitizeExtractedTitle,
+  normalizeItemMetaImageUrls,
+  getFeedTypeFromUrl,
+  isLikelyFeedUrl,
+  isFeedContentType,
+  looksLikeXmlFeed,
+  hasUsableMetadata,
+  getMetadataSourcePriority,
+  mergeMetadataBySourcePriority,
+  mergeMetadataPreferPrimary,
+} from './extraction.pure.utils';
+
+// Re-exported so existing importers keep working; first-paint code should import
+// from './extraction.pure.utils' directly (see that file).
+export { resolveAbsoluteUrl };
 
 export interface SocialOEmbedResponse {
   title?: string;
@@ -28,109 +58,6 @@ function extractTextFromHtmlFragment(html?: string): string | undefined {
   return text || undefined;
 }
 
-function normalizeTextSnippet(value?: string | null): string | undefined {
-  if (typeof value !== 'string') {
-    return undefined;
-  }
-
-  const normalized = value.replace(/\s+/g, ' ').trim();
-  return normalized || undefined;
-}
-
-const MAX_EXTRACTED_TITLE_CHARS = 120;
-
-function addMissingTitleWordBreaks(value: string): string {
-  return value
-    .replace(/([a-z0-9\u2019])([A-Z][a-z])/g, '$1 $2')
-    .replace(/([0-9])([A-Z][a-z])/g, '$1 $2');
-}
-
-function trimRepeatedIndexedSuffix(value: string): string {
-  const indexedLabelMatches = Array.from(value.matchAll(/\b([A-Z][a-z]{3,})\s+\d+\b/g));
-  if (indexedLabelMatches.length < 2) {
-    return value;
-  }
-
-  const labelCounts = indexedLabelMatches.reduce<Map<string, number>>((counts, match) => {
-    const label = match[1]?.toLowerCase();
-    if (!label) {
-      return counts;
-    }
-
-    counts.set(label, (counts.get(label) || 0) + 1);
-    return counts;
-  }, new Map());
-
-  const firstRepeatedMatch = indexedLabelMatches.find((match) => {
-    const label = match[1]?.toLowerCase();
-    return !!label && (labelCounts.get(label) || 0) >= 2;
-  });
-
-  if (!firstRepeatedMatch || typeof firstRepeatedMatch.index !== 'number' || firstRepeatedMatch.index < 12) {
-    return value;
-  }
-
-  const prefix = normalizeTextSnippet(value.slice(0, firstRepeatedMatch.index));
-  if (!prefix || prefix.split(/\s+/).length < 2) {
-    return value;
-  }
-
-  return prefix;
-}
-
-function truncateExtractedTitle(value: string): string {
-  if (value.length <= MAX_EXTRACTED_TITLE_CHARS) {
-    return value;
-  }
-
-  const candidate = value.slice(0, MAX_EXTRACTED_TITLE_CHARS + 1);
-  const boundary = Math.max(
-    candidate.lastIndexOf(' | '),
-    candidate.lastIndexOf(' - '),
-    candidate.lastIndexOf(' — '),
-    candidate.lastIndexOf(' – '),
-    candidate.lastIndexOf(': '),
-    candidate.lastIndexOf('; '),
-    candidate.lastIndexOf(', '),
-    candidate.lastIndexOf(' '),
-  );
-
-  const cutIndex = boundary >= 60 ? boundary : MAX_EXTRACTED_TITLE_CHARS;
-  return `${candidate.slice(0, cutIndex).trimEnd()}...`;
-}
-
-export function sanitizeExtractedTitle(value?: string | null): string | undefined {
-  const normalized = normalizeTextSnippet(value);
-  if (!normalized) {
-    return undefined;
-  }
-
-  const withWordBreaks = normalizeTextSnippet(addMissingTitleWordBreaks(normalized));
-  if (!withWordBreaks || isLikelyMetadataNoise(withWordBreaks)) {
-    return undefined;
-  }
-
-  return truncateExtractedTitle(trimRepeatedIndexedSuffix(withWordBreaks));
-}
-
-function isLikelyMetadataNoise(value?: string | null): boolean {
-  const normalized = normalizeTextSnippet(value)?.toLowerCase();
-  if (!normalized) {
-    return true;
-  }
-
-  return (
-    normalized.includes('this website uses cookies') ||
-    normalized.includes('allow all cookies') ||
-    normalized.includes('allow selected cookies') ||
-    normalized.includes('use necessary cookies only') ||
-    normalized.includes('cookie declaration') ||
-    normalized.includes('enable javascript and cookies') ||
-    normalized.includes('attention required') ||
-    normalized.includes('access denied') ||
-    normalized.includes('just a moment')
-  );
-}
 
 function getHeuristicTitleFromDOM(document: Document): string | undefined {
   for (const selector of ['main h1', 'article h1', '[role="main"] h1', 'h1']) {
@@ -141,195 +68,6 @@ function getHeuristicTitleFromDOM(document: Document): string | undefined {
   }
 
   return undefined;
-}
-
-export function resolveAbsoluteUrl(baseUrl: string, value?: string | null): string | undefined {
-  const normalized = normalizeTextSnippet(value);
-  if (!normalized) {
-    return undefined;
-  }
-
-  try {
-    return new URL(normalized, baseUrl).toString();
-  } catch {
-    return undefined;
-  }
-}
-
-export function normalizeItemMetaImageUrls(baseUrl: string | undefined, meta?: ItemMeta | null): ItemMeta | undefined {
-  if (!meta) {
-    return undefined;
-  }
-
-  const normalizedBaseUrl = normalizeTextSnippet(baseUrl || meta.url);
-  if (!normalizedBaseUrl) {
-    return meta;
-  }
-
-  const normalizedImageSrc =
-    resolveAbsoluteUrl(normalizedBaseUrl, meta.imageSrc) ||
-    normalizeTextSnippet(meta.imageSrc) ||
-    (meta.imageSrc === '' ? '' : undefined);
-
-  return {
-    ...meta,
-    url: resolveAbsoluteUrl(normalizedBaseUrl, meta.url) || normalizedBaseUrl,
-    favicon: resolveAbsoluteUrl(normalizedBaseUrl, meta.favicon) || normalizeTextSnippet(meta.favicon),
-    faviconSrcPath:
-      resolveAbsoluteUrl(normalizedBaseUrl, meta.faviconSrcPath) ||
-      normalizeTextSnippet(meta.faviconSrcPath),
-    imageSrc: normalizedImageSrc,
-    bannerImageSrcPath:
-      resolveAbsoluteUrl(normalizedBaseUrl, meta.bannerImageSrcPath) ||
-      normalizeTextSnippet(meta.bannerImageSrcPath),
-  };
-}
-
-function getFeedType(typeAttr?: string | null): 'rss' | 'atom' | 'json' | null {
-  const normalized = normalizeTextSnippet(typeAttr)?.toLowerCase();
-  if (!normalized) {
-    return null;
-  }
-
-  if (normalized.includes('rss+xml')) return 'rss';
-  if (normalized.includes('atom+xml')) return 'atom';
-  if (normalized.includes('feed+json') || normalized.includes('json')) return 'json';
-  return null;
-}
-
-function getFeedTypeFromText(value?: string | null): 'rss' | 'atom' | 'json' | null {
-  const normalized = normalizeTextSnippet(value)?.toLowerCase();
-  if (!normalized) {
-    return null;
-  }
-
-  if (normalized.includes('atom')) return 'atom';
-  if (normalized.includes('json feed') || normalized.includes('jsonfeed')) return 'json';
-  if (normalized.includes('rss') || normalized.includes('podcast')) return 'rss';
-  return null;
-}
-
-export function getFeedTypeFromUrl(value?: string | null): 'rss' | 'atom' | 'json' | null {
-  const normalized = normalizeTextSnippet(value)?.toLowerCase();
-  if (!normalized) {
-    return null;
-  }
-
-  if (/(?:^|\/)(?:atom)(?:[/?._]|$)/.test(normalized) || /(?:^|[?&])(format|output|feed)=atom(?:[&#]|$)/.test(normalized) || /\.atom(?:$|[?#])/.test(normalized)) return 'atom';
-  if (normalized.includes('jsonfeed') || normalized.includes('feed.json') || /(?:^|[?&])(format|output|feed)=json(?:[&#]|$)/.test(normalized)) return 'json';
-  if (
-    /\.rss(?:$|[?#])/.test(normalized) ||
-    /(?:^|\/)(?:rss|feed|feeds)(?:[/?._]|$)/.test(normalized) ||
-    /(?:^|[?&])(format|output|feed)=rss(?:[&#]|$)/.test(normalized) ||
-    /(?:^|\/)(?:podcast|podcasts)(?:[/?._-]|$)/.test(normalized)
-  ) {
-    return 'rss';
-  }
-
-  return null;
-}
-
-function hasStrongFeedUrlCue(value?: string | null): boolean {
-  const normalized = normalizeTextSnippet(value)?.toLowerCase();
-  if (!normalized) {
-    return false;
-  }
-
-  return /(?:^|\/)(?:feed|feeds|rss|atom)(?:[/?._]|$)/.test(normalized)
-    || /(?:^|[?&])(format|output|feed)=(rss|atom|json)(?:[&#]|$)/.test(normalized)
-    || /\.(rss|atom|xml|json)(?:$|[?#])/.test(normalized)
-    || /(?:^|\/)(?:podcast|podcasts)(?:[/?._-]|$)/.test(normalized);
-}
-
-const FEED_FILE_EXTENSION_RE = /\.(rss|atom)$/;
-const FEED_FILE_NAME_RE = /^(feed|feeds|rss|rss2|atom|index|podcast|episodes)\.(xml|rss|atom|json)$/;
-const FEED_DATA_EXTENSION_RE = /\.(xml|json|rss|atom)$/;
-const FEED_PATH_SEGMENTS = new Set(['feed', 'feeds', 'rss', 'atom']);
-// `feeds.npr.org/510355/podcast.xml`, `rss.example.com/show.xml` — a feed-hosting
-// subdomain plus a data file. The subdomain alone is not enough (`feeds.example.com/about`).
-const FEED_HOST_LABELS = new Set(['feed', 'feeds', 'rss', 'podcasts']);
-const FEED_FORMAT_QUERY_KEYS = ['format', 'output', 'feed', 'alt', 'type'];
-const FEED_FORMAT_QUERY_VALUE_RE = /^(rss|rss2|atom|feed|json)$/i;
-
-/**
- * Strict "this URL is a feed" test, for deciding whether to *act* on a URL —
- * prefiltering navigations in the extension, and intercepting them in the native
- * in-app browsers. Deliberately much narrower than `hasStrongFeedUrlCue`, which is
- * tuned for scoring anchor candidates alongside a text cue and happily matches
- * `/podcasts/the-daily` or any `.xml`. Acting on those would hijack ordinary page
- * loads and sitemaps, so this requires a real feed filename, a feed path segment,
- * or an explicit feed format in the query string.
- */
-export function isLikelyFeedUrl(value?: string | null): boolean {
-  const normalized = normalizeTextSnippet(value);
-  if (!normalized) {
-    return false;
-  }
-
-  let parsed: URL;
-  try {
-    parsed = new URL(normalized);
-  } catch {
-    return false;
-  }
-
-  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
-    return false;
-  }
-
-  const segments = parsed.pathname.toLowerCase().split('/').filter(Boolean);
-  const lastSegment = segments[segments.length - 1] || '';
-
-  // `/whatever.rss`, `/whatever.atom` — the extension alone is conclusive.
-  if (FEED_FILE_EXTENSION_RE.test(lastSegment)) {
-    return true;
-  }
-
-  // `/feed.xml`, `/rss.xml`, `/atom.xml`, `/index.xml` (Hugo), `/feed.json`, `/podcast.xml`.
-  if (FEED_FILE_NAME_RE.test(lastSegment)) {
-    return true;
-  }
-
-  // `feeds.npr.org/510355/podcast.xml` — feed-hosting subdomain + a data file.
-  const firstHostLabel = parsed.hostname.toLowerCase().split('.')[0] || '';
-  if (FEED_HOST_LABELS.has(firstHostLabel) && FEED_DATA_EXTENSION_RE.test(lastSegment)) {
-    return true;
-  }
-
-  // A `feed`/`feeds`/`rss`/`atom` path segment, but only when the URL also ends in
-  // something feed-shaped: the segment itself (`/blog/feed`, `/rss/`), a data file
-  // (`/feeds/videos.xml` on YouTube), or Blogger's `/feeds/posts/default`.
-  if (segments.some((segment) => FEED_PATH_SEGMENTS.has(segment))) {
-    if (
-      FEED_PATH_SEGMENTS.has(lastSegment) ||
-      FEED_DATA_EXTENSION_RE.test(lastSegment) ||
-      lastSegment === 'default'
-    ) {
-      return true;
-    }
-  }
-
-  // `?format=rss`, `?feed=atom`, `?alt=rss`, …
-  for (const key of FEED_FORMAT_QUERY_KEYS) {
-    const queryValue = parsed.searchParams.get(key);
-    if (queryValue && FEED_FORMAT_QUERY_VALUE_RE.test(queryValue.trim())) {
-      return true;
-    }
-  }
-
-  return false;
-}
-
-const FEED_CONTENT_TYPE_RE = /(rss\+xml|atom\+xml|feed\+json|rdf\+xml)/;
-
-/**
- * True when a response `Content-Type` names a feed outright. This is the signal that
- * makes a browser download a feed link instead of rendering it, so it is also the
- * most reliable way to recognise one — no body parsing required.
- */
-export function isFeedContentType(value?: string | null): boolean {
-  const normalized = normalizeTextSnippet(value)?.toLowerCase();
-  return !!normalized && FEED_CONTENT_TYPE_RE.test(normalized);
 }
 
 function hasGenericFeedAnchorCue(value?: string | null): boolean {
@@ -632,75 +370,6 @@ export function extractMetadataFromOEmbed(
   };
 }
 
-export function hasUsableMetadata(meta?: ItemMeta | null): boolean {
-  if (!meta) {
-    return false;
-  }
-
-  return Boolean(meta.title?.trim() || meta.description?.trim() || meta.imageSrc?.trim());
-}
-
-const METADATA_SOURCE_PRIORITY: Record<string, number> = {
-  published_curated: 100,
-  published: 95,
-  live_dom: 90,
-  yt_api: 85,
-  oembed: 80,
-  html_parser: 70,
-  parser_1: 60,
-  parser_err: 10,
-};
-
-export function getMetadataSourcePriority(meta?: ItemMeta | null): number {
-  const sourceId = meta?.tsExtractedInfo?.sourceId;
-  if (!sourceId) {
-    return 0;
-  }
-
-  return METADATA_SOURCE_PRIORITY[sourceId] ?? 0;
-}
-
-export function mergeMetadataBySourcePriority(existing: ItemMeta, incoming?: ItemMeta | null): ItemMeta {
-  if (!incoming) {
-    return existing;
-  }
-
-  const incomingWins = getMetadataSourcePriority(incoming) >= getMetadataSourcePriority(existing);
-  return mergeMetadataPreferPrimary(incomingWins ? incoming : existing, incomingWins ? existing : incoming);
-}
-
-export function mergeMetadataPreferPrimary(primary: ItemMeta, fallback?: ItemMeta | null): ItemMeta {
-  if (!fallback) {
-    return normalizeItemMetaImageUrls(primary.url, primary) || primary;
-  }
-
-  const mergedExtractedInfo: ItemMetaExtracted | undefined = (primary.tsExtractedInfo || fallback.tsExtractedInfo)
-    ? {
-        pageType: primary.tsExtractedInfo?.pageType ?? fallback.tsExtractedInfo?.pageType ?? null,
-        ...(fallback.tsExtractedInfo || {}),
-        ...(primary.tsExtractedInfo || {}),
-      }
-    : undefined;
-
-  const mergedMeta: ItemMeta = {
-    ...fallback,
-    ...primary,
-    title: primary.title?.trim() || fallback.title,
-    description: primary.description?.trim() || fallback.description,
-    keywords: primary.keywords?.trim() || fallback.keywords,
-    siteName: primary.siteName?.trim() || fallback.siteName,
-    type: primary.type?.trim() || fallback.type,
-    locale: primary.locale?.trim() || fallback.locale,
-    favicon: primary.favicon?.trim() || fallback.favicon,
-    faviconSrcPath: primary.faviconSrcPath?.trim() || fallback.faviconSrcPath,
-    imageSrc: primary.imageSrc?.trim() || fallback.imageSrc,
-    bannerImageSrcPath: primary.bannerImageSrcPath?.trim() || fallback.bannerImageSrcPath,
-    tsExtractedInfo: mergedExtractedInfo,
-  };
-
-  return normalizeItemMetaImageUrls(primary.url || fallback.url, mergedMeta) || mergedMeta;
-}
-
 export function convertRedditUrlToJson(url: string): string {
   // Convert Reddit URL to JSON API endpoint by appending .json
   let jsonUrl = url;
@@ -716,20 +385,95 @@ export function convertRedditUrlToJson(url: string): string {
 
 
 /**
- * Cheap sniff for an RSS/Atom feed body. Podcasts (and other feeds) store the
- * feed URL as their primary URL, so the generic HTML/og:image extractor never
- * sees the artwork (it lives in <itunes:image> / the channel <image>) and
- * mangles the title by concatenating every <title>. Detect feeds up front and
- * parse them properly instead.
+ * The shape of a fetched response body, as far as metadata extraction cares.
  *
- * Regex-only on purpose — no `DOMParser`, no cheerio — so it also runs in the MV3
- * background service worker, where the extension sniffs feed responses.
+ * `binary` means "definitely not markup" — a zip, an image, an audio file. It exists
+ * so callers can stop *before* handing megabytes of bytes to an HTML parser.
  */
-export function looksLikeXmlFeed(data: string): boolean {
+export type FetchedContentKind = 'html' | 'feed' | 'pdf' | 'binary';
+
+/**
+ * Cheap sniff for a PDF body: the `%PDF-` header. The spec allows leading junk before
+ * it (readers scan the first 1KB), so we do the same rather than requiring offset 0.
+ *
+ * Byte-safe: a `Uint8Array` is checked as bytes, never decoded, so a PDF that was
+ * fetched as binary is recognised without a lossy round-trip through UTF-8.
+ */
+export function looksLikePdf(data?: Uint8Array | string | null): boolean {
   if (!data) return false;
-  const head = data.slice(0, 1500).toLowerCase().trimStart();
-  if (head.startsWith('<!doctype html') || head.startsWith('<html')) return false;
-  return /<rss[\s>]/.test(head) || /<feed[\s>]/.test(head) || (head.startsWith('<?xml') && head.includes('<channel'));
+
+  if (typeof data === 'string') {
+    return data.slice(0, 1024).includes('%PDF-');
+  }
+
+  const limit = Math.min(data.length, 1024);
+  // '%PDF-' = 0x25 0x50 0x44 0x46 0x2d
+  for (let i = 0; i + 4 < limit; i += 1) {
+    if (
+      data[i] === 0x25 &&
+      data[i + 1] === 0x50 &&
+      data[i + 2] === 0x44 &&
+      data[i + 3] === 0x46 &&
+      data[i + 4] === 0x2d
+    ) {
+      return true;
+    }
+  }
+  return false;
+}
+
+const HTML_CONTENT_TYPE_RE = /(text\/html|application\/xhtml)/;
+const TEXTUAL_CONTENT_TYPE_RE = /(^text\/|\+xml|\/xml|\/json)/;
+
+/**
+ * Decide how to parse a fetched body.
+ *
+ * The `Content-Type` header leads, because it is what the *browser* acted on — a
+ * response labelled `application/pdf` was never going to render as a page. Magic
+ * bytes then override, but only in the direction that prevents damage: a body that
+ * is really a PDF is treated as one even when the server mislabelled it `text/plain`
+ * (common on academic and government hosts). We never demote a real HTML body.
+ *
+ * Without this, every non-HTML URL reached the HTML parser, which found no title and
+ * no description and cached that emptiness.
+ */
+export function classifyFetchedContentKind(args: {
+  contentType?: string | null;
+  bytes?: Uint8Array | string | null;
+}): FetchedContentKind {
+  const contentType = normalizeTextSnippet(args.contentType)?.toLowerCase() || '';
+  const bytes = args.bytes;
+
+  // Magic bytes are conclusive for PDF and cost nothing, so check them first: they
+  // are the only signal available when the header is missing, wrong, or generic.
+  if (looksLikePdf(bytes)) {
+    return 'pdf';
+  }
+
+  if (contentType.includes('application/pdf')) {
+    return 'pdf';
+  }
+
+  if (isFeedContentType(contentType)) {
+    return 'feed';
+  }
+
+  if (HTML_CONTENT_TYPE_RE.test(contentType)) {
+    return 'html';
+  }
+
+  // Textual types (xml, json, plain) can still be a feed — sniff the body the way
+  // the existing feed path does before giving up on them.
+  if (!contentType || TEXTUAL_CONTENT_TYPE_RE.test(contentType)) {
+    if (typeof bytes === 'string' && looksLikeXmlFeed(bytes)) {
+      return 'feed';
+    }
+    // An unlabelled or textual response is far more often a page than a download;
+    // keep today's behaviour rather than newly refusing to parse pages that worked.
+    return 'html';
+  }
+
+  return 'binary';
 }
 
 /** Text of a namespaced channel-level tag (e.g. "itunes:summary"), direct children only. */
@@ -1051,6 +795,11 @@ async function extractYTPageInfoFromMeta(meta: Record<string, any>, $: any, url:
       tsExtractedInfo.handleId = tsExtractedInfo.handleId || youtubeHandleIdFromAuthor;
     }
 
+    const youtubeChannelName = ($('span[itemprop="author"] link[itemprop="name"]').attr('content') || '').trim();
+    if (youtubeChannelName && (youtubeChannelId || youtubeHandleIdFromAuthor)) {
+      tsExtractedInfo.channelName = youtubeChannelName;
+    }
+
     const externalChannelIds = await findVariableURLs($, 'externalChannelId');
 
     // Capture the canonical UC channel id even when a handle is already known.
@@ -1136,7 +885,10 @@ async function extractYTPageInfoFromDOM(document: Document, url: string, tsExtra
     const youtubeChannelId = youtubeChannelUrl ? parseChannelIdFromString(youtubeChannelUrl) : null;
     const youtubeHandleIdFromAuthor = youtubeChannelUrl ? parseYTHandleIdFromString(youtubeChannelUrl) : null;
 
-    const youtubeChannelName = authorSpan?.textContent || null;
+    // The name is a sibling `<link itemprop="name" content>`, not the url link's text.
+    const youtubeChannelName = (
+      document.querySelector('span[itemprop="author"] link[itemprop="name"]')?.getAttribute('content') || ''
+    ).trim();
 
     if (youtubeChannelId && !tsExtractedInfo.youtubeChannelIds.includes(youtubeChannelId)) {
       tsExtractedInfo.youtubeChannelIds.push(youtubeChannelId);
@@ -1145,6 +897,10 @@ async function extractYTPageInfoFromDOM(document: Document, url: string, tsExtra
 
     if (youtubeHandleIdFromAuthor) {
       tsExtractedInfo.handleId = tsExtractedInfo.handleId || youtubeHandleIdFromAuthor;
+    }
+
+    if (youtubeChannelName && (youtubeChannelId || youtubeHandleIdFromAuthor)) {
+      tsExtractedInfo.channelName = youtubeChannelName;
     }
 
     const externalChannelIds = await findVariableURLsInDOM(document, 'externalChannelId');

@@ -497,6 +497,18 @@ export const DEVICE_AGENT_ALLOWED_PATHS = new Set([
   // from the token rather than the body, so rule 2 holds without a further gate. Guard needs
   // this to enforce without the main app running (UX-019).
   '/companion/rules/current',
+  // The settings THIS device compiles its rules from (DCP-5). Read-only, takes no user or device id:
+  // the user is the token's, so rules 1 and 2 above hold the same way they do for the route above.
+  '/companion/settings/current',
+  // The desktop Companion's nudge stream (DCP-8): an SSE stream that carries only the content-free
+  // `deviceSettingsChanged` for the token's own user, answered by a fetch of the route above. It
+  // grants nothing, changes nothing and takes no id, so rules 1 and 2 hold.
+  '/companion/settings/events',
+  // Guard's own FCM token (DCP-7), so a guardian's change reaches Guard with Kindredly force-stopped.
+  // It grants nothing, and it writes only the caller's own client row (`updateDeviceToken` keys the
+  // row by the token's user and the request's client id), so rules 1 and 2 above hold. The pushes
+  // that token can receive are the child's, and Guard acts only on the silent "fetch your settings".
+  '/user/client/updateDeviceToken',
 ]);
 
 /** Long-lived Companion (device-agent) token: `DEVICE_AGENT_ALLOWED_PATHS` only, session-revocable. */

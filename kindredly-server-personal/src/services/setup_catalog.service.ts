@@ -438,7 +438,10 @@ class SetupCatalogService {
     if ((group.source === 'manual' ? 'manual' : 'dynamic_curated') === 'manual') {
       const itemIds = this.dedupeIds(group.itemIds).slice(0, itemLimit);
       if (itemIds.length > 0) {
-        const manualItems = await this.publishedService.getPublishedWithIdsForView(ctx, itemIds);
+        // Setup suggestions recommend, so a row under curation review is left out.
+        const manualItems = await this.publishedService.getPublishedWithIdsForView(ctx, itemIds, {
+          recommendableOnly: true,
+        });
         const lookup = new Map(manualItems.filter((item) => !!item?._id).map((item) => [item._id, item]));
         items = itemIds.map((id) => lookup.get(id)).filter((item): item is Published => !!item);
       }

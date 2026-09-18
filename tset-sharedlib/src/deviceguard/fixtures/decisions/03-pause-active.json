@@ -1,0 +1,108 @@
+{
+  "id": "03-pause-active",
+  "behaviour": "A guardian's pause lifts every usage limit until it expires. It does not lift app blocks.",
+  "clock": {
+    "nowMs": 1789491600000,
+    "familyTimeZone": "America/Los_Angeles",
+    "deviceTimeZone": "America/Los_Angeles"
+  },
+  "settings": {
+    "usageLimitsData": {
+      "contentUsageLimits": [
+        {
+          "id": "r-fun",
+          "name": "Fun",
+          "type": "advanced",
+          "conditions": [
+            {
+              "type": "eduValue",
+              "values": [
+                "eduval_fun"
+              ]
+            }
+          ],
+          "timeLimits": [
+            {
+              "hours": 1,
+              "daysOfWeek": [
+                0,
+                1,
+                2,
+                3,
+                4,
+                5,
+                6
+              ]
+            }
+          ]
+        }
+      ],
+      "temporaryRules": []
+    },
+    "ruleOverrideSettings": {
+      "ruleOverrides": []
+    },
+    "accessControlSettings": {
+      "disableUsageLimits": true,
+      "disableUsageLimitsExpires": 1789495200000
+    },
+    "appPolicy": {
+      "version": 1,
+      "blockedCategories": [
+        "browsers"
+      ],
+      "entries": {},
+      "updatedAt": 1
+    },
+    "appPolicyStatus": "readable"
+  },
+  "installedApps": [
+    {
+      "pkg": "com.roblox.client",
+      "label": "Roblox",
+      "platform": "android"
+    },
+    {
+      "pkg": "com.android.chrome",
+      "label": "Chrome",
+      "platform": "android"
+    }
+  ],
+  "floor": [],
+  "usage": {
+    "appMsByPkg": {
+      "com.roblox.client": 7200000
+    },
+    "webLogs": [
+      {
+        "url": "https://example.com/eduval_fun/70",
+        "eduValue": "eduval_fun",
+        "minutes": 70
+      }
+    ]
+  },
+  "usageSeed": {
+    "perRuleUsedMs": {}
+  },
+  "expectDevice": [
+    {
+      "pkg": "com.roblox.client",
+      "action": "allow",
+      "reason": null,
+      "ruleId": null
+    },
+    {
+      "pkg": "com.android.chrome",
+      "action": "block",
+      "reason": "app-blocked",
+      "ruleId": null
+    }
+  ],
+  "expectBrowser": [
+    {
+      "ruleId": "r-fun",
+      "exceeded": false,
+      "reason": null
+    }
+  ]
+}

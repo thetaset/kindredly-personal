@@ -106,7 +106,8 @@ export class SecurityDigestService {
           }),
       );
 
-      if (!config.adminWatchNotifications) return;
+      // The structured log line above always happens; only the mail is gated.
+      if (!config.adminWatchNotifications || !config.adminEmail) return;
 
       const rows = Object.entries(finding.detail)
         .map(([key, value]) => `<tr><td><strong>${key}</strong></td><td>${value}</td></tr>`)

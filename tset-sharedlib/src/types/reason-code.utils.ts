@@ -2,6 +2,9 @@ import type { ReasonCode } from './activity.types'
 import { REASON_LABELS } from './reason-metadata'
 
 const reasonPrecedence: ReasonCode[] = [
+  // First of all: while it is on, nothing else a child could fix or wait out changes anything, and
+  // "blocked URL" or "no time left" would send them after a way through that does not exist.
+  'family-downtime',
   'custom-blocked-url',
   'short-form-video',
   'social-media',
@@ -124,6 +127,7 @@ const POLL_RE_EVALUABLE_REASON_CODES: ReadonlySet<ReasonCode> = new Set<ReasonCo
   'checkpoint-pending',
   'reqs-not-met',
   // Whole-session stances the poll reads directly.
+  'family-downtime',
   'restrict-all',
   'other',
 ])
@@ -137,4 +141,79 @@ const POLL_RE_EVALUABLE_REASON_CODES: ReadonlySet<ReasonCode> = new Set<ReasonCo
 export function isContentDerivedReason(code: ReasonCode | null | undefined): boolean {
   if (!code) return true
   return !POLL_RE_EVALUABLE_REASON_CODES.has(code)
+}
+
+/**
+ * Blocks the assistant may review on a parent's behalf.
+ *
+ * The line is "would a parent plausibly say yes to this, in writing, in advance?".
+ * A site missing from the library and a category call are both judgment calls a
+ * parent's guidelines can settle. A safety block and a rule the parent wrote
+ * themselves are not: the first is not ours to hand to a model, and the second is
+ * already their explicit answer, so re-litigating it would let a child route
+ * around a decision that has been made.
+ *
+ * An allowlist rather than a denylist, for the same reason
+ * `POLL_RE_EVALUABLE_REASON_CODES` is one: a reason code added later is not
+ * reviewable until someone decides it is. The cost of that default is a request
+ * going to a parent who would have been happy to automate it.
+ */
+export const AI_REVIEWABLE_REASON_CODES: ReadonlySet<ReasonCode> = new Set<ReasonCode>([
+  // The library does not have it yet — the case the feature exists for.
+  'not-in-library',
+  // Category calls a parent's guidelines can legitimately overrule.
+  'inappropriate-topic',
+  'social-media',
+  'short-form-video',
+  // A block with no more specific explanation.
+  'other',
+])
+
+/**
+ * May the assistant review a request carrying this reason?
+ *
+ * A missing code answers `true`, unlike `isContentDerivedReason`. The two
+ * fail-safe in opposite directions because the risks are opposite: there, an
+ * unknown code wrongly treated as re-evaluable is a navigation loop; here the
+ * worst case is a request the assistant looks at and hands to the parent anyway,
+ * since the model can only approve or defer. Callers still gate on the request
+ * being a `url` type, which is what a missing code accompanies in practice.
+ */
+export function isAiReviewableReasonCode(code: ReasonCode | null | undefined): boolean {
+  if (!code) return true
+  return AI_REVIEWABLE_REASON_CODES.has(code)
+}
+
+/**
+ * Blocks the assistant may review as a possible MISCLASSIFICATION.
+ *
+ * A separate list from `AI_REVIEWABLE_REASON_CODES` because it answers a
+ * different question. There the question is "would a parent allow this site?";
+ * here it is "is this page really the category it is being charged to?" — a
+ * child out of Entertainment time on a page that is plainly a lesson.
+ *
+ * Only the two codes that mean a budget for a CATEGORY ran out.
+ * `out-of-time-range` is a schedule decision — the category is not what is wrong,
+ * the hour is — and `reqs-not-met` is a gate the parent set, not a category call.
+ * Reclassifying either would let a category argument reopen a decision that was
+ * never about categories.
+ *
+ * A denylist would be wrong here for the same reason it is wrong above: a reason
+ * code added later must not become reclassifiable because nobody said otherwise.
+ */
+export const AI_RECLASSIFY_REASON_CODES: ReadonlySet<ReasonCode> = new Set<ReasonCode>([
+  'no-time-given',
+  'time-exceeded',
+])
+
+/**
+ * May the assistant reconsider the category behind this block?
+ *
+ * A missing code answers `false`, unlike `isAiReviewableReasonCode`. Widening a
+ * category is a change to what the child may do for the rest of the day, so it
+ * needs a stated reason to be about a category at all.
+ */
+export function isAiReclassifyReasonCode(code: ReasonCode | null | undefined): boolean {
+  if (!code) return false
+  return AI_RECLASSIFY_REASON_CODES.has(code)
 }

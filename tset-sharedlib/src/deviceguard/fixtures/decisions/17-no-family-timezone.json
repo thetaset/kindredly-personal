@@ -1,0 +1,81 @@
+{
+  "id": "17-no-family-timezone",
+  "behaviour": "A family with no timezone yet uses the device's own clock: at 23:30 Tuesday in Chicago the device and the browser both give Tuesday's allowance.",
+  "clock": {
+    "nowMs": 1789533000000,
+    "familyTimeZone": null,
+    "deviceTimeZone": "America/Chicago"
+  },
+  "settings": {
+    "usageLimitsData": {
+      "contentUsageLimits": [
+        {
+          "id": "r-fun",
+          "name": "Fun",
+          "type": "advanced",
+          "conditions": [
+            {
+              "type": "eduValue",
+              "values": [
+                "eduval_fun"
+              ]
+            }
+          ],
+          "timeLimits": [
+            {
+              "hours": 1,
+              "daysOfWeek": [
+                2
+              ]
+            },
+            {
+              "hours": 0,
+              "daysOfWeek": [
+                3
+              ]
+            }
+          ]
+        }
+      ],
+      "temporaryRules": []
+    },
+    "ruleOverrideSettings": {
+      "ruleOverrides": []
+    },
+    "accessControlSettings": {},
+    "appPolicy": null,
+    "appPolicyStatus": "absent"
+  },
+  "installedApps": [
+    {
+      "pkg": "com.roblox.client",
+      "label": "Roblox",
+      "platform": "android"
+    }
+  ],
+  "floor": [],
+  "usage": {
+    "appMsByPkg": {
+      "com.roblox.client": 600000
+    },
+    "webLogs": []
+  },
+  "usageSeed": {
+    "perRuleUsedMs": {}
+  },
+  "expectDevice": [
+    {
+      "pkg": "com.roblox.client",
+      "action": "allow",
+      "reason": null,
+      "ruleId": null
+    }
+  ],
+  "expectBrowser": [
+    {
+      "ruleId": "r-fun",
+      "exceeded": false,
+      "reason": null
+    }
+  ]
+}

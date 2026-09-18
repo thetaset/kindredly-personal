@@ -63,7 +63,8 @@ export function isOfficialPublisherId(value: string | null | undefined): boolean
 // truth shared by the server allowlist (admin.service.ts) and the client model
 // picker (AdminClassificationEvalData.vue). The first entry is the default used
 // whenever no (valid) model is requested.
-export const GROUND_TRUTH_MODELS = ['gpt-5.4-nano', 'gpt-4o-mini'] as const;
+// Every entry must be in AI_MODEL_ALLOWLIST so it has a price; gpt-4o-mini never could.
+export const GROUND_TRUTH_MODELS = ['gpt-5.4-nano', 'gpt-5.4-mini'] as const;
 export const DEFAULT_GROUND_TRUTH_MODEL = GROUND_TRUTH_MODELS[0];
 
 const YOUTUBE_CATEGORIES = {

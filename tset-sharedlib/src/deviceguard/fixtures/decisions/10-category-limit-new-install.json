@@ -1,0 +1,87 @@
+{
+  "id": "10-category-limit-new-install",
+  "behaviour": "A category limit covers a seed-map app installed today with no guardian decision, and category apps share one budget.",
+  "clock": {
+    "nowMs": 1789491600000,
+    "familyTimeZone": "America/Los_Angeles",
+    "deviceTimeZone": "America/Los_Angeles"
+  },
+  "settings": {
+    "usageLimitsData": {
+      "contentUsageLimits": [
+        {
+          "id": "r-games",
+          "name": "Games",
+          "type": "advanced",
+          "conditions": [
+            {
+              "type": "eduValue",
+              "values": [
+                "eduval_fun"
+              ]
+            }
+          ],
+          "timeLimits": [
+            {
+              "hours": 1,
+              "daysOfWeek": [
+                0,
+                1,
+                2,
+                3,
+                4,
+                5,
+                6
+              ]
+            }
+          ]
+        }
+      ],
+      "temporaryRules": []
+    },
+    "ruleOverrideSettings": {
+      "ruleOverrides": []
+    },
+    "accessControlSettings": {},
+    "appPolicy": null,
+    "appPolicyStatus": "absent"
+  },
+  "installedApps": [
+    {
+      "pkg": "com.roblox.client",
+      "label": "Roblox",
+      "platform": "android"
+    },
+    {
+      "pkg": "com.mojang.minecraftpe",
+      "label": "Minecraft",
+      "platform": "android",
+      "firstSeenAt": 1789491540000
+    }
+  ],
+  "floor": [],
+  "usage": {
+    "appMsByPkg": {
+      "com.mojang.minecraftpe": 3660000
+    },
+    "webLogs": []
+  },
+  "usageSeed": {
+    "perRuleUsedMs": {}
+  },
+  "expectDevice": [
+    {
+      "pkg": "com.mojang.minecraftpe",
+      "action": "block",
+      "reason": "budget-exhausted",
+      "ruleId": "r-games"
+    },
+    {
+      "pkg": "com.roblox.client",
+      "action": "block",
+      "reason": "budget-exhausted",
+      "ruleId": "r-games"
+    }
+  ],
+  "browserNotApplicable": "Device-only: the installed-app catalog and per-app time exist only on the device."
+}

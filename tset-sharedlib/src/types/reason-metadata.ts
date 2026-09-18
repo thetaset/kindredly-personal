@@ -19,6 +19,7 @@ export const REASON_LABELS: Partial<Record<ReasonCode, string>> = {
   'not-in-library': 'Not in library',
   'library-syncing': 'Library syncing',
   'restrict-all': 'Restricted',
+  'family-downtime': 'Family Downtime',
   other: 'Blocked',
 }
 
@@ -127,6 +128,11 @@ export const REASON_UI_COPY: Partial<Record<ReasonCode, ReasonUICopy>> = {
     title: 'Access to this content is restricted.',
     detailTitle: 'Restricted by your settings',
     detailBody: 'A rule is currently restricting access to this content.',
+  },
+  'family-downtime': {
+    title: 'Family Downtime.',
+    detailTitle: 'Family Downtime',
+    detailBody: 'Screens are off for the whole family right now. An admin set this.',
   },
 }
 

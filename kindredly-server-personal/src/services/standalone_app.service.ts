@@ -6,7 +6,13 @@ type StandaloneAppRegistryEntry = StandaloneAppManifest & {
   allowlistedUserIds?: string[];
 };
 
-const standaloneAppRegistry: Record<string, StandaloneAppRegistryEntry> = {
+/**
+ * THE registry. The client carries a fallback copy (`tset-client/src/app/apps/standaloneAppCatalog.ts`)
+ * for a server that cannot answer; this list leads and the client may lag it, never the reverse —
+ * an app that exists only client-side ships only with a client release (BOX-10). Exported for the
+ * drift test.
+ */
+export const standaloneAppRegistry: Record<string, StandaloneAppRegistryEntry> = {
   'activity-finder': {
     slug: 'activity-finder',
     title: 'Activity Finder',
@@ -20,7 +26,6 @@ const standaloneAppRegistry: Record<string, StandaloneAppRegistryEntry> = {
     featureGate: null,
     allowedRoles: [],
     allowedAccountTypes: [],
-    extensionEmbeddingAllowed: false,
   },
   'knowledge-map': {
     slug: 'knowledge-map',
@@ -34,7 +39,6 @@ const standaloneAppRegistry: Record<string, StandaloneAppRegistryEntry> = {
     featureGate: null,
     allowedRoles: [],
     allowedAccountTypes: [],
-    extensionEmbeddingAllowed: false,
   },
   // App-listing metadata only — Explore Nearby has no server backend (curated data
   // ships in the client; OpenStreetMap is fetched client-side; favorites/last-location
@@ -52,7 +56,6 @@ const standaloneAppRegistry: Record<string, StandaloneAppRegistryEntry> = {
     featureGate: null,
     allowedRoles: [],
     allowedAccountTypes: [],
-    extensionEmbeddingAllowed: false,
   },
   // The critical-thinking puzzle app. Content is authored in the `puzzle_content` store and read
   // through /thinkingPuzzles/catalog; the client also carries a bundled seed it falls back to when
@@ -70,7 +73,6 @@ const standaloneAppRegistry: Record<string, StandaloneAppRegistryEntry> = {
     featureGate: null,
     allowedRoles: [],
     allowedAccountTypes: [],
-    extensionEmbeddingAllowed: false,
   },
   'mindful-minute': {
     slug: 'mindful-minute',
@@ -84,7 +86,19 @@ const standaloneAppRegistry: Record<string, StandaloneAppRegistryEntry> = {
     featureGate: null,
     allowedRoles: [],
     allowedAccountTypes: [],
-    extensionEmbeddingAllowed: false,
+  },
+  'source-lens': {
+    slug: 'source-lens',
+    title: 'Source Lens',
+    summary: 'A guided case file for inspecting articles, claims, and cited evidence.',
+    runtimeKind: 'bundled',
+    canonicalPath: '/apps/source-lens',
+    runtimeEntryPath: null,
+    discoverability: 'listed',
+    requiresLogin: false,
+    featureGate: null,
+    allowedRoles: [],
+    allowedAccountTypes: [],
   },
   'trusted-search': {
     slug: 'trusted-search',
@@ -98,7 +112,6 @@ const standaloneAppRegistry: Record<string, StandaloneAppRegistryEntry> = {
     featureGate: null,
     allowedRoles: [],
     allowedAccountTypes: [],
-    extensionEmbeddingAllowed: false,
   },
   'family-board': {
     slug: 'family-board',
@@ -113,7 +126,6 @@ const standaloneAppRegistry: Record<string, StandaloneAppRegistryEntry> = {
     featureGate: null,
     allowedRoles: [],
     allowedAccountTypes: [],
-    extensionEmbeddingAllowed: false,
   },
   'mind-map': {
     slug: 'mind-map',
@@ -128,7 +140,6 @@ const standaloneAppRegistry: Record<string, StandaloneAppRegistryEntry> = {
     featureGate: null,
     allowedRoles: [],
     allowedAccountTypes: [],
-    extensionEmbeddingAllowed: false,
   },
   lesson: {
     slug: 'lesson',
@@ -143,7 +154,6 @@ const standaloneAppRegistry: Record<string, StandaloneAppRegistryEntry> = {
     featureGate: null,
     allowedRoles: [],
     allowedAccountTypes: [],
-    extensionEmbeddingAllowed: false,
   },
   notes: {
     slug: 'notes',
@@ -158,7 +168,6 @@ const standaloneAppRegistry: Record<string, StandaloneAppRegistryEntry> = {
     featureGate: null,
     allowedRoles: [],
     allowedAccountTypes: [],
-    extensionEmbeddingAllowed: false,
   },
   'family-reflection': {
     slug: 'family-reflection',
@@ -172,7 +181,6 @@ const standaloneAppRegistry: Record<string, StandaloneAppRegistryEntry> = {
     featureGate: null,
     allowedRoles: [],
     allowedAccountTypes: [],
-    extensionEmbeddingAllowed: false,
   },
 };
 
@@ -195,7 +203,6 @@ function toManifest(app: StandaloneAppRegistryEntry): StandaloneAppManifest {
     featureGate: app.featureGate,
     allowedRoles: app.allowedRoles,
     allowedAccountTypes: app.allowedAccountTypes,
-    extensionEmbeddingAllowed: app.extensionEmbeddingAllowed,
   };
 }
 

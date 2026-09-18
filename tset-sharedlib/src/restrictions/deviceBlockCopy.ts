@@ -43,7 +43,12 @@ export type DeviceBlockReason =
    * action behind it: put Kindredly in this browser and it opens. Reporting it as "a parent turned
    * this off" would send a child to ask for something nobody chose.
    */
-  | 'browser-unprotected';
+  | 'browser-unprotected'
+  /**
+   * Family Downtime is on. Checked before everything but the safety floor, and lifted by nothing a
+   * child can ask for, so its words never mention asking.
+   */
+  | 'family-downtime';
 
 const DEVICE_BLOCK_REASONS: readonly string[] = [
   'budget-exhausted',
@@ -51,6 +56,7 @@ const DEVICE_BLOCK_REASONS: readonly string[] = [
   'always-blocked',
   'app-blocked',
   'browser-unprotected',
+  'family-downtime',
 ];
 
 /**
@@ -92,6 +98,8 @@ export type DeviceBlockCopyInput = {
    * back to the generic "use a browser with Kindredly in it", which is what it always said.
    */
   allowedBrowsers?: readonly string[];
+  /** The person's Blocked message, shown during Family Downtime. */
+  note?: string | null;
 };
 
 /**
@@ -134,6 +142,25 @@ function unlockLine(input: DeviceBlockCopyInput): string {
     : 'Opens again tomorrow.';
 }
 
+const WEEKDAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+/**
+ * "Until 07:00." today, "Until tomorrow at 07:00.", "Until Sunday at 18:00." within the week, and
+ * "Until Sep 28 at 18:00." past it (a one-off can run 14 days). Nothing without a time.
+ */
+export function downtimeUntilSentence(input: DeviceBlockCopyInput): string {
+  if (input.unlockAtMs == null) return '';
+  const clock = localClock(input.unlockAtMs, input.tzOffsetMinutes);
+  const day = (ms: number) => Math.floor((ms + input.tzOffsetMinutes * 60_000) / 86_400_000);
+  const days = day(input.unlockAtMs) - day(input.nowMs);
+  if (days <= 0) return `Until ${clock}.`;
+  if (days === 1) return `Until tomorrow at ${clock}.`;
+  const local = new Date(input.unlockAtMs + input.tzOffsetMinutes * 60_000);
+  if (days < 7) return `Until ${WEEKDAY_NAMES[local.getUTCDay()]} at ${clock}.`;
+  return `Until ${MONTH_NAMES[local.getUTCMonth()]} ${local.getUTCDate()} at ${clock}.`;
+}
+
 /** "this computer" or "this phone" — the one place that decides, so no surface can say the wrong one. */
 export function deviceNoun(platform: string | null | undefined): string {
   return isDesktopPlatform(platform) ? 'this computer' : 'this phone';
@@ -161,6 +188,15 @@ export function deviceBlockCopy(input: DeviceBlockCopyInput): DeviceBlockCopy {
   const opens = unlockLine(input);
 
   switch (input.reason) {
+    case 'family-downtime': {
+      // The whole family is off screens, so the app is not the subject and asking is not offered.
+      const note = (input.note || '').trim();
+      const until = downtimeUntilSentence(input);
+      return {
+        headline: 'Family Downtime',
+        detail: [until, note || 'Screens are off for the whole family right now.'].filter(Boolean).join(' '),
+      };
+    }
     case 'app-blocked':
       // Checked first on purpose: "your time is used up" would be a lie for an app with no budget.
       return { headline: `${appLabel} is turned off`, detail: 'A parent turned this off. Ask them if you need it.' };
@@ -207,6 +243,8 @@ export function deviceBlockCopy(input: DeviceBlockCopyInput): DeviceBlockCopy {
 export function deviceBlockSubtitle(input: DeviceBlockCopyInput): string {
   const noun = deviceNoun(input.platform);
   switch (input.reason) {
+    case 'family-downtime':
+      return downtimeUntilSentence(input) || 'An admin set Family Downtime.';
     case 'app-blocked':
       return `A parent chooses which apps can be used on ${noun}.`;
     case 'browser-unprotected': {
