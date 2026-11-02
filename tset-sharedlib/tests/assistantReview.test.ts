@@ -15,6 +15,8 @@ import {
   summarizeAssistantReviewEntry,
   assistantGrantScopeLabel,
   assistantReviewSourceSummary,
+  ASSISTANT_REVIEW_STARTER_TEMPLATES,
+  defaultAssistantStarterIdForAge,
 } from '../src/restrictions/assistantReview';
 
 describe('normalizeAssistantReviewSettings', () => {
@@ -139,6 +141,30 @@ describe('getAssistantWeeklyAllowance', () => {
   it('falls back to the free tier for an unknown plan', () => {
     expect(getAssistantWeeklyAllowance(null)).toBe(3);
     expect(getAssistantWeeklyAllowance('mystery')).toBe(3);
+  });
+});
+
+// HAT-206: a first visit opens with the starter for the child's age.
+describe('defaultAssistantStarterIdForAge', () => {
+  it('picks by age: under 9, 9 to 12, 13 and up', () => {
+    expect(defaultAssistantStarterIdForAge(6)).toBe('starter-younger');
+    expect(defaultAssistantStarterIdForAge(8)).toBe('starter-younger');
+    expect(defaultAssistantStarterIdForAge(9)).toBe('starter-school-age');
+    expect(defaultAssistantStarterIdForAge(12)).toBe('starter-school-age');
+    expect(defaultAssistantStarterIdForAge(13)).toBe('starter-teen');
+    expect(defaultAssistantStarterIdForAge(17)).toBe('starter-teen');
+  });
+
+  // It only ever grants, so an unknown age must not read as older.
+  it('picks the most careful starter when the age is unknown', () => {
+    expect(defaultAssistantStarterIdForAge(null)).toBe('starter-younger');
+    expect(defaultAssistantStarterIdForAge(undefined)).toBe('starter-younger');
+    expect(defaultAssistantStarterIdForAge(Number.NaN)).toBe('starter-younger');
+  });
+
+  it('always names a starter that exists', () => {
+    const ids = ASSISTANT_REVIEW_STARTER_TEMPLATES.map((template) => template.id);
+    for (const age of [null, 5, 10, 15]) expect(ids).toContain(defaultAssistantStarterIdForAge(age));
   });
 });
 

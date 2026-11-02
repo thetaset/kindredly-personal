@@ -1,0 +1,69 @@
+{
+  "id": "27-app-grant-expired",
+  "behaviour": "Once a guardian's grant for an app has ended, the app is blocked again.",
+  "clock": {
+    "nowMs": 1789491600000,
+    "familyTimeZone": "America/Los_Angeles",
+    "deviceTimeZone": "America/Los_Angeles"
+  },
+  "settings": {
+    "usageLimitsData": {
+      "contentUsageLimits": [],
+      "temporaryRules": []
+    },
+    "ruleOverrideSettings": {
+      "ruleOverrides": []
+    },
+    "accessControlSettings": {},
+    "appPolicy": {
+      "version": 1,
+      "blockedCategories": [
+        "browsers"
+      ],
+      "entries": {},
+      "updatedAt": 1
+    },
+    "appPolicyStatus": "readable",
+    "appGrants": [
+      {
+        "appId": "com.android.chrome",
+        "until": 1789491599999
+      }
+    ]
+  },
+  "installedApps": [
+    {
+      "pkg": "com.android.chrome",
+      "label": "Chrome",
+      "platform": "android"
+    },
+    {
+      "pkg": "org.mozilla.firefox",
+      "label": "Firefox",
+      "platform": "android"
+    }
+  ],
+  "floor": [],
+  "usage": {
+    "appMsByPkg": {},
+    "webLogs": []
+  },
+  "usageSeed": {
+    "perRuleUsedMs": {}
+  },
+  "expectDevice": [
+    {
+      "pkg": "com.android.chrome",
+      "action": "block",
+      "reason": "app-blocked",
+      "ruleId": null
+    },
+    {
+      "pkg": "org.mozilla.firefox",
+      "action": "block",
+      "reason": "app-blocked",
+      "ruleId": null
+    }
+  ],
+  "browserNotApplicable": "Device-only: a guardian's yes to an app from a request is enforced only on devices (HAT-178)."
+}

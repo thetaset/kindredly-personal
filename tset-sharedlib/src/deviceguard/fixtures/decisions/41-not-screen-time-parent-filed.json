@@ -1,0 +1,108 @@
+{
+  "id": "41-not-screen-time-parent-filed",
+  "behaviour": "A parent who gives Camera a usage type makes its time count again (HAT-952): an hour on Camera and half an hour on Roblox spend the one-hour overall limit.",
+  "clock": {
+    "nowMs": 1789448400000,
+    "familyTimeZone": "America/Los_Angeles",
+    "deviceTimeZone": "America/Los_Angeles"
+  },
+  "settings": {
+    "usageLimitsData": {
+      "contentUsageLimits": [
+        {
+          "id": "r-all-apps",
+          "name": "All apps",
+          "type": "advanced",
+          "conditions": [
+            {
+              "type": "appId",
+              "values": [
+                "all-device-apps"
+              ]
+            }
+          ],
+          "timeLimits": [
+            {
+              "hours": 1,
+              "daysOfWeek": [
+                0,
+                1,
+                2,
+                3,
+                4,
+                5,
+                6
+              ]
+            }
+          ]
+        }
+      ],
+      "temporaryRules": []
+    },
+    "ruleOverrideSettings": {
+      "ruleOverrides": []
+    },
+    "accessControlSettings": {},
+    "appPolicy": {
+      "version": 1,
+      "blockedCategories": [],
+      "entries": {
+        "com.google.android.GoogleCamera": {
+          "pkg": "com.google.android.GoogleCamera",
+          "eduValue": "eduval_fun",
+          "updatedAt": 1
+        }
+      },
+      "updatedAt": 1
+    },
+    "appPolicyStatus": "readable"
+  },
+  "installedApps": [
+    {
+      "pkg": "com.roblox.client",
+      "label": "Roblox",
+      "platform": "android"
+    },
+    {
+      "pkg": "com.google.android.deskclock",
+      "label": "Clock",
+      "platform": "android",
+      "isSystem": true
+    },
+    {
+      "pkg": "com.google.android.GoogleCamera",
+      "label": "Camera",
+      "platform": "android",
+      "isSystem": true
+    },
+    {
+      "pkg": "com.vendor.clock",
+      "label": "Clock",
+      "platform": "android",
+      "isSystem": true,
+      "notScreenTime": true
+    }
+  ],
+  "floor": [
+    "com.android.settings"
+  ],
+  "usage": {
+    "appMsByPkg": {
+      "com.google.android.GoogleCamera": 3600000,
+      "com.roblox.client": 1800000
+    },
+    "webLogs": []
+  },
+  "usageSeed": {
+    "perRuleUsedMs": {}
+  },
+  "expectDevice": [
+    {
+      "pkg": "com.roblox.client",
+      "action": "block",
+      "reason": "budget-exhausted",
+      "ruleId": "r-all-apps"
+    }
+  ],
+  "browserNotApplicable": "Device-only here: the Usage page's side is tested in ActivityService.notScreenTime.test.ts."
+}

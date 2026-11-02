@@ -28,8 +28,10 @@ export default class ItemQueryService {
 
     const targetUserId = userId || ctx.currentUserId;
 
-    // Permission check
-    await ctx.verifySelfOrAdmin(targetUserId);
+    // Permission check. An admin may list a child's items, never another adult's: the app only
+    // offers another adult's shared collections (HAT-631), and this route answers with everything
+    // they own.
+    await ctx.verifySelfOrAdminOverUser(targetUserId);
 
     // Early return for empty ID filter
     if (filters.ids && filters.ids.length === 0) {
@@ -177,6 +179,17 @@ export default class ItemQueryService {
     // SubType filters
     if ((filters as any).subTypes && (filters as any).subTypes.length > 0) {
       query = query.whereIn('item.subType', (filters as any).subTypes);
+    }
+
+    // SubType exclusion — the library's New list drops products (shopping carts). The
+    // orWhereNull leg is not optional: whereNotIn on its own is NULL for a row with no
+    // subType, so the whole New list would come back holding only the items that happen
+    // to carry one. Same rule as the client's queryFromIndexLocal predicate.
+    if (filters.excludeSubTypes && filters.excludeSubTypes.length > 0) {
+      const excluded = filters.excludeSubTypes;
+      query = query.where(function () {
+        this.whereNotIn('item.subType', excluded).orWhereNull('item.subType');
+      });
     }
 
     if (filters.inCollections && filters.inCollections.length > 0) {

@@ -3,6 +3,10 @@ import knex from '@/db/knex_config';
 import {RefStateRepo} from '@/db/ref_state.repo';
 import SSEManager from './sse.manager';
 import {familyDowntimeForDevice, normalizeFamilyDowntime} from 'tset-sharedlib/restrictions/familyDowntime';
+import {normalizeAllowList} from 'tset-sharedlib/restrictions/alwaysAllowed';
+import {deviceAppGrants} from 'tset-sharedlib/restrictions/appGrants';
+import {restrictionsPauseAt} from 'tset-sharedlib/deviceguard/compileDeviceSettings';
+import {companionSigningPublicKey, signBrowserPause} from './companion_signing';
 import type {
   DeviceAppPolicy,
   DeviceAppPolicyStatus,
@@ -23,8 +27,21 @@ import type {
 const DEVICE_ACCESS_CONTROL_KEYS = [
   'disableUsageLimits',
   'disableUsageLimitsExpires',
+  // "Pause all restrictions". Without these a phone never heard of a guardian's pause: it was not in
+  // the fetch, and a write to it did not count as a change, so no device was nudged. A child asked a
+  // parent from the block screen, the parent paused everything, and the phone kept blocking.
+  'disableRestrictions',
+  'disableRestrictionsExpires',
+  // "Block all access". A device must see it to decline a pause while it is on, as the browser does,
+  // even before it can block everything itself.
+  'restrictAll',
+  'restrictAllExpires',
   'usageLimitInterventionMode',
   'defaultInterventionMode',
+  // Earn access (HAT-836): the rules and when each was last opened. A device works out which rules
+  // hold with the same sharedlib math as the browser, so an opening on any device reaches the phone.
+  'earnAccessSettings',
+  'earnAccessOpenings',
 ] as const;
 
 export const DEVICE_GUARD_REF_TYPE = 'device-guard';
@@ -44,6 +61,10 @@ export function deviceSettingsFromOptions(options: unknown): DeviceOptionSetting
   const limits = o.usageLimitsData && typeof o.usageLimitsData === 'object' ? o.usageLimitsData : {};
   const overrides = o.ruleOverrideSettings && typeof o.ruleOverrideSettings === 'object' ? o.ruleOverrideSettings : {};
   const access = o.accessControlSettings && typeof o.accessControlSettings === 'object' ? o.accessControlSettings : {};
+  const alwaysAllowAppIds = normalizeAllowList(o.alwaysAllowed).appIds;
+  // A guardian's yes to one app from a request (HAT-178). Ended ones stay until the next write: this
+  // also decides whether a write changed anything, so it cannot read the clock.
+  const appGrants = deviceAppGrants(o.appGrants);
 
   const accessControlSettings: DeviceOptionSettings['accessControlSettings'] = {};
   for (const key of DEVICE_ACCESS_CONTROL_KEYS) {
@@ -60,6 +81,10 @@ export function deviceSettingsFromOptions(options: unknown): DeviceOptionSetting
     },
     ruleOverrideSettings: {ruleOverrides: Array.isArray(overrides.ruleOverrides) ? overrides.ruleOverrides : []},
     accessControlSettings,
+    // Always allowed apps (HAT-152). Absent when there are none, so a device that has none sees the
+    // same settings as before, and adding or removing a site or library item wakes no device.
+    ...(alwaysAllowAppIds.length ? {alwaysAllowAppIds} : {}),
+    ...(appGrants.length ? {appGrants} : {}),
   };
 }
 
@@ -175,15 +200,20 @@ export class DeviceSettingsService {
     userId: string,
     knownVersion: number | undefined,
     nowMs = Date.now(),
+    deviceId?: string | null,
   ): Promise<DeviceSettingsCurrentResponse> {
     const user = await this.db('user')
       .where({_id: userId})
       .first('_id', 'accountId', 'options', 'deviceSettingsVersion', 'deleted');
     if (!user || user.deleted) throw new Error('User not found');
 
+    // For a computer's root guard, in every answer, unchanged ones too: the signed pause lasts 30
+    // minutes, so each fetch renews it (HAT-766).
+    const guard = deviceId ? signedForGuard(user.options, deviceId, nowMs) : {};
+
     const version = Number(user.deviceSettingsVersion || 0);
     if (knownVersion !== undefined && knownVersion === version) {
-      return {version, serverTimeMs: nowMs};
+      return {version, serverTimeMs: nowMs, ...guard};
     }
 
     const account = user.accountId ? await this.db('account').where({_id: user.accountId}).first('options') : undefined;
@@ -213,8 +243,23 @@ export class DeviceSettingsService {
       ...appPolicyFromRow(policyRow),
       familyDowntime,
     };
-    return {version, serverTimeMs: nowMs, settings, familyTimeZone};
+    return {version, serverTimeMs: nowMs, settings, familyTimeZone, ...guard};
   }
+}
+
+/**
+ * What a computer's root guard needs from a settings fetch (HAT-766): the server's public key, which
+ * it records once, and, while a guardian has paused all restrictions, the signed statement that lets
+ * it lift browser lockdown on this device. "Block all access" means no pause here as everywhere.
+ */
+export function signedForGuard(
+  options: unknown,
+  deviceId: string,
+  nowMs: number,
+): Pick<DeviceSettingsCurrentResponse, 'signingKey' | 'browserPause'> {
+  const pause = restrictionsPauseAt(deviceSettingsFromOptions(options), nowMs);
+  const browserPause = pause ? signBrowserPause({deviceId, pauseUntilMs: pause.untilMs, nowMs}) : null;
+  return {signingKey: companionSigningPublicKey(), ...(browserPause ? {browserPause} : {})};
 }
 
 export default DeviceSettingsService;

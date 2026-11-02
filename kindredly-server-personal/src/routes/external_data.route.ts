@@ -7,6 +7,9 @@ import {ApiReq} from '@/types/api-types';
 import {authenticateJWT, errorHelper} from '../utils/auth_utils';
 import {RequestContext} from '@/base/request_context';
 import {outboundFetchCounter} from '@/services/outbound_fetch_counter';
+import {resolveShortLink} from '@/utils/short_link';
+import {callCheckedService} from '@/services/app_service.service';
+import {findWork} from '@/services/work_lookup.service';
 
 class ExternalDataRoute implements Routes {
   public router = Router();
@@ -125,6 +128,51 @@ class ExternalDataRoute implements Routes {
       outboundFetchCounter,
       errorHelper(async (req: ApiReq<'/data/podcastFeedLookup'>, res) => {
         const results = await this.contentSourceService.lookupPodcastFeed(req.body);
+        res.json({success: true, results});
+      }),
+    );
+
+    // Where a short link leads, so an item saved from one is stored as the post's own address
+    // (SMB-4). Each hop goes through the same SSRF guard as every other fetch here.
+    this.router.post(
+      '/data/resolveShortLink',
+      authenticateJWT,
+      outboundFetchCounter,
+      errorHelper(async (req: ApiReq<'/data/resolveShortLink'>, res) => {
+        const url = typeof req.body?.url === 'string' ? req.body.url.slice(0, 2048) : '';
+        const resolved = await resolveShortLink(url).catch(() => null);
+        res.json({success: true, results: {url: resolved}});
+      }),
+    );
+
+    // A call an app makes to a checked outside service, such as weather (HAT-629). The service
+    // checks the address against the list itself; nothing here trusts the host's check.
+    this.router.post(
+      '/data/appService',
+      authenticateJWT,
+      outboundFetchCounter,
+      errorHelper(async (req: ApiReq<'/data/appService'>, res) => {
+        const results = await callCheckedService(req.body?.url);
+        res.json({success: true, results});
+      }),
+    );
+
+    // A book, film, series, album or song by name, for Kinbot's addWork (HAT-794). Reads only
+    // Wikipedia, Wikidata and Open Library; a url is used only when it is one of theirs.
+    this.router.post(
+      '/data/findWork',
+      authenticateJWT,
+      outboundFetchCounter,
+      errorHelper(async (req: ApiReq<'/data/findWork'>, res) => {
+        const body = req.body || {};
+        const results = await findWork({
+          query: typeof body.query === 'string' ? body.query : undefined,
+          kind: body.kind,
+          by: typeof body.by === 'string' ? body.by : undefined,
+          year: typeof body.year === 'number' ? body.year : undefined,
+          workId: typeof body.workId === 'string' ? body.workId.slice(0, 40) : undefined,
+          url: typeof body.url === 'string' ? body.url.slice(0, 2048) : undefined,
+        });
         res.json({success: true, results});
       }),
     );

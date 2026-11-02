@@ -29,6 +29,7 @@ const ALL_REASON_CODES: ReasonCode[] = [
   'library-syncing',
   'reqs-not-met',
   'checkpoint-pending',
+  'earn-access-pending',
   'out-of-time-range',
   'no-matching-rule',
 ];

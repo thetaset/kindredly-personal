@@ -72,6 +72,17 @@ export const COLLECTION_TEMPLATE_SEED: CollectionTemplate[] = [
     minAgeGroups: ADULT_BANDS,
   },
   {
+    id: 'home.shoppingcart.v1',
+    name: 'Shopping cart',
+    group: 'Home & Family',
+    description: 'Products you might buy, from any store, with the price the page showed.',
+    tags: ['shopping'],
+    seedText: 'shopping cart products buy price store wishlist amazon target basket',
+    kindTemplateId: 'kindtpl.cart.v1',
+    icon: 'cart',
+    minAgeGroups: ADULT_BANDS,
+  },
+  {
     id: 'personal.health.symbols.v1',
     name: 'Health Info',
     group: 'Personal Admin',

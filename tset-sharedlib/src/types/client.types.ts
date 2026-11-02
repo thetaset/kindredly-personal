@@ -21,16 +21,24 @@ export interface TempShareData {
     mimeType?: string;
     dataType?: string;
     filename?: string;
+    /** The name a new item made from this file starts with, when better than the filename: a right-clicked picture's page title. */
+    itemName?: string;
     path?: string;
     data?: string;
     file?: File;
     size?: number;
+    /** A large file shared on an iPhone, left where it is and read by byte range when added (IFX-20). */
+    filePath?: string;
+    /** A large file shared on Android, read over the native port by this handle when added (IFX-20). */
+    nativeHandle?: string;
   };
   preppedData?: {
     fileType?: string;
     fileData?: string;
     imagePreview?: string;
     imageType?: string;
+    /** A video's first frame at full size, as a data URL: the item's picture when one is made. */
+    posterImage?: string;
   };
 }
 
@@ -53,6 +61,15 @@ export interface ClientSettings {
   redditHideSearch: boolean | null;
   redditHideComments: boolean | null;
   redditHideOtherDistractions: boolean | null;
+  /** One video, then stop (D13, SMB-20). Null: on for a child, off for anyone else. */
+  tiktokPlayOnce: boolean | null;
+  instagramPlayOnce: boolean | null;
+  youtubeShortsPlayOnce: boolean | null;
+  /**
+   * Google Search AI (HAT-128). `noChat`: AI Overviews stay, AI Mode and follow-ups go.
+   * `hideAll`: no AI Overviews, AI Mode or People also ask. `null`: Google as it comes.
+   */
+  googleAILimit: 'noChat' | 'hideAll' | null;
   showRedirectsInHistory: boolean;
   disableAllImageScanningOnDevice: boolean;
   developerMode: boolean;
@@ -96,12 +113,70 @@ export const GUARDIAN_ONLY_PREF_KEYS = [
    * which the child's own SiteStyleService legitimately reads.
    */
   'filters.autoApprovalSettings',
+
+  /*
+   * Content filtering (HAT-327 REG-4, closes observation #88). The child's own browser
+   * enforces these (`SentryProcessor`, `bg/advancedFilteringPrefs.ts`), so a child who
+   * could write them could set their own strictness to "relaxed" or empty their blocked
+   * sites. Only the Filtering page, settings copy and Kinbot's admin tools write them, and
+   * a parent unlocking a child's device is an admin by then (the temporary override).
+   */
+  'filters.strictnessPresetId',
+  'filters.contentFilters',
+  'filters.blockedUrlPatterns',
+  'filters.serverDeepLookupEnabled',
+  'filters.adLoadAnalysis.enabled',
+  /** Per-family classification fixes, set by an admin. */
+  'classification.overrides',
+
+  /*
+   * Distraction filters: what YouTube, Reddit and Google hide. Written only by their panels,
+   * which are admin-only; a child unhiding YouTube comments was one request away.
+   */
+  'youtubeHideSearch',
+  'youtubeHideComments',
+  'youtubeHideRecommendations',
+  'youtubeHideOtherDistractions',
+  'redditHideSearch',
+  'redditHideComments',
+  'redditHideOtherDistractions',
+  'tiktokPlayOnce',
+  'instagramPlayOnce',
+  'youtubeShortsPlayOnce',
+  'googleAILimit',
+
+  /*
+   * A child's email allowlist lives in `options.emailAllowedSenders` (admin-only). This is
+   * the adult's own list and the child's old one; a child writing it changes nothing today,
+   * and guarding it keeps it that way if a reader ever looks here again.
+   */
+  'integrations.email.allowedSenders',
+
+  /** Whether Kinbot may read this person's encrypted data. A parent's call for a child. */
+  'features.aiPrivateData.enabled',
+
+  /** Digital citizenship lessons a parent says they talked over with the child (HAT-534, DCL-10). */
+  'lessonPacks.talkedAbout',
+] as const;
+
+/**
+ * Key families only an admin may write, matched by prefix: a new member is guarded the day it
+ * is added. Same rule as the list above.
+ */
+export const GUARDIAN_ONLY_PREF_PREFIXES = [
+  /** What Kinbot may do for this person, by capability group. Set on a child's AI page. */
+  'features.aiCapability.',
+  /** Whether Kinbot may change parental controls without asking. A guardian's grant. */
+  'features.aiParentalGrant.',
 ] as const;
 
 export type GuardianOnlyPrefKey = (typeof GUARDIAN_ONLY_PREF_KEYS)[number];
 
-export function isGuardianOnlyPrefKey(key: string): key is GuardianOnlyPrefKey {
-  return (GUARDIAN_ONLY_PREF_KEYS as readonly string[]).includes(key);
+export function isGuardianOnlyPrefKey(key: string): boolean {
+  return (
+    (GUARDIAN_ONLY_PREF_KEYS as readonly string[]).includes(key) ||
+    GUARDIAN_ONLY_PREF_PREFIXES.some((prefix) => key.startsWith(prefix))
+  );
 }
 
 export interface StorageCleanupSettings {

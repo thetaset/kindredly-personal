@@ -28,6 +28,8 @@ import type {
 import { ALL_DEVICE_APPS } from '../types/device-guard.types'
 import type { CompiledAppPolicy } from '../types/device-guard.types'
 import { catalogAppId, type AppCatalogEntry } from './deviceAppPolicy';
+import { GAME_ATTRIBUTE, hasGameAttribute } from '../restrictions/games';
+import { gamesInConditions } from '../restrictions/gamesList';
 
 const HR_OF_MS = 1000 * 60 * 60
 
@@ -101,6 +103,30 @@ function appIdConditions(conditions: LimitMatchCondition[] | undefined): LimitMa
 }
 
 /**
+ * The apps of the games a rule names (`game` condition, HAT-634): one game's app on every platform,
+ * from the games list. Named apps, like an explicit `appId`, so they need no catalog and no account
+ * setting turns them off: the parent chose that game.
+ */
+function namedGameAppIds(rule: LimitRule): string[] {
+  return gamesInConditions(rule.conditions).flatMap((game) => game.apps)
+}
+
+/** Conditions only a browser can test: a page's library item, its address, or what it is doing. */
+const BROWSER_TARGET_TYPES = new Set<string>(['itemIds', 'urlPatterns', 'attribute'])
+
+/**
+ * A rule that names sites or library items. A category beside them narrows those sites on the
+ * web ("Entertainment on YouTube": `checkConditionList` ANDs the two), so on a phone it adds
+ * nothing: expanding it would count every entertainment app against a YouTube limit (HAT-596).
+ */
+function hasBrowserTarget(rule: LimitRule): boolean {
+  // The Games attribute is not a browser-only target: it names the Games app type on a device
+  // (`expandGameAppIds`). Video playback, the other attribute, is only knowable in a browser.
+  return (rule.conditions ?? []).some((c) =>
+    BROWSER_TARGET_TYPES.has(c.type) && !(c.type === 'attribute' && (c.values ?? []).every((v) => v === GAME_ATTRIBUTE)))
+}
+
+/**
  * Fold today's `RuleOverride`s (bonus time, "block again at", temporary grants)
  * into the rules before compiling, so the device sees the same allowance the
  * browser does.
@@ -151,7 +177,7 @@ export function expandEduValueAppIds(rule: LimitRule, catalog: AppCatalogEntry[]
   const wanted = new Set(
     (rule.conditions ?? []).filter((c) => c.type === 'eduValue').flatMap((c) => c.values),
   )
-  if (wanted.size === 0 || catalog.length === 0) return []
+  if (wanted.size === 0 || catalog.length === 0 || hasBrowserTarget(rule)) return []
   return catalog.filter((a) => wanted.has(a.eduValue)).map(catalogAppId)
 }
 
@@ -177,7 +203,7 @@ const NON_SOCIAL_VALUES = new Set(['non-social', 'nonsocial'])
  * way. An empty `values` array is affirmative too, matching `checkConditionList`.
  */
 export function expandSocialAppIds(rule: LimitRule, catalog: AppCatalogEntry[]): string[] {
-  if (catalog.length === 0) return []
+  if (catalog.length === 0 || hasBrowserTarget(rule)) return []
   const conditions = (rule.conditions ?? []).filter((c) => c.type === 'socialDesignation')
   if (conditions.length === 0) return []
   const affirmative = conditions.some((c) => {
@@ -186,6 +212,19 @@ export function expandSocialAppIds(rule: LimitRule, catalog: AppCatalogEntry[]):
   })
   if (!affirmative) return []
   return catalog.filter((a) => a.categoryId === 'social').map(catalogAppId)
+}
+
+/**
+ * Apps in the `games` app type, for the Games limit (HAT-634): its `game` attribute matches a listed
+ * game site on the web and every game app on a phone or computer — the Games type from Android's
+ * category, the curated seed, every Steam title and a Linux desktop file that says Game.
+ *
+ * Like Social media, only a rule that names nothing narrower expands: a Games attribute beside sites
+ * or library items would narrow those sites on the web, so it adds no apps here.
+ */
+export function expandGameAppIds(rule: LimitRule, catalog: AppCatalogEntry[]): string[] {
+  if (catalog.length === 0 || hasBrowserTarget(rule) || !hasGameAttribute(rule.conditions)) return []
+  return catalog.filter((a) => a.categoryId === 'games').map(catalogAppId)
 }
 
 /**
@@ -247,24 +286,31 @@ export function isDeviceAppRule(
   // First and unconditionally: an explicit appId is a per-rule opt-in the parent made
   // deliberately, and no account-level accounting preference should undo it.
   if (appIdConditions(rule.conditions).length > 0) return true
+  if (namedGameAppIds(rule).length > 0) return true
   if (!categoryExpansionAllowed(rule, categoryExpansion)) return false
   if (expandEduValueAppIds(rule, catalog).length > 0) return true
+  if (expandGameAppIds(rule, catalog).length > 0) return true
   return expandSocialAppIds(rule, catalog).length > 0
 }
 
-function resolveAppIds(
+/**
+ * The apps a rule counts on a device: its named apps and games, then its categories' apps. Exported
+ * so the Blocked page's app rows (`blockedPageRows`) read the same expansion the phone compiles.
+ */
+export function resolveAppIds(
   rule: LimitRule,
   catalog: AppCatalogEntry[] = [],
   categoryExpansion: CategoryExpansion = 'all',
 ): string[] | typeof ALL_DEVICE_APPS {
-  const explicit = appIdConditions(rule.conditions).flatMap((c) => c.values)
+  const explicit = [...appIdConditions(rule.conditions).flatMap((c) => c.values), ...namedGameAppIds(rule)]
   if (explicit.includes(ALL_DEVICE_APPS)) return ALL_DEVICE_APPS
   if (!categoryExpansionAllowed(rule, categoryExpansion)) return [...new Set(explicit)]
   // Union, not intersection. `checkConditionList` ANDs conditions on the web side,
   // so a rule carrying two different condition types would mean something narrower
-  // there than here. The authoring UI emits exactly one condition per rule (the
-  // ALL_DEVICE_APPS sentinel only ever lands on the `type: 'all'` overall rule), so
-  // no rule it produces can hit the difference. Revisit if that stops being true.
+  // there than here. The one mix the authoring UI writes is a limit on sites or library
+  // items in one category (HAT-596), and the category expands to no apps beside those
+  // (`hasBrowserTarget`), so only the apps the parent named count. Apps with a category
+  // and no site stay a union; the UI does not write that.
   //
   // De-dupe, preserve first-seen order for deterministic output.
   return [
@@ -272,6 +318,7 @@ function resolveAppIds(
       ...explicit,
       ...expandEduValueAppIds(rule, catalog),
       ...expandSocialAppIds(rule, catalog),
+      ...expandGameAppIds(rule, catalog),
     ]),
   ]
 }

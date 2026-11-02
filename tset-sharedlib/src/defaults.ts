@@ -5,6 +5,8 @@
 import { AccessControlSettings, LimitRule, RuleOverride, RuleOverrideSettings } from "./types";
 import type { TemporaryLimitRule } from "./types";
 import type { RewardSettings, DailyRewardStates } from './types/reward.types';
+import type { AllowList } from './restrictions/alwaysAllowed';
+import type { SocialMediaSettings } from './restrictions/socialMedia';
 
 
 export interface UsageLimitData{
@@ -18,13 +20,34 @@ export interface UserOptions{
   whitelistingEnabled: boolean;
   codeInjectionEnabled: boolean;
   contentFilteringEnabled: boolean;
-  /** Keep all links inside the in-app browser instead of opening external apps. */
+  /**
+   * "Open other apps", stored inverted: true keeps links inside Kindredly. Absent means allowed for an
+   * adult and not for a child — read it through `personAllowsOtherApps` (other-apps.ts), never directly.
+   */
   containLinksInternally?: boolean;
+  /** "Open YouTube in the YouTube app". Absent means off — read it through `personAllowsYouTubeApp`. */
+  openYouTubeInApp?: boolean;
   usageLimitsData?: UsageLimitData;
+  /**
+   * Always allowed: sites, library items and apps that open whatever this person's time (HAT-152).
+   * Its own key, not inside `usageLimitsData`, which several writers replace whole. See
+   * `restrictions/alwaysAllowed.ts`.
+   */
+  alwaysAllowed?: AllowList;
+  /** Block social media and its Exceptions (SMB). Absent = the older rules decide. See `restrictions/socialMedia.ts`. */
+  socialMedia?: SocialMediaSettings;
   logActivity: boolean;
   aiChatEnabled?: boolean;
+  /** AI tools, per person. Absent = on. See `types/user.types.ts`. */
+  aiToolsEnabled?: boolean;
+  /** Web search inside Kinbot, per person. Absent = off. See `family-ai.ts`. */
+  aiWebSearchEnabled?: boolean;
   /** App Builder: create and edit the code behind Kindredly apps. Admin-granted per child. */
   appEditorEnabled?: boolean;
+  /** Command bar: admin-granted per person. */
+  commandBarEnabled?: boolean;
+  /** Search your history: admin-granted per person. See `types/user.types.ts`. */
+  historySearchEnabled?: boolean;
   /** Library-mode kids: allow browsing the published catalog and requesting adds. */
   explorePublishedEnabled?: boolean;
   /** Curated email, per person. Admin-granted — see `types/user.types.ts` for why these are here. */
@@ -39,6 +62,8 @@ export interface UserOptions{
   companionDevicesEnabled?: boolean;
   /** Remote actions into a managed child browser session. Admin-granted per person. */
   remoteChildActionsEnabled?: boolean;
+  /** Shopping carts: products saved from stores, in a collection with a cart view. Admin-granted per person. */
+  shoppingCartEnabled?: boolean;
   accessControlSettings?: AccessControlSettings;
   ruleOverrideSettings?: RuleOverrideSettings
   /** Reward rules and categories configured for this user. */
@@ -59,11 +84,12 @@ export const DEFAULT_USER_OPTIONS:UserOptions = {
   whitelistingEnabled: false,
   codeInjectionEnabled: false,
   contentFilteringEnabled: false,
-  containLinksInternally: false,
   // Fail-closed seed for device-only mode, where no server record exists. It is NOT the live
   // default: an absent value resolves through the feature control's per-user-type default
   // (admin on, restricted off) in useFeatureToggle. See config/appEditorAccess.ts.
   appEditorEnabled: false,
+  commandBarEnabled: false,
+  historySearchEnabled: false,
   explorePublishedEnabled: false,
   // The optional features that used to be one family-wide switch. Same fail-closed seeding as
   // `appEditorEnabled` above: this is what device-only mode reads when there is no server record,
@@ -74,6 +100,7 @@ export const DEFAULT_USER_OPTIONS:UserOptions = {
   communityContentEnabled: false,
   companionDevicesEnabled: false,
   remoteChildActionsEnabled: false,
+  shoppingCartEnabled: false,
   logActivity: false,
   accessControlSettings: {
     takeBreakSettings: {

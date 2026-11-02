@@ -39,20 +39,25 @@ export type AssistantReviewPreset = {
   id: string;
   /** The sentence this contributes, verbatim, to the guidelines block. */
   sentence: string;
+  /**
+   * What a parent reads on a row (HAT-205): the thing itself, under a caption that already
+   * says "It may approve" or "It never approves". The model is never sent this.
+   */
+  label: string;
   /** Whether it widens or narrows what gets approved. Groups the UI, nothing more. */
   tone: 'allow' | 'exclude';
 };
 
 export const ASSISTANT_REVIEW_PRESETS: readonly AssistantReviewPreset[] = [
-  {id: 'educational', sentence: 'Educational and reference sites are fine.', tone: 'allow'},
-  {id: 'logic-games', sentence: 'Problem-solving and logic games are OK.', tone: 'allow'},
-  {id: 'coding', sentence: 'Coding and programming resources are fine.', tone: 'allow'},
-  {id: 'creative', sentence: 'Creative tools for drawing, music and writing are fine.', tone: 'allow'},
-  {id: 'news', sentence: 'Age-appropriate news and current events are fine.', tone: 'allow'},
-  {id: 'no-social', sentence: 'No social media or chat.', tone: 'exclude'},
-  {id: 'no-streaming', sentence: 'No video streaming.', tone: 'exclude'},
-  {id: 'no-violence', sentence: 'Nothing with violence.', tone: 'exclude'},
-  {id: 'no-shopping', sentence: 'No shopping or in-app purchases.', tone: 'exclude'},
+  {id: 'educational', sentence: 'Educational and reference sites are fine.', label: 'Educational and reference sites', tone: 'allow'},
+  {id: 'logic-games', sentence: 'Problem-solving and logic games are OK.', label: 'Problem-solving and logic games', tone: 'allow'},
+  {id: 'coding', sentence: 'Coding and programming resources are fine.', label: 'Coding and programming', tone: 'allow'},
+  {id: 'creative', sentence: 'Creative tools for drawing, music and writing are fine.', label: 'Creative tools for drawing, music and writing', tone: 'allow'},
+  {id: 'news', sentence: 'Age-appropriate news and current events are fine.', label: 'Age-appropriate news', tone: 'allow'},
+  {id: 'no-social', sentence: 'No social media or chat.', label: 'Social media or chat', tone: 'exclude'},
+  {id: 'no-streaming', sentence: 'No video streaming.', label: 'Video streaming', tone: 'exclude'},
+  {id: 'no-violence', sentence: 'Nothing with violence.', label: 'Anything with violence', tone: 'exclude'},
+  {id: 'no-shopping', sentence: 'No shopping or in-app purchases.', label: 'Shopping or in-app purchases', tone: 'exclude'},
 ] as const;
 
 /**
@@ -273,6 +278,21 @@ export function isAssistantReviewStarterTemplateId(id: string): boolean {
 }
 
 /**
+ * The starter a first visit opens with, by the child's age (HAT-206), so a parent can press
+ * Turn on without choosing anything. Under 9 is Younger child, 9 to 12 School age, 13 and up
+ * Teen — 13 is where the review's own age band turns from child to teen.
+ *
+ * An unknown age picks Younger child, the most careful of the three, for the reason the
+ * review treats an unknown birthday as a child: this feature only ever grants, so guessing
+ * older is guessing in the one direction that can do harm.
+ */
+export function defaultAssistantStarterIdForAge(age: number | null | undefined): string {
+  if (typeof age !== 'number' || !Number.isFinite(age) || age < 9) return 'starter-younger';
+  if (age < 13) return 'starter-school-age';
+  return 'starter-teen';
+}
+
+/**
  * One stored template, or nothing.
  *
  * A template whose entry composes to nothing is dropped, on the same rule overrides use: an
@@ -372,7 +392,8 @@ export function assistantReviewSourceSummary(
     case 'model':
       if (decision === 'approve') return 'The AI checked this against your guidelines.';
       if (decision === 'reclassify') return 'The AI read this as study material and changed what it counts as.';
-      return 'The AI looked and was not sure, so it left it for you.';
+      // It looked and chose not to approve. "Was not sure" sat beside "99% confident" on the card.
+      return 'The AI looked and left this one for you.';
     case 'cached':
       return 'Not re-checked — this is the answer from a recent ask for the same site.';
     case 'cooldown':

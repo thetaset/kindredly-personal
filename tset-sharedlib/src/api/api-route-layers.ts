@@ -31,6 +31,7 @@ export const serverOnlyRoutes: Array<keyof ApiRouteMap> = [
   // Admin routes - server only, called from admin UI directly
   '/admin/account/changeSysOptions',
   '/admin/account/changeType',
+  '/admin/account/delete',
   '/admin/account/info',
   '/admin/contentBundles/get',
   '/admin/contentLoader/dryRun',
@@ -43,6 +44,8 @@ export const serverOnlyRoutes: Array<keyof ApiRouteMap> = [
   '/admin/feedGen/loadFeed',
   '/admin/published/package/export',
   '/admin/published/package/import',
+  '/admin/published/relations/list',
+  '/admin/published/settings/export',
   '/admin/published/enrich',
   '/admin/published/applyEnrichmentPatches',
   '/admin/published/importBatches',
@@ -94,6 +97,7 @@ export const serverOnlyRoutes: Array<keyof ApiRouteMap> = [
   '/admin/user/info',
   '/admin/user/list',
   '/admin/user/stats',
+  '/admin/clients/seen',
 
   // Auth routes that bypass BGRouter (handled by auth service directly)
   '/auth/signin',
@@ -123,7 +127,19 @@ export const serverOnlyRoutes: Array<keyof ApiRouteMap> = [
  * These routes operate on local state, browser APIs, or native features.
  */
 export const clientOnlyRoutes: Array<keyof ApiRouteMap> = [
+  '/appbuild/seal',
+  '/auth/localFamilyStatus',
+  '/auth/eraseLocalFamily',
+  '/auth/verifyOwnPinpass',
+  '/auth/verifyParentPinpass',
+  '/auth/switchNeedsFullPassword',
   '/client/hometab',
+  '/item/attachment/pieces/start',
+  '/item/attachment/pieces/finish',
+  '/userfile/pieces/put',
+  '/userfile/pieces/open',
+  '/userfile/pieces/read',
+  '/userfile/pieces/close',
   '/client/widget/status',
   '/native/speechStart',
   '/native/speechStop',
@@ -150,6 +166,20 @@ export const clientOnlyRoutes: Array<keyof ApiRouteMap> = [
   // Task state is client-side and encrypted, so the check-in's task gate can
   // only be answered in the background. There is no server handler by design.
   '/checkpoint/taskgate/status',
+  // Earn access steps are tasks, lessons and usage, read on a device (HAT-836). The child's write,
+  // /user/earnAccess/open, has a server handler; these do not, by design.
+  '/earnAccess/status',
+  '/earnAccess/assertOpen',
+  '/user/earnAccess/approve',
+  '/earnAccess/rules/put',
+  '/earnAccess/rules/remove',
+  // Page notes are encrypted notes found by page through an index on the device (PGN-2).
+  '/pageNotes/forUrl',
+  '/pageNotes/save',
+  '/pageNotes/reminderFor',
+  '/pageNotes/read',
+  '/pageNotes/choices',
+  '/pageNotes/openOnPage',
   // Events are items whose times live in the encrypted `info` blob, so listing
   // and expanding them can only happen on a signed-in client.
   '/event_items/upsert',
@@ -203,6 +233,10 @@ export const requiresBGRouterHandler: Array<keyof ApiRouteMap> = [
 
   // Client-upload publishing orchestration (UI -> BG)
   '/published/publishCollectionClientUpload',
+
+  // Connected AI apps pairing: the device's key pair and the adult's secret key (HAT-616)
+  '/mcpRelayDevice/pairStart',
+  '/mcpRelayDevice/pairFinish',
 ];
 
 /**

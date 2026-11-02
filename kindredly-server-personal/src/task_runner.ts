@@ -6,8 +6,11 @@ import knex from './db/knex_config';
 import {Queue, RedisOptions, Worker} from 'bullmq';
 import {runJob} from './base/task_dispatch';
 import {cloudRecurringJobs} from './base/recurring_jobs';
+import {initFirebaseIfConfigured} from './base/firebase_init';
 
 validateEnv();
+// Jobs send pushes too; without this every one failed in this process.
+initFirebaseIfConfigured();
 
 const connection: RedisOptions = {
   host: config.redis.host,

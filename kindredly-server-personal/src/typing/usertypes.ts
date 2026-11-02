@@ -5,6 +5,8 @@ export interface UserOptions {
   logActivity: boolean;
   /** Keep all links inside the in-app browser instead of opening external apps. */
   containLinksInternally?: boolean;
+  /** "Open YouTube in the YouTube app" (tset-sharedlib `other-apps.ts`). Absent means off. */
+  openYouTubeInApp?: boolean;
   /**
    * Admin override for this individual's monthly AI spend allowance, in USD.
    *

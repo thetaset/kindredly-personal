@@ -18,7 +18,7 @@
 import { checkpointResetBoundaryMs } from './checkpoint';
 
 /** The request types that build a key of their own rather than taking one from the caller. */
-export type AccessRequestDraftType = 'url' | 'item' | 'time' | 'checkpoint' | string;
+export type AccessRequestDraftType = 'url' | 'item' | 'time' | 'checkpoint' | 'earnAccess' | string;
 
 export type AccessRequestDraftInput = {
   type: AccessRequestDraftType;
@@ -58,11 +58,23 @@ export function checkpointRequestKey(nowMs: number): string {
   return `CHECKPOINT_${now.getFullYear()}-${now.getMonth() + 1}-${now.getDate()}`;
 }
 
+/**
+ * `EARN_ACCESS_r1_2026-10-29` — one ask a day per Earn access rule (HAT-836). Asking again while the
+ * first waits is the same ask, as with the check-in.
+ */
+export function earnAccessRequestKey(ruleId: string, nowMs: number): string {
+  const now = new Date(nowMs);
+  return `EARN_ACCESS_${ruleId}_${now.getFullYear()}-${now.getMonth() + 1}-${now.getDate()}`;
+}
+
 /** Midnight at the end of the child's today. A time request is only ever valid for "today". */
 export function nextLocalMidnightMs(nowMs: number): number {
   const now = new Date(nowMs);
   return new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 0, 0, 0, 0).getTime();
 }
+
+/** The one key a child's ask for a pause is filed under (HAT-766). */
+export const PAUSE_REQUEST_KEY = 'pause';
 
 export function buildAccessRequestDraft(input: AccessRequestDraftInput): AccessRequestDraftResult {
   const type = input.type || 'url';
@@ -77,6 +89,20 @@ export function buildAccessRequestDraft(input: AccessRequestDraftInput): AccessR
     key = timeRequestKey(input.nowMs);
     // Persist an explicit expiry rather than leaving the sweep to parse the key. Both work; only
     // this one keeps working when the key format changes.
+    details.expiresAtTs = nextLocalMidnightMs(input.nowMs);
+    details.requestedAtTs = input.nowMs;
+  } else if (type === 'pause') {
+    // "Ask to install something" (HAT-766): a guardian's Pause all restrictions. One ask at a time
+    // per child, and it lapses with the day, as a time ask does.
+    key = PAUSE_REQUEST_KEY;
+    details.expiresAtTs = nextLocalMidnightMs(input.nowMs);
+    details.requestedAtTs = input.nowMs;
+  } else if (type === 'earnAccess') {
+    // The rule rides in the details, so a parent's Approve opens that rule and no other.
+    const ruleId = String(details.earnAccessRuleId || '').trim();
+    if (!ruleId) return { ok: false, error: 'Which rule is this for?' };
+    key = earnAccessRequestKey(ruleId, input.nowMs);
+    // An ask lapses with the day: a weekly rule asked about on Monday is asked about again Tuesday.
     details.expiresAtTs = nextLocalMidnightMs(input.nowMs);
     details.requestedAtTs = input.nowMs;
   } else if (type === 'checkpoint') {

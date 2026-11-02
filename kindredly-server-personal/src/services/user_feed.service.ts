@@ -400,6 +400,8 @@ class UserFeedService {
       createdAt: currentTimeSt,
       updatedAt: currentTimeSt,
       info: info,
+      // The author is in their own post's sharedWith; their copy must not count as unread.
+      isRead: targetUserId === ctx.currentUserId,
     };
 
     return await this.userFeed.create(feedEntry);

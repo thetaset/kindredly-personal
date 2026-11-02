@@ -44,6 +44,12 @@ export enum NotificationType {
    * unrelated category silently lose the one alert that must not be lost.
    */
   DEVICE_PROTECTION_ALERT = 'DEVICE_PROTECTION_ALERT',
+  /**
+   * Kinbot gave a child its self-harm help reply (EUP-12). The guardian is told, with what the
+   * child wrote (founder, 2026-10-23). Its own category so muting anything else never mutes it;
+   * email and push both start on.
+   */
+  CHILD_SAFETY_ALERT = 'CHILD_SAFETY_ALERT',
 
   /**
    * New apps appeared on a child's Guard device since the parent last reviewed
@@ -70,6 +76,38 @@ export enum NotificationType {
    * Its own category so a family can switch it without touching anything else.
    */
   CURATION_REVIEW_RESULT = 'CURATION_REVIEW_RESULT',
+
+  /**
+   * Family Downtime started: a push to each admin's phone, removed when it ends (HAT-380).
+   * Push only, never a stored notification: it is true only while downtime is on.
+   */
+  FAMILY_DOWNTIME = 'FAMILY_DOWNTIME',
+
+  /**
+   * A connected AI app is asking an adult's permission (HAT-690): a push to that adult's phones
+   * that names nothing, since what is asked is encrypted and lasts ten minutes. Push only, never a
+   * stored notification; the request itself shows in Kindredly (mcp_permission.service.ts).
+   */
+  AI_APP_PERMISSION = 'AI_APP_PERMISSION',
+
+  /**
+   * A new device of this person asks to open their data (UNL-14): a push to their phones, so "Is
+   * this you?" can be answered without the app open. Always sent, like a sign-in alert: it is
+   * about their own account, and only a session signed in as them can ask. Push only.
+   */
+  DEVICE_UNLOCK_REQUEST = 'DEVICE_UNLOCK_REQUEST',
+
+  /**
+   * A child finished a part of a built-in lesson pack (Digital citizenship, HAT-577). Names the
+   * child and the pack, never the part. Its own category, push off until a guardian turns it on.
+   */
+  LESSON_PART_DONE = 'LESSON_PART_DONE',
+
+  /**
+   * Each admin's report of which children were active, weekly on Sunday evening by default, or
+   * daily, or off (HAT-655). Sent even when no child was active, saying so, with nothing to open.
+   */
+  ACTIVITY_REPORT = 'ACTIVITY_REPORT',
 }
 
 export enum EventRecordName {
@@ -99,11 +137,14 @@ export enum TaskRunnerJobTypes {
   runCompanionTamperWatch = 'companionTamperWatch.run',
   runSecurityDigest = 'securityDigest.run',
   runRealmBackup = 'realmBackup.run',
+  runFamilyDowntimeNotices = 'familyDowntimeNotices.run',
+  runActivityReports = 'activityReports.run',
   subscribe = 'publishedService.subscribe',
   updateSubscription = 'publishedService.updateSubscription',
   publishedModerationAiReview = 'publishedService.publishedModerationAiReview',
   curationReviewAiDraft = 'curationReview.aiDraft',
   runDueCurationReviews = 'curationReview.runDue',
+  runCatalogMonitor = 'catalogMonitor.run',
   getBannerImageDataForUrl = 'getBannerImageDataForUrl',
   TASKRUNNER_TEST = 'TASKRUNNER_TEST',
   fetchMetadata = 'fetchMetadata',

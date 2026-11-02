@@ -47,11 +47,15 @@ import UserNotificationsRoute from './routes/user_notifications.route';
 import UserPrefsRoute from './routes/user_prefs.route';
 import RefStateRoute from './routes/ref_state.route';
 import DeviceGuardRoute from './routes/device_guard.route';
+import ExtensionRemovalRoute from './routes/extension_removal.route';
 import RealmRecoveryRoute from './routes/realm_recovery.route';
 import StandaloneAppRoute from './routes/standalone_app.route';
 import PluginService from './services/plugin.service';
 import {asPath} from './utils/crypto_util';
+import {adminPathGuardMiddleware} from './middlewares/admin_path_guard.middleware';
 import AccountRoute from './routes/account.route';
+import McpRelayRoute, {McpRelayWellKnownRoute} from './routes/mcp_relay.route';
+import DeviceUnlockRoute from './routes/device_unlock.route';
 import UserRoute from './routes/user.route';
 import UserShowcaseRoute from './routes/user_showcase.route';
 import ExternalDataRoute from './routes/external_data.route';
@@ -63,6 +67,7 @@ import {container} from '@/inversify.config';
 import PasskeyRoute from './routes/passkey.route';
 import EmbeddingCacheRoute from './routes/embedding_cache.route';
 import {authenticateJWTHelper, type TRequest} from '@/utils/auth_utils';
+import {initFirebaseIfConfigured} from '@/base/firebase_init';
 
 function skipLogging(req) {
   if (req.url.includes('/image/get')) {
@@ -85,16 +90,7 @@ class App {
     this.env = config.env;
     this.port = config.port;
 
-    if (config.firebaseConfig && !TEST_MODE) {
-      // Lazy: firebase-admin is push notification delivery, which a self-hosted
-      // server has no account for. Requiring it here keeps it out of the
-      // published package.json instead of out of the published app.ts.
-      // eslint-disable-next-line @typescript-eslint/no-var-requires
-      const {cert, initializeApp} = require('firebase-admin/app'); // personal-optional: guarded
-      initializeApp({
-        credential: cert(JSON.parse(config.firebaseConfig)),
-      });
-    }
+    initFirebaseIfConfigured();
 
     this.initializeDB();
     this.initializeMiddlewares();
@@ -113,6 +109,7 @@ class App {
         new CommentRoute(),
         new ContentBundleRoute(),
         new DeviceGuardRoute(),
+        new ExtensionRemovalRoute(),
         new RealmRecoveryRoute(),
         new SetupCatalogRoute(),
         new EmbeddingCacheRoute(),
@@ -137,6 +134,8 @@ class App {
         new UserPrefsRoute(),
         new UserRoute(),
         new UserShowcaseRoute(),
+        new McpRelayRoute(),
+        new DeviceUnlockRoute(),
       ];
 
       this.initializeRoutes([...mainRoutes, ...cloudOnlyRoutes()]);
@@ -194,7 +193,11 @@ class App {
         logger.info(`[box-tls] https on ${port}; authority sha256 ${tls.caSha256}; trust page at /box/trust`);
       });
     } else {
-      this.app.listen(this.port, ready);
+      const server = this.app.listen(this.port, ready);
+      // Longer than the load balancer's 300-second idle timeout (webapistack.ts), so the API never
+      // closes a connection the load balancer is about to reuse, which it reports as a 502.
+      server.keepAliveTimeout = 305_000;
+      server.headersTimeout = 310_000;
     }
     void startBoxAnnounce({port, caSha256: tls?.caSha256}).then((announced) => {
       if (announced) this.boxHostname = announced.hostname;
@@ -378,10 +381,19 @@ class App {
       asPath('/ref_state/account/upsert'),
       asPath('/admin/published/attachment/add'),
       asPath('/admin/classificationEval/datasets/import'),
+      // Connected AI apps: 512 KB route-level parsers that never log a parse error (HAT-616).
+      asPath('/mcpRelay/mcp'),
+      asPath('/mcpRelay/reply'),
+      asPath('/mcpRelay/call'),
+      // An AI app's file, sent by link: its own 21 MB raw parser (HAT-964).
+      asPath('/mcpRelay/upload'),
     ]);
     // Wrap a middleware so it is skipped for requests matching a predicate.
     const skipWhen = (predicate, mw) => (req, res, next) => (predicate(req) ? next() : mw(req, res, next));
     const skipBigBody = (mw) => skipWhen((req) => bigBodyPaths.has(req.path), mw);
+    // Any spelling of an admin or curation-AI path but the exact one is a 404, so the load
+    // balancer's case-sensitive address rule can't be walked around (docs/guides/admin-lockdown.md).
+    this.app.use(adminPathGuardMiddleware);
     this.app.use(skipBigBody(express.json({limit: '10mb'})));
     this.app.use(skipBigBody(express.urlencoded({limit: '10mb', extended: true})));
     this.app.use(cookieParser(config.cookieSecret));
@@ -575,6 +587,8 @@ class App {
     mountBoxTrustRoutes(this.app, {port: Number(this.port), hostname: () => this.boxHostname});
 
     this.app.use('/', new HealthCheckRouter().router);
+    // OAuth discovery for Connected AI apps lives at the host's root (HAT-616).
+    this.app.use('/', new McpRelayWellKnownRoute().router);
     routes.forEach((route) => {
       this.app.use('/' + config.apiVersion, route.router);
     });

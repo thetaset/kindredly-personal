@@ -189,7 +189,11 @@ class PermissionService {
     return Array.from(userIds);
   }
 
-  async _filterToItemIdsWithPermissionForUser(userId: string, itemIds: string[], permList: string[]) {
+  async _filterToItemIdsWithPermissionForUser(
+    userId: string,
+    itemIds: string[],
+    permList: string[],
+  ): Promise<string[]> {
     const q = this.itemRepo
       .query()
       .from('user_perm')
@@ -197,7 +201,9 @@ class PermissionService {
       .whereIn('user_perm.itemId', itemIds)
       .whereIn('user_perm.permission', permList)
       .select('user_perm.itemId');
-    return await q;
+    // Ids, as the name says. It returned `{itemId}` rows, so saveItemCollections compared rows with
+    // ids and never removed a non-admin's item from a collection they unticked.
+    return ((await q) as Array<{itemId: string}>).map((r) => r.itemId);
   }
 
   // ROUTE-METHOD
@@ -924,6 +930,10 @@ class PermissionService {
       throw new Error('Target user not found');
     }
 
+    // The owner already has it. A row for them could only take it out of their own library: a
+    // post sharing an item back to its owner wrote `notInLibrary` for them (HAT-984).
+    if (targetUserId === item.userId) return;
+
     const isTargetInSameAccount = targetUser.accountId === ctx.accountId;
     if (isTargetInSameAccount) {
       await ctx.verifyInAccount(targetUserId);
@@ -964,28 +974,35 @@ class PermissionService {
       notInLibrary,
     );
 
-    this._sendShareNotification(ctx, targetUserId, item).catch((e) => {
+    this._sendShareNotification(ctx, targetUserId, item, notInLibrary).catch((e) => {
       console.error('Error sending share notification', e);
     });
   }
 
-  async _sendShareNotification(ctx: RequestContext, targetUserId: string, item: Item) {
+  async _sendShareNotification(ctx: RequestContext, targetUserId: string, item: Item, notInLibrary = false) {
     const currentUser = await ctx.getCurrentUser();
     const targetUser = await ctx.getUserById(targetUserId);
 
     const pathst = item.type == 'col' ? 'collection' : 'item';
-    const name = 'A new Item';
+    // The server cannot read an item's name (it is encrypted), so the words say what kind of thing it is.
+    const kind = item.type == 'col' ? 'a collection' : 'an item';
 
     const isCrossAccountShare = !!(targetUser?.accountId && targetUser.accountId !== ctx.accountId);
 
-    const messageStart = item.type == 'col' ? 'The collection ' : '';
-    const actionText = isCrossAccountShare ? 'was shared with you by' : 'was added to your library by';
-    const message = `${messageStart}<a href="TS_BASE_PATH#/${pathst}/${item._id}">${name}</a> ${actionText} <a href="TS_BASE_PATH#/user/profile/${currentUser?._id}">${currentUser.username}</a>`;
+    const sender = `<a href="TS_BASE_PATH#/user/profile/${currentUser?._id}">${currentUser.username}</a>`;
+    const thing = `<a href="TS_BASE_PATH#/${pathst}/${item._id}">${kind}</a>`;
+    // "Added to your library" only when it was: a share waiting under Not in library says shared.
+    const saysShared = isCrossAccountShare || notInLibrary;
+    const message = saysShared ? `${sender} shared ${thing} with you.` : `${sender} added ${thing} to your library.`;
+
+    // A push for a friend or another adult (HAT-877). Not for a child in the sharer's own family: a
+    // guardian filling a child's library would send one for every item.
+    const sendPush = isCrossAccountShare || targetUser?.type !== UserType.restricted;
 
     const notificationData = {
-      title: isCrossAccountShare
-        ? `${currentUser.username} shared "${name}" with you.`
-        : `${currentUser.username} added "${name}" to your library.`,
+      title: saysShared
+        ? `${currentUser.username} shared ${kind} with you.`
+        : `${currentUser.username} added ${kind} to your library.`,
       message: message.replace(/TS_BASE_PATH/g, '/kindredapp/'),
       emailMessage: message.replace(/TS_BASE_PATH/g, `${config.serverHostname}/kindredapp/`),
       refInfo: {
@@ -1000,6 +1017,7 @@ class PermissionService {
       targetUser?.accountId || ctx.accountId,
       targetUserId,
       notificationData,
+      sendPush,
     );
   }
 

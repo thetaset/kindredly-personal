@@ -4,18 +4,21 @@ import { checkIfYTChannel, normalizeYouTubeChannelIdentifier, parseChannelIdFrom
 import { ItemMeta, ItemMetaExtracted } from './shared.types';
 import { getSocialMetadataProvider, isRootWebsiteURL, type SocialMetadataProvider } from './url.utils';
 import { recognizePage, recognizedToItemResourceType } from './page-recognition.utils';
+import { extractProductMetadata, looksLikeProductPage } from './product-metadata.utils';
+import { pickPageImage } from './page-image.utils';
+import { pickPageTitle, withNameFromAddress } from './link-name.utils';
+// Moved to the parser-free module; re-exported so the server's import keeps working.
+export { getRedditTitleFromAddress } from './link-name.utils';
 import {
   normalizeTextSnippet,
   resolveAbsoluteUrl,
-  getFeedType,
-  getFeedTypeFromText,
   getFeedTypeFromUrl,
-  hasStrongFeedUrlCue,
-  isFeedContentType,
   isLikelyMetadataNoise,
   looksLikeXmlFeed,
   normalizeItemMetaImageUrls,
   sanitizeExtractedTitle,
+  extractFeedLinksFromEntries,
+  extractFeedLinksFromAnchors,
 } from './extraction.pure.utils';
 // Re-exported so every existing importer of this module keeps resolving (server, background, fetchmeta).
 export {
@@ -29,6 +32,9 @@ export {
   getMetadataSourcePriority,
   mergeMetadataBySourcePriority,
   mergeMetadataPreferPrimary,
+  looksLikePdf,
+  classifyFetchedContentKind,
+  type FetchedContentKind,
 } from './extraction.pure.utils';
 
 // Re-exported so existing importers keep working; first-paint code should import
@@ -68,109 +74,6 @@ function getHeuristicTitleFromDOM(document: Document): string | undefined {
   }
 
   return undefined;
-}
-
-function hasGenericFeedAnchorCue(value?: string | null): boolean {
-  const normalized = normalizeTextSnippet(value)?.toLowerCase();
-  if (!normalized) {
-    return false;
-  }
-
-  return /\b(feed|subscribe)\b/.test(normalized);
-}
-
-function addFeedLink(
-  baseUrl: string,
-  seen: Set<string>,
-  feedLinks: NonNullable<ItemMetaExtracted['discoveredFeedLinks']>,
-  entry: { href?: string | null; title?: string | null; text?: string | null },
-  feedType: 'rss' | 'atom' | 'json' | null,
-  source: 'head' | 'anchor',
-) {
-  const href = resolveAbsoluteUrl(baseUrl, entry.href);
-  if (!href || !feedType) {
-    return;
-  }
-
-  try {
-    const protocol = new URL(href).protocol;
-    if (protocol !== 'http:' && protocol !== 'https:') {
-      return;
-    }
-  } catch {
-    return;
-  }
-
-  if (seen.has(href)) {
-    return;
-  }
-
-  seen.add(href);
-  feedLinks.push({
-    url: href,
-    title: normalizeTextSnippet(entry.title) || normalizeTextSnippet(entry.text),
-    type: feedType,
-    source,
-  });
-}
-
-function extractFeedLinksFromEntries(
-  baseUrl: string,
-  entries: Array<{ rel?: string | null; type?: string | null; href?: string | null; title?: string | null }>
-) {
-  const seen = new Set<string>();
-  const feedLinks: NonNullable<ItemMetaExtracted['discoveredFeedLinks']> = [];
-
-  for (const entry of entries) {
-    const rel = normalizeTextSnippet(entry.rel)?.toLowerCase() || '';
-    const href = resolveAbsoluteUrl(baseUrl, entry.href);
-    if (!href) continue;
-
-    const title = normalizeTextSnippet(entry.title);
-    const relTokens = rel.split(/\s+/).filter(Boolean);
-    const relLooksRelevant = relTokens.includes('alternate') || relTokens.includes('feed');
-    const feedType = getFeedType(entry.type);
-
-    if (!relLooksRelevant || !feedType) continue;
-
-    addFeedLink(baseUrl, seen, feedLinks, { href, title }, feedType, 'head');
-  }
-
-  return feedLinks;
-}
-
-function extractFeedLinksFromAnchors(
-  baseUrl: string,
-  entries: Array<{ href?: string | null; type?: string | null; title?: string | null; text?: string | null }>,
-  existingFeedLinks: NonNullable<ItemMetaExtracted['discoveredFeedLinks']> = [],
-) {
-  const feedLinks = [...existingFeedLinks];
-  const seen = new Set(feedLinks.map((link) => link.url));
-
-  for (const entry of entries) {
-    const href = resolveAbsoluteUrl(baseUrl, entry.href);
-    if (!href) continue;
-
-    const textType = getFeedTypeFromText(`${entry.title || ''} ${entry.text || ''}`);
-    const hrefType = getFeedType(entry.type) || getFeedTypeFromUrl(href);
-    const hasExplicitFeedCue = !!textType;
-    const hasWeakFeedCue = hasGenericFeedAnchorCue(entry.title) || hasGenericFeedAnchorCue(entry.text);
-
-    if (!hrefType && !hasExplicitFeedCue && !(hasStrongFeedUrlCue(href) && hasWeakFeedCue)) {
-      continue;
-    }
-
-    addFeedLink(
-      baseUrl,
-      seen,
-      feedLinks,
-      entry,
-      hrefType || textType || 'rss',
-      'anchor',
-    );
-  }
-
-  return feedLinks;
 }
 
 function getHeuristicDescriptionFromDOM(document: Document): string | undefined {
@@ -383,98 +286,89 @@ export function convertRedditUrlToJson(url: string): string {
   return jsonUrl;
 }
 
-
-/**
- * The shape of a fetched response body, as far as metadata extraction cares.
- *
- * `binary` means "definitely not markup" — a zip, an image, an audio file. It exists
- * so callers can stop *before* handing megabytes of bytes to an HTML parser.
- */
-export type FetchedContentKind = 'html' | 'feed' | 'pdf' | 'binary';
-
-/**
- * Cheap sniff for a PDF body: the `%PDF-` header. The spec allows leading junk before
- * it (readers scan the first 1KB), so we do the same rather than requiring offset 0.
- *
- * Byte-safe: a `Uint8Array` is checked as bytes, never decoded, so a PDF that was
- * fetched as binary is recognised without a lossy round-trip through UTF-8.
- */
-export function looksLikePdf(data?: Uint8Array | string | null): boolean {
-  if (!data) return false;
-
-  if (typeof data === 'string') {
-    return data.slice(0, 1024).includes('%PDF-');
-  }
-
-  const limit = Math.min(data.length, 1024);
-  // '%PDF-' = 0x25 0x50 0x44 0x46 0x2d
-  for (let i = 0; i + 4 < limit; i += 1) {
-    if (
-      data[i] === 0x25 &&
-      data[i + 1] === 0x50 &&
-      data[i + 2] === 0x44 &&
-      data[i + 3] === 0x46 &&
-      data[i + 4] === 0x2d
-    ) {
-      return true;
-    }
-  }
-  return false;
+function isRedditHost(hostname: string): boolean {
+  const host = hostname.toLowerCase();
+  return host === 'reddit.com' || host.endsWith('.reddit.com') || host === 'redd.it';
 }
 
-const HTML_CONTENT_TYPE_RE = /(text\/html|application\/xhtml)/;
-const TEXTUAL_CONTENT_TYPE_RE = /(^text\/|\+xml|\/xml|\/json)/;
-
 /**
- * Decide how to parse a fetched body.
- *
- * The `Content-Type` header leads, because it is what the *browser* acted on — a
- * response labelled `application/pdf` was never going to render as a page. Magic
- * bytes then override, but only in the direction that prevents damage: a body that
- * is really a PDF is treated as one even when the server mislabelled it `text/plain`
- * (common on academic and government hosts). We never demote a real HTML body.
- *
- * Without this, every non-HTML URL reached the HTML parser, which found no title and
- * no description and cached that emptiness.
+ * Reddit's oEmbed is the one Reddit read that still answers without an account: `.json` returns
+ * 403 and a page read gets a script challenge titled "Reddit" (HAT-619). It answers a post or
+ * comment address only, /r/<subreddit>/comments/<id>/, and ignores which subreddit is named, so a
+ * redd.it link or a bare /comments/<id> is given that form. Null for anything else.
  */
-export function classifyFetchedContentKind(args: {
-  contentType?: string | null;
-  bytes?: Uint8Array | string | null;
-}): FetchedContentKind {
-  const contentType = normalizeTextSnippet(args.contentType)?.toLowerCase() || '';
-  const bytes = args.bytes;
+export function getRedditOEmbedEndpoint(url: string): string | null {
+  let urlObj: URL;
+  try {
+    urlObj = new URL(url);
+  } catch {
+    return null;
+  }
+  if (!isRedditHost(urlObj.hostname)) return null;
 
-  // Magic bytes are conclusive for PDF and cost nothing, so check them first: they
-  // are the only signal available when the header is missing, wrong, or generic.
-  if (looksLikePdf(bytes)) {
-    return 'pdf';
+  const path = urlObj.pathname;
+  let postUrl: string | null = null;
+  if (/^\/r\/[^/]+\/comments\/[a-z0-9]+/i.test(path)) {
+    postUrl = url;
+  } else {
+    const id = urlObj.hostname.toLowerCase() === 'redd.it'
+      ? path.match(/^\/([a-z0-9]+)\/?$/i)?.[1]
+      : path.match(/^\/comments\/([a-z0-9]+)/i)?.[1];
+    if (id) postUrl = `https://www.reddit.com/r/all/comments/${id}/`;
   }
 
-  if (contentType.includes('application/pdf')) {
-    return 'pdf';
-  }
-
-  if (isFeedContentType(contentType)) {
-    return 'feed';
-  }
-
-  if (HTML_CONTENT_TYPE_RE.test(contentType)) {
-    return 'html';
-  }
-
-  // Textual types (xml, json, plain) can still be a feed — sniff the body the way
-  // the existing feed path does before giving up on them.
-  if (!contentType || TEXTUAL_CONTENT_TYPE_RE.test(contentType)) {
-    if (typeof bytes === 'string' && looksLikeXmlFeed(bytes)) {
-      return 'feed';
-    }
-    // An unlabelled or textual response is far more often a page than a download;
-    // keep today's behaviour rather than newly refusing to parse pages that worked.
-    return 'html';
-  }
-
-  return 'binary';
+  return postUrl ? `https://www.reddit.com/oembed?url=${encodeURIComponent(postUrl)}` : null;
 }
+
+/** A link from Reddit's phone share button, /r/<subreddit>/s/<code>. It redirects to the post. */
+export function isRedditShareLink(url: string): boolean {
+  try {
+    const urlObj = new URL(url);
+    return isRedditHost(urlObj.hostname) && /^\/r\/[^/]+\/s\/[^/]+\/?$/i.test(urlObj.pathname);
+  } catch {
+    return false;
+  }
+}
+
+export function extractMetadataFromRedditOEmbed(url: string, payload: SocialOEmbedResponse): ItemMeta | null {
+  const title = payload?.title ? decodeHtmlEntityString(payload.title) : '';
+  if (!title) return null;
+
+  // The embed's link to the post carries its real subreddit and id.
+  const postHref = payload.html ? cheerio.load(payload.html)('a[href*="/comments/"]').first().attr('href') : undefined;
+  const postMatch = postHref?.match(/\/r\/([^/]+)\/comments\/([a-z0-9]+)/i);
+
+  return {
+    url,
+    title,
+    siteName: 'Reddit',
+    tsExtractedInfo: {
+      pageType: ItemResourceType.SITE_ITEM,
+      sourceId: 'oembed',
+      redditSubreddit: postMatch?.[1],
+      redditAuthor: payload.author_name,
+      ...(postMatch && postHref
+        ? {
+            recognized: {
+              provider: 'reddit',
+              resourceType: 'REDDIT_POST',
+              contentKind: 'post',
+              externalId: postMatch[2],
+              parentExternalId: postMatch[1],
+              canonicalUrl: postHref,
+              confidence: 0.9,
+            },
+          }
+        : {}),
+    } as ItemMetaExtracted,
+  };
+}
+
+/** Reddit's script challenge, served instead of the page to a read that does not run JavaScript. */
+export function isRedditChallengePage(html: string): boolean {
+  return /<input[^>]*name=["']?js_challenge/i.test(html);
+}
+
 
 /** Text of a namespaced channel-level tag (e.g. "itunes:summary"), direct children only. */
 function feedNsText(root: any, tag: string): string {
@@ -545,26 +439,32 @@ export async function extractMetadata(url: string, data: string) {
   let meta: ItemMeta = {};
   meta['url'] = url;
 
-  meta.title = mergeOptions([
-    sanitizeExtractedTitle(metaOrig['title']),
-    sanitizeExtractedTitle(metaOrig['og:title']),
-    sanitizeExtractedTitle(metaOrig['twitter:title']),
-    sanitizeExtractedTitle(metaOrig['schema:title']),
-    sanitizeExtractedTitle(metaOrig['heuristic:title']),
-    sanitizeExtractedTitle(metaOrig['og:site_name']),
-  ]);
+  // The first title that names the page, not only its site (HAT-619).
+  meta.title = pickPageTitle(
+    url,
+    [
+      sanitizeExtractedTitle(metaOrig['title']),
+      sanitizeExtractedTitle(metaOrig['og:title']),
+      sanitizeExtractedTitle(metaOrig['twitter:title']),
+      sanitizeExtractedTitle(metaOrig['schema:title']),
+      sanitizeExtractedTitle(metaOrig['heuristic:title']),
+      sanitizeExtractedTitle(metaOrig['og:site_name']),
+    ],
+    metaOrig['og:site_name'],
+  );
   meta.description = mergeOptions([metaOrig['description'], metaOrig['og:description'], metaOrig['twitter:description'], metaOrig['schema:description'], metaOrig['heuristic:description']]);
   meta.keywords = mergeOptions([metaOrig['keywords'], metaOrig['og:keywords']]);
   meta.siteName = mergeOptions([metaOrig['og:site_name']]);
   meta.type = mergeOptions([metaOrig['og:type']]);
   meta.locale = mergeOptions([metaOrig['og:locale']]);
-  meta.imageSrc = mergeOptions([
-    metaOrig['og:image'],
-    metaOrig['twitter:image'],
-    metaOrig['twitter:image:src'],
-    metaOrig['image'],
-    metaOrig['schema:image'],
-  ]) || '';
+  // The shared rule the popup uses too: a YouTube video's own thumbnail, and the site's logo
+  // only when the page offers nothing else (HAT-323).
+  meta.imageSrc = pickPageImage({
+    pageUrl: url,
+    tagged: [metaOrig['og:image'], metaOrig['twitter:image'], metaOrig['twitter:image:src'], metaOrig['image']],
+    structured: [metaOrig['schema:image']],
+    icons: [metaOrig['shortcut icon'], metaOrig['icon'], metaOrig['apple-touch-icon'], metaOrig['apple-touch-icon-precomposed']],
+  }) || '';
 
   //favicon
   meta.favicon = mergeOptions([
@@ -579,8 +479,8 @@ export async function extractMetadata(url: string, data: string) {
   };
   meta.tsExtractedInfo = metaOrig['tsExtractedInfo'];
 
-
-  return normalizeItemMetaImageUrls(url, meta) || meta;
+  // A title that only names the site ("Claude" on every shared chat) is not this page's name (HAT-619).
+  return withNameFromAddress(normalizeItemMetaImageUrls(url, meta) || meta);
 }
 
 export async function extractMetadataFromDOM(url: string, document: Document) {
@@ -589,26 +489,32 @@ export async function extractMetadataFromDOM(url: string, document: Document) {
   let meta: ItemMeta = {};
   meta['url'] = url;
 
-  meta.title = mergeOptions([
-    sanitizeExtractedTitle(metaOrig['title']),
-    sanitizeExtractedTitle(metaOrig['og:title']),
-    sanitizeExtractedTitle(metaOrig['twitter:title']),
-    sanitizeExtractedTitle(metaOrig['schema:title']),
-    sanitizeExtractedTitle(metaOrig['heuristic:title']),
-    sanitizeExtractedTitle(metaOrig['og:site_name']),
-  ]);
+  // The first title that names the page, not only its site (HAT-619).
+  meta.title = pickPageTitle(
+    url,
+    [
+      sanitizeExtractedTitle(metaOrig['title']),
+      sanitizeExtractedTitle(metaOrig['og:title']),
+      sanitizeExtractedTitle(metaOrig['twitter:title']),
+      sanitizeExtractedTitle(metaOrig['schema:title']),
+      sanitizeExtractedTitle(metaOrig['heuristic:title']),
+      sanitizeExtractedTitle(metaOrig['og:site_name']),
+    ],
+    metaOrig['og:site_name'],
+  );
   meta.description = mergeOptions([metaOrig['description'], metaOrig['og:description'], metaOrig['twitter:description'], metaOrig['schema:description'], metaOrig['heuristic:description']]);
   meta.keywords = mergeOptions([metaOrig['keywords'], metaOrig['og:keywords']]);
   meta.siteName = mergeOptions([metaOrig['og:site_name']]);
   meta.type = mergeOptions([metaOrig['og:type']]);
   meta.locale = mergeOptions([metaOrig['og:locale']]);
-  meta.imageSrc = mergeOptions([
-    metaOrig['og:image'],
-    metaOrig['twitter:image'],
-    metaOrig['twitter:image:src'],
-    metaOrig['image'],
-    metaOrig['schema:image'],
-  ]) || '';
+  // The shared rule the popup uses too: a YouTube video's own thumbnail, and the site's logo
+  // only when the page offers nothing else (HAT-323).
+  meta.imageSrc = pickPageImage({
+    pageUrl: url,
+    tagged: [metaOrig['og:image'], metaOrig['twitter:image'], metaOrig['twitter:image:src'], metaOrig['image']],
+    structured: [metaOrig['schema:image']],
+    icons: [metaOrig['shortcut icon'], metaOrig['icon'], metaOrig['apple-touch-icon'], metaOrig['apple-touch-icon-precomposed']],
+  }) || '';
 
   //favicon
   meta.favicon = mergeOptions([
@@ -623,7 +529,7 @@ export async function extractMetadataFromDOM(url: string, document: Document) {
   };
   meta.tsExtractedInfo = metaOrig['tsExtractedInfo'];
 
-  return normalizeItemMetaImageUrls(url, meta) || meta;
+  return withNameFromAddress(normalizeItemMetaImageUrls(url, meta) || meta);
 }
 
 async function parseAllMetadataFromDOM(url: string, document: Document) {
@@ -689,11 +595,13 @@ async function parseAllMetadataFromDOM(url: string, document: Document) {
     });
 
     // Extract JSON-LD structured data as additional fallback sources
+    const jsonLdBlocks: any[] = [];
     document.querySelectorAll('script[type="application/ld+json"]').forEach(el => {
       try {
         const text = el.textContent;
         if (!text) return;
         const jsonLd = JSON.parse(text);
+        jsonLdBlocks.push(jsonLd);
         const schemas: any[] = Array.isArray(jsonLd) ? jsonLd : [jsonLd];
         for (const schema of schemas) {
           if (!metaOrig['og:image'] && !metaOrig['twitter:image'] && !metaOrig['schema:image']) {
@@ -747,6 +655,12 @@ async function parseAllMetadataFromDOM(url: string, document: Document) {
       if (!tsExtractedInfo.pageType) {
         tsExtractedInfo.pageType = recognizedToItemResourceType(recognized);
       }
+    }
+
+    // Same product read as the HTML parser above — the two must never drift.
+    const product = extractProductMetadata({ url, jsonLd: jsonLdBlocks, metaTags: metaOrig, siteName: metaOrig['og:site_name'] });
+    if (looksLikeProductPage(product, url)) {
+      tsExtractedInfo.product = product;
     }
   } catch (err) {
     tsExtractedInfo.message = 'ERROR: ' + err;
@@ -1037,11 +951,13 @@ async function parseAllMetadata(url: string, data: any) {
     });
 
     // Extract JSON-LD structured data as additional fallback sources
+    const jsonLdBlocks: any[] = [];
     $('script[type="application/ld+json"]').each((_, el) => {
       try {
         const text = $(el).html();
         if (!text) return;
         const jsonLd = JSON.parse(text);
+        jsonLdBlocks.push(jsonLd);
         const schemas: any[] = Array.isArray(jsonLd) ? jsonLd : [jsonLd];
         for (const schema of schemas) {
           if (!metaOrig['og:image'] && !metaOrig['twitter:image'] && !metaOrig['schema:image']) {
@@ -1094,6 +1010,13 @@ async function parseAllMetadata(url: string, data: any) {
       if (!tsExtractedInfo.pageType) {
         tsExtractedInfo.pageType = recognizedToItemResourceType(recognized);
       }
+    }
+
+    // What the page says about the product on it, if it is one. Additive: a page that is not a
+    // product leaves this absent, and a product page with no readable price still says so.
+    const product = extractProductMetadata({ url, jsonLd: jsonLdBlocks, metaTags: metaOrig, siteName: metaOrig['og:site_name'] });
+    if (looksLikeProductPage(product, url)) {
+      tsExtractedInfo.product = product;
     }
   } catch (err) {
     tsExtractedInfo.message = 'ERROR: ' + err;

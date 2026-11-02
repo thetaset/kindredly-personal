@@ -1,0 +1,1 @@
+import{S as e}from"./StoreManagerCcZtDsPo.js";import{j as n}from"./appLifecycle.storeCIRbKlhW.js";const o="kindred:memory-pressure";function t(){n("[MEMORY] freeNonEssentialMemory: releasing cached store instances"),e.clearAllInstances(),typeof window<"u"&&window.dispatchEvent(new CustomEvent(o))}export{o as M,t as f};

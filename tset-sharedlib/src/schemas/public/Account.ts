@@ -1,6 +1,7 @@
 import type { AssistantReviewConfig } from '../../restrictions/assistantReview';
 import type { FamilyDowntimeSettings } from '../../restrictions/familyDowntime';
 import type { FamilyAiSetting } from '../../family-ai';
+import type { OwnAiStored } from '../../own-ai';
 
 export interface AccountOptions {
   setupComplete?: boolean;
@@ -42,6 +43,23 @@ export interface AccountOptions {
    * value not offered yet. Readable by every member, since each AI entry point checks it.
    */
   aiSetting?: FamilyAiSetting | null;
+
+  /**
+   * Connected AI apps (HAT-616, docs/proposals/connected-ai-apps.md): an outside AI app, like Claude,
+   * may look things up through Kindredly's relay. Absent reads as Off. Written only by
+   * `/mcpRelay/setEnabled` — `updateAccountOptions` drops it, since clients send whole cached
+   * objects — and refused there unless Kindredly granted the family (`SystemOptions.connectedAiApps`)
+   * and Family AI is On. Turning Family AI off clears it, so turning AI back on never re-enables it.
+   */
+  mcpRelayEnabled?: boolean;
+
+  /**
+   * The family's own AI account (HAT-966, `own-ai.ts`): provider, key and model, encrypted with the
+   * family's account key, so the server stores it but cannot read it. Readable by every member, since
+   * each device calls the provider itself. Admin-write through `updateAccountOptions`, which refuses
+   * anything not shaped like `OwnAiStored`; null removes it.
+   */
+  ownAi?: OwnAiStored | null;
 }
 
 
@@ -64,6 +82,13 @@ export interface SystemOptions {
    * not a promise the client makes. See docs/trackers/key-custody-and-recovery-tracker.md.
    */
   noServerKeyStorage?: boolean;
+  /**
+   * Kindredly staff made Connected AI apps available to this family (HAT-616). Set only through the
+   * admin console's `/admin/account/changeSysOptions`. Deliberately NOT a key in `extendedFeatures`,
+   * which the family's own admin can write through `/account/extendedFeatures/update`
+   * (agent observation 153). Absent reads as not granted: the family sees nothing.
+   */
+  connectedAiApps?: boolean;
 }
 
 export type AccountType = 'standard' | 'plus' | 'superplus';

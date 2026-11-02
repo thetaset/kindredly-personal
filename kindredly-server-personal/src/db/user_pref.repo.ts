@@ -45,19 +45,25 @@ export class UserPrefRepo extends BaseRepo<UserPref> {
     if (!pref) {
       return userPrefDefaults[key];
     }
+    return readPrefValue(pref.value);
+  }
 
-    const rawValue = pref.value;
-    if (typeof rawValue === 'string') {
-      const trimmed = rawValue.trim();
-      if (!trimmed) return rawValue;
-      try {
-        return JSON.parse(trimmed);
-      } catch {
-        return rawValue;
-      }
+  /** `getUserPref` for many users in one read, keyed by user id. */
+  async getUserPrefForUsers(userIds: string[], key: string): Promise<Map<string, any>> {
+    const values = new Map<string, any>();
+    if (userIds.length === 0) return values;
+    const rows: {_id: string; value: unknown}[] = await this.query()
+      .whereIn(
+        '_id',
+        userIds.map((id) => this.prefId(id, key)),
+      )
+      .select('_id', 'value');
+    const byId = new Map(rows.map((r) => [r._id, r.value]));
+    for (const userId of userIds) {
+      const prefId = this.prefId(userId, key);
+      values.set(userId, byId.has(prefId) ? readPrefValue(byId.get(prefId)) : userPrefDefaults[key]);
     }
-
-    return rawValue;
+    return values;
   }
 
   async updateWithId(id: string, update: UserPref) {
@@ -88,4 +94,18 @@ export class UserPrefRepo extends BaseRepo<UserPref> {
   async deleteWithId(id: string) {
     return await this.where({_id: id}).delete();
   }
+}
+
+/** A stored value, parsed when it was saved as JSON text. */
+function readPrefValue(rawValue: unknown): any {
+  if (typeof rawValue === 'string') {
+    const trimmed = rawValue.trim();
+    if (!trimmed) return rawValue;
+    try {
+      return JSON.parse(trimmed);
+    } catch {
+      return rawValue;
+    }
+  }
+  return rawValue;
 }

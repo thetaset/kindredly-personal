@@ -1,8 +1,8 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "generatedFrom": "src/api/api-route-map.ts",
-  "routeCount": 875,
-  "validatedRouteCount": 875,
+  "routeCount": 1039,
+  "validatedRouteCount": 1039,
   "unrepresentableTypes": {},
   "routes": {
     "/": "#/definitions/InlineRequest_",
@@ -34,9 +34,6 @@
     "/event_items/archive": "#/definitions/InlineRequest_event_items_archive",
     "/event_items/listForUser": "#/definitions/InlineRequest_event_items_listForUser",
     "/event/occurrences/listByRange": "#/definitions/InlineRequest_event_occurrences_listByRange",
-    "/reward/state/get": "#/definitions/InlineRequest_reward_state_get",
-    "/reward/claim": "#/definitions/InlineRequest_reward_claim",
-    "/reward/grant/manual": "#/definitions/InlineRequest_reward_grant_manual",
     "/user/showcase/get": "#/definitions/InlineRequest_user_showcase_get",
     "/user/showcase/update": "#/definitions/InlineRequest_user_showcase_update",
     "/collection/showcase/create": "#/definitions/InlineRequest_collection_showcase_create",
@@ -48,12 +45,18 @@
     "/task_items/upsert": "#/definitions/InlineRequest_task_items_upsert",
     "/task_items/listAssigned": "#/definitions/InlineRequest_task_items_listAssigned",
     "/task_items/assignees": "#/definitions/InlineRequest_task_items_assignees",
+    "/task_items/collections": "#/definitions/InlineRequest_task_items_collections",
+    "/task_items/convertFromNote": "#/definitions/InlineRequest_task_items_convertFromNote",
+    "/task_items/convertToNote": "#/definitions/InlineRequest_task_items_convertToNote",
     "/task_completion/upsert": "#/definitions/InlineRequest_task_completion_upsert",
     "/task_completion/listForTask": "#/definitions/InlineRequest_task_completion_listForTask",
     "/lesson_progress/get": "#/definitions/InlineRequest_lesson_progress_get",
     "/lesson_progress/savePosition": "#/definitions/InlineRequest_lesson_progress_savePosition",
     "/lesson_progress/recordQuizAttempt": "#/definitions/InlineRequest_lesson_progress_recordQuizAttempt",
     "/lesson_progress/reset": "#/definitions/InlineRequest_lesson_progress_reset",
+    "/lesson_progress/partDone": "#/definitions/InlineRequest_lesson_progress_partDone",
+    "/track_progress/getCheck": "#/definitions/InlineRequest_track_progress_getCheck",
+    "/track_progress/saveCheck": "#/definitions/InlineRequest_track_progress_saveCheck",
     "/monitor/analyzeContent": "#/definitions/InlineRequest_monitor_analyzeContent",
     "/datasetgen/status": "#/definitions/InlineRequest_datasetgen_status",
     "/datasetgen/run": "#/definitions/InlineRequest_datasetgen_run",
@@ -61,6 +64,9 @@
     "/datasetgen/clear": "#/definitions/InlineRequest_datasetgen_clear",
     "/usertask/lessonGen/generate": "#/definitions/LessonGenRequest",
     "/usertask/lessonGen/grade": "#/definitions/LessonGradeRequest",
+    "/usertask/track/syllabus": "#/definitions/TrackSyllabusRequest",
+    "/usertask/track/writeItem": "#/definitions/TrackWriteItemRequest",
+    "/usertask/track/improve": "#/definitions/TrackImproveRequest",
     "/access_request/add": "#/definitions/InlineRequest_access_request_add",
     "/access_request/listall": "#/definitions/InlineRequest_access_request_listall",
     "/access_request/listForUser": "#/definitions/InlineRequest_access_request_listForUser",
@@ -108,6 +114,9 @@
     "/artifact/list": "#/definitions/ArtifactListRequest",
     "/artifact/delete": "#/definitions/ArtifactDeleteRequest",
     "/artifact/syncPending": "#/definitions/ArtifactSyncPendingRequest",
+    "/continue/record": "#/definitions/ContinueRecordRequest",
+    "/continue/list": "#/definitions/ContinueListRequest",
+    "/continue/remove": "#/definitions/ContinueRemoveRequest",
     "/account/stats": "#/definitions/InlineRequest_account_stats",
     "/account/users": "#/definitions/InlineRequest_account_users",
     "/activity/clearHistory": "#/definitions/InlineRequest_activity_clearHistory",
@@ -124,6 +133,7 @@
     "/activity/getSessionSummarySnapshot": "#/definitions/GetSessionSummarySnapshotRequest",
     "/activity/list": "#/definitions/InlineRequest_activity_list",
     "/activity/removeLogEntry": "#/definitions/RemoveLogEntryRequest",
+    "/activity/removeLogEntries": "#/definitions/RemoveLogEntriesRequest",
     "/activity/reportClassificationIssue": "#/definitions/ReportClassificationIssueRequest",
     "/activity/getClassificationEvalProgramStatus": "#/definitions/GetClassificationEvalProgramStatusRequest",
     "/activity/uploadClassificationDatasetSamples": "#/definitions/UploadClassificationDatasetSamplesRequest",
@@ -138,6 +148,7 @@
     "/admin/aiExtraUsage/revoke": "#/definitions/InlineRequest_admin_aiExtraUsage_revoke",
     "/admin/aiLimits/setHostedStopped": "#/definitions/InlineRequest_admin_aiLimits_setHostedStopped",
     "/admin/account/changeType": "#/definitions/InlineRequest_admin_account_changeType",
+    "/admin/account/delete": "#/definitions/InlineRequest_admin_account_delete",
     "/admin/account/info": "#/definitions/InlineRequest_admin_account_info",
     "/admin/rollout/readiness": "#/definitions/InlineRequest_admin_rollout_readiness",
     "/admin/rollout/setReady": "#/definitions/InlineRequest_admin_rollout_setReady",
@@ -147,6 +158,7 @@
     "/admin/alertReceivers/add": "#/definitions/InlineRequest_admin_alertReceivers_add",
     "/admin/alertReceivers/remove": "#/definitions/InlineRequest_admin_alertReceivers_remove",
     "/admin/user/stats": "#/definitions/InlineRequest_admin_user_stats",
+    "/admin/clients/seen": "#/definitions/InlineRequest_admin_clients_seen",
     "/admin/dataRetention/run": "#/definitions/InlineRequest_admin_dataRetention_run",
     "/admin/rateLimit/get": "#/definitions/InlineRequest_admin_rateLimit_get",
     "/admin/rateLimit/set": "#/definitions/InlineRequest_admin_rateLimit_set",
@@ -238,6 +250,10 @@
     "/admin/published/setCuration": "#/definitions/InlineRequest_admin_published_setCuration",
     "/admin/published/process": "#/definitions/AdminPublishedProcessRequest",
     "/admin/published/create": "#/definitions/InlineRequest_admin_published_create",
+    "/admin/track/syllabus": "#/definitions/TrackSyllabusRequest",
+    "/admin/track/writeItem": "#/definitions/TrackWriteItemRequest",
+    "/admin/track/improve": "#/definitions/TrackImproveRequest",
+    "/admin/published/keepTrackItem": "#/definitions/InlineRequest_admin_published_keepTrackItem",
     "/admin/published/updateContentFields": "#/definitions/InlineRequest_admin_published_updateContentFields",
     "/admin/published/attachment/add": "#/definitions/InlineRequest_admin_published_attachment_add",
     "/admin/published/attachment/remove": "#/definitions/InlineRequest_admin_published_attachment_remove",
@@ -255,7 +271,13 @@
     "/admin/published/approveBatch": "#/definitions/AdminPublishedApproveBatchRequest",
     "/admin/published/itemsSchemaUpdate": "#/definitions/InlineRequest_admin_published_itemsSchemaUpdate",
     "/admin/published/list": "#/definitions/InlineRequest_admin_published_list",
+    "/admin/published/relations/list": "#/definitions/InlineRequest_admin_published_relations_list",
+    "/admin/published/settings/export": "#/definitions/InlineRequest_admin_published_settings_export",
     "/admin/signin": "#/definitions/InlineRequest_admin_signin",
+    "/admin/secondFactor/status": "#/definitions/InlineRequest_admin_secondFactor_status",
+    "/admin/secondFactor/start": "#/definitions/InlineRequest_admin_secondFactor_start",
+    "/admin/secondFactor/confirm": "#/definitions/InlineRequest_admin_secondFactor_confirm",
+    "/admin/secondFactor/disable": "#/definitions/InlineRequest_admin_secondFactor_disable",
     "/admin/diagnostics/list": "#/definitions/InlineRequest_admin_diagnostics_list",
     "/admin/diagnostics/run": "#/definitions/InlineRequest_admin_diagnostics_run",
     "/admin/sse/clearAllData": "#/definitions/InlineRequest_admin_sse_clearAllData",
@@ -271,6 +293,7 @@
     "/admin/user/info": "#/definitions/InlineRequest_admin_user_info",
     "/admin/user/list": "#/definitions/InlineRequest_admin_user_list",
     "/ai/deleteSession": "#/definitions/InlineRequest_ai_deleteSession",
+    "/ai/stageFile": "#/definitions/InlineRequest_ai_stageFile",
     "/ai/getCurrentSessionId": "#/definitions/InlineRequest_ai_getCurrentSessionId",
     "/ai/getSessionById": "#/definitions/InlineRequest_ai_getSessionById",
     "/ai/itemSuggestGenerator": "#/definitions/AIItemSuggestRequest",
@@ -292,6 +315,7 @@
     "/ai/renameSession": "#/definitions/InlineRequest_ai_renameSession",
     "/ai/textRequest": "#/definitions/AITextRequest",
     "/ai/collectionAuthoringPrompt": "#/definitions/InlineRequest_ai_collectionAuthoringPrompt",
+    "/ai/childMessageCheck": "#/definitions/InlineRequest_ai_childMessageCheck",
     "/ai/provider/listOllamaModels": "#/definitions/InlineRequest_ai_provider_listOllamaModels",
     "/ai/provider/syncOriginRule": "#/definitions/InlineRequest_ai_provider_syncOriginRule",
     "/ai/image/generate": "#/definitions/InlineRequest_ai_image_generate",
@@ -299,11 +323,23 @@
     "/ai/image/credits": "#/definitions/Record%3Cstring%2Cnever%3E",
     "/ai/provider/getConfig": "#/definitions/InlineRequest_ai_provider_getConfig",
     "/ai/provider/setConfig": "#/definitions/InlineRequest_ai_provider_setConfig",
+    "/ai/ownAi/status": "#/definitions/InlineRequest_ai_ownAi_status",
+    "/ai/ownAi/listModels": "#/definitions/InlineRequest_ai_ownAi_listModels",
+    "/ai/ownAi/test": "#/definitions/InlineRequest_ai_ownAi_test",
+    "/ai/ownAi/save": "#/definitions/InlineRequest_ai_ownAi_save",
+    "/ai/ownAi/remove": "#/definitions/InlineRequest_ai_ownAi_remove",
+    "/ai/ownAi/openRouterExchange": "#/definitions/InlineRequest_ai_ownAi_openRouterExchange",
+    "/ai/compactSession": "#/definitions/InlineRequest_ai_compactSession",
+    "/ai/hiddenWords/get": "#/definitions/InlineRequest_ai_hiddenWords_get",
+    "/ai/hiddenWords/set": "#/definitions/InlineRequest_ai_hiddenWords_set",
+    "/ai/taskModels/list": "#/definitions/InlineRequest_ai_taskModels_list",
+    "/ai/taskModels/set": "#/definitions/InlineRequest_ai_taskModels_set",
     "/ai/provider/browserStatus": "#/definitions/InlineRequest_ai_provider_browserStatus",
     "/ai/provider/firefoxStatus": "#/definitions/InlineRequest_ai_provider_firefoxStatus",
     "/ai/provider/firefoxDownload": "#/definitions/InlineRequest_ai_provider_firefoxDownload",
     "/ai/provider/firefoxDeleteModels": "#/definitions/InlineRequest_ai_provider_firefoxDeleteModels",
     "/auth/checkPassword": "#/definitions/InlineRequest_auth_checkPassword",
+    "/auth/checkPin": "#/definitions/InlineRequest_auth_checkPin",
     "/auth/client/info": "#/definitions/InlineRequest_auth_client_info",
     "/auth/completeEmailVerification": "#/definitions/InlineRequest_auth_completeEmailVerification",
     "/auth/desktopHandoff/create": "#/definitions/InlineRequest_auth_desktopHandoff_create",
@@ -329,6 +365,11 @@
     "/auth/setStoredRecoveryKey": "#/definitions/InlineRequest_auth_setStoredRecoveryKey",
     "/auth/signin": "#/definitions/SignInRequest",
     "/auth/signinlocal": "#/definitions/Record%3Cstring%2Cany%3E",
+    "/auth/localFamilyStatus": "#/definitions/InlineRequest_auth_localFamilyStatus",
+    "/auth/eraseLocalFamily": "#/definitions/InlineRequest_auth_eraseLocalFamily",
+    "/auth/verifyOwnPinpass": "#/definitions/InlineRequest_auth_verifyOwnPinpass",
+    "/auth/verifyParentPinpass": "#/definitions/InlineRequest_auth_verifyParentPinpass",
+    "/auth/switchNeedsFullPassword": "#/definitions/InlineRequest_auth_switchNeedsFullPassword",
     "/auth/getRestrictedUser": "#/definitions/InlineRequest_auth_getRestrictedUser",
     "/auth/signout": "#/definitions/InlineRequest_auth_signout",
     "/auth/handoffExport": "#/definitions/InlineRequest_auth_handoffExport",
@@ -352,24 +393,34 @@
     "/companion/unlink": "#/definitions/InlineRequest_companion_unlink",
     "/companion/status": "#/definitions/InlineRequest_companion_status",
     "/companion/open": "#/definitions/InlineRequest_companion_open",
+    "/companion/app/decision": "#/definitions/InlineRequest_companion_app_decision",
+    "/companion/app/open": "#/definitions/InlineRequest_companion_app_open",
     "/companion/rules/push": "#/definitions/InlineRequest_companion_rules_push",
     "/companion/inventory/sync": "#/definitions/InlineRequest_companion_inventory_sync",
     "/companion/inventory/list": "#/definitions/InlineRequest_companion_inventory_list",
     "/companion/devices/list": "#/definitions/InlineRequest_companion_devices_list",
+    "/companion/devices/adminCodes": "#/definitions/InlineRequest_companion_devices_adminCodes",
     "/companion/policy/get": "#/definitions/InlineRequest_companion_policy_get",
     "/companion/policy/save": "#/definitions/InlineRequest_companion_policy_save",
+    "/companion/policy/edit": "#/definitions/InlineRequest_companion_policy_edit",
+    "/socialMedia/librarySites": "#/definitions/InlineRequest_socialMedia_librarySites",
     "/companion/protection/authorizeRemoval": "#/definitions/InlineRequest_companion_protection_authorizeRemoval",
+    "/extension/removalAlert/register": "#/definitions/InlineRequest_extension_removalAlert_register",
+    "/extension/removed": "#/definitions/InlineRequest_extension_removed",
     "/companion/apps/reportNew": "#/definitions/InlineRequest_companion_apps_reportNew",
     "/companion/rules/current": "#/definitions/InlineRequest_companion_rules_current",
     "/companion/settings/current": "#/definitions/DeviceSettingsCurrentRequest",
     "/companion/settings/version": "#/definitions/InlineRequest_companion_settings_version",
+    "/companion/devices/requestUpload": "#/definitions/InlineRequest_companion_devices_requestUpload",
     "/companion/settings/events": "#/definitions/InlineRequest_companion_settings_events",
     "/companion/devices/remove": "#/definitions/InlineRequest_companion_devices_remove",
+    "/companion/devices/removeSelf": "#/definitions/InlineRequest_companion_devices_removeSelf",
     "/companion/protection/disable": "#/definitions/InlineRequest_companion_protection_disable",
     "/companion/protection/enable": "#/definitions/InlineRequest_companion_protection_enable",
     "/client/widget/status": "#/definitions/InlineRequest_client_widget_status",
     "/collection/listByUser": "#/definitions/CollectionListByUserRequest",
     "/collection/suggest": "#/definitions/InlineRequest_collection_suggest",
+    "/collection/suggestConfident": "#/definitions/InlineRequest_collection_suggestConfident",
     "/collection/recent": "#/definitions/InlineRequest_collection_recent",
     "/collection/related": "#/definitions/InlineRequest_collection_related",
     "/collection/create": "#/definitions/SaveItemRequest",
@@ -388,6 +439,7 @@
     "/comment/delete": "#/definitions/InlineRequest_comment_delete",
     "/comment/list": "#/definitions/InlineRequest_comment_list",
     "/content/clearPipelineResults": "#/definitions/InlineRequest_content_clearPipelineResults",
+    "/content/getBlockPageReason": "#/definitions/InlineRequest_content_getBlockPageReason",
     "/content/getLoggedBlockingEntry": "#/definitions/InlineRequest_content_getLoggedBlockingEntry",
     "/content/getLoggedInfoForItemId": "#/definitions/InlineRequest_content_getLoggedInfoForItemId",
     "/content/getLoggedInfoForLimitRuleId": "#/definitions/InlineRequest_content_getLoggedInfoForLimitRuleId",
@@ -429,10 +481,12 @@
     "/content/familyPolicyRules/list": "#/definitions/FamilyPolicyRuleListRequest",
     "/content/familyPolicyRules/upsert": "#/definitions/FamilyPolicyRuleUpsertRequest",
     "/content/familyPolicyRules/delete": "#/definitions/FamilyPolicyRuleDeleteRequest",
+    "/content/familyPolicyRules/unblockSite": "#/definitions/InlineRequest_content_familyPolicyRules_unblockSite",
     "/content/familyCurationChecks/list": "#/definitions/InlineRequest_content_familyCurationChecks_list",
     "/content/familyCurationChecks/set": "#/definitions/InlineRequest_content_familyCurationChecks_set",
     "/content/familyCurationChecks/clear": "#/definitions/InlineRequest_content_familyCurationChecks_clear",
     "/content/familyPolicyBlockRules/sync": "#/definitions/InlineRequest_content_familyPolicyBlockRules_sync",
+    "/content/fixClassificationForVisits": "#/definitions/InlineRequest_content_fixClassificationForVisits",
     "/content/fixPipelineClassification": "#/definitions/InlineRequest_content_fixPipelineClassification",
     "/content/classificationLab": "#/definitions/InlineRequest_content_classificationLab",
     "/content/classifyLibraryMetadata": "#/definitions/InlineRequest_content_classifyLibraryMetadata",
@@ -444,8 +498,13 @@
     "/data/learnedClassifierModel/getActive": "#/definitions/InlineRequest_data_learnedClassifierModel_getActive",
     "/data/siteOverrides/getActive": "#/definitions/Record%3Cstring%2Cnever%3E",
     "/data/meta": "#/definitions/InlineRequest_data_meta",
+    "/data/readFullPage": "#/definitions/InlineRequest_data_readFullPage",
+    "/data/postMedia": "#/definitions/InlineRequest_data_postMedia",
     "/data/resourceInfo": "#/definitions/InlineRequest_data_resourceInfo",
     "/data/podcastFeedLookup": "#/definitions/PodcastFeedLookupRequest",
+    "/data/resolveShortLink": "#/definitions/InlineRequest_data_resolveShortLink",
+    "/data/appService": "#/definitions/InlineRequest_data_appService",
+    "/data/findWork": "#/definitions/FindWorkRequest",
     "/data/raw": "#/definitions/InlineRequest_data_raw",
     "/data/file": "#/definitions/InlineRequest_data_file",
     "/data/metaWithBanner": "#/definitions/InlineRequest_data_metaWithBanner",
@@ -500,6 +559,8 @@
     "/encryption/getKeyBackup": "#/definitions/InlineRequest_encryption_getKeyBackup",
     "/encryption/getKeys": "#/definitions/InlineRequest_encryption_getKeys",
     "/encryption/getRecoveryKey": "#/definitions/InlineRequest_encryption_getRecoveryKey",
+    "/encryption/keyCopy/remove": "#/definitions/InlineRequest_encryption_keyCopy_remove",
+    "/encryption/replaceRecoveryKey": "#/definitions/InlineRequest_encryption_replaceRecoveryKey",
     "/encryption/listKeys": "#/definitions/InlineRequest_encryption_listKeys",
     "/encryption/listKeysWithStatus": "#/definitions/InlineRequest_encryption_listKeysWithStatus",
     "/encryption/recoverUsingKey": "#/definitions/InlineRequest_encryption_recoverUsingKey",
@@ -528,8 +589,12 @@
     "/invite/checkCode": "#/definitions/InlineRequest_invite_checkCode",
     "/invite/create": "#/definitions/InviteCreateRequest",
     "/invite/getInfo": "#/definitions/InlineRequest_invite_getInfo",
+    "/invite/findForSignup": "#/definitions/InlineRequest_invite_findForSignup",
+    "/invite/joinInsteadCheck": "#/definitions/InlineRequest_invite_joinInsteadCheck",
+    "/invite/joinInstead": "#/definitions/InlineRequest_invite_joinInstead",
     "/item/addToCollections": "#/definitions/InlineRequest_item_addToCollections",
     "/item/archiveUpdate": "#/definitions/InlineRequest_item_archiveUpdate",
+    "/item/archiveMany": "#/definitions/InlineRequest_item_archiveMany",
     "/item/attachment/add": "#/definitions/InlineRequest_item_attachment_add",
     "/item/attachment/remove": "#/definitions/InlineRequest_item_attachment_remove",
     "/item/attachment/rename": "#/definitions/InlineRequest_item_attachment_rename",
@@ -549,6 +614,8 @@
     "/collection/listByIds": "#/definitions/CollectionListByIdsRequest",
     "/library/root": "#/definitions/ListLibraryRootRequest",
     "/library/archived": "#/definitions/GetArchivedItemsRequest",
+    "/library/archivedIds": "#/definitions/InlineRequest_library_archivedIds",
+    "/library/archivedByIds": "#/definitions/InlineRequest_library_archivedByIds",
     "/library/hidden": "#/definitions/GetHiddenItemsRequest",
     "/library/uncategorized": "#/definitions/GetUncategorizedItemsRequest",
     "/item/listSharedWithUser": "#/definitions/ListSharedWithUserRequest",
@@ -558,6 +625,7 @@
     "/item/matchesForURLs": "#/definitions/InlineRequest_item_matchesForURLs",
     "/item/matchForPublished": "#/definitions/InlineRequest_item_matchForPublished",
     "/item/meta/refreshWithIds": "#/definitions/InlineRequest_item_meta_refreshWithIds",
+    "/item/meta/saveRefreshed": "#/definitions/InlineRequest_item_meta_saveRefreshed",
     "/item/parents/bychildid": "#/definitions/InlineRequest_item_parents_bychildid",
     "/item/pathtree": "#/definitions/InlineRequest_item_pathtree",
     "/item/permissions/list": "#/definitions/InlineRequest_item_permissions_list",
@@ -586,10 +654,18 @@
     "/item/shareWithUsers": "#/definitions/InlineRequest_item_shareWithUsers",
     "/item/shareWithFriend": "#/definitions/InlineRequest_item_shareWithFriend",
     "/item/similar/byURL": "#/definitions/InlineRequest_item_similar_byURL",
+    "/item/savedState/byURL": "#/definitions/InlineRequest_item_savedState_byURL",
+    "/pageNotes/forUrl": "#/definitions/InlineRequest_pageNotes_forUrl",
+    "/pageNotes/save": "#/definitions/PageNoteSaveRequest",
+    "/pageNotes/choices": "#/definitions/InlineRequest_pageNotes_choices",
+    "/pageNotes/read": "#/definitions/InlineRequest_pageNotes_read",
+    "/pageNotes/openOnPage": "#/definitions/InlineRequest_pageNotes_openOnPage",
+    "/pageNotes/reminderFor": "#/definitions/InlineRequest_pageNotes_reminderFor",
     "/item/addToUserLibrary": "#/definitions/AddItemToUserLibraryRequest",
     "/item/removeFromUserLibrary": "#/definitions/RemoveItemFromUserLibraryRequest",
     "/item/transferOwnership": "#/definitions/InlineRequest_item_transferOwnership",
     "/item/update": "#/definitions/UpdateItemRequest",
+    "/item/notifyAddedToCollections": "#/definitions/InlineRequest_item_notifyAddedToCollections",
     "/item/updateParents": "#/definitions/InlineRequest_item_updateParents",
     "/item/updatePermissions": "#/definitions/InlineRequest_item_updatePermissions",
     "/item/userPermissionLookup": "#/definitions/InlineRequest_item_userPermissionLookup",
@@ -633,12 +709,83 @@
     "/published/get": "#/definitions/InlineRequest_published_get",
     "/published/getGalleryGroupAndItems": "#/definitions/InlineRequest_published_getGalleryGroupAndItems",
     "/published/curationQueue": "#/definitions/InlineRequest_published_curationQueue",
+    "/published/curate/history": "#/definitions/InlineRequest_published_curate_history",
+    "/published/curate/archive": "#/definitions/InlineRequest_published_curate_archive",
+    "/published/curate/restore": "#/definitions/InlineRequest_published_curate_restore",
+    "/published/curate/delete": "#/definitions/InlineRequest_published_curate_delete",
+    "/published/curate/setBlocked": "#/definitions/InlineRequest_published_curate_setBlocked",
+    "/published/curate/changeType": "#/definitions/InlineRequest_published_curate_changeType",
+    "/published/curate/addLinks": "#/definitions/InlineRequest_published_curate_addLinks",
+    "/published/curate/approve": "#/definitions/InlineRequest_published_curate_approve",
+    "/published/curate/list": "#/definitions/InlineRequest_published_curate_list",
+    "/published/curate/updateContent": "#/definitions/InlineRequest_published_curate_updateContent",
+    "/published/curate/manifestPreview": "#/definitions/InlineRequest_published_curate_manifestPreview",
+    "/published/curate/manifestImport": "#/definitions/InlineRequest_published_curate_manifestImport",
     "/curationReview/listForItem": "#/definitions/InlineRequest_curationReview_listForItem",
     "/curationReview/queue": "#/definitions/InlineRequest_curationReview_queue",
     "/curationReview/getForCurator": "#/definitions/InlineRequest_curationReview_getForCurator",
     "/curationReview/saveDraft": "#/definitions/CurationReviewSaveRequest",
     "/curationReview/finalize": "#/definitions/CurationReviewSaveRequest",
     "/curationReview/screenshot/upload": "#/definitions/InlineRequest_curationReview_screenshot_upload",
+    "/curationProposal/queue": "#/definitions/InlineRequest_curationProposal_queue",
+    "/curationProposal/apply": "#/definitions/CurationProposalApplyRequest",
+    "/curationProposal/remove": "#/definitions/InlineRequest_curationProposal_remove",
+    "/curationProposal/reject": "#/definitions/InlineRequest_curationProposal_reject",
+    "/agent/mcp/curation": "#/definitions/InlineRequest_agent_mcp_curation",
+    "/mcpRelay/status": "#/definitions/InlineRequest_mcpRelay_status",
+    "/mcpRelay/setEnabled": "#/definitions/InlineRequest_mcpRelay_setEnabled",
+    "/mcpRelay/connections/list": "#/definitions/InlineRequest_mcpRelay_connections_list",
+    "/mcpRelay/connections/create": "#/definitions/InlineRequest_mcpRelay_connections_create",
+    "/mcpRelay/connections/remove": "#/definitions/InlineRequest_mcpRelay_connections_remove",
+    "/mcpRelay/session/state": "#/definitions/InlineRequest_mcpRelay_session_state",
+    "/mcpRelay/session/agree": "#/definitions/InlineRequest_mcpRelay_session_agree",
+    "/mcpRelay/session/deny": "#/definitions/InlineRequest_mcpRelay_session_deny",
+    "/mcpRelay/session/end": "#/definitions/InlineRequest_mcpRelay_session_end",
+    "/mcpRelay/reply": "#/definitions/McpRelayReplyRequest",
+    "/mcpRelay/mcp": "#/definitions/InlineRequest_mcpRelay_mcp",
+    "/mcpPermission/create": "#/definitions/InlineRequest_mcpPermission_create",
+    "/mcpPermission/list": "#/definitions/InlineRequest_mcpPermission_list",
+    "/mcpPermission/decide": "#/definitions/InlineRequest_mcpPermission_decide",
+    "/mcpPermission/status": "#/definitions/InlineRequest_mcpPermission_status",
+    "/mcpPermission/take": "#/definitions/InlineRequest_mcpPermission_take",
+    "/mcpUpload/create": "#/definitions/InlineRequest_mcpUpload_create",
+    "/mcpUpload/open": "#/definitions/InlineRequest_mcpUpload_open",
+    "/mcpUpload/list": "#/definitions/InlineRequest_mcpUpload_list",
+    "/mcpUpload/claim": "#/definitions/InlineRequest_mcpUpload_claim",
+    "/mcpUpload/finish": "#/definitions/InlineRequest_mcpUpload_finish",
+    "/mcpRelay/upload": "#/definitions/InlineRequest_mcpRelay_upload",
+    "/deviceUnlock/create": "#/definitions/InlineRequest_deviceUnlock_create",
+    "/deviceUnlock/list": "#/definitions/InlineRequest_deviceUnlock_list",
+    "/deviceUnlock/approve": "#/definitions/InlineRequest_deviceUnlock_approve",
+    "/deviceUnlock/deny": "#/definitions/InlineRequest_deviceUnlock_deny",
+    "/deviceUnlock/take": "#/definitions/InlineRequest_deviceUnlock_take",
+    "/deviceUnlock/cancel": "#/definitions/InlineRequest_deviceUnlock_cancel",
+    "/deviceApproval/start": "#/definitions/InlineRequest_deviceApproval_start",
+    "/deviceApproval/scanned": "#/definitions/InlineRequest_deviceApproval_scanned",
+    "/deviceApproval/check": "#/definitions/InlineRequest_deviceApproval_check",
+    "/deviceApproval/cancel": "#/definitions/InlineRequest_deviceApproval_cancel",
+    "/deviceApproval/list": "#/definitions/InlineRequest_deviceApproval_list",
+    "/deviceApproval/approve": "#/definitions/InlineRequest_deviceApproval_approve",
+    "/deviceApproval/deny": "#/definitions/InlineRequest_deviceApproval_deny",
+    "/mcpRelay/pairing/start": "#/definitions/InlineRequest_mcpRelay_pairing_start",
+    "/mcpRelay/pairing/redeem": "#/definitions/InlineRequest_mcpRelay_pairing_redeem",
+    "/mcpRelay/pairing/status": "#/definitions/InlineRequest_mcpRelay_pairing_status",
+    "/mcpRelay/pairing/finish": "#/definitions/InlineRequest_mcpRelay_pairing_finish",
+    "/mcpRelay/connections/key": "#/definitions/InlineRequest_mcpRelay_connections_key",
+    "/mcpRelayDevice/pairStart": "#/definitions/InlineRequest_mcpRelayDevice_pairStart",
+    "/mcpRelayDevice/pairFinish": "#/definitions/InlineRequest_mcpRelayDevice_pairFinish",
+    "/mcpRelay/call": "#/definitions/InlineRequest_mcpRelay_call",
+    "/mcpRelay/oauth/request": "#/definitions/InlineRequest_mcpRelay_oauth_request",
+    "/mcpRelay/oauth/decide": "#/definitions/InlineRequest_mcpRelay_oauth_decide",
+    "/mcpRelay/oauth/register": "#/definitions/InlineRequest_mcpRelay_oauth_register",
+    "/mcpRelay/oauth/token": "#/definitions/InlineRequest_mcpRelay_oauth_token",
+    "/mcpRelay/oauth/authorize": "#/definitions/InlineRequest_mcpRelay_oauth_authorize",
+    "/mcpRelay/.well-known/oauth-protected-resource": "#/definitions/InlineRequest_mcpRelay_well_known_oauth_protected_resource",
+    "/mcpRelay/.well-known/oauth-authorization-server": "#/definitions/InlineRequest_mcpRelay_well_known_oauth_authorization_server",
+    "/mcpRelay/.well-known/openid-configuration": "#/definitions/InlineRequest_mcpRelay_well_known_openid_configuration",
+    "/admin/agentKeys/list": "#/definitions/InlineRequest_admin_agentKeys_list",
+    "/admin/agentKeys/create": "#/definitions/InlineRequest_admin_agentKeys_create",
+    "/admin/agentKeys/revoke": "#/definitions/InlineRequest_admin_agentKeys_revoke",
     "/curationReview/requestAiDraft": "#/definitions/InlineRequest_curationReview_requestAiDraft",
     "/published/info/update": "#/definitions/InlineRequest_published_info_update",
     "/published/item/importFromPublished": "#/definitions/ImportFromPublishedRequest",
@@ -672,6 +819,7 @@
     "/search/main": "#/definitions/SearchMainRequest",
     "/search/autocomplete": "#/definitions/InlineRequest_search_autocomplete",
     "/search/browser-address-autocomplete": "#/definitions/InlineRequest_search_browser_address_autocomplete",
+    "/search/history": "#/definitions/SearchHistoryRequest",
     "/search/embedded": "#/definitions/InlineRequest_search_embedded",
     "/search/status": "#/definitions/InlineRequest_search_status",
     "/search/lookupProviders": "#/definitions/InlineRequest_search_lookupProviders",
@@ -726,6 +874,7 @@
     "/realm/claim/withPassword": "#/definitions/InlineRequest_realm_claim_withPassword",
     "/system/status": "#/definitions/InlineRequest_system_status",
     "/system/version": "#/definitions/InlineRequest_system_version",
+    "/system/updateCheck": "#/definitions/InlineRequest_system_updateCheck",
     "/test/client/dbtest": "#/definitions/InlineRequest_test_client_dbtest",
     "/test/client/debugInfo": "#/definitions/InlineRequest_test_client_debugInfo",
     "/test/client/run": "#/definitions/InlineRequest_test_client_run",
@@ -800,12 +949,20 @@
     "/user/notification/count": "#/definitions/InlineRequest_user_notification_count",
     "/user/notification/list": "#/definitions/InlineRequest_user_notification_list",
     "/user/notification/markAllAsRead": "#/definitions/InlineRequest_user_notification_markAllAsRead",
+    "/user/notification/lessonPartDone": "#/definitions/InlineRequest_user_notification_lessonPartDone",
     "/user/notification/markRead": "#/definitions/InlineRequest_user_notification_markRead",
     "/user/notification/markUnread": "#/definitions/InlineRequest_user_notification_markUnread",
     "/user/notification/remove": "#/definitions/InlineRequest_user_notification_remove",
     "/user/options/get": "#/definitions/InlineRequest_user_options_get",
     "/user/options/update": "#/definitions/InlineRequest_user_options_update",
     "/user/checkpoint/clear": "#/definitions/InlineRequest_user_checkpoint_clear",
+    "/user/checkpoint/approve": "#/definitions/InlineRequest_user_checkpoint_approve",
+    "/user/earnAccess/open": "#/definitions/InlineRequest_user_earnAccess_open",
+    "/user/earnAccess/approve": "#/definitions/InlineRequest_user_earnAccess_approve",
+    "/earnAccess/status": "#/definitions/InlineRequest_earnAccess_status",
+    "/earnAccess/assertOpen": "#/definitions/InlineRequest_earnAccess_assertOpen",
+    "/earnAccess/rules/put": "#/definitions/InlineRequest_earnAccess_rules_put",
+    "/earnAccess/rules/remove": "#/definitions/InlineRequest_earnAccess_rules_remove",
     "/user/settings/copy": "#/definitions/CopyUserSettingsRequest",
     "/user/blockedMessage/fillBlank": "#/definitions/InlineRequest_user_blockedMessage_fillBlank",
     "/user/plugin/list": "#/definitions/InlineRequest_user_plugin_list",
@@ -825,6 +982,13 @@
     "/userdata/proxy": "#/definitions/InlineRequest_userdata_proxy",
     "/userdata/proxyr": "#/definitions/InlineRequest_userdata_proxyr",
     "/userfile/getById": "#/definitions/InlineRequest_userfile_getById",
+    "/item/attachment/pieces/start": "#/definitions/ItemAttachmentPiecesStartRequest",
+    "/item/attachment/pieces/finish": "#/definitions/ItemAttachmentPiecesFinishRequest",
+    "/userfile/pieces/put": "#/definitions/FilePiecesPutRequest",
+    "/userfile/pieces/open": "#/definitions/FilePiecesOpenRequest",
+    "/userfile/pieces/read": "#/definitions/FilePiecesReadRequest",
+    "/userfile/pieces/close": "#/definitions/FilePiecesCloseRequest",
+    "/appbuild/seal": "#/definitions/InlineRequest_appbuild_seal",
     "/userfile/getMetaById": "#/definitions/InlineRequest_userfile_getMetaById",
     "/userfile/updateEncInfo": "#/definitions/InlineRequest_userfile_updateEncInfo",
     "/userfile/listByUser": "#/definitions/InlineRequest_userfile_listByUser",
@@ -1775,51 +1939,6 @@
         "endMs"
       ]
     },
-    "InlineRequest_reward_state_get": {
-      "type": "object",
-      "properties": {
-        "userId": {
-          "type": [
-            "string",
-            "null"
-          ]
-        }
-      }
-    },
-    "InlineRequest_reward_claim": {
-      "type": "object",
-      "properties": {
-        "userId": {
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "rewardRuleId": {
-          "type": "string"
-        }
-      },
-      "required": [
-        "rewardRuleId"
-      ]
-    },
-    "InlineRequest_reward_grant_manual": {
-      "type": "object",
-      "properties": {
-        "userId": {
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "rewardRuleId": {
-          "type": "string"
-        }
-      },
-      "required": [
-        "rewardRuleId"
-      ]
-    },
     "TokenData": {
       "type": "object",
       "properties": {
@@ -2288,6 +2407,12 @@
             "null"
           ]
         },
+        "notInLibrary": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
         "decrypted": {
           "type": "boolean"
         },
@@ -2328,6 +2453,7 @@
         "art_work",
         "article",
         "artist",
+        "audiobook",
         "book",
         "ebook",
         "content_creator",
@@ -2754,12 +2880,21 @@
             "published",
             "published_curated",
             "oembed",
+            "provider_api",
+            "provider_url",
+            "book_catalog",
             "live_dom",
+            "full_page",
+            "device_fetch",
+            "shared_title",
             "pdf_landing_page",
             "pdf_embedded",
             "file_name",
             "file_headers"
           ]
+        },
+        "nameFromAddress": {
+          "type": "boolean"
         },
         "redditScore": {
           "type": "number"
@@ -2776,8 +2911,14 @@
         "redditCreated": {
           "type": "number"
         },
+        "postMedia": {
+          "$ref": "#/definitions/PostMedia"
+        },
         "recognized": {
           "$ref": "#/definitions/RecognizedPageInfo"
+        },
+        "product": {
+          "$ref": "#/definitions/ProductMetadata"
         }
       },
       "required": [
@@ -2812,6 +2953,51 @@
       },
       "required": [
         "url"
+      ]
+    },
+    "PostMedia": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": [
+            "image",
+            "gallery",
+            "video"
+          ]
+        },
+        "urls": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "poster": {
+          "type": "string"
+        },
+        "provider": {
+          "type": "string",
+          "enum": [
+            "reddit",
+            "google_photos"
+          ]
+        },
+        "sizeBytes": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "total": {
+          "type": [
+            "number",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "kind",
+        "urls"
       ]
     },
     "RecognizedPageInfo": {
@@ -2859,6 +3045,7 @@
         "youtube",
         "reddit",
         "netflix",
+        "google_photos",
         "generic"
       ]
     },
@@ -2889,6 +3076,10 @@
         },
         {
           "type": "string",
+          "const": "GOOGLE_PHOTOS_SHARE"
+        },
+        {
+          "type": "string",
           "const": "GENERIC_SITE"
         }
       ]
@@ -2905,7 +3096,59 @@
         "movie",
         "series",
         "episode",
+        "photo",
+        "album",
         "unknown"
+      ]
+    },
+    "ProductMetadata": {
+      "type": "object",
+      "properties": {
+        "price": {
+          "type": "number"
+        },
+        "currency": {
+          "type": "string"
+        },
+        "store": {
+          "type": "string"
+        },
+        "productType": {
+          "type": "string"
+        },
+        "identifier": {
+          "$ref": "#/definitions/ProductIdentifier"
+        },
+        "availability": {
+          "type": "string"
+        },
+        "seenAt": {
+          "type": "string"
+        }
+      }
+    },
+    "ProductIdentifier": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "$ref": "#/definitions/ProductIdentifierKind"
+        },
+        "value": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "value"
+      ]
+    },
+    "ProductIdentifierKind": {
+      "type": "string",
+      "enum": [
+        "asin",
+        "gtin",
+        "sku",
+        "mpn"
       ]
     },
     "ItemMetaFileInfo": {
@@ -3216,6 +3459,48 @@
         "taskId"
       ]
     },
+    "InlineRequest_task_items_collections": {
+      "type": "object",
+      "properties": {
+        "taskIds": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "collectionIds": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "taskIds"
+      ]
+    },
+    "InlineRequest_task_items_convertFromNote": {
+      "type": "object",
+      "properties": {
+        "itemId": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "itemId"
+      ]
+    },
+    "InlineRequest_task_items_convertToNote": {
+      "type": "object",
+      "properties": {
+        "itemId": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "itemId"
+      ]
+    },
     "InlineRequest_task_completion_upsert": {
       "type": "object",
       "properties": {
@@ -3397,6 +3682,79 @@
         "quizStepKeys"
       ]
     },
+    "InlineRequest_lesson_progress_partDone": {
+      "type": "object"
+    },
+    "InlineRequest_track_progress_getCheck": {
+      "type": "object",
+      "properties": {
+        "refType": {
+          "type": "string",
+          "enum": [
+            "item",
+            "published"
+          ]
+        },
+        "refId": {
+          "type": "string"
+        },
+        "ownerId": {
+          "type": "string"
+        },
+        "checkKey": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "refType",
+        "refId",
+        "checkKey"
+      ]
+    },
+    "InlineRequest_track_progress_saveCheck": {
+      "type": "object",
+      "properties": {
+        "refType": {
+          "type": "string",
+          "enum": [
+            "item",
+            "published"
+          ]
+        },
+        "refId": {
+          "type": "string"
+        },
+        "ownerId": {
+          "type": "string"
+        },
+        "checkKey": {
+          "type": "string"
+        },
+        "answer": {
+          "anyOf": [
+            {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            {
+              "type": "boolean"
+            }
+          ]
+        },
+        "correct": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "refType",
+        "refId",
+        "checkKey",
+        "answer",
+        "correct"
+      ]
+    },
     "InlineRequest_monitor_analyzeContent": {
       "type": "object",
       "properties": {
@@ -3493,6 +3851,15 @@
         },
         "model": {
           "type": "string"
+        },
+        "reasoningEffort": {
+          "type": "string",
+          "enum": [
+            "none",
+            "low",
+            "medium",
+            "high"
+          ]
         }
       },
       "required": [
@@ -3593,6 +3960,690 @@
         "learnerAnswer"
       ]
     },
+    "TrackSyllabusRequest": {
+      "type": "object",
+      "properties": {
+        "subject": {
+          "type": "string"
+        },
+        "source": {
+          "$ref": "#/definitions/TrackSourceRef"
+        },
+        "sources": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/TrackSourceRef"
+          }
+        },
+        "onlyMySources": {
+          "type": "boolean"
+        },
+        "kind": {
+          "$ref": "#/definitions/TrackKind"
+        },
+        "length": {
+          "type": "number"
+        },
+        "audience": {
+          "type": "string"
+        },
+        "voice": {
+          "$ref": "#/definitions/TrackVoiceKey"
+        },
+        "model": {
+          "type": "string"
+        },
+        "reasoningEffort": {
+          "$ref": "#/definitions/AiReasoningEffort"
+        }
+      },
+      "required": [
+        "kind",
+        "length",
+        "voice"
+      ]
+    },
+    "TrackSourceRef": {
+      "anyOf": [
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "type": "string",
+              "const": "url"
+            },
+            "url": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "url"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "type": "string",
+              "const": "text"
+            },
+            "text": {
+              "type": "string"
+            },
+            "title": {
+              "type": "string"
+            },
+            "origin": {
+              "type": "string",
+              "enum": [
+                "pasted",
+                "library"
+              ]
+            },
+            "url": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "text"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "type": "string",
+              "const": "pdf"
+            },
+            "dataBase64": {
+              "type": "string"
+            },
+            "filename": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "dataBase64"
+          ]
+        }
+      ]
+    },
+    "TrackKind": {
+      "type": "string",
+      "enum": [
+        "theme",
+        "course"
+      ]
+    },
+    "TrackVoiceKey": {
+      "type": "string",
+      "enum": [
+        "story",
+        "direct",
+        "curious"
+      ]
+    },
+    "AiReasoningEffort": {
+      "type": "string",
+      "enum": [
+        "none",
+        "low",
+        "medium",
+        "high"
+      ]
+    },
+    "TrackWriteItemRequest": {
+      "type": "object",
+      "properties": {
+        "track": {
+          "$ref": "#/definitions/TrackContext"
+        },
+        "item": {
+          "$ref": "#/definitions/TrackSyllabusItem"
+        },
+        "source": {
+          "$ref": "#/definitions/TrackSourceSummary"
+        },
+        "sourceText": {
+          "type": "string"
+        },
+        "position": {
+          "type": "number"
+        },
+        "total": {
+          "type": "number"
+        },
+        "previous": {
+          "type": "object",
+          "properties": {
+            "title": {
+              "type": "string"
+            },
+            "summary": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "title"
+          ]
+        },
+        "withImage": {
+          "type": "boolean"
+        },
+        "model": {
+          "type": "string"
+        },
+        "reasoningEffort": {
+          "$ref": "#/definitions/AiReasoningEffort"
+        }
+      },
+      "required": [
+        "track",
+        "item",
+        "source",
+        "position",
+        "total"
+      ]
+    },
+    "TrackContext": {
+      "type": "object",
+      "properties": {
+        "title": {
+          "type": "string"
+        },
+        "kind": {
+          "$ref": "#/definitions/TrackKind"
+        },
+        "voice": {
+          "$ref": "#/definitions/TrackVoiceKey"
+        },
+        "audience": {
+          "type": "string"
+        },
+        "subject": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "title",
+        "kind",
+        "voice"
+      ]
+    },
+    "TrackSyllabusItem": {
+      "type": "object",
+      "properties": {
+        "key": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "kind": {
+          "$ref": "#/definitions/TrackItemKind"
+        },
+        "sourceId": {
+          "type": "string"
+        },
+        "locator": {
+          "type": "string"
+        },
+        "angle": {
+          "type": "string"
+        },
+        "imageQuery": {
+          "type": "string"
+        },
+        "sectionKey": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "key",
+        "title",
+        "kind",
+        "sourceId"
+      ]
+    },
+    "TrackItemKind": {
+      "type": "string",
+      "enum": [
+        "page",
+        "reading",
+        "visual",
+        "exercise"
+      ]
+    },
+    "TrackSourceSummary": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "url": {
+          "type": "string"
+        },
+        "license": {
+          "type": "string"
+        },
+        "revisionId": {
+          "type": "string"
+        },
+        "kind": {
+          "type": "string"
+        },
+        "sections": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "id",
+        "title",
+        "kind"
+      ]
+    },
+    "TrackImproveRequest": {
+      "type": "object",
+      "properties": {
+        "track": {
+          "$ref": "#/definitions/TrackContext"
+        },
+        "title": {
+          "type": "string"
+        },
+        "item": {
+          "$ref": "#/definitions/TrackItemV1"
+        },
+        "position": {
+          "type": "number"
+        },
+        "previous": {
+          "type": "object",
+          "properties": {
+            "title": {
+              "type": "string"
+            },
+            "summary": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "title"
+          ]
+        },
+        "sourceText": {
+          "type": "string"
+        },
+        "critiqueOnly": {
+          "type": "boolean"
+        },
+        "model": {
+          "type": "string"
+        },
+        "reasoningEffort": {
+          "$ref": "#/definitions/AiReasoningEffort"
+        }
+      },
+      "required": [
+        "track",
+        "title",
+        "item",
+        "position"
+      ]
+    },
+    "TrackItemV1": {
+      "type": "object",
+      "properties": {
+        "schemaVersion": {
+          "type": "number",
+          "const": 1
+        },
+        "schemaId": {
+          "type": "string",
+          "const": "kindredly.trackItem.v1"
+        },
+        "kind": {
+          "$ref": "#/definitions/TrackItemKind"
+        },
+        "body": {
+          "type": "string"
+        },
+        "recap": {
+          "type": "string"
+        },
+        "image": {
+          "$ref": "#/definitions/TrackItemImage"
+        },
+        "passage": {
+          "$ref": "#/definitions/TrackItemPassage"
+        },
+        "answer": {
+          "type": "string"
+        },
+        "check": {
+          "$ref": "#/definitions/TrackItemCheck"
+        },
+        "sources": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/TrackItemSource"
+          }
+        },
+        "review": {
+          "$ref": "#/definitions/TrackItemReview"
+        },
+        "pasted": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "schemaVersion",
+        "schemaId",
+        "kind",
+        "body",
+        "sources"
+      ]
+    },
+    "TrackItemImage": {
+      "type": "object",
+      "properties": {
+        "assetId": {
+          "type": "string"
+        },
+        "src": {
+          "type": "string"
+        },
+        "alt": {
+          "type": "string"
+        },
+        "credit": {
+          "type": "string"
+        },
+        "license": {
+          "type": "string"
+        },
+        "sourceUrl": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "credit",
+        "license"
+      ]
+    },
+    "TrackItemPassage": {
+      "type": "object",
+      "properties": {
+        "text": {
+          "type": "string"
+        },
+        "source": {
+          "type": "string"
+        },
+        "locator": {
+          "type": "string"
+        },
+        "after": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "text",
+        "source"
+      ]
+    },
+    "TrackItemCheck": {
+      "anyOf": [
+        {
+          "$ref": "#/definitions/LessonMultipleChoiceQuestion"
+        },
+        {
+          "$ref": "#/definitions/LessonTrueFalseQuestion"
+        }
+      ]
+    },
+    "LessonMultipleChoiceQuestion": {
+      "type": "object",
+      "properties": {
+        "key": {
+          "type": "string"
+        },
+        "type": {
+          "type": "string",
+          "const": "multiple_choice"
+        },
+        "prompt": {
+          "type": "string"
+        },
+        "media": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/LessonMediaRef"
+          }
+        },
+        "explanation": {
+          "type": "string"
+        },
+        "hint": {
+          "type": "string"
+        },
+        "points": {
+          "type": "number"
+        },
+        "choices": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/LessonChoice"
+          }
+        },
+        "multiSelect": {
+          "type": "boolean"
+        },
+        "correctChoiceKeys": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "shuffleChoices": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "choices",
+        "correctChoiceKeys",
+        "key",
+        "multiSelect",
+        "prompt",
+        "type"
+      ]
+    },
+    "LessonMediaRef": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": [
+            "image",
+            "video",
+            "audio",
+            "file"
+          ]
+        },
+        "attachmentId": {
+          "type": "string"
+        },
+        "mimeType": {
+          "type": "string"
+        },
+        "previewAttachmentId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "alt": {
+          "type": "string"
+        },
+        "hideCaption": {
+          "type": "boolean"
+        },
+        "externalUrl": {
+          "type": "string"
+        },
+        "provider": {
+          "type": "string",
+          "enum": [
+            "youtube",
+            "url"
+          ]
+        }
+      },
+      "required": [
+        "kind"
+      ]
+    },
+    "LessonChoice": {
+      "type": "object",
+      "properties": {
+        "key": {
+          "type": "string"
+        },
+        "text": {
+          "type": "string"
+        },
+        "media": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/LessonMediaRef"
+          }
+        }
+      },
+      "required": [
+        "key",
+        "text"
+      ]
+    },
+    "LessonTrueFalseQuestion": {
+      "type": "object",
+      "properties": {
+        "key": {
+          "type": "string"
+        },
+        "type": {
+          "type": "string",
+          "const": "true_false"
+        },
+        "prompt": {
+          "type": "string"
+        },
+        "media": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/LessonMediaRef"
+          }
+        },
+        "explanation": {
+          "type": "string"
+        },
+        "hint": {
+          "type": "string"
+        },
+        "points": {
+          "type": "number"
+        },
+        "correct": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "correct",
+        "key",
+        "prompt",
+        "type"
+      ]
+    },
+    "TrackItemSource": {
+      "type": "object",
+      "properties": {
+        "title": {
+          "type": "string"
+        },
+        "url": {
+          "type": "string"
+        },
+        "revisionId": {
+          "type": "string"
+        },
+        "locator": {
+          "type": "string"
+        },
+        "license": {
+          "type": "string"
+        },
+        "retrievedAt": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "title"
+      ]
+    },
+    "TrackItemReview": {
+      "type": "object",
+      "properties": {
+        "scores": {
+          "$ref": "#/definitions/Partial%3CRecord%3CTrackCriterion%2Cnumber%3E%3E"
+        },
+        "notes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "rounds": {
+          "type": "number"
+        },
+        "flag": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "scores"
+      ]
+    },
+    "Partial<Record<TrackCriterion,number>>": {
+      "type": "object",
+      "properties": {
+        "keepsReading": {
+          "type": "number"
+        },
+        "oneIdea": {
+          "type": "number"
+        },
+        "standsAloneOrFollows": {
+          "type": "number"
+        },
+        "satisfyingEnd": {
+          "type": "number"
+        },
+        "tracedToSource": {
+          "type": "number"
+        },
+        "voice": {
+          "type": "number"
+        }
+      }
+    },
     "InlineRequest_access_request_add": {
       "type": "object",
       "properties": {
@@ -3652,7 +4703,12 @@
       ]
     },
     "InlineRequest_access_request_reviewStatus": {
-      "type": "object"
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string"
+        }
+      }
     },
     "InlineRequest_account_content_getTermDict": {
       "type": "object",
@@ -3763,6 +4819,19 @@
           "anyOf": [
             {
               "$ref": "#/definitions/FamilyAiSetting"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "mcpRelayEnabled": {
+          "type": "boolean"
+        },
+        "ownAi": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/OwnAiStored"
             },
             {
               "type": "null"
@@ -3984,6 +5053,9 @@
       ]
     },
     "FamilyDowntimeAllow": {
+      "$ref": "#/definitions/AllowList"
+    },
+    "AllowList": {
       "type": "object",
       "properties": {
         "urlPatterns": {
@@ -4018,6 +5090,30 @@
         "privateOnly",
         "settingsOnly",
         "on"
+      ]
+    },
+    "OwnAiStored": {
+      "type": "object",
+      "properties": {
+        "v": {
+          "type": "number",
+          "const": 1
+        },
+        "keyId": {
+          "type": "string"
+        },
+        "data": {
+          "type": "string"
+        },
+        "updatedAt": {
+          "type": "number"
+        }
+      },
+      "required": [
+        "v",
+        "keyId",
+        "data",
+        "updatedAt"
       ]
     },
     "InlineRequest_account_options_update": {
@@ -4214,9 +5310,12 @@
         "post",
         "feed_item",
         "app_global",
+        "app",
         "device-guard",
         "agent-changeset",
-        "job"
+        "job",
+        "ai-hidden-words",
+        "subscriptions"
       ]
     },
     "RefStateListRequest": {
@@ -4421,6 +5520,7 @@
       "type": "string",
       "enum": [
         "manual",
+        "manual_family_block",
         "migration_classification_override",
         "migration_blocked_pattern",
         "server_sync",
@@ -4879,6 +5979,69 @@
         }
       }
     },
+    "ContinueRecordRequest": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "$ref": "#/definitions/ContinueKind"
+        },
+        "itemId": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "place": {
+          "type": "string"
+        },
+        "pct": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "finished": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "kind",
+        "itemId",
+        "name",
+        "place"
+      ]
+    },
+    "ContinueKind": {
+      "type": "string",
+      "enum": [
+        "ebook",
+        "lesson",
+        "audio"
+      ]
+    },
+    "ContinueListRequest": {
+      "type": "object",
+      "properties": {
+        "forceRemote": {
+          "type": "boolean"
+        }
+      }
+    },
+    "ContinueRemoveRequest": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "$ref": "#/definitions/ContinueKind"
+        },
+        "itemId": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "itemId"
+      ]
+    },
     "InlineRequest_account_stats": {
       "type": "object"
     },
@@ -5132,6 +6295,50 @@
       "required": [
         "userId",
         "url"
+      ]
+    },
+    "RemoveLogEntriesRequest": {
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string"
+        },
+        "since": {
+          "type": "number"
+        },
+        "visits": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/HistoryVisitKey"
+          }
+        }
+      }
+    },
+    "HistoryVisitKey": {
+      "type": "object",
+      "properties": {
+        "url": {
+          "type": "string"
+        },
+        "startTime": {
+          "type": "number"
+        },
+        "endTime": {
+          "type": "number"
+        },
+        "srcId": {
+          "type": [
+            "string",
+            "number"
+          ]
+        },
+        "monitorId": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "url",
+        "startTime"
       ]
     },
     "ReportClassificationIssueRequest": {
@@ -5999,6 +7206,21 @@
         "accountType"
       ]
     },
+    "InlineRequest_admin_account_delete": {
+      "type": "object",
+      "properties": {
+        "accountId": {
+          "type": "string"
+        },
+        "confirmation": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "accountId",
+        "confirmation"
+      ]
+    },
     "InlineRequest_admin_account_info": {
       "type": "object",
       "properties": {
@@ -6099,6 +7321,9 @@
       ]
     },
     "InlineRequest_admin_user_stats": {
+      "type": "object"
+    },
+    "InlineRequest_admin_clients_seen": {
       "type": "object"
     },
     "InlineRequest_admin_dataRetention_run": {
@@ -8212,7 +9437,9 @@
       "enum": [
         "facts",
         "verse",
-        "passage"
+        "passage",
+        "activity",
+        "day"
       ]
     },
     "AdminFeedGenGeneratePostsRequest": {
@@ -8656,6 +9883,27 @@
         "name"
       ]
     },
+    "InlineRequest_admin_published_keepTrackItem": {
+      "type": "object",
+      "properties": {
+        "itemId": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "item": {},
+        "expectedBody": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "itemId",
+        "title",
+        "item",
+        "expectedBody"
+      ]
+    },
     "InlineRequest_admin_published_updateContentFields": {
       "type": "object",
       "properties": {
@@ -9042,6 +10290,23 @@
         "pageInfo": {}
       }
     },
+    "InlineRequest_admin_published_relations_list": {
+      "type": "object",
+      "properties": {
+        "afterId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "limit": {
+          "type": "number"
+        }
+      }
+    },
+    "InlineRequest_admin_published_settings_export": {
+      "type": "null"
+    },
     "InlineRequest_admin_signin": {
       "type": "object",
       "properties": {
@@ -9050,11 +10315,42 @@
         },
         "password": {
           "type": "string"
+        },
+        "code": {
+          "type": "string"
         }
       },
       "required": [
         "username",
         "password"
+      ]
+    },
+    "InlineRequest_admin_secondFactor_status": {
+      "type": "object"
+    },
+    "InlineRequest_admin_secondFactor_start": {
+      "type": "object"
+    },
+    "InlineRequest_admin_secondFactor_confirm": {
+      "type": "object",
+      "properties": {
+        "code": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "code"
+      ]
+    },
+    "InlineRequest_admin_secondFactor_disable": {
+      "type": "object",
+      "properties": {
+        "code": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "code"
       ]
     },
     "InlineRequest_admin_diagnostics_list": {
@@ -9217,6 +10513,23 @@
         "sessionId"
       ]
     },
+    "InlineRequest_ai_stageFile": {
+      "type": "object",
+      "properties": {
+        "fileData": {
+          "type": "string"
+        },
+        "fileType": {
+          "type": "string"
+        },
+        "filename": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "fileData"
+      ]
+    },
     "InlineRequest_ai_getCurrentSessionId": {
       "type": "object"
     },
@@ -9318,6 +10631,9 @@
         },
         "model": {
           "type": "string"
+        },
+        "playbookId": {
+          "type": "string"
         }
       }
     },
@@ -9354,6 +10670,15 @@
             "auto",
             "none",
             "required"
+          ]
+        },
+        "reasoningEffort": {
+          "type": "string",
+          "enum": [
+            "none",
+            "low",
+            "medium",
+            "high"
           ]
         }
       },
@@ -9665,11 +10990,25 @@
           "type": "string"
         },
         "context": {},
-        "schema": {}
+        "schema": {},
+        "capability": {
+          "type": "string"
+        }
       }
     },
     "InlineRequest_ai_collectionAuthoringPrompt": {
       "type": "object"
+    },
+    "InlineRequest_ai_childMessageCheck": {
+      "type": "object",
+      "properties": {
+        "text": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "text"
+      ]
     },
     "InlineRequest_ai_provider_listOllamaModels": {
       "type": "object",
@@ -9719,7 +11058,8 @@
             "server",
             "ollama",
             "browser",
-            "browser-ff"
+            "browser-ff",
+            "own"
           ]
         },
         "endpoint": {
@@ -9735,6 +11075,157 @@
           "type": "string"
         }
       }
+    },
+    "InlineRequest_ai_ownAi_status": {
+      "type": "object"
+    },
+    "OwnAiProviderId": {
+      "type": "string",
+      "enum": [
+        "openai",
+        "anthropic",
+        "google",
+        "openrouter",
+        "custom"
+      ]
+    },
+    "InlineRequest_ai_ownAi_listModels": {
+      "type": "object",
+      "properties": {
+        "provider": {
+          "$ref": "#/definitions/OwnAiProviderId"
+        },
+        "baseUrl": {
+          "type": "string"
+        },
+        "apiKey": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "provider"
+      ]
+    },
+    "InlineRequest_ai_ownAi_test": {
+      "type": "object",
+      "properties": {
+        "provider": {
+          "$ref": "#/definitions/OwnAiProviderId"
+        },
+        "baseUrl": {
+          "type": "string"
+        },
+        "apiKey": {
+          "type": "string"
+        },
+        "model": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "provider",
+        "model"
+      ]
+    },
+    "InlineRequest_ai_ownAi_save": {
+      "type": "object",
+      "properties": {
+        "provider": {
+          "$ref": "#/definitions/OwnAiProviderId"
+        },
+        "baseUrl": {
+          "type": "string"
+        },
+        "apiKey": {
+          "type": "string"
+        },
+        "model": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "provider",
+        "model"
+      ]
+    },
+    "InlineRequest_ai_ownAi_remove": {
+      "type": "object"
+    },
+    "InlineRequest_ai_ownAi_openRouterExchange": {
+      "type": "object",
+      "properties": {
+        "code": {
+          "type": "string"
+        },
+        "codeVerifier": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "code",
+        "codeVerifier"
+      ]
+    },
+    "InlineRequest_ai_compactSession": {
+      "type": "object",
+      "properties": {
+        "sessionId": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "sessionId"
+      ]
+    },
+    "InlineRequest_ai_hiddenWords_get": {
+      "type": "object"
+    },
+    "InlineRequest_ai_hiddenWords_set": {
+      "type": "object",
+      "properties": {
+        "words": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "words"
+      ]
+    },
+    "InlineRequest_ai_taskModels_list": {
+      "type": "object"
+    },
+    "InlineRequest_ai_taskModels_set": {
+      "type": "object",
+      "properties": {
+        "taskId": {
+          "type": "string"
+        },
+        "engineId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "reasoningEffort": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "enum": [
+            "none",
+            "low",
+            "medium",
+            "high",
+            null
+          ]
+        }
+      },
+      "required": [
+        "taskId"
+      ]
     },
     "InlineRequest_ai_provider_browserStatus": {
       "type": "object"
@@ -9772,6 +11263,17 @@
         "password"
       ]
     },
+    "InlineRequest_auth_checkPin": {
+      "type": "object",
+      "properties": {
+        "pin": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "pin"
+      ]
+    },
     "InlineRequest_auth_client_info": {},
     "InlineRequest_auth_completeEmailVerification": {
       "type": "object",
@@ -9802,6 +11304,9 @@
         },
         "targetUserId": {
           "type": "string"
+        },
+        "tempAuthToken": {
+          "$ref": "#/definitions/TokenData"
         }
       },
       "required": [
@@ -10305,6 +11810,39 @@
         }
       }
     },
+    "InlineRequest_auth_localFamilyStatus": {
+      "type": "object"
+    },
+    "InlineRequest_auth_eraseLocalFamily": {
+      "type": "object"
+    },
+    "InlineRequest_auth_verifyOwnPinpass": {
+      "type": "object",
+      "properties": {
+        "pinpass": {
+          "type": "string"
+        }
+      }
+    },
+    "InlineRequest_auth_verifyParentPinpass": {
+      "type": "object",
+      "properties": {
+        "pinpass": {
+          "type": "string"
+        }
+      }
+    },
+    "InlineRequest_auth_switchNeedsFullPassword": {
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "userId"
+      ]
+    },
     "InlineRequest_auth_getRestrictedUser": {
       "type": "object"
     },
@@ -10645,19 +12183,46 @@
           "type": "boolean"
         },
         "usageLimitsData": {},
+        "alwaysAllowed": {
+          "$ref": "#/definitions/AllowList"
+        },
+        "socialMedia": {
+          "$ref": "#/definitions/SocialMediaSettings"
+        },
+        "pageNoteReminders": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/PageNoteReminder"
+          }
+        },
         "logActivity": {
           "type": "boolean"
         },
         "containLinksInternally": {
           "type": "boolean"
         },
+        "openYouTubeInApp": {
+          "type": "boolean"
+        },
         "aiChatEnabled": {
+          "type": "boolean"
+        },
+        "aiToolsEnabled": {
+          "type": "boolean"
+        },
+        "aiWebSearchEnabled": {
           "type": "boolean"
         },
         "assistantReviewEnabled": {
           "type": "boolean"
         },
         "appEditorEnabled": {
+          "type": "boolean"
+        },
+        "commandBarEnabled": {
+          "type": "boolean"
+        },
+        "historySearchEnabled": {
           "type": "boolean"
         },
         "emailEnabled": {
@@ -10681,10 +12246,16 @@
         "remoteChildActionsEnabled": {
           "type": "boolean"
         },
+        "shoppingCartEnabled": {
+          "type": "boolean"
+        },
         "explorePublishedEnabled": {
           "type": "boolean"
         },
         "accessControlSettings": {},
+        "accessControlSettingsPatch": {
+          "$ref": "#/definitions/Record%3Cstring%2Cunknown%3E"
+        },
         "ruleOverrideSettings": {
           "$ref": "#/definitions/RuleOverrideSettings"
         },
@@ -10696,6 +12267,30 @@
         },
         "appCapabilityGrants": {
           "$ref": "#/definitions/Record%3Cstring%2CPartial%3CRecord%3Cstring%2CAppCapabilityGrant%3E%3E%3E"
+        },
+        "appGrants": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "appId": {
+                "type": "string"
+              },
+              "until": {
+                "type": "number"
+              },
+              "grantedAt": {
+                "type": "number"
+              },
+              "grantedBy": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "appId",
+              "until"
+            ]
+          }
         },
         "emailAllowedSenders": {
           "type": "array",
@@ -10709,6 +12304,60 @@
         "codeInjectionEnabled",
         "contentFilteringEnabled",
         "logActivity"
+      ]
+    },
+    "SocialMediaSettings": {
+      "type": "object",
+      "properties": {
+        "blocked": {
+          "type": "boolean"
+        },
+        "exceptions": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "notice": {
+          "type": "string",
+          "enum": [
+            "sites",
+            "apps"
+          ]
+        }
+      },
+      "required": [
+        "blocked",
+        "exceptions"
+      ]
+    },
+    "PageNoteReminder": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "kind": {
+          "$ref": "#/definitions/PageNoteReminderKind"
+        },
+        "value": {
+          "type": "string"
+        },
+        "label": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "kind",
+        "value"
+      ]
+    },
+    "PageNoteReminderKind": {
+      "type": "string",
+      "enum": [
+        "youtubeChannel",
+        "site"
       ]
     },
     "RuleOverrideSettings": {
@@ -11052,7 +12701,8 @@
             "attribute",
             "usageRequirement",
             "socialDesignation",
-            "appId"
+            "appId",
+            "game"
           ]
         },
         "values": {
@@ -11260,15 +12910,26 @@
           "type": "string"
         },
         "passwordCopy": {
-          "type": "string"
+          "type": [
+            "string",
+            "null"
+          ]
         },
         "userId": {
           "type": "string"
+        },
+        "currentPassword": {
+          "type": "string"
+        },
+        "forceSkipCheck": {
+          "type": "boolean"
+        },
+        "keyFollows": {
+          "type": "boolean"
         }
       },
       "required": [
-        "password",
-        "passwordCopy"
+        "password"
       ]
     },
     "InlineRequest_auth_updatePIN": {
@@ -11385,6 +13046,9 @@
       "properties": {
         "credentialId": {
           "type": "string"
+        },
+        "userId": {
+          "type": "string"
         }
       },
       "required": [
@@ -11451,7 +13115,8 @@
         "usageAccess",
         "notifications",
         "battery",
-        "overlay"
+        "overlay",
+        "fasterBlocking"
       ]
     },
     "InlineRequest_companion_open": {
@@ -11463,6 +13128,28 @@
       },
       "required": [
         "target"
+      ]
+    },
+    "InlineRequest_companion_app_decision": {
+      "type": "object",
+      "properties": {
+        "pkg": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "pkg"
+      ]
+    },
+    "InlineRequest_companion_app_open": {
+      "type": "object",
+      "properties": {
+        "pkg": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "pkg"
       ]
     },
     "InlineRequest_companion_rules_push": {
@@ -11490,6 +13177,17 @@
       }
     },
     "InlineRequest_companion_devices_list": {
+      "type": "object",
+      "properties": {
+        "childUserId": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "childUserId"
+      ]
+    },
+    "InlineRequest_companion_devices_adminCodes": {
       "type": "object",
       "properties": {
         "childUserId": {
@@ -11592,10 +13290,85 @@
         "policy"
       ]
     },
+    "Record<string,boolean>": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "boolean"
+      }
+    },
+    "InlineRequest_companion_policy_edit": {
+      "type": "object",
+      "properties": {
+        "childUserId": {
+          "type": "string"
+        },
+        "categories": {
+          "$ref": "#/definitions/Record%3Cstring%2Cboolean%3E"
+        },
+        "apps": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "pkg": {
+                "type": "string"
+              },
+              "policyKey": {
+                "type": "string"
+              },
+              "categoryId": {
+                "type": "string"
+              },
+              "decision": {
+                "type": "string",
+                "enum": [
+                  "allow",
+                  "block"
+                ]
+              }
+            },
+            "required": [
+              "pkg",
+              "policyKey",
+              "categoryId",
+              "decision"
+            ]
+          }
+        }
+      }
+    },
+    "InlineRequest_socialMedia_librarySites": {
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
     "InlineRequest_companion_protection_authorizeRemoval": {
       "type": "object",
       "properties": {
         "deviceId": {
+          "type": "string"
+        }
+      }
+    },
+    "InlineRequest_extension_removalAlert_register": {
+      "type": "object"
+    },
+    "InlineRequest_extension_removed": {
+      "type": "object",
+      "properties": {
+        "u": {
+          "type": "string"
+        },
+        "c": {
+          "type": "string"
+        },
+        "s": {
           "type": "string"
         }
       }
@@ -11647,6 +13420,14 @@
         }
       }
     },
+    "InlineRequest_companion_devices_requestUpload": {
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string"
+        }
+      }
+    },
     "InlineRequest_companion_settings_events": {
       "type": "object"
     },
@@ -11663,6 +13444,17 @@
       "required": [
         "childUserId",
         "deviceId"
+      ]
+    },
+    "InlineRequest_companion_devices_removeSelf": {
+      "type": "object",
+      "properties": {
+        "approval": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "approval"
       ]
     },
     "InlineRequest_companion_protection_disable": {
@@ -11701,6 +13493,17 @@
       }
     },
     "InlineRequest_collection_suggest": {
+      "type": "object",
+      "properties": {
+        "query": {
+          "type": "string"
+        },
+        "url": {
+          "type": "string"
+        }
+      }
+    },
+    "InlineRequest_collection_suggestConfident": {
       "type": "object",
       "properties": {
         "query": {
@@ -11778,6 +13581,9 @@
             "attr",
             "value"
           ]
+        },
+        "notifyOthers": {
+          "type": "boolean"
         },
         "options": {
           "$ref": "#/definitions/CreateCollectionOptions"
@@ -12001,6 +13807,9 @@
         },
         "userId": {
           "type": "string"
+        },
+        "localOnly": {
+          "type": "boolean"
         }
       },
       "required": [
@@ -12116,6 +13925,26 @@
       "properties": {
         "userId": {
           "type": "string"
+        }
+      }
+    },
+    "InlineRequest_content_getBlockPageReason": {
+      "type": "object",
+      "properties": {
+        "srcType": {
+          "type": "string"
+        },
+        "srcId": {
+          "type": "string"
+        },
+        "ts": {
+          "type": "number"
+        },
+        "url": {
+          "type": [
+            "string",
+            "null"
+          ]
         }
       }
     },
@@ -12367,6 +14196,7 @@
           "items": {
             "type": "string",
             "enum": [
+              "js-pixels-png-base64",
               "original-base64",
               "js-resized-jpeg-base64",
               "original-base64-trace"
@@ -12573,6 +14403,21 @@
     "InlineRequest_content_classificationOverrides_reload": {
       "type": "object"
     },
+    "InlineRequest_content_familyPolicyRules_unblockSite": {
+      "type": "object",
+      "properties": {
+        "site": {
+          "type": "string"
+        },
+        "userId": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "site",
+        "userId"
+      ]
+    },
     "InlineRequest_content_familyCurationChecks_list": {
       "type": "object"
     },
@@ -12614,6 +14459,57 @@
           }
         }
       }
+    },
+    "InlineRequest_content_fixClassificationForVisits": {
+      "type": "object",
+      "properties": {
+        "eduValue": {
+          "$ref": "#/definitions/EduValue"
+        },
+        "targetUserId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "note": {
+          "type": "string"
+        },
+        "visits": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "url": {
+                "type": "string"
+              },
+              "startTime": {
+                "type": "number"
+              },
+              "endTime": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "pipelineResultId": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "url",
+              "startTime"
+            ]
+          }
+        }
+      },
+      "required": [
+        "eduValue",
+        "visits"
+      ]
     },
     "InlineRequest_content_fixPipelineClassification": {
       "type": "object",
@@ -12784,6 +14680,28 @@
         "url"
       ]
     },
+    "InlineRequest_data_readFullPage": {
+      "type": "object",
+      "properties": {
+        "url": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "url"
+      ]
+    },
+    "InlineRequest_data_postMedia": {
+      "type": "object",
+      "properties": {
+        "url": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "url"
+      ]
+    },
     "InlineRequest_data_resourceInfo": {
       "type": "object",
       "properties": {
@@ -12811,6 +14729,61 @@
           "type": "string"
         }
       }
+    },
+    "InlineRequest_data_resolveShortLink": {
+      "type": "object",
+      "properties": {
+        "url": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "url"
+      ]
+    },
+    "InlineRequest_data_appService": {
+      "type": "object",
+      "properties": {
+        "url": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "url"
+      ]
+    },
+    "FindWorkRequest": {
+      "type": "object",
+      "properties": {
+        "query": {
+          "type": "string"
+        },
+        "kind": {
+          "$ref": "#/definitions/WorkKind"
+        },
+        "by": {
+          "type": "string"
+        },
+        "year": {
+          "type": "number"
+        },
+        "workId": {
+          "type": "string"
+        },
+        "url": {
+          "type": "string"
+        }
+      }
+    },
+    "WorkKind": {
+      "type": "string",
+      "enum": [
+        "book",
+        "film",
+        "video_series",
+        "music",
+        "song"
+      ]
     },
     "InlineRequest_data_raw": {
       "type": "object",
@@ -12929,7 +14902,7 @@
         "recommendationId": {
           "type": "string"
         },
-        "options": {}
+        "recommendation": {}
       },
       "required": [
         "recommendationId"
@@ -13544,6 +15517,22 @@
     "InlineRequest_encryption_getRecoveryKey": {
       "type": "object"
     },
+    "InlineRequest_encryption_keyCopy_remove": {
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string"
+        }
+      }
+    },
+    "InlineRequest_encryption_replaceRecoveryKey": {
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string"
+        }
+      }
+    },
     "InlineRequest_encryption_listKeys": {
       "type": "object",
       "properties": {
@@ -13960,6 +15949,55 @@
         "code"
       ]
     },
+    "InlineRequest_invite_findForSignup": {
+      "type": "object",
+      "properties": {
+        "loginType": {
+          "type": "string"
+        },
+        "loginPayload": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/Record%3Cstring%2Cany%3E"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "email": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "loginType"
+      ]
+    },
+    "InlineRequest_invite_joinInsteadCheck": {
+      "type": "object",
+      "properties": {
+        "code": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "code"
+      ]
+    },
+    "InlineRequest_invite_joinInstead": {
+      "type": "object",
+      "properties": {
+        "code": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "code"
+      ]
+    },
     "InlineRequest_item_addToCollections": {
       "type": "object",
       "properties": {
@@ -13999,6 +16037,27 @@
       },
       "required": [
         "itemId",
+        "value"
+      ]
+    },
+    "InlineRequest_item_archiveMany": {
+      "type": "object",
+      "properties": {
+        "itemIds": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "value": {
+          "type": "boolean"
+        },
+        "includeShared": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "itemIds",
         "value"
       ]
     },
@@ -14202,6 +16261,9 @@
         },
         "includeFeedback": {
           "type": "boolean"
+        },
+        "localOnly": {
+          "type": "boolean"
         }
       },
       "required": [
@@ -14297,6 +16359,9 @@
         },
         "limit": {
           "type": "number"
+        },
+        "localOnly": {
+          "type": "boolean"
         }
       }
     },
@@ -14307,6 +16372,31 @@
           "type": "string"
         }
       }
+    },
+    "InlineRequest_library_archivedIds": {
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string"
+        }
+      }
+    },
+    "InlineRequest_library_archivedByIds": {
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string"
+        },
+        "itemIds": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "itemIds"
+      ]
     },
     "GetHiddenItemsRequest": {
       "type": "object",
@@ -14332,6 +16422,15 @@
         },
         "sharedByUserId": {
           "type": "string"
+        },
+        "sinceMs": {
+          "type": "number"
+        },
+        "limit": {
+          "type": "number"
+        },
+        "fromFriends": {
+          "type": "boolean"
         }
       }
     },
@@ -14415,6 +16514,21 @@
           "type": "boolean"
         }
       }
+    },
+    "InlineRequest_item_meta_saveRefreshed": {
+      "type": "object",
+      "properties": {
+        "itemId": {
+          "type": "string"
+        },
+        "meta": {
+          "$ref": "#/definitions/ItemMeta"
+        }
+      },
+      "required": [
+        "itemId",
+        "meta"
+      ]
     },
     "InlineRequest_item_parents_bychildid": {
       "type": "object",
@@ -14624,6 +16738,12 @@
             "type": "string"
           }
         },
+        "excludeSubTypes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
         "effectiveTypes": {
           "type": "array",
           "items": {
@@ -14641,6 +16761,9 @@
           "items": {
             "type": "string"
           }
+        },
+        "text": {
+          "type": "string"
         },
         "inCollections": {
           "type": "array",
@@ -14789,11 +16912,14 @@
         "limit": {
           "type": "number"
         },
-        "minItemAgeDays": {
+        "notUsedDays": {
           "type": "number"
         },
-        "minSinceTouchedDays": {
-          "type": "number"
+        "groupChoices": {
+          "$ref": "#/definitions/Record%3Cstring%2Cboolean%3E"
+        },
+        "includeFiled": {
+          "type": "boolean"
         },
         "includeCollections": {
           "type": "boolean"
@@ -15098,6 +17224,141 @@
         "url"
       ]
     },
+    "InlineRequest_item_savedState_byURL": {
+      "type": "object",
+      "properties": {
+        "url": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "url"
+      ]
+    },
+    "InlineRequest_pageNotes_forUrl": {
+      "type": "object",
+      "properties": {
+        "url": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "url"
+      ]
+    },
+    "PageNoteSaveRequest": {
+      "type": "object",
+      "properties": {
+        "url": {
+          "type": "string"
+        },
+        "itemId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "title": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "channelId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "name": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "text": {
+          "type": "string"
+        },
+        "baseUpdatedAt": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "baseText": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "addToNote": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "url",
+        "text"
+      ]
+    },
+    "InlineRequest_pageNotes_choices": {
+      "type": "object",
+      "properties": {
+        "url": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "url"
+      ]
+    },
+    "InlineRequest_pageNotes_read": {
+      "type": "object",
+      "properties": {
+        "itemId": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "itemId"
+      ]
+    },
+    "InlineRequest_pageNotes_openOnPage": {
+      "type": "object",
+      "properties": {
+        "url": {
+          "type": "string"
+        },
+        "itemId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "opened": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "url"
+      ]
+    },
+    "InlineRequest_pageNotes_reminderFor": {
+      "type": "object",
+      "properties": {
+        "url": {
+          "type": "string"
+        },
+        "channelIds": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "url"
+      ]
+    },
     "AddItemToUserLibraryRequest": {
       "type": "object",
       "properties": {
@@ -15171,6 +17432,24 @@
         "data"
       ]
     },
+    "InlineRequest_item_notifyAddedToCollections": {
+      "type": "object",
+      "properties": {
+        "itemId": {
+          "type": "string"
+        },
+        "collectionIds": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "itemId",
+        "collectionIds"
+      ]
+    },
     "InlineRequest_item_updateParents": {
       "type": "object",
       "properties": {
@@ -15184,6 +17463,9 @@
           }
         },
         "removeMissingCollections": {
+          "type": "boolean"
+        },
+        "notifyOthers": {
           "type": "boolean"
         }
       },
@@ -15758,6 +18040,9 @@
         },
         "dbId": {
           "type": "string"
+        },
+        "limit": {
+          "type": "number"
         }
       },
       "required": [
@@ -15766,6 +18051,187 @@
     },
     "InlineRequest_published_curationQueue": {
       "type": "object"
+    },
+    "InlineRequest_published_curate_history": {
+      "type": "object",
+      "properties": {
+        "itemId": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "itemId"
+      ]
+    },
+    "InlineRequest_published_curate_archive": {
+      "type": "object",
+      "properties": {
+        "itemId": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "itemId"
+      ]
+    },
+    "InlineRequest_published_curate_restore": {
+      "type": "object",
+      "properties": {
+        "itemId": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "itemId"
+      ]
+    },
+    "InlineRequest_published_curate_delete": {
+      "type": "object",
+      "properties": {
+        "itemId": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "itemId"
+      ]
+    },
+    "InlineRequest_published_curate_setBlocked": {
+      "type": "object",
+      "properties": {
+        "itemId": {
+          "type": "string"
+        },
+        "blocked": {
+          "type": "boolean"
+        },
+        "message": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "itemId",
+        "blocked"
+      ]
+    },
+    "InlineRequest_published_curate_changeType": {
+      "type": "object",
+      "properties": {
+        "itemId": {
+          "type": "string"
+        },
+        "type": {
+          "type": "string"
+        },
+        "subType": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "itemId",
+        "type"
+      ]
+    },
+    "InlineRequest_published_curate_addLinks": {
+      "type": "object",
+      "properties": {
+        "urls": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "urls"
+      ]
+    },
+    "InlineRequest_published_curate_approve": {
+      "type": "object",
+      "properties": {
+        "itemIds": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "itemIds"
+      ]
+    },
+    "InlineRequest_published_curate_list": {
+      "type": "object",
+      "properties": {
+        "which": {
+          "type": "string",
+          "enum": [
+            "waiting",
+            "archived"
+          ]
+        }
+      },
+      "required": [
+        "which"
+      ]
+    },
+    "InlineRequest_published_curate_updateContent": {
+      "type": "object",
+      "properties": {
+        "itemId": {
+          "type": "string"
+        },
+        "textContent": {
+          "type": "string"
+        },
+        "feeds": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ItemFeed"
+          }
+        },
+        "additionalLinks": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/AdditionalLink"
+          }
+        }
+      },
+      "required": [
+        "itemId"
+      ]
+    },
+    "InlineRequest_published_curate_manifestPreview": {
+      "type": "object",
+      "properties": {
+        "manifestText": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "manifestText"
+      ]
+    },
+    "InlineRequest_published_curate_manifestImport": {
+      "type": "object",
+      "properties": {
+        "manifestText": {
+          "type": "string"
+        },
+        "manifestHash": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "manifestText",
+        "manifestHash"
+      ]
     },
     "InlineRequest_curationReview_listForItem": {
       "type": "object",
@@ -15918,6 +18384,790 @@
       "required": [
         "reviewId",
         "imageData"
+      ]
+    },
+    "InlineRequest_curationProposal_queue": {
+      "type": "object"
+    },
+    "CurationProposalApplyRequest": {
+      "type": "object",
+      "properties": {
+        "proposalId": {
+          "type": "string"
+        },
+        "markCurated": {
+          "type": "boolean"
+        },
+        "changes": {
+          "$ref": "#/definitions/CurationProposalChanges"
+        }
+      },
+      "required": [
+        "proposalId"
+      ]
+    },
+    "CurationProposalChanges": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "imageFilename": {
+          "type": "string"
+        },
+        "categories": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "useCriteria": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "feeds": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/AdminContentLoaderManifestFeed"
+          }
+        }
+      }
+    },
+    "AdminContentLoaderManifestFeed": {
+      "type": "object",
+      "properties": {
+        "feedId": {
+          "type": "string"
+        },
+        "type": {
+          "type": "string",
+          "enum": [
+            "rss",
+            "atom",
+            "json",
+            "other"
+          ]
+        },
+        "title": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "mediaKind": {
+          "type": "string",
+          "const": "audio"
+        },
+        "url": {
+          "type": "string"
+        },
+        "feedURL": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "type",
+        "feedURL"
+      ]
+    },
+    "InlineRequest_curationProposal_remove": {
+      "type": "object",
+      "properties": {
+        "proposalId": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "proposalId"
+      ]
+    },
+    "InlineRequest_curationProposal_reject": {
+      "type": "object",
+      "properties": {
+        "proposalId": {
+          "type": "string"
+        },
+        "note": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "proposalId"
+      ]
+    },
+    "McpJsonRpcMessage": {
+      "type": "object",
+      "properties": {
+        "jsonrpc": {
+          "type": "string",
+          "const": "2.0"
+        },
+        "id": {
+          "type": [
+            "string",
+            "number",
+            "null"
+          ]
+        },
+        "method": {
+          "type": "string"
+        },
+        "params": {
+          "$ref": "#/definitions/Record%3Cstring%2Cunknown%3E"
+        }
+      },
+      "required": [
+        "jsonrpc",
+        "method"
+      ]
+    },
+    "InlineRequest_agent_mcp_curation": {
+      "anyOf": [
+        {
+          "$ref": "#/definitions/McpJsonRpcMessage"
+        },
+        {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/McpJsonRpcMessage"
+          }
+        }
+      ]
+    },
+    "InlineRequest_mcpRelay_status": {
+      "type": "object"
+    },
+    "InlineRequest_mcpRelay_setEnabled": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "enabled"
+      ]
+    },
+    "InlineRequest_mcpRelay_connections_list": {
+      "type": "object"
+    },
+    "InlineRequest_mcpRelay_connections_create": {
+      "type": "object",
+      "properties": {
+        "clientName": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "clientName"
+      ]
+    },
+    "InlineRequest_mcpRelay_connections_remove": {
+      "type": "object",
+      "properties": {
+        "connectionId": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "connectionId"
+      ]
+    },
+    "InlineRequest_mcpRelay_session_state": {
+      "type": "object",
+      "properties": {
+        "front": {
+          "type": "boolean"
+        }
+      }
+    },
+    "InlineRequest_mcpRelay_session_agree": {
+      "type": "object",
+      "properties": {
+        "connectionId": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "connectionId"
+      ]
+    },
+    "InlineRequest_mcpRelay_session_deny": {
+      "type": "object",
+      "properties": {
+        "connectionId": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "connectionId"
+      ]
+    },
+    "InlineRequest_mcpRelay_session_end": {
+      "type": "object",
+      "properties": {
+        "connectionId": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "connectionId"
+      ]
+    },
+    "McpRelayReplyRequest": {
+      "type": "object",
+      "properties": {
+        "frameId": {
+          "type": "string"
+        },
+        "replyTo": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "ok",
+            "undeliverable",
+            "notHere"
+          ]
+        },
+        "result": {}
+      },
+      "required": [
+        "frameId",
+        "replyTo",
+        "status"
+      ]
+    },
+    "InlineRequest_mcpRelay_mcp": {
+      "anyOf": [
+        {
+          "$ref": "#/definitions/McpJsonRpcMessage"
+        },
+        {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/McpJsonRpcMessage"
+          }
+        }
+      ]
+    },
+    "InlineRequest_mcpPermission_create": {
+      "type": "object",
+      "properties": {
+        "blob": {
+          "type": "string"
+        },
+        "argsHash": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "blob",
+        "argsHash"
+      ]
+    },
+    "InlineRequest_mcpPermission_list": {
+      "type": "object"
+    },
+    "InlineRequest_mcpPermission_decide": {
+      "type": "object",
+      "properties": {
+        "requestId": {
+          "type": "string"
+        },
+        "approved": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "requestId",
+        "approved"
+      ]
+    },
+    "InlineRequest_mcpPermission_status": {
+      "type": "object",
+      "properties": {
+        "requestId": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "requestId"
+      ]
+    },
+    "InlineRequest_mcpPermission_take": {
+      "type": "object",
+      "properties": {
+        "argsHash": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "argsHash"
+      ]
+    },
+    "InlineRequest_mcpUpload_create": {
+      "type": "object",
+      "properties": {
+        "blob": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "blob"
+      ]
+    },
+    "InlineRequest_mcpUpload_open": {
+      "type": "object",
+      "properties": {
+        "token": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "token"
+      ]
+    },
+    "InlineRequest_mcpUpload_list": {
+      "type": "object"
+    },
+    "InlineRequest_mcpUpload_claim": {
+      "type": "object",
+      "properties": {
+        "uploadId": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "uploadId"
+      ]
+    },
+    "InlineRequest_mcpUpload_finish": {
+      "type": "object",
+      "properties": {
+        "uploadId": {
+          "type": "string"
+        },
+        "added": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "uploadId",
+        "added"
+      ]
+    },
+    "InlineRequest_mcpRelay_upload": {
+      "type": "object",
+      "properties": {
+        "t": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "t"
+      ]
+    },
+    "InlineRequest_deviceUnlock_create": {
+      "type": "object",
+      "properties": {
+        "publicKey": {
+          "type": "string"
+        },
+        "deviceLabel": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "publicKey"
+      ]
+    },
+    "InlineRequest_deviceUnlock_list": {
+      "type": "object"
+    },
+    "InlineRequest_deviceUnlock_approve": {
+      "type": "object",
+      "properties": {
+        "requestId": {
+          "type": "string"
+        },
+        "wrappedKey": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "requestId",
+        "wrappedKey"
+      ]
+    },
+    "InlineRequest_deviceUnlock_deny": {
+      "type": "object",
+      "properties": {
+        "requestId": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "requestId"
+      ]
+    },
+    "InlineRequest_deviceUnlock_take": {
+      "type": "object",
+      "properties": {
+        "requestId": {
+          "type": "string"
+        },
+        "pickupToken": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "requestId",
+        "pickupToken"
+      ]
+    },
+    "InlineRequest_deviceUnlock_cancel": {
+      "type": "object",
+      "properties": {
+        "requestId": {
+          "type": "string"
+        },
+        "pickupToken": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "requestId",
+        "pickupToken"
+      ]
+    },
+    "InlineRequest_deviceApproval_start": {
+      "type": "object"
+    },
+    "InlineRequest_deviceApproval_scanned": {
+      "type": "object",
+      "properties": {
+        "requestId": {
+          "type": "string"
+        },
+        "publicKey": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "requestId",
+        "publicKey"
+      ]
+    },
+    "InlineRequest_deviceApproval_check": {
+      "type": "object",
+      "properties": {
+        "requestId": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "requestId"
+      ]
+    },
+    "InlineRequest_deviceApproval_cancel": {
+      "type": "object"
+    },
+    "InlineRequest_deviceApproval_list": {
+      "type": "object"
+    },
+    "InlineRequest_deviceApproval_approve": {
+      "type": "object",
+      "properties": {
+        "requestId": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "requestId"
+      ]
+    },
+    "InlineRequest_deviceApproval_deny": {
+      "type": "object",
+      "properties": {
+        "requestId": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "requestId"
+      ]
+    },
+    "InlineRequest_mcpRelay_pairing_start": {
+      "type": "object",
+      "properties": {
+        "extPub": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "extPub"
+      ]
+    },
+    "InlineRequest_mcpRelay_pairing_redeem": {
+      "type": "object",
+      "properties": {
+        "redeemToken": {
+          "type": "string"
+        },
+        "shimPub": {
+          "type": "string"
+        },
+        "clientName": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "redeemToken",
+        "shimPub"
+      ]
+    },
+    "InlineRequest_mcpRelay_pairing_status": {
+      "type": "object",
+      "properties": {
+        "connectionId": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "connectionId"
+      ]
+    },
+    "InlineRequest_mcpRelay_pairing_finish": {
+      "type": "object",
+      "properties": {
+        "connectionId": {
+          "type": "string"
+        },
+        "wrappedKey": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "connectionId",
+        "wrappedKey"
+      ]
+    },
+    "InlineRequest_mcpRelay_connections_key": {
+      "type": "object",
+      "properties": {
+        "connectionId": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "connectionId"
+      ]
+    },
+    "InlineRequest_mcpRelayDevice_pairStart": {
+      "type": "object"
+    },
+    "InlineRequest_mcpRelayDevice_pairFinish": {
+      "type": "object",
+      "properties": {
+        "connectionId": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "connectionId"
+      ]
+    },
+    "McpRelaySealedEnvelope": {
+      "type": "object",
+      "properties": {
+        "format": {
+          "type": "string",
+          "const": "mcprelay-v1"
+        },
+        "alg": {
+          "type": "string",
+          "const": "AES-GCM"
+        },
+        "rid": {
+          "type": "string"
+        },
+        "iv": {
+          "type": "string"
+        },
+        "data": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "format",
+        "alg",
+        "rid",
+        "iv",
+        "data"
+      ]
+    },
+    "InlineRequest_mcpRelay_call": {
+      "type": "object",
+      "properties": {
+        "envelope": {
+          "$ref": "#/definitions/McpRelaySealedEnvelope"
+        }
+      },
+      "required": [
+        "envelope"
+      ]
+    },
+    "InlineRequest_mcpRelay_oauth_request": {
+      "type": "object",
+      "properties": {
+        "requestId": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "requestId"
+      ]
+    },
+    "InlineRequest_mcpRelay_oauth_decide": {
+      "type": "object",
+      "properties": {
+        "requestId": {
+          "type": "string"
+        },
+        "allow": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "requestId",
+        "allow"
+      ]
+    },
+    "InlineRequest_mcpRelay_oauth_register": {
+      "type": "object",
+      "properties": {
+        "redirect_uris": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "client_name": {
+          "type": "string"
+        },
+        "token_endpoint_auth_method": {
+          "type": "string",
+          "const": "none"
+        }
+      },
+      "required": [
+        "redirect_uris"
+      ]
+    },
+    "InlineRequest_mcpRelay_oauth_token": {
+      "type": "object",
+      "properties": {
+        "grant_type": {
+          "type": "string",
+          "enum": [
+            "authorization_code",
+            "refresh_token"
+          ]
+        },
+        "code": {
+          "type": "string"
+        },
+        "code_verifier": {
+          "type": "string"
+        },
+        "redirect_uri": {
+          "type": "string"
+        },
+        "client_id": {
+          "type": "string"
+        },
+        "refresh_token": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "grant_type"
+      ]
+    },
+    "InlineRequest_mcpRelay_oauth_authorize": {
+      "type": "object",
+      "properties": {
+        "response_type": {
+          "type": "string",
+          "const": "code"
+        },
+        "client_id": {
+          "type": "string"
+        },
+        "redirect_uri": {
+          "type": "string"
+        },
+        "code_challenge": {
+          "type": "string"
+        },
+        "code_challenge_method": {
+          "type": "string",
+          "const": "S256"
+        },
+        "state": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "response_type",
+        "client_id",
+        "redirect_uri",
+        "code_challenge",
+        "code_challenge_method"
+      ]
+    },
+    "InlineRequest_mcpRelay_well_known_oauth_protected_resource": {
+      "type": "object"
+    },
+    "InlineRequest_mcpRelay_well_known_oauth_authorization_server": {
+      "type": "object"
+    },
+    "InlineRequest_mcpRelay_well_known_openid_configuration": {
+      "type": "object"
+    },
+    "InlineRequest_admin_agentKeys_list": {
+      "type": "object"
+    },
+    "InlineRequest_admin_agentKeys_create": {
+      "type": "object",
+      "properties": {
+        "label": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "label"
+      ]
+    },
+    "InlineRequest_admin_agentKeys_revoke": {
+      "type": "object",
+      "properties": {
+        "keyId": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "keyId"
       ]
     },
     "InlineRequest_curationReview_requestAiDraft": {
@@ -16153,7 +19403,8 @@
             "string",
             "null"
           ]
-        }
+        },
+        "track": {}
       },
       "required": [
         "collectionId",
@@ -16507,11 +19758,41 @@
         "searchLookupValue": {
           "type": "string"
         },
-        "filters": {}
+        "filters": {},
+        "place": {
+          "$ref": "#/definitions/SearchPlace"
+        }
       },
       "required": [
         "searchType",
         "searchLookupValue"
+      ]
+    },
+    "SearchPlace": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "$ref": "#/definitions/SearchPlaceKind"
+        },
+        "id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind"
+      ]
+    },
+    "SearchPlaceKind": {
+      "type": "string",
+      "enum": [
+        "library",
+        "readlater",
+        "collection",
+        "settings",
+        "posts",
+        "myfeed",
+        "person",
+        "archive"
       ]
     },
     "InlineRequest_search_autocomplete": {
@@ -16522,6 +19803,9 @@
         },
         "userId": {
           "type": "string"
+        },
+        "place": {
+          "$ref": "#/definitions/SearchPlace"
         }
       },
       "required": [
@@ -16541,6 +19825,26 @@
       "required": [
         "query"
       ]
+    },
+    "SearchHistoryRequest": {
+      "type": "object",
+      "properties": {
+        "query": {
+          "type": "string"
+        },
+        "keptDays": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "limit": {
+          "type": "number"
+        },
+        "warmOnly": {
+          "type": "boolean"
+        }
+      }
     },
     "InlineRequest_search_embedded": {},
     "InlineRequest_search_status": {
@@ -16876,6 +20180,12 @@
         "data": {},
         "encInfo": {
           "$ref": "#/definitions/EncInfo"
+        },
+        "expectedUpdatedAt": {
+          "type": [
+            "string",
+            "null"
+          ]
         }
       },
       "required": [
@@ -17113,6 +20423,9 @@
       "type": "object"
     },
     "InlineRequest_system_version": {
+      "type": "object"
+    },
+    "InlineRequest_system_updateCheck": {
       "type": "object"
     },
     "InlineRequest_test_client_dbtest": {},
@@ -17357,6 +20670,9 @@
             },
             "overlay": {
               "type": "boolean"
+            },
+            "fasterBlocking": {
+              "type": "boolean"
             }
           },
           "required": [
@@ -17448,7 +20764,8 @@
               "type": "string",
               "enum": [
                 "events",
-                "poll"
+                "poll",
+                "running"
               ]
             },
             "intervalMs": {
@@ -17458,6 +20775,9 @@
           "required": [
             "kind"
           ]
+        },
+        "accountIsAdmin": {
+          "type": "boolean"
         },
         "timeZoneMismatch": {
           "type": "boolean"
@@ -17470,6 +20790,10 @@
           "items": {
             "type": "string"
           }
+        },
+        "adminCode": {
+          "type": "string",
+          "const": "device"
         }
       },
       "required": [
@@ -17498,7 +20822,10 @@
         "usageAccessRevoked",
         "mainAppMissing",
         "companionQuit",
-        "escapeHatch"
+        "escapeHatch",
+        "companionTampered",
+        "linkRemoved",
+        "stayDownForged"
       ]
     },
     "InlineRequest_user_client_heartbeat": {
@@ -18408,6 +21735,9 @@
     "InlineRequest_user_notification_markAllAsRead": {
       "type": "object"
     },
+    "InlineRequest_user_notification_lessonPartDone": {
+      "type": "object"
+    },
     "InlineRequest_user_notification_markRead": {
       "type": "object",
       "properties": {
@@ -18468,19 +21798,46 @@
           "type": "boolean"
         },
         "usageLimitsData": {},
+        "alwaysAllowed": {
+          "$ref": "#/definitions/AllowList"
+        },
+        "socialMedia": {
+          "$ref": "#/definitions/SocialMediaSettings"
+        },
+        "pageNoteReminders": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/PageNoteReminder"
+          }
+        },
         "logActivity": {
           "type": "boolean"
         },
         "containLinksInternally": {
           "type": "boolean"
         },
+        "openYouTubeInApp": {
+          "type": "boolean"
+        },
         "aiChatEnabled": {
+          "type": "boolean"
+        },
+        "aiToolsEnabled": {
+          "type": "boolean"
+        },
+        "aiWebSearchEnabled": {
           "type": "boolean"
         },
         "assistantReviewEnabled": {
           "type": "boolean"
         },
         "appEditorEnabled": {
+          "type": "boolean"
+        },
+        "commandBarEnabled": {
+          "type": "boolean"
+        },
+        "historySearchEnabled": {
           "type": "boolean"
         },
         "emailEnabled": {
@@ -18504,10 +21861,16 @@
         "remoteChildActionsEnabled": {
           "type": "boolean"
         },
+        "shoppingCartEnabled": {
+          "type": "boolean"
+        },
         "explorePublishedEnabled": {
           "type": "boolean"
         },
         "accessControlSettings": {},
+        "accessControlSettingsPatch": {
+          "$ref": "#/definitions/Record%3Cstring%2Cunknown%3E"
+        },
         "ruleOverrideSettings": {
           "$ref": "#/definitions/RuleOverrideSettings"
         },
@@ -18519,6 +21882,30 @@
         },
         "appCapabilityGrants": {
           "$ref": "#/definitions/Record%3Cstring%2CPartial%3CRecord%3Cstring%2CAppCapabilityGrant%3E%3E%3E"
+        },
+        "appGrants": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "appId": {
+                "type": "string"
+              },
+              "until": {
+                "type": "number"
+              },
+              "grantedAt": {
+                "type": "number"
+              },
+              "grantedBy": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "appId",
+              "until"
+            ]
+          }
         },
         "emailAllowedSenders": {
           "type": "array",
@@ -18544,6 +21931,374 @@
     },
     "InlineRequest_user_checkpoint_clear": {
       "type": "object"
+    },
+    "InlineRequest_user_checkpoint_approve": {
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "userId"
+      ]
+    },
+    "InlineRequest_user_earnAccess_open": {
+      "type": "object",
+      "properties": {
+        "ruleId": {
+          "type": "string"
+        },
+        "userId": {
+          "type": "string"
+        },
+        "tempAuthToken": {
+          "$ref": "#/definitions/TokenData"
+        },
+        "confirmed": {
+          "type": "boolean",
+          "const": true
+        }
+      },
+      "required": [
+        "ruleId"
+      ]
+    },
+    "InlineRequest_user_earnAccess_approve": {
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string"
+        },
+        "ruleId": {
+          "type": "string"
+        },
+        "tempAuthToken": {
+          "$ref": "#/definitions/TokenData"
+        }
+      },
+      "required": [
+        "userId",
+        "ruleId"
+      ]
+    },
+    "InlineRequest_earnAccess_status": {
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "forceRefresh": {
+          "type": "boolean"
+        }
+      }
+    },
+    "InlineRequest_earnAccess_assertOpen": {
+      "type": "object",
+      "properties": {
+        "ruleId": {
+          "type": "string"
+        },
+        "confirmed": {
+          "type": "boolean",
+          "const": true
+        }
+      },
+      "required": [
+        "ruleId"
+      ]
+    },
+    "EarnAccessRule": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "kind": {
+          "type": "string",
+          "const": "checkin"
+        },
+        "checkin": {
+          "$ref": "#/definitions/EarnAccessCheckin"
+        },
+        "name": {
+          "type": "string"
+        },
+        "enabled": {
+          "type": "boolean"
+        },
+        "holds": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/EarnAccessHold"
+          }
+        },
+        "steps": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/EarnAccessStep"
+          }
+        },
+        "approval": {
+          "type": "boolean"
+        },
+        "reset": {
+          "$ref": "#/definitions/EarnAccessReset"
+        },
+        "daysOfWeek": {
+          "type": "array",
+          "items": {
+            "type": "number"
+          }
+        },
+        "instructions": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "enabled",
+        "holds",
+        "steps",
+        "approval",
+        "reset"
+      ]
+    },
+    "EarnAccessCheckin": {
+      "type": "object",
+      "properties": {
+        "mode": {
+          "$ref": "#/definitions/CheckpointMode"
+        },
+        "exceptions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/CheckpointException"
+          }
+        },
+        "resetHourLocal": {
+          "type": "number"
+        },
+        "taskGate": {
+          "$ref": "#/definitions/CheckpointTaskGate"
+        }
+      },
+      "required": [
+        "mode"
+      ]
+    },
+    "CheckpointMode": {
+      "type": "string",
+      "enum": [
+        "reminder",
+        "self",
+        "guardian"
+      ]
+    },
+    "CheckpointException": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "label": {
+          "type": "string"
+        },
+        "conditions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/LimitMatchCondition"
+          }
+        }
+      },
+      "required": [
+        "id",
+        "conditions"
+      ]
+    },
+    "CheckpointTaskGate": {
+      "type": "object",
+      "properties": {
+        "version": {
+          "type": "number",
+          "const": 1
+        },
+        "enabled": {
+          "type": "boolean"
+        },
+        "requiredTaskIds": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "EarnAccessHold": {
+      "type": "string",
+      "enum": [
+        "entertainment",
+        "junk",
+        "games",
+        "social"
+      ]
+    },
+    "EarnAccessStep": {
+      "anyOf": [
+        {
+          "$ref": "#/definitions/EarnAccessTaskStep"
+        },
+        {
+          "$ref": "#/definitions/EarnAccessMinutesStep"
+        },
+        {
+          "$ref": "#/definitions/EarnAccessLessonStep"
+        },
+        {
+          "$ref": "#/definitions/EarnAccessConfirmStep"
+        }
+      ]
+    },
+    "EarnAccessTaskStep": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "type": {
+          "type": "string",
+          "const": "task"
+        },
+        "taskId": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "type",
+        "taskId"
+      ]
+    },
+    "EarnAccessMinutesStep": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "type": {
+          "type": "string",
+          "const": "minutes"
+        },
+        "eduValues": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/EduValue"
+          }
+        },
+        "minutes": {
+          "type": "number"
+        }
+      },
+      "required": [
+        "id",
+        "type",
+        "eduValues",
+        "minutes"
+      ]
+    },
+    "EarnAccessLessonStep": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "type": {
+          "type": "string",
+          "const": "lesson"
+        },
+        "count": {
+          "type": "number"
+        }
+      },
+      "required": [
+        "id",
+        "type",
+        "count"
+      ]
+    },
+    "EarnAccessConfirmStep": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "type": {
+          "type": "string",
+          "const": "confirm"
+        }
+      },
+      "required": [
+        "id",
+        "type"
+      ]
+    },
+    "EarnAccessReset": {
+      "type": "string",
+      "enum": [
+        "day",
+        "week",
+        "never"
+      ]
+    },
+    "InlineRequest_earnAccess_rules_put": {
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "put": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/EarnAccessRule"
+          }
+        },
+        "update": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/EarnAccessRule"
+          }
+        },
+        "add": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/EarnAccessRule"
+          }
+        }
+      }
+    },
+    "InlineRequest_earnAccess_rules_remove": {
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "ruleId": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "ruleId"
+      ]
     },
     "CopyUserSettingsRequest": {
       "type": "object",
@@ -18808,6 +22563,163 @@
       },
       "required": [
         "fileId"
+      ]
+    },
+    "ItemAttachmentPiecesStartRequest": {
+      "type": "object",
+      "properties": {
+        "itemId": {
+          "type": "string"
+        },
+        "encInfo": {},
+        "attachmentInfo": {
+          "type": "object",
+          "properties": {
+            "filename": {
+              "type": "string"
+            },
+            "fileType": {
+              "type": "string"
+            },
+            "filesize": {
+              "type": "number"
+            },
+            "meta": {
+              "$ref": "#/definitions/Record%3Cstring%2Cunknown%3E"
+            },
+            "attachmentType": {
+              "type": "string",
+              "enum": [
+                "file",
+                "snapshot"
+              ]
+            },
+            "createDate": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "filename",
+            "fileType",
+            "filesize"
+          ]
+        }
+      },
+      "required": [
+        "itemId",
+        "encInfo",
+        "attachmentInfo"
+      ]
+    },
+    "ItemAttachmentPiecesFinishRequest": {
+      "type": "object",
+      "properties": {
+        "uploadId": {
+          "type": "string"
+        },
+        "imagePreview": {
+          "type": "string"
+        },
+        "imageType": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "uploadId"
+      ]
+    },
+    "FilePiecesPutRequest": {
+      "type": "object",
+      "properties": {
+        "uploadId": {
+          "type": "string"
+        },
+        "index": {
+          "type": "number"
+        },
+        "data": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "uploadId",
+        "index",
+        "data"
+      ]
+    },
+    "FilePiecesOpenRequest": {
+      "type": "object",
+      "properties": {
+        "fileId": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "fileId"
+      ]
+    },
+    "FilePiecesReadRequest": {
+      "type": "object",
+      "properties": {
+        "readId": {
+          "type": "string"
+        },
+        "offset": {
+          "type": "number"
+        },
+        "length": {
+          "type": "number"
+        }
+      },
+      "required": [
+        "readId",
+        "offset",
+        "length"
+      ]
+    },
+    "FilePiecesCloseRequest": {
+      "type": "object",
+      "properties": {
+        "readId": {
+          "type": "string"
+        },
+        "uploadId": {
+          "type": "string"
+        }
+      }
+    },
+    "InlineRequest_appbuild_seal": {
+      "type": "object",
+      "properties": {
+        "format": {
+          "type": "string"
+        },
+        "runtime": {
+          "type": "number"
+        },
+        "hash": {
+          "type": "string"
+        },
+        "jsDigest": {
+          "type": "string"
+        },
+        "cssDigest": {
+          "type": "string"
+        },
+        "libs": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "format",
+        "runtime",
+        "hash",
+        "jsDigest",
+        "cssDigest",
+        "libs"
       ]
     },
     "InlineRequest_userfile_getMetaById": {
@@ -19546,6 +23458,9 @@
         "lessonGenLesson": {
           "$ref": "#/definitions/AdminAiPromptOverride"
         },
+        "lessonCheck": {
+          "$ref": "#/definitions/AdminAiPromptOverride"
+        },
         "lessonGradeAnswer": {
           "$ref": "#/definitions/AdminAiPromptOverride"
         },
@@ -19553,6 +23468,18 @@
           "$ref": "#/definitions/AdminAiPromptOverride"
         },
         "curationReviewDraft": {
+          "$ref": "#/definitions/AdminAiPromptOverride"
+        },
+        "trackSearch": {
+          "$ref": "#/definitions/AdminAiPromptOverride"
+        },
+        "trackSyllabus": {
+          "$ref": "#/definitions/AdminAiPromptOverride"
+        },
+        "trackWrite": {
+          "$ref": "#/definitions/AdminAiPromptOverride"
+        },
+        "trackCritic": {
           "$ref": "#/definitions/AdminAiPromptOverride"
         }
       }
@@ -19624,6 +23551,9 @@
           "type": "number"
         },
         "outputPerMillion": {
+          "type": "number"
+        },
+        "cachedInputPerMillion": {
           "type": "number"
         },
         "source": {
@@ -19841,6 +23771,15 @@
         },
         "model": {
           "type": "string"
+        },
+        "reasoningEffort": {
+          "type": "string",
+          "enum": [
+            "none",
+            "low",
+            "medium",
+            "high"
+          ]
         }
       },
       "required": [
@@ -19879,6 +23818,18 @@
           },
           "required": [
             "messages"
+          ]
+        },
+        "model": {
+          "type": "string"
+        },
+        "reasoningEffort": {
+          "type": "string",
+          "enum": [
+            "none",
+            "low",
+            "medium",
+            "high"
           ]
         }
       },

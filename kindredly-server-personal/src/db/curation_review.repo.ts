@@ -120,6 +120,7 @@ export class CurationReviewRepo extends BaseRepo<CurationReview> {
       .where('p.published', true)
       .where('p.visibilityCode', 2)
       .whereNull('p.blockedAt')
+      .whereNull('p.archivedAt')
       .where('p.nextReviewAt', '<=', new Date())
       .whereNotExists(
         db('curation_review as r').select(db.raw('1')).whereRaw('r."publishedId" = p._id').where('r.status', 'open'),
@@ -141,6 +142,7 @@ export class CurationReviewRepo extends BaseRepo<CurationReview> {
       .where('p.visibilityCode', 2)
       .where('p.curated', true)
       .whereNull('p.blockedAt')
+      .whereNull('p.archivedAt')
       .whereNull('p.nextReviewAt')
       .whereRaw('COALESCE(p."excludeFromSearch", false) = false')
       .whereNotExists(db('curation_review as r').select(db.raw('1')).whereRaw('r."publishedId" = p._id'))

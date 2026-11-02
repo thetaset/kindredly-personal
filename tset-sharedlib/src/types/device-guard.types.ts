@@ -10,6 +10,7 @@
 import type { EncInfoKey } from './encryption.types';
 import type { InterventionMode } from './activity.types';
 import type { LimitRule, RuleOverride } from './usage-limits.types';
+import type { EarnAccessOpenings, EarnAccessSettings } from './earn-access.types';
 import type { TemporaryLimitRule } from './reward.types';
 import type { DeviceHealth } from '../deviceguard/deviceHealth';
 
@@ -75,6 +76,11 @@ export interface DeviceAppInventoryEntry {
   androidCategory?: number;
   /** `ApplicationInfo.FLAG_SYSTEM` on Android; `/System/Applications` on macOS. Omitted when false. */
   isSystem?: boolean;
+  /**
+   * Android: the phone names this app as its clock, calculator, camera, dialer or Settings, so its
+   * time counts toward no limit (HAT-952, `deviceguard/notScreenTime.ts`). Omitted when false.
+   */
+  notScreenTime?: boolean;
   /** Desktop only: install path (bundle path / exe path) — display + kill targeting, never uploaded elsewhere. */
   path?: string;
   /** Desktop only: a hint from the platform ('game' for a Steam library entry, 'store' for launchers). */
@@ -154,7 +160,10 @@ export interface DeviceAppPolicy {
   blockedCategories: string[];
   /** Per-app exceptions ONLY; an entry.decision outranks its category. */
   entries: Record<string, DeviceAppPolicyEntry>;
-  /** Expand eduValue limit conditions into phone apps. Default true. */
+  /**
+   * Retired (HAT-042, BTL-3). Was the "count device apps toward usage limits" switch; every reader
+   * now ignores it and every save from Blocked or Counting rules drops it. Kept so old rows parse.
+   */
   countInUsageLimits?: boolean;
   /** Last time the parent saved, for the "new since you last looked" set. */
   reviewedAt?: number;
@@ -162,9 +171,11 @@ export interface DeviceAppPolicy {
 }
 
 /**
- * The fully materialized posture the device enforces: one flat sorted set and
- * nothing else. Every judgement (category resolution, curated-list expansion,
- * safety-floor subtraction) happens on the authoring side so Guard stays dumb.
+ * The fully materialized posture the device enforces. `blocked` preserves the
+ * Android wire format; `scopedBlocked` lets desktop clients distinguish apps
+ * that share an identifier across platforms. Every judgement (category
+ * resolution, curated-list expansion, safety-floor subtraction) happens on
+ * the authoring side.
  *
  * A package NOT in this set is not thereby allowed — it falls through to the
  * normal rule loop, so a time limit can still govern it. "Not blocked" never
@@ -176,6 +187,9 @@ export interface DeviceAppPolicy {
  */
 export interface CompiledAppPolicy {
   blocked: string[];
+  /** Platform-qualified identities. Desktop uses this when present so an Android
+   * package with the same name cannot block or allow the desktop app. */
+  scopedBlocked?: string[];
 }
 
 /**
@@ -209,7 +223,23 @@ export type DeviceTamperKind =
    * path indistinguishable from tampering. A parent who did it themselves ignores the line; one
    * who did not has just learned their PIN is out.
    */
-  | 'escapeHatch';
+  | 'escapeHatch'
+  /**
+   * Linux desktop: the root guard saw someone working to keep the Companion from coming back — its
+   * restart file deleted while the account is supervised, or a process posing as the Companion
+   * (CMP-48). The guard keeps restarting it regardless, so this too is a report, not an outage.
+   */
+  | 'companionTampered'
+  /**
+   * Linux desktop: the link record (provisioning.enc) was deleted from the child's folder, and the
+   * Companion put it back from the root guard's copy (CMP-69). Deleting it used to end enforcement.
+   */
+  | 'linkRemoved'
+  /**
+   * Linux desktop: the guard kept the Companion closed for a stay-down the Companion never wrote:
+   * one with no signature under this computer's key (CMP-69). Up to 30 minutes, then it came back.
+   */
+  | 'stayDownForged';
 
 /**
  * Companion self-reported health, persisted server-side in a ref_state row.
@@ -243,6 +273,8 @@ export interface DeviceGuardStatus {
     batteryUnrestricted: boolean;
     /** Required for ENFORCEMENT only; monitoring works without it. */
     overlay?: boolean;
+    /** Faster blocking (the accessibility service) is on. Absent from builds before HAT-930. */
+    fasterBlocking?: boolean;
   };
   /** Compiled limits currently cached on the device (Phase 2 enforcement). */
   rulesCount?: number;
@@ -300,18 +332,53 @@ export interface DeviceGuardStatus {
   appliedSettingsVersion?: number;
   /** Age of today's web time (usage seed) on the device. Sent from DCP-9. */
   usageSeedAgeMs?: number;
-  /** How the device notices the app in front: OS events, or polling at an interval. */
-  detection?: { kind: 'events' | 'poll'; intervalMs?: number };
+  /**
+   * How the device notices the app in front: OS events, or polling at an interval. `running` is a
+   * Linux desktop that hides the app in front (GNOME or KDE on Wayland): blocked apps are closed
+   * whenever they run, and no app time is counted.
+   */
+  detection?: { kind: 'events' | 'poll' | 'running'; intervalMs?: number };
+  /**
+   * Linux computers: the account the Companion runs in is an administrator, so whoever uses it can
+   * use sudo, and sudo stops and removes the Companion. Sent only while linked to a child (HAT-198).
+   * Absent: not known, or not a child's computer.
+   */
+  accountIsAdmin?: boolean;
   /** The device's timezone differs from the family's (D3). Schedules still follow the family's. */
   timeZoneMismatch?: boolean;
   /** The device clock is far from the server's, which a child can do to slide a schedule. */
   clockJump?: boolean;
   /** What this build can do: `settingsFetch` (compiles its own rules, DCP-7), `guardPush` (the server holds Guard's own FCM token, DCP-7). */
   capabilities?: string[];
+  /**
+   * Which admin code this build takes (UI: "Admin code"; code: unlockPin). `device`: only its own,
+   * from the device key it was linked with (CMP-5, CMP-62). Absent: an older build, which takes the
+   * clock code every install shares, so the parent's Admin code page shows that one for it.
+   */
+  adminCode?: 'device';
 }
 
-/** Which Android surface to open from the setup wizard (main app deep-links to it). */
-export type CompanionOpenTarget = 'app' | 'usageAccess' | 'notifications' | 'battery' | 'overlay';
+/**
+ * Which Android surface to open from the setup wizard (main app deep-links to it). `fasterBlocking`
+ * opens the Companion on its own explanation of the accessibility service, which Play requires the
+ * Companion itself to show before the service is turned on (HAT-930).
+ */
+export type CompanionOpenTarget = 'app' | 'usageAccess' | 'notifications' | 'battery' | 'overlay' | 'fasterBlocking';
+
+/**
+ * Guard's live answer for one app: would it block `pkg` right now, from the ruleset it is enforcing.
+ * `ok: false` means the answer is not known — Guard not running, too old to answer, or not reached —
+ * which is never the same as "allowed".
+ */
+export type CompanionAppDecision = {
+  ok: boolean;
+  pkg: string;
+  action?: 'allow' | 'warn' | 'block';
+  /** Guard's block reason in wire form (`app-blocked`, `family-downtime`, `budget-exhausted`, …). */
+  reason?: string | null;
+  unlockAtMs?: number | null;
+  error?: string;
+};
 
 /**
  * Result of probing the Companion satellite from the main app. Every layer is
@@ -395,6 +462,18 @@ export interface CompanionDeviceView {
   deviceHealth: DeviceHealth;
 }
 
+/**
+ * One device on the parent's Admin code page (CMP-5, CMP-62). Computed in the background from the
+ * device key; the key itself never leaves it.
+ */
+export interface DeviceAdminCodeView {
+  device: CompanionDeviceView;
+  /** The device's code for each 15-minute window, from the current one on. Empty when `reason` is set. */
+  codes: { window: number; code: string }[];
+  /** No code: the device's key could not be read on this account. */
+  reason?: 'no-key';
+}
+
 // --- Compiled rules (graduated from the Phase-0 spike compiler; enforcement lands in Phase 2) ---
 
 export interface CompiledTimeRange {
@@ -453,6 +532,58 @@ export interface CompiledDeviceRuleSet {
    * have already ended. Not gated on a pause. Absent from an older compile, which behaves as before.
    */
   familyDowntime?: DeviceFamilyDowntime;
+  /**
+   * Always allowed apps, passed through from the settings. After the floor, such an app skips Family
+   * Downtime and the rule loop, and its time is left out of every budget; an app block still closes
+   * it. Absent when there are none, so every other ruleset and its fingerprint are unchanged.
+   */
+  alwaysAllowAppIds?: string[];
+  /**
+   * Android packages whose time counts toward no budget: the Clock, calls, Settings, the keyboard,
+   * the phone's own screens, Calculator and Camera (`deviceguard/notScreenTime.ts`, HAT-952). Unlike
+   * Always allowed, nothing about blocking changes. Absent when the device reports no Android apps.
+   */
+  notCountedAppIds?: string[];
+  /**
+   * Apps a guardian allowed from a request, each until its `until` (`restrictions/appGrants.ts`,
+   * HAT-178). Such an app is not blocked by anything until then, like the safety floor; the device
+   * checks `until` on every decision, so the block comes back with no fetch. Absent when there are none.
+   */
+  appGrants?: { appId: string; until: number }[];
+  /**
+   * A guardian's "Pause all restrictions", while it is in force at compile time. App blocks and time
+   * limits are suspended until `untilMs`; Family Downtime is not, because a pause does not lift it in
+   * the browser either. `untilMs` 0 means until the guardian turns it off.
+   *
+   * An end time, not a ruleset with the blocks removed: the blocks stay in the ruleset and come back
+   * on their own the moment the pause ends, with no push and no network. Dropping them instead would
+   * leave a phone that loses its connection mid-pause unblocked for good.
+   *
+   * Absent from an older compile, which never paused on the device at all.
+   */
+  restrictionsPause?: { untilMs: number };
+  /**
+   * Earn access (HAT-836), with the apps each rule's holds cover on this device, expanded as a 0-minute
+   * limit on the same condition is (`compileEarnAccess`). Below the floor, a guardian's grant, Family
+   * Downtime, the pause, an app block and Always allowed, such an app is blocked with reason
+   * `earn-access` while its rule holds.
+   *
+   * `rules` is every rule that can hold an app here, each with the times it is open (opened for its
+   * day or week, or a day it does not apply), worked out in the family timezone up to `horizonEndMs`,
+   * as Family Downtime's are. Outside those times it holds, past the horizon too. A device checks "is
+   * now inside one" and nothing else, so a daily rule opened yesterday holds again at the family's
+   * midnight on a device that cannot recompile (no stored settings, only what Kindredly pushed, EA-15).
+   * A rule opened for good is left out: only a change to the settings can make it hold again.
+   *
+   * `holds` is the rules holding at compile time, for a device that predates `rules`; one that reads
+   * `rules` ignores it. Absent when no rule can hold an app here, so every other ruleset and its
+   * fingerprint are unchanged.
+   */
+  earnAccess?: {
+    holds: Array<{ ruleId: string; name: string; appIds: string[] }>;
+    rules?: Array<{ ruleId: string; name: string; appIds: string[]; open: Array<{ startMs: number; endMs: number }> }>;
+    horizonEndMs?: number;
+  };
   /**
    * The linked child's display name, so a Companion can name them with no browser attached.
    *
@@ -514,12 +645,22 @@ export interface DeviceSettings {
   usageLimitsData: { contentUsageLimits: LimitRule[]; temporaryRules: TemporaryLimitRule[] };
   /** Bonus time. Each override carries an absolute `expiresAt`, evaluated on the device. */
   ruleOverrideSettings: { ruleOverrides: RuleOverride[] };
-  /** Pause (with its expiry) and intervention mode. Only these fields reach a device. */
+  /**
+   * The two pauses and "Block all access" (each with its expiry), and intervention mode. Only these
+   * fields reach a device (`DEVICE_ACCESS_CONTROL_KEYS` on the server).
+   */
   accessControlSettings: {
     disableUsageLimits?: boolean;
     disableUsageLimitsExpires?: number;
+    disableRestrictions?: boolean;
+    disableRestrictionsExpires?: number;
+    restrictAll?: boolean;
+    restrictAllExpires?: number;
     usageLimitInterventionMode?: InterventionMode;
     defaultInterventionMode?: InterventionMode;
+    /** Earn access rules and when each was last opened (HAT-836). The device works out which hold. */
+    earnAccessSettings?: EarnAccessSettings;
+    earnAccessOpenings?: EarnAccessOpenings;
   };
   appPolicy: DeviceAppPolicy | null;
   appPolicyStatus: DeviceAppPolicyStatus;
@@ -533,6 +674,17 @@ export interface DeviceSettings {
    * `intervals` is empty for a family with no downtime.
    */
   familyDowntime?: DeviceFamilyDowntime;
+  /**
+   * Always allowed apps (`user.options.alwaysAllowed.appIds`, HAT-152), `<platform>:<id>`. Open during
+   * Family Downtime and past every time limit; an app block still wins. Absent when there are none,
+   * and from a server that predates it.
+   */
+  alwaysAllowAppIds?: string[];
+  /**
+   * Apps a guardian allowed from a request (`options.appGrants`, HAT-178), `<platform>:<id>` until
+   * `until`. Ended ones may still be here; a device ignores them. Absent when there are none.
+   */
+  appGrants?: { appId: string; until: number }[];
 }
 
 /**
@@ -569,4 +721,15 @@ export interface DeviceSettingsCurrentResponse {
   settings?: DeviceSettings;
   /** IANA id a guardian set for the family (D3), e.g. `America/Los_Angeles`. Null until one is set. */
   familyTimeZone?: string | null;
+  /**
+   * The server's Ed25519 public key (PEM), which a Linux computer's root guard records once (HAT-766).
+   * Sent to a device token only.
+   */
+  signingKey?: string;
+  /**
+   * While a guardian has paused all restrictions: the server's signed statement that browser lockdown
+   * may be lifted on this device until `untilMs`, at most 30 minutes ahead and renewed on every fetch.
+   * The Companion hands `message` and `signature` to the root guard unchanged.
+   */
+  browserPause?: {message: string; signature: string; untilMs: number};
 }

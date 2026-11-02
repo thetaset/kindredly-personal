@@ -65,6 +65,24 @@ class UserPrefsRoute implements Routes {
       }),
     );
 
+    // Open an Earn access rule (HAT-836): your own, or a guardian a child's — see
+    // UserService.openEarnAccess.
+    this.router.post(
+      '/user/earnAccess/open',
+      authenticateJWT,
+      errorHelper(async (req: ApiReq<'/user/earnAccess/open'>, res) => {
+        const results = await this.userService.openEarnAccess(RequestContext.instance(req), {
+          ruleId: req.body?.ruleId,
+          userId: req.body?.userId,
+        });
+        const result = {
+          success: true,
+          results,
+        };
+        res.json(result);
+      }),
+    );
+
     this.router.post(
       '/user/settings/copy',
       authenticateJWT,

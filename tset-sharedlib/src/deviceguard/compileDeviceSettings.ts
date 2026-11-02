@@ -21,11 +21,25 @@ import type {
   DeviceAppInventoryEntry,
   DeviceSettings,
 } from '../types/device-guard.types'
-import { buildAppCatalog, compileAppPolicy } from './deviceAppPolicy'
+import type { EarnAccessOpenings } from '../types/earn-access.types'
+import { buildAppCatalog, compileAppPolicy, type AppCatalogEntry } from './deviceAppPolicy'
+import { deviceAppGrants } from '../restrictions/appGrants'
+import { compileNotCountedAppIds } from './notScreenTime'
+import {
+  EARN_ACCESS_DEVICE_HORIZON_DAYS,
+  earnAccessDayStarts,
+  earnAccessHoldsAsLimitRules,
+  earnAccessOpenTimes,
+  earnAccessRuleHolding,
+  earnAccessRuleIsComplete,
+  normalizeEarnAccessSettings,
+} from '../restrictions/earnAccess'
+import { familyClock } from './familyClock'
 import {
   applyOverrides,
   compileDeviceRules,
   isDeviceAppRule,
+  resolveAppIds,
   type CategoryExpansion,
 } from './deviceRuleCompiler'
 
@@ -47,18 +61,32 @@ export type DeviceSettingsCompileInput = {
   serverTimeSkewMs?: number
 }
 
+// One formatter per timezone: building one costs far more than using it, and the activity report
+// asks for a date per activity row.
+const offsetFormatters = new Map<string, Intl.DateTimeFormat>()
+
+function offsetFormatter(timeZone: string): Intl.DateTimeFormat {
+  let formatter = offsetFormatters.get(timeZone)
+  if (!formatter) {
+    // Throws for an unknown timezone, as before, and keeps nothing.
+    formatter = new Intl.DateTimeFormat('en-US', {
+      timeZone,
+      hourCycle: 'h23',
+      year: 'numeric',
+      month: 'numeric',
+      day: 'numeric',
+      hour: 'numeric',
+      minute: 'numeric',
+      second: 'numeric',
+    })
+    offsetFormatters.set(timeZone, formatter)
+  }
+  return formatter
+}
+
 /** Minutes to add to UTC for local time in `timeZone` at `nowMs`. -420 for Los Angeles in summer. */
 export function timeZoneOffsetMinutes(nowMs: number, timeZone: string): number {
-  const parts = new Intl.DateTimeFormat('en-US', {
-    timeZone,
-    hourCycle: 'h23',
-    year: 'numeric',
-    month: 'numeric',
-    day: 'numeric',
-    hour: 'numeric',
-    minute: 'numeric',
-    second: 'numeric',
-  }).formatToParts(new Date(nowMs))
+  const parts = offsetFormatter(timeZone).formatToParts(new Date(nowMs))
   const get = (type: string) => Number(parts.find((p) => p.type === type)?.value || 0)
   const localAsUtc = Date.UTC(
     get('year'),
@@ -92,6 +120,30 @@ export function isPaused(settings: DeviceSettings, nowMs: number): boolean {
 }
 
 /**
+ * "Pause all restrictions" at `nowMs`, or null when it is not in force. `untilMs` 0 means until the
+ * guardian turns it off.
+ *
+ * Line for line the browser's own reading (`getRestrictionEffectiveStatus` in the client's
+ * `restrictionState.ts`), so a paused child is paused on every surface at once:
+ * - "Block all access" wins outright. While `restrictAll` is set there is no pause, even an expired
+ *   `restrictAll` — the browser checks it first and never reaches the pause.
+ * - Then the pause: on with no expiry, or with an expiry still ahead.
+ *
+ * The device cannot block everything yet, so under "Block all access" the most it does is decline
+ * to pause. It never lifts blocks the browser is holding closed.
+ *
+ * Distinct from `isPaused`, which is "Pause just usage limits" and deliberately leaves app blocks up.
+ */
+export function restrictionsPauseAt(settings: Pick<DeviceSettings, 'accessControlSettings'>, nowMs: number): { untilMs: number } | null {
+  const access = settings.accessControlSettings || {}
+  if (access.restrictAll) return null
+  if (!access.disableRestrictions) return null
+  const untilMs = access.disableRestrictionsExpires || 0
+  if (untilMs && untilMs <= nowMs) return null
+  return { untilMs }
+}
+
+/**
  * The rules in force at `nowMs`: the authored limits plus every unexpired reward-minted rule, the
  * same merge the browser makes (`ActivityLogDataService._getUsageLimitsData`). Empty while paused.
  */
@@ -121,7 +173,8 @@ export function compileDeviceSettings(input: DeviceSettingsCompileInput): Compil
   // case (DCP-5); deciding that is the device's job, not this function's.
   const policy = settings.appPolicy
   const catalog = buildAppCatalog(input.installedApps, policy)
-  const categoryExpansion: CategoryExpansion = policy?.countInUsageLimits === false ? 'blocksOnly' : 'all'
+  // A stored `countInUsageLimits: false` is ignored: the switch is gone (HAT-042, BTL-3).
+  const categoryExpansion: CategoryExpansion = 'all'
   const deviceRules = rules.filter((rule) => isDeviceAppRule(rule, catalog, categoryExpansion))
 
   // Only rules that reach this device carry a seed, as in the rule sync's `buildUsageSeed`.
@@ -134,6 +187,8 @@ export function compileDeviceSettings(input: DeviceSettingsCompileInput): Compil
   const access = settings.accessControlSettings || {}
   const appPolicy = compileAppPolicy(policy, catalog)
   const familyDowntime = compileFamilyDowntime(settings.familyDowntime, nowMs)
+  // The blocks and limits are compiled as usual underneath it, so they resume when it ends.
+  const restrictionsPause = restrictionsPauseAt(settings, nowMs)
   const compiled = compileDeviceRules(deviceRules, {
     version: COMPILED_RULESET_VERSION,
     now: nowMs,
@@ -149,7 +204,73 @@ export function compileDeviceSettings(input: DeviceSettingsCompileInput): Compil
     categoryExpansion,
     ...(appPolicy ? { appPolicy } : {}),
   })
-  return familyDowntime ? { ...compiled, familyDowntime } : compiled
+  const withDowntime = familyDowntime ? { ...compiled, familyDowntime } : compiled
+  const alwaysAllowAppIds = compileAlwaysAllowAppIds(settings.alwaysAllowAppIds)
+  // Time that is not screen time (HAT-952); only for a phone, so a computer's ruleset is unchanged.
+  const isPhone = (input.installedApps || []).some((app) => (app?.platform || 'android') === 'android')
+  const notCountedAppIds = isPhone ? compileNotCountedAppIds(input.installedApps, policy) : []
+  const withNotCounted = notCountedAppIds.length ? { ...withDowntime, notCountedAppIds } : withDowntime
+  const withAlwaysAllowed = alwaysAllowAppIds.length ? { ...withNotCounted, alwaysAllowAppIds } : withNotCounted
+  // A guardian's yes to one app from a request. Only the live ones; the device re-checks `until`.
+  const appGrants = deviceAppGrants(settings.appGrants).filter((grant) => grant.until > nowMs)
+  const withGrants = appGrants.length ? { ...withAlwaysAllowed, appGrants } : withAlwaysAllowed
+  // Earn access (HAT-836). Not gated on "Pause just usage limits", which does not lift it in the
+  // browser either; "Pause all restrictions" is the device's to apply, as for every block.
+  const earnAccess = compileEarnAccess(access, catalog, nowMs, familyTimeZone)
+  const withEarnAccess = earnAccess ? { ...withGrants, earnAccess } : withGrants
+  return restrictionsPause ? { ...withEarnAccess, restrictionsPause } : withEarnAccess
+}
+
+/**
+ * Earn access for the compiled ruleset (HAT-836): every rule that is on and can hold, with the apps
+ * its holds cover and the times it is open up to the horizon, in the family timezone; and, for a
+ * device that predates those times, the rules holding at `nowMs`. Each hold is expanded as a 0-minute
+ * limit on the same condition (`earnAccessHoldsAsLimitRules`) through `resolveAppIds`, so a rule
+ * holding Games closes exactly the apps the Games limit counts. The floor is left to the device, as
+ * for every limit.
+ *
+ * A rule that covers no app on this device is left out, and the field is null when none is left.
+ * The child's Kindredly pushes the same thing (`CompanionRuleSyncService`), and Guard's Kotlin
+ * compile ports it (`DeviceSettingsCompiler.compileEarnAccess`).
+ */
+export function compileEarnAccess(
+  access: { earnAccessSettings?: unknown; earnAccessOpenings?: EarnAccessOpenings | null } | null | undefined,
+  catalog: AppCatalogEntry[],
+  nowMs: number,
+  familyTimeZone: string | null | undefined,
+): CompiledDeviceRuleSet['earnAccess'] | null {
+  const openings = access?.earnAccessOpenings
+  const now = familyClock(nowMs, familyTimeZone)
+  const dayStarts = earnAccessDayStarts(nowMs, familyTimeZone, EARN_ACCESS_DEVICE_HORIZON_DAYS)
+  const earnAccess: NonNullable<CompiledDeviceRuleSet['earnAccess']> = { holds: [], rules: [] }
+  for (const rule of normalizeEarnAccessSettings(access?.earnAccessSettings).rules) {
+    if (!rule.enabled || !earnAccessRuleIsComplete(rule)) continue
+    const open = earnAccessOpenTimes(rule, openings, dayStarts, familyTimeZone)
+    if (!open) continue
+    const appIds = new Set<string>()
+    for (const limit of earnAccessHoldsAsLimitRules(rule)) {
+      const ids = resolveAppIds(limit, catalog, 'all')
+      // A hold names no app explicitly, so this is always a list; the sentinel would mean every app.
+      if (Array.isArray(ids)) for (const id of ids) appIds.add(id)
+    }
+    if (!appIds.size) continue
+    earnAccess.rules!.push({ ruleId: rule.id, name: rule.name, appIds: [...appIds], open })
+    if (earnAccessRuleHolding(rule, openings, now)) earnAccess.holds.push({ ruleId: rule.id, name: rule.name, appIds: [...appIds] })
+  }
+  if (!earnAccess.rules!.length) return null
+  return { ...earnAccess, horizonEndMs: dayStarts[dayStarts.length - 1] }
+}
+
+/**
+ * Always allowed apps for the compiled ruleset: the settings' ids, deduplicated, in their order.
+ * Guard's Kotlin compile does the same (`DeviceSettingsCompiler.compileAlwaysAllowAppIds`).
+ */
+export function compileAlwaysAllowAppIds(ids: unknown): string[] {
+  const out: string[] = []
+  for (const id of Array.isArray(ids) ? ids : []) {
+    if (typeof id === 'string' && id.trim() && !out.includes(id.trim())) out.push(id.trim())
+  }
+  return out
 }
 
 /**

@@ -20,6 +20,7 @@
 
 import { familyClock, isKnownTimeZone } from '../deviceguard/familyClock'
 import { timeZoneOffsetMinutes } from '../deviceguard/compileDeviceSettings'
+import { ALLOW_LIST_MAX, allowListMatches, normalizeAllowList, type AllowList } from './alwaysAllowed'
 
 const MINUTE_MS = 60_000
 const DAY_MS = 24 * 60 * MINUTE_MS
@@ -27,8 +28,8 @@ const DAY_MS = 24 * 60 * MINUTE_MS
 /** A one-off may not run longer than this. A slipped date should not lock a family for a month. */
 export const FAMILY_DOWNTIME_ONE_OFF_MAX_MS = 14 * DAY_MS
 export const FAMILY_DOWNTIME_ONE_OFF_MAX = 20
-export const FAMILY_DOWNTIME_ALLOW_MAX = 50
-const ALLOW_ENTRY_MAX_LENGTH = 300
+export const FAMILY_DOWNTIME_ALLOW_MAX = ALLOW_LIST_MAX
+const TEXT_MAX_LENGTH = 300
 
 /**
  * A recurring window. `start` and `end` are `HH:MM` wall-clock times in the family timezone.
@@ -76,16 +77,11 @@ export type FamilyDowntimeDismissal = {
   untilMs: number
 }
 
-/** What stays open during downtime, on top of each device's own safety floor. */
-export type FamilyDowntimeAllow = {
-  urlPatterns: string[]
-  itemIds: string[]
-  /** `<platform>:<id>` device app ids, as custom limits store them. */
-  appIds: string[]
-}
+/** What stays open during downtime, on top of each device's own safety floor. The shape Always allowed uses too. */
+export type FamilyDowntimeAllow = AllowList
 
 export type FamilyDowntimeSettings = {
-  /** Whether the recurring schedules apply. One-offs apply either way; an admin started them. */
+  /** Family Downtime is on. Off (the default) until an admin turns it on; while off, nothing applies — schedules or one-offs. */
   enabled: boolean
   schedules: FamilyDowntimeSchedule[]
   oneOffs: FamilyDowntimeOneOff[]
@@ -127,21 +123,8 @@ function finite(value: unknown): value is number {
   return typeof value === 'number' && Number.isFinite(value)
 }
 
-function text(value: unknown, max = ALLOW_ENTRY_MAX_LENGTH): string {
+function text(value: unknown, max = TEXT_MAX_LENGTH): string {
   return typeof value === 'string' ? value.trim().slice(0, max) : ''
-}
-
-function stringList(raw: unknown): string[] {
-  const out: string[] = []
-  const seen = new Set<string>()
-  for (const value of Array.isArray(raw) ? raw : []) {
-    const entry = text(value)
-    if (!entry || seen.has(entry)) continue
-    seen.add(entry)
-    out.push(entry)
-    if (out.length >= FAMILY_DOWNTIME_ALLOW_MAX) break
-  }
-  return out
 }
 
 /**
@@ -205,12 +188,7 @@ export function normalizeFamilyDowntime(raw: unknown): FamilyDowntimeSettings {
   }
   out.dismissals = [...dismissedBy].map(([userId, untilMs]) => ({ userId, untilMs }))
 
-  const allow = input.allow && typeof input.allow === 'object' ? (input.allow as Record<string, unknown>) : {}
-  out.allow = {
-    urlPatterns: stringList(allow.urlPatterns),
-    itemIds: stringList(allow.itemIds),
-    appIds: stringList(allow.appIds),
-  }
+  out.allow = normalizeAllowList(input.allow)
 
   out.updatedAt = finite(input.updatedAt) ? input.updatedAt : 0
   out.updatedBy = text(input.updatedBy, 64)
@@ -352,6 +330,7 @@ export function expandFamilyDowntimeIntervals(
   toMs: number,
   timeZone: string | null | undefined,
 ): DowntimeInterval[] {
+  if (!settings.enabled) return []
   let recurring = recurringOccurrences(settings, fromMs, toMs, timeZone)
   for (const exception of settings.exceptions) {
     recurring = recurring.flatMap((interval) => subtract(interval, exception))
@@ -442,56 +421,15 @@ export function familyDowntimeStateAt(
 }
 
 /**
- * `calm.com` → site `calm.com`; `*.calm.com` and `.calm.com` the same; `https://www.pbskids.org/games/`
- * → site `pbskids.org`, path `/games`; `youtube.com/watch?v=abc` → also query `v=abc`.
- */
-function allowedSite(pattern: string): { host: string; path: string; query: [string, string][] } | null {
-  const text = pattern.trim().replace(/^[a-z][a-z0-9+.-]*:\/\//i, '')
-  const cut = text.search(/[/?#]/)
-  const host = (cut < 0 ? text : text.slice(0, cut))
-    .toLowerCase()
-    .replace(/:\d+$/, '')
-    .replace(/^\*?\./, '')
-    .replace(/^www\./, '')
-  if (!host || /\s/.test(host)) return null
-  const rest = cut < 0 ? '' : text.slice(cut).replace(/#.*$/, '')
-  const q = rest.indexOf('?')
-  const path = (q < 0 ? rest : rest.slice(0, q)).toLowerCase().replace(/\/+$/, '')
-  const query = q < 0 ? [] : [...new URLSearchParams(rest.slice(q + 1))]
-  return { host, path, query }
-}
-
-/**
- * Does the family allowlist leave this open during downtime?
- *
- * A site matches by its name, never as a piece of the address: `calm.com` opens `calm.com` and
- * `www.calm.com/sleep`, but not `notcalm.com` or `tiktok.com/?calm.com`, which a child could type to
- * get past downtime. An entry with a path (`pbskids.org/games`) opens only pages under it, and one with
- * a query (`youtube.com/watch?v=abc`) only addresses carrying it, so one allowed video is not all of
- * them. A library item matches by id, which only a Kindredly page showing that item can supply.
+ * Does the family allowlist leave this open during downtime? The matcher Always allowed uses too
+ * (`allowListMatches`): a site by its name and subdomains, never as a piece of the address; a library
+ * item by id, which only a Kindredly page showing that item, or the device's own library, can supply.
  */
 export function isAllowedDuringDowntime(
   allow: FamilyDowntimeAllow | null | undefined,
-  target: { url?: string | null; itemId?: string | null },
+  target: { url?: string | null; itemId?: string | null; itemIds?: readonly string[] | null },
 ): boolean {
-  if (!allow) return false
-  if (target.itemId && allow.itemIds.includes(target.itemId)) return true
-  let url: URL
-  try {
-    url = new URL(target.url || '')
-  } catch {
-    return false
-  }
-  if (url.protocol !== 'https:' && url.protocol !== 'http:') return false
-  const host = url.hostname.toLowerCase().replace(/^www\./, '')
-  const pathname = url.pathname.toLowerCase().replace(/\/+$/, '')
-  return allow.urlPatterns.some((pattern) => {
-    const site = allowedSite(pattern)
-    if (!site || (host !== site.host && !host.endsWith(`.${site.host}`))) return false
-    if (site.path && pathname !== site.path && !pathname.startsWith(`${site.path}/`)) return false
-    // The first value, the one a site reads: `watch?v=OTHER&v=abc` plays OTHER, so it must not match `v=abc`.
-    return site.query.every(([key, value]) => url.searchParams.get(key) === value)
-  })
+  return allowListMatches(allow, target)
 }
 
 /** One person's downtime as a page shows and enforces it: the state, plus what stays open. */

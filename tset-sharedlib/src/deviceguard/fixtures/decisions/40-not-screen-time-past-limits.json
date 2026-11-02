@@ -1,0 +1,126 @@
+{
+  "id": "40-not-screen-time-past-limits",
+  "behaviour": "The Clock, Camera and an app the phone names as its clock spend no budget (HAT-952), so two hours on them leave Roblox open under a one-hour overall limit. A Mac has no list, so the same time spends its budget there.",
+  "clock": {
+    "nowMs": 1789448400000,
+    "familyTimeZone": "America/Los_Angeles",
+    "deviceTimeZone": "America/Los_Angeles"
+  },
+  "settings": {
+    "usageLimitsData": {
+      "contentUsageLimits": [
+        {
+          "id": "r-all-apps",
+          "name": "All apps",
+          "type": "advanced",
+          "conditions": [
+            {
+              "type": "appId",
+              "values": [
+                "all-device-apps"
+              ]
+            }
+          ],
+          "timeLimits": [
+            {
+              "hours": 1,
+              "daysOfWeek": [
+                0,
+                1,
+                2,
+                3,
+                4,
+                5,
+                6
+              ]
+            }
+          ]
+        }
+      ],
+      "temporaryRules": []
+    },
+    "ruleOverrideSettings": {
+      "ruleOverrides": []
+    },
+    "accessControlSettings": {},
+    "appPolicy": {
+      "version": 1,
+      "blockedCategories": [],
+      "entries": {},
+      "updatedAt": 1
+    },
+    "appPolicyStatus": "readable"
+  },
+  "installedApps": [
+    {
+      "pkg": "com.roblox.client",
+      "label": "Roblox",
+      "platform": "android"
+    },
+    {
+      "pkg": "com.google.android.deskclock",
+      "label": "Clock",
+      "platform": "android",
+      "isSystem": true
+    },
+    {
+      "pkg": "com.google.android.GoogleCamera",
+      "label": "Camera",
+      "platform": "android",
+      "isSystem": true
+    },
+    {
+      "pkg": "com.vendor.clock",
+      "label": "Clock",
+      "platform": "android",
+      "isSystem": true,
+      "notScreenTime": true
+    }
+  ],
+  "floor": [
+    "com.android.settings"
+  ],
+  "usage": {
+    "appMsByPkg": {
+      "com.google.android.deskclock": 3600000,
+      "com.vendor.clock": 3600000,
+      "com.google.android.GoogleCamera": 1800000,
+      "com.roblox.client": 1800000
+    },
+    "webLogs": []
+  },
+  "usageSeed": {
+    "perRuleUsedMs": {}
+  },
+  "expectDevice": [
+    {
+      "pkg": "com.roblox.client",
+      "action": "allow",
+      "reason": null,
+      "ruleId": null
+    },
+    {
+      "pkg": "com.google.android.deskclock",
+      "action": "allow",
+      "reason": null,
+      "ruleId": null
+    }
+  ],
+  "browserNotApplicable": "Device-only here: the Usage page's side is tested in ActivityService.notScreenTime.test.ts.",
+  "expectDeviceByPlatform": {
+    "macos": [
+      {
+        "pkg": "com.roblox.client",
+        "action": "block",
+        "reason": "budget-exhausted",
+        "ruleId": "r-all-apps"
+      },
+      {
+        "pkg": "com.google.android.deskclock",
+        "action": "block",
+        "reason": "budget-exhausted",
+        "ruleId": "r-all-apps"
+      }
+    ]
+  }
+}

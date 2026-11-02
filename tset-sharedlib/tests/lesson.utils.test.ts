@@ -1,4 +1,8 @@
 import {
+  getLessonWriting,
+  isLessonBeingWritten,
+  LESSON_WRITING_GIVES_UP_MS,
+  setLessonWritingOnInfo,
   LESSON_SCHEMA_ID,
   DEFAULT_LESSON_SCORING,
   setLessonSchemaOnInfo,
@@ -368,5 +372,25 @@ describe('content.types lesson registration', () => {
 
   test('default open action is openItem (opens detail, then Start lesson)', () => {
     expect(getDefaultOpenAction('thing', 'lesson')).toBe('openItem');
+  });
+});
+
+describe('a lesson being written (HAT-753)', () => {
+  it('goes on and comes off without touching the lesson beside it', () => {
+    const withLesson = setLessonSchemaOnInfo({ value: '' } as any, makeEmptyLesson('Bees'));
+    const writing = setLessonWritingOnInfo(withLesson, { startedAt: '2026-10-24T10:00:00Z' });
+    expect(getLessonWriting({ info: writing })).toEqual({ startedAt: '2026-10-24T10:00:00Z' });
+    expect(getLessonWriting({ details: { info: writing } })).toEqual({ startedAt: '2026-10-24T10:00:00Z' });
+    const done = setLessonWritingOnInfo(writing, null);
+    expect(getLessonWriting({ info: done })).toBeNull();
+    expect((done as any).schemas[LESSON_SCHEMA_ID]).toEqual((withLesson as any).schemas[LESSON_SCHEMA_ID]);
+  });
+
+  it('counts as being written only until the writing would have given up', () => {
+    const info = setLessonWritingOnInfo({ value: '' } as any, { startedAt: '2026-10-24T10:00:00Z' });
+    const at = Date.parse('2026-10-24T10:00:00Z');
+    expect(isLessonBeingWritten({ info }, at + 60_000)).toBe(true);
+    expect(isLessonBeingWritten({ info }, at + LESSON_WRITING_GIVES_UP_MS)).toBe(false);
+    expect(isLessonBeingWritten({ info: { value: '' } as any }, at)).toBe(false);
   });
 });

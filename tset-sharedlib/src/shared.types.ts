@@ -36,7 +36,9 @@ export type {
   ContentType, 
   TopicTag,
   IntentTag,
-  UseCriterias, 
+  Privacy,
+  AiFeature,
+  UseCriterias,
   UseCriteriaData, 
   UseCriteriaDataWithDetails 
 } from './content.types';
@@ -60,6 +62,8 @@ export type SubscriptionRefType =
   | 'item_feed'
   | 'pub_item_feed'
   | 'custom'
+  // Rediscover was a subscription (SL-280) and is a place of its own again (HAT-453). Rows made
+  // before then stay in the table; the server leaves them out of every list and makes no new one.
   | 'rediscover';
 export const SUBSCRIPTION_REF_TYPES: SubscriptionRefType[] = [
   'col',
@@ -70,27 +74,6 @@ export const SUBSCRIPTION_REF_TYPES: SubscriptionRefType[] = [
   'custom',
   'rediscover',
 ];
-/**
- * The built-in Rediscover source: a subscription whose items come from the person's own library
- * (things saved and not opened in a while) rather than from a feed. One per user, so its refId is
- * this fixed value rather than an item id.
- */
-export const REDISCOVER_SUBSCRIPTION_REF_ID = 'rediscover';
-/**
- * The record's `data` when the server creates the source for a user. It is on by default:
- * the server adds it the first time a user lists their own subscriptions, unless they removed
- * it before — that removal is remembered under REDISCOVER_SOURCE_PREF_KEY so it never comes
- * back on its own.
- */
-export const REDISCOVER_SUBSCRIPTION_DEFAULT_DATA = {
-  title: 'Rediscover',
-  type: 'rediscover',
-  description: 'Things from your library you have not opened in a while. Three new ones each day.',
-  consumeSettings: { mode: 'whats_new' },
-};
-/** User pref: `{ removedAt: ISO | null }`. Set on remove, cleared on a manual re-subscribe. */
-export const REDISCOVER_SOURCE_PREF_KEY = 'rediscoverSource';
-
 export type { default as Published } from './schemas/public/Published';
 
 // Deprecated re-exports from this file (should use api-types.ts or specific modules)

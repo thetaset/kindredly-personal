@@ -80,7 +80,7 @@
         { "path": "/profile_images/ladybug-svgrepo-com.svg", "name": "ladybug", "tags": ["insect", "bug"] },
         { "path": "/profile_images/penguin-svgrepo-com.svg", "name": "penguin", "tags": ["bird", "arctic"] },
         { "path": "/profile_images/squid-svgrepo-com.svg", "name": "squid", "tags": ["ocean", "sea"] },
-        { "path": "/profile_images/person-gear.svg", "name": "settings", "tags": ["person", "gear", "default"] }
+        { "path": "/profile_images/person-gear.svg", "name": "settings", "tags": ["person", "gear", "default"], "deviceOnly": true }
       ]
     }
   ]

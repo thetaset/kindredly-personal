@@ -22,6 +22,7 @@ import {
   resolveDisplaySubType,
 } from './content.types';
 import { resolveAbsoluteUrl } from './extraction.pure.utils';
+import { isCiphertextLike, resolveItemDisplayName } from './item-name.utils';
 
 function isIterable(value: unknown): value is Iterable<unknown> {
   return !!value && typeof (value as { [Symbol.iterator]?: unknown })[Symbol.iterator] === 'function';
@@ -93,14 +94,11 @@ function normalizeExternalImageCandidate(value: unknown, baseUrl?: string): stri
 /**
  * Last-resort display guard for strings that are almost certainly leftover
  * ciphertext (e.g. legacy double-encrypted fields that "decrypt" into inner
- * ciphertext): one unbroken base64 run with `=` padding, optionally wrapped
- * in literal JSON quotes. Real names/comments virtually never look like this.
+ * ciphertext). Names go through `resolveItemDisplayName`, which applies the same guard.
  */
-const CIPHERTEXT_LIKE = /^"?[A-Za-z0-9+/]{16,}={1,2}"?$/;
-
 function scrubCiphertextLike(value?: string | null): string | undefined {
   if (!value) return undefined;
-  return CIPHERTEXT_LIKE.test(value.trim()) ? undefined : value;
+  return isCiphertextLike(value) ? undefined : value;
 }
 
 /**
@@ -122,18 +120,10 @@ function usableRelationDetails(
   return details;
 }
 
-function resolveName(
-  details: Item,
-  collectionRelation?: ItemRelationView,
-  meta?: any
-): string {
-  return (
-    scrubCiphertextLike(usableRelationDetails(collectionRelation)?.name) ||
-    scrubCiphertextLike(details.name) ||
-    meta?.title ||
-    prettyURL(details.url ?? undefined) ||
-    '?'
-  );
+function resolveName(details: Item, collectionRelation?: ItemRelationView): string {
+  return resolveItemDisplayName(details as any, {
+    relationName: usableRelationDetails(collectionRelation)?.name,
+  });
 }
 
 function resolveDescription(
@@ -169,7 +159,7 @@ function getIconInfo(type: ItemType, subType?: ItemTypeSecondary): {
   typeIcon: string | null;
 } {
   if (type === 'col') {
-    return { typeName: 'Collection', typeIcon: 'collection' };
+    return { typeName: 'Collection', typeIcon: 'folder' };
   }
 
   const normalizedSubType = normalizeSubTypeForType(type, subType) ?? undefined;
@@ -201,14 +191,6 @@ function resolveDefaultImage(details: Item, meta?: any, baseUrl?: string): strin
     normalizeExternalImageCandidate(meta?.favicon, normalizedBaseUrl) ||
     asNonEmptyString(meta?.faviconPath)
   );
-}
-
-/**
- * Simple URL prettifier (you'd use the real one from your utils)
- */
-function prettyURL(url?: string): string {
-  if (!url) return '';
-  return url.replace(/^https?:\/\//, '').substring(0, 50);
 }
 
 
@@ -244,7 +226,7 @@ export function createDisplayItem(
     details.decrypted === false;
   
   // Resolve display strings (handle decryption failure)
-  let name = resolveName(details, collectionRelation, meta);
+  let name = resolveName(details, collectionRelation);
   let description = resolveDescription(details, collectionRelation, meta);
   let comment = resolveComment(details, collectionRelation);
   
@@ -308,10 +290,11 @@ export function createDisplayItem(
     sharedByUserId: details.sharedByUserId ?? undefined,
     sharedWithUserId: details.sharedWithUserId ?? undefined,
     sharedAt: toISOStringSafe(details.sharedAt),
-    
+    notInLibrary: details.notInLibrary === true ? true : undefined,
+
     publishId: details.publishId ?? undefined,
     published: details.published ?? undefined,
-    
+
     meta: meta ?? undefined,
     attachments: details.attachments ?? undefined,
     info: details.info ?? undefined,
@@ -361,9 +344,10 @@ export function createPublishedDisplayItem(
 ): PublishedDisplayItem {
   const { details, stats, curation, parentRelation, inLibrary } = publishedInfo;
   const meta = details.meta;
-  
-  // Determine subType (includes the derivations that are not stamped at save time)
-  const subType = resolveDisplaySubType(details);
+
+  // Determine subType (includes the derivations that are not stamped at save time). Not from the
+  // address: the catalog's Kind filter is SQL that cannot see it, and the card must agree (HAT-918).
+  const subType = resolveDisplaySubType(details, { fromAddress: false });
 
   const { typeName, typeIcon } = getIconInfo(details.type!, subType ?? undefined);
   const typeDetails = getItemTypeDetails(details.type!, subType ?? '');
@@ -372,11 +356,10 @@ export function createPublishedDisplayItem(
   const defaultImage = resolveDefaultImage(details, meta, details.data?.url);
   
   // Resolve name/description with fallbacks (client-side resolution)
-  const name =
-    parentRelation?.details?.name ||
-    details.name ||
-    meta?.title ||
-    prettyURL(details.data?.url);
+  const name = resolveItemDisplayName(
+    { name: details.name, meta, url: details.data?.url },
+    { relationName: parentRelation?.details?.name },
+  );
     
   const description =
     parentRelation?.details?.description ||
@@ -440,6 +423,7 @@ export function createPublishedDisplayItem(
     curatorId: curation?.curatorId,
     curatorComment: curation?.curatorComment,
     underReview: !!curation?.underReviewAt,
+    archived: !!curation?.archivedAt,
     nextReviewAt: curation?.nextReviewAt ?? undefined,
 
     inLibrary,

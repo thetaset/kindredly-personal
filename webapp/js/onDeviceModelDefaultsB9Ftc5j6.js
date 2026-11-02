@@ -1,0 +1,1 @@
+function e(){return"potion-32m"}function r(){return t()?"tfjs":"onnx"}function t(){const n=typeof navigator>"u"?"":navigator.userAgent||"";return/\bChrom(e|ium)\/\d/.test(n)&&!/\b(CriOS|EdgiOS)\//.test(n)}export{r as a,e as d};

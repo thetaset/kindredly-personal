@@ -122,6 +122,11 @@ export type DesktopBridgeSummary = {
   registrationFailed: { target: string; error: string }[];
   /** Bundle id of the browser holding the extension, from the relay pid-walk. macOS only, '' when unresolved. */
   browserPkg: string;
+  /**
+   * Every browser with Kindredly connected right now, by the same ids as `browserPkg` (CMP-16), so
+   * two connected browsers are both named. Absent on older builds.
+   */
+  browserPkgs?: string[];
   /** 'chromium' | 'firefox' from the relay origin scheme, '' when nothing is attached. */
   originFamily: 'chromium' | 'firefox' | '';
   /** The attached extension's id. Note every Chromium browser ships the same one. */
@@ -199,6 +204,37 @@ export type DesktopStatus = {
      */
     linkedUserType?: 'admin' | 'restricted';
     deviceId: string;
+    /** The server this computer reports to, so the window's website links go to a box when it is linked to one (CMP-61). */
+    serverBaseUrl?: string;
+    /**
+     * Linux, linked to a child: this computer's account is an administrator, so whoever uses it can
+     * remove the Companion with sudo (HAT-198). Absent on older builds and on other systems.
+     */
+    accountIsAdmin?: boolean;
+    /**
+     * Whether any ruleset has reached this computer, and what it holds (CMP-31), so "App limits: On"
+     * is not said with nothing to enforce. `rulesCount` is time limits and schedules;
+     * `blockedAppsCount` is apps a guardian turned off. Absent on older builds.
+     */
+    rulesLoaded?: boolean;
+    rulesCount?: number;
+    blockedAppsCount?: number;
+    /**
+     * Whether this computer can reach Kindredly (CMP-56). The last check-in's and the last settings
+     * fetch's error ('' while they work), and when the current run of failures began (epoch ms, 0
+     * while they work), so the window can say "Can't reach Kindredly since 9:40". After a wake both
+     * are retried within seconds, so a failure that outlasts the network coming back is real.
+     */
+    lastHeartbeatError?: string;
+    lastHeartbeatErrorSince?: number;
+    lastSettingsError?: string;
+    lastSettingsErrorSince?: number;
+    /**
+     * When the link record became unreadable (CMP-52), or 0. While it is, `linked` is false and the
+     * computer is still treated as linked: supervised, behind the settings gate, its sealed rules
+     * kept, and the record retried every 30 s.
+     */
+    provisioningUnreadableSince?: number;
   };
   /**
    * Why this computer is not enforcing, when it is not. `null`/absent means it is.
@@ -207,12 +243,12 @@ export type DesktopStatus = {
    * browsers locked down", which is a different question and was the only one a parent could ask.
    *
    * `source` says where to undo it: `device` in the Companion's own settings, `account` in
-   * Kindredly, `escape` on the block screen (that one expires on its own and is also reported as
-   * tamper).
+   * Kindredly ("Pause all restrictions"), `escape` from the admin code on the block screen (it
+   * expires on its own, is reported as tamper, and `app:resumeProtection` ends it early, CMP-26).
    *
    * `until` is a real deadline EXCEPT when `indefinite` is true, where it is meaningless — read
-   * that flag first. An open-ended pause is only ever possible on a computer that is not linked to
-   * a restricted user, and it is the privacy switch an adult needs on their own machine.
+   * that flag first. Open-ended: an off switch set in Companion settings, or an account pause a
+   * guardian set to last until they turn it off (CMP-3).
    */
   enforcementPause?: {
     source: 'device' | 'account' | 'escape';

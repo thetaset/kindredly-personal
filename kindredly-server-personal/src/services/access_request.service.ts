@@ -8,6 +8,7 @@ import NotificationService from './notification.service';
 import EventAuditService from './record_event.service';
 import {AccessRequestRepo} from '@/db/access_request.repo';
 import {NotificationType} from '@/typing/enum_strings';
+import {escapeHtml} from '@/utils/text_utils';
 import AccessRequestReviewService from './access_request_review.service';
 import {
   ASSISTANT_APPROVER_ID,
@@ -380,11 +381,19 @@ class AccessRequestService {
     const requestType = type || 'url';
 
     // Library-add requests dedup by requester+key so re-asking for the same
-    // item doesn't pile up duplicates for the parent.
-    if (requestType === 'publishedItem' || requestType === 'item') {
+    // item doesn't pile up duplicates for the parent. A check-in has one key a
+    // day, so asking again while the first waits is the same ask: two rows and two
+    // notifications 8 seconds apart otherwise (HAT-781).
+    // An ask to pause restrictions (HAT-766) is one per child in the same way.
+    if (
+      requestType === 'publishedItem' ||
+      requestType === 'item' ||
+      requestType === 'checkpoint' ||
+      requestType === 'earnAccess' ||
+      requestType === 'pause'
+    ) {
       const existing = await this._getAccessRequestByRequesterAndKey(ctx, key);
-      const pendingType = requestType === 'publishedItem' ? 'publishedItem' : 'item';
-      const pending = (existing as any[]).find((r) => r?.type === pendingType && r?.status === 'requested');
+      const pending = (existing as any[]).find((r) => r?.type === requestType && r?.status === 'requested');
       if (pending) return {requestId: pending._id};
     }
 
@@ -519,7 +528,7 @@ class AccessRequestService {
           ...outcome.aiReview,
           decision: 'leave_for_parent',
           source: 'error',
-          reasonForParent: 'The assistant approved this, but adding it to the library failed.',
+          reasonForParent: 'AI request review approved this, but adding it to the library failed.',
           reasonForChild: 'Sent to your parent to look at.',
         };
         const requestId = await this._createRow(ctx, {
@@ -578,7 +587,8 @@ class AccessRequestService {
         ctx.accountId,
         {
           title: 'AI approved a site',
-          message: `${requesterName} asked for ${host}. ${outcome.aiReview.reasonForParent}`,
+          // HTML in the notice: the child's name and the request are theirs, the reason the model's.
+          message: escapeHtml(`${requesterName} asked for ${host}. ${outcome.aiReview.reasonForParent}`),
           shortMessage: `Approved ${host} for ${requesterName}`,
           refInfo: {requestId, url: key, decision: 'approve', targetUserId: ctx.currentUserId},
         },
@@ -615,7 +625,7 @@ class AccessRequestService {
           ...outcome.aiReview,
           decision: 'leave_for_parent',
           source: 'error',
-          reasonForParent: 'The assistant read this as study material, but changing its category failed.',
+          reasonForParent: 'AI request review read this as study material, but changing its category failed.',
           reasonForChild: 'Sent to your parent to look at.',
           reclassifiedEduValue: null,
         };
@@ -668,7 +678,9 @@ class AccessRequestService {
         ctx.accountId,
         {
           title: 'AI changed a category',
-          message: `${requesterName} was out of time on ${assistantReviewHostKey(key) || key}. ${applied.reasonForParent}`,
+          message: escapeHtml(
+            `${requesterName} was out of time on ${assistantReviewHostKey(key) || key}. ${applied.reasonForParent}`,
+          ),
           shortMessage: `Recategorized ${assistantReviewHostKey(key) || key} for ${requesterName}`,
           refInfo: {requestId, url: key, decision: 'reclassify', targetUserId: ctx.currentUserId},
         },
@@ -738,7 +750,7 @@ class AccessRequestService {
     // on this screen, so this is reachable by an ordinary click, not just an
     // engineered one.
     if (accessrequest.approverId === ASSISTANT_APPROVER_ID) {
-      throw new Error('This request was already decided by the assistant');
+      throw new Error('This request was already decided by AI request review');
     }
 
     const isActionRequest = accessrequest.type === 'action';

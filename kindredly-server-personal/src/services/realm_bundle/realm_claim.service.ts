@@ -3,7 +3,7 @@ import {promisify} from 'util';
 
 import knex from '@/db/knex_config';
 import {SysInfoRepo} from '@/db/sysinfo.repo';
-import {hashString} from '@/utils/crypto_util';
+import {secretForStorage} from '@/services/stored_secret.service';
 import {logger} from '@/utils/logger';
 import {Knex} from 'knex';
 
@@ -205,7 +205,7 @@ export class RealmClaimService {
 
     await this.db('user')
       .where({_id: userId})
-      .update({password: hashString(password)});
+      .update({password: await secretForStorage(userId, 'password', password, this.db)});
     logger.info(`[claim] ${userId} claimed their account after a restore`);
     return {userId, username: user.username};
   }

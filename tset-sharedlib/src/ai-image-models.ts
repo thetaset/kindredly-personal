@@ -9,7 +9,7 @@
  * An image model a family runs themselves (Stable Diffusion and friends) never appears here:
  * it is reached directly from their own device, costs us nothing, and has no allowlist.
  */
-export type AiImageModelId = 'gpt-image-1';
+export type AiImageModelId = 'gpt-image-2';
 
 export type AiImageModel = {
   id: AiImageModelId;
@@ -21,8 +21,8 @@ export type AiImageModel = {
   size: '1024x1024';
   /**
    * The two models take different parameters. DALL·E 3 wants `quality: 'standard'` and has
-   * to be asked for base64; GPT Image 1 rejects both — it grades quality low/medium/high and
-   * always returns base64. Sending one model's parameters to the other is a 400.
+   * to be asked for base64; the GPT Image models reject both — they grade quality low/medium/high
+   * and always return base64. Sending one model's parameters to the other is a 400.
    */
   quality: 'standard' | 'low' | 'medium' | 'high';
   /** False when the model always returns base64 and rejects the parameter. */
@@ -30,13 +30,14 @@ export type AiImageModel = {
 };
 
 /**
- * DALL·E 3 was the default until 2026-09-15 and is gone from OpenAI's API (observation #95), so a
- * device still set to it resolves to the default below.
+ * DALL·E 3 was the default until 2026-09-15 and is gone from OpenAI's API (observation #95); GPT
+ * Image 1 was the default until 2026-09-24 and leaves the API on 2026-12-01. A device still set to
+ * either resolves to the default below.
  */
 export const AI_IMAGE_MODELS: readonly AiImageModel[] = [
   {
-    id: 'gpt-image-1',
-    label: 'GPT Image 1',
+    id: 'gpt-image-2',
+    label: 'GPT Image 2',
     note: 'Detailed pictures, including readable text.',
     size: '1024x1024',
     quality: 'medium',

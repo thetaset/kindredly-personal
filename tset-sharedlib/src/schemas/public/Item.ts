@@ -107,6 +107,7 @@ export default interface Item {
   permissionUserId?: string | null;
   permission?: string | null;
   ownedByUserType?: string | null;
+  notInLibrary?: boolean | null;
 
   // Client-side decryption state (not in DB)
   decrypted?: boolean;

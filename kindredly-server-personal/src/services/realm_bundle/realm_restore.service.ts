@@ -333,7 +333,9 @@ export class RealmRestoreService {
         }
         continue;
       }
-      written += await this.writeTable(table, opened.records.get(table) ?? [], dropped, skipped);
+      let records = opened.records.get(table) ?? [];
+      if (table === 'subscription') records = await this.withoutMissingPublishedSubscriptions(records, skipped);
+      written += await this.writeTable(table, records, dropped, skipped);
     }
 
     const memberIds = (opened.records.get('user') ?? []).map((r) => r.recordId).filter(Boolean);
@@ -375,6 +377,34 @@ export class RealmRestoreService {
   private readerFor(target: BackupTarget | null): RealmBundleReader {
     if (!target) throw new Error('No backup target is configured, so there is nothing to restore from');
     return new RealmBundleReader(target);
+  }
+
+  /**
+   * A published-collection subscription follows a row in `published`, which belongs to the host
+   * and never travels. Restored where that row does not exist, it would follow nothing: an empty
+   * source in the person's list that can never load. It is skipped and named instead.
+   */
+  private async withoutMissingPublishedSubscriptions(
+    records: BundleRecord[],
+    skipped: SkippedRecord[],
+  ): Promise<BundleRecord[]> {
+    const refIdOf = (record: BundleRecord) => String((record.data as any)?.refId ?? '');
+    const isPublished = (record: BundleRecord) => (record.data as any)?.refType === 'pub_col';
+    const publishedIds = [...new Set(records.filter(isPublished).map(refIdOf).filter(Boolean))];
+    if (!publishedIds.length) return records;
+
+    const present = new Set(
+      (await this.db('published').whereIn('_id', publishedIds).select('_id')).map((row: any) => row._id),
+    );
+    return records.filter((record) => {
+      if (!isPublished(record) || present.has(refIdOf(record))) return true;
+      skipped.push({
+        table: 'subscription',
+        recordId: record.recordId,
+        reason: 'the published collection it follows is not on this host',
+      });
+      return false;
+    });
   }
 
   /** `realm.json` is the `account` row, field-filtered on the way out (§4.4). */

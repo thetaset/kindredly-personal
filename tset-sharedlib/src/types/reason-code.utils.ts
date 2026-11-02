@@ -10,14 +10,17 @@ const reasonPrecedence: ReasonCode[] = [
   'social-media',
   'extremism',
   'violence',
+  // Above strong-language (HAT-801): a sexual page that also swears is recorded as Adult content.
+  'adult-content',
   'strong-language',
   'inappropriate-topic',
-  'adult-content',
   'inappropriate',
   'restrict-all',
   // Above the time reasons on purpose: when a checkpoint is holding, "ask a
   // parent" is the actionable explanation and "outside allowed hours" is not.
   'checkpoint-pending',
+  // The same for Earn access: what is left to do is the way through.
+  'earn-access-pending',
   'reqs-not-met',
   // Above 'not-in-library' on purpose, and present at all on purpose: a device
   // part-way through its first sync cannot tell whether a page is approved, and
@@ -123,8 +126,9 @@ const POLL_RE_EVALUABLE_REASON_CODES: ReadonlySet<ReasonCode> = new Set<ReasonCo
   'time-exceeded',
   'out-of-time-range',
   'no-matching-rule',
-  // From check-in state.
+  // From check-in and Earn access state.
   'checkpoint-pending',
+  'earn-access-pending',
   'reqs-not-met',
   // Whole-session stances the poll reads directly.
   'family-downtime',
@@ -161,9 +165,9 @@ export function isContentDerivedReason(code: ReasonCode | null | undefined): boo
 export const AI_REVIEWABLE_REASON_CODES: ReadonlySet<ReasonCode> = new Set<ReasonCode>([
   // The library does not have it yet — the case the feature exists for.
   'not-in-library',
-  // Category calls a parent's guidelines can legitimately overrule.
+  // Category calls a parent's guidelines can legitimately overrule. Not social media: Block social
+  // media is a parent's own setting, like Blocked (SMB-12), and its way through is Exceptions.
   'inappropriate-topic',
-  'social-media',
   'short-form-video',
   // A block with no more specific explanation.
   'other',

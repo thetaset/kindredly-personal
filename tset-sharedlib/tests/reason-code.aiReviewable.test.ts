@@ -9,7 +9,6 @@ describe('isAiReviewableReasonCode', () => {
     const reviewable: ReasonCode[] = [
       'not-in-library',
       'inappropriate-topic',
-      'social-media',
       'short-form-video',
       'other',
     ];
@@ -17,9 +16,10 @@ describe('isAiReviewableReasonCode', () => {
   });
 
   // A parent's own block rule is already their answer; re-deciding it would let a
-  // child route around a decision that has been made.
+  // child route around a decision that has been made. Block social media is one (SMB-12).
   it('never reviews a rule the parent wrote themselves', () => {
     expect(isAiReviewableReasonCode('custom-blocked-url')).toBe(false);
+    expect(isAiReviewableReasonCode('social-media')).toBe(false);
   });
 
   it('never reviews a safety block', () => {

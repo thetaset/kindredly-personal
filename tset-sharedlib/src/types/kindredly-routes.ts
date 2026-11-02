@@ -96,6 +96,18 @@ export function kindredlyRoutePath(route?: KindredlyRoute | null): string {
 }
 
 /**
+ * Is this pathname one of the routes above? The extension's check when the Companion asks it to
+ * open a page itself (`COMPANION_OPEN_PATH`, HAT-667): the same closed set, read from this side of
+ * the boundary rather than trusted from the other.
+ */
+export function isKindredlyRoutePathname(pathname: string): boolean {
+  const value = String(pathname || '')
+  if (['/', '/settings', '/settings/device', '/settings/admincode'].includes(value)) return true
+  const limits = /^\/manage\/user\/([^/]+)\/usagelimits$/.exec(value)
+  return Boolean(limits && USER_ID_PATTERN.test(limits[1]))
+}
+
+/**
  * The extension's own copy of Kindredly, in the browser it is installed in.
  *
  * '' when the id is not one Chrome would load — the caller's signal to fall back to the website.

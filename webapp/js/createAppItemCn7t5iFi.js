@@ -1,0 +1,1 @@
+import{t as r}from"./appLifecycle.storeCIRbKlhW.js";async function s(){var t;const e=await r("/item/save",{details:{type:"thing",subType:"kin_app",name:"Untitled app"}},{includeEncInfo:!0});return!e.success||!((t=e.result)!=null&&t.itemId)?{error:e.message||"Could not create the app."}:{itemId:e.result.itemId}}export{s as c};

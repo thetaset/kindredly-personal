@@ -15,12 +15,6 @@ export const AI_IMAGE_CREDIT_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
 /** The 429 `errorType` when a family has no credits left. */
 export const AI_IMAGE_CREDITS_USED = 'AI_IMAGE_CREDITS_USED';
 
-/**
- * The 428 `errorType` when the assistant is not turned on for the person asking. Images need the
- * assistant on (founder, 2026-09-15): the same parent switch, `user.options.aiChatEnabled`.
- */
-export const AI_ASSISTANT_OFF = 'AI_ASSISTANT_OFF';
-
 export type AiImageCredits = {
   /** The plan's weekly allowance. */
   perWeek: number;

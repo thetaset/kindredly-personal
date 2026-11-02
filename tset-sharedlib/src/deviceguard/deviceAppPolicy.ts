@@ -16,8 +16,10 @@ import {
   appCategoryFromAndroid,
   getAppCategory,
   isAppCategoryId,
+  DEVICE_SAFETY_FLOOR_LINUX,
   DEVICE_SAFETY_FLOOR_MACOS,
   DEVICE_SAFETY_FLOOR_STATIC,
+  DEVICE_SAFETY_FLOOR_WINDOWS,
   type AppCategoryId,
 } from '../kinds/appCategories'
 import { APP_CATEGORY_SEED } from '../kinds/appCategorySeed'
@@ -66,7 +68,7 @@ export function catalogAppId(app: Pick<AppCatalogEntry, 'pkg' | 'platform' | 'ap
  * without anyone touching a setting.
  */
 export function resolveAppCategory(
-  app: Pick<DeviceAppInventoryEntry, 'pkg' | 'androidCategory' | 'platform'>,
+  app: Pick<DeviceAppInventoryEntry, 'pkg' | 'androidCategory' | 'platform' | 'hint'>,
   policy?: DeviceAppPolicy | null,
 ): AppCategoryId {
   const override = policyEntryFor(app, policy)?.categoryId
@@ -95,11 +97,17 @@ export function resolveAppCategory(
  * of these two shapes.
  */
 function inferAppCategory(
-  app: Pick<DeviceAppInventoryEntry, 'pkg' | 'platform'>,
+  app: Pick<DeviceAppInventoryEntry, 'pkg' | 'platform' | 'hint'>,
 ): AppCategoryId | null {
   // Everything in a Steam library is a game. Enumerating them would be endless and
   // is never more accurate than the platform already is.
   if (app.platform === 'steam') return 'games'
+
+  // A Linux app's own `.desktop` file says `Categories=Game;` — the one declared category on a
+  // desktop worth trusting, because a launcher has no reason to claim it falsely. Linux only: on a
+  // Mac the same hint comes from Apple's category, and moving those apps now would re-file them
+  // under a different budget for families who never touched a setting.
+  if (app.platform === 'linux' && app.hint === 'game') return 'games'
 
   // An unrecognized first-party Apple binary is a system tool — Font Book, Time
   // Machine, Mission Control. Filing them under Utilities keeps them out of the
@@ -120,7 +128,12 @@ function inferAppCategory(
  * own `isSystem` flag (set for `/System/Applications` and `/Applications/Utilities`), and the
  * anti-brick safety floors, which are the ids we have already promised can never be blocked.
  */
-const SAFETY_FLOOR_PKGS = new Set<string>([...DEVICE_SAFETY_FLOOR_STATIC, ...DEVICE_SAFETY_FLOOR_MACOS])
+const SAFETY_FLOOR_PKGS = new Set<string>([
+  ...DEVICE_SAFETY_FLOOR_STATIC,
+  ...DEVICE_SAFETY_FLOOR_MACOS,
+  ...DEVICE_SAFETY_FLOOR_LINUX,
+  ...DEVICE_SAFETY_FLOOR_WINDOWS,
+])
 
 export function isSystemFurniture(
   app: Pick<DeviceAppInventoryEntry, 'pkg' | 'isSystem'>,
@@ -135,7 +148,7 @@ export function isSystemFurniture(
  * filed Terminal as a task, that is a decision, not a mistake to correct.
  */
 export function resolveAppEduValue(
-  app: Pick<DeviceAppInventoryEntry, 'pkg' | 'androidCategory' | 'platform' | 'isSystem'>,
+  app: Pick<DeviceAppInventoryEntry, 'pkg' | 'androidCategory' | 'platform' | 'isSystem' | 'hint'>,
   policy?: DeviceAppPolicy | null,
 ): EduValue {
   const override = policyEntryFor(app, policy)?.eduValue
@@ -247,10 +260,9 @@ function deviceBlockId(value: string): string {
   return !platform || platform === 'android' ? pkg : toDeviceAppId(platform, pkg)
 }
 
-/** Every spelling of an id that could be in the set, so a removal cannot miss one. */
+/** Spelling variants for the SAME platform; a Mac exception must not clear Android. */
 function blockIdSpellings(value: string): string[] {
-  const { pkg } = parseDeviceAppId(value)
-  return [...new Set([value, deviceBlockId(value), pkg])]
+  return [...new Set([value, deviceBlockId(value)])]
 }
 
 /**
@@ -273,8 +285,17 @@ export function compileAppPolicy(
   const blockedCategories = new Set(policy.blockedCategories || [])
 
   const blocked = new Set<string>()
+  const scopedBlocked = new Set<string>()
   for (const categoryId of blockedCategories) {
-    for (const pkg of packagesInCategory(categoryId)) blocked.add(pkg)
+    for (const pkg of packagesInCategory(categoryId)) {
+      blocked.add(pkg)
+      // A category is a deliberate choice across devices. Name each platform so
+      // a single-app override on Android cannot change the same-named Mac app.
+      scopedBlocked.add(toDeviceAppId('android', pkg))
+      scopedBlocked.add(toDeviceAppId('macos', pkg))
+      scopedBlocked.add(toDeviceAppId('linux', pkg))
+      scopedBlocked.add(toDeviceAppId('windows', pkg))
+    }
   }
 
   // ...and again from what is actually ON the child's devices.
@@ -290,20 +311,28 @@ export function compileAppPolicy(
   // page uses (override → seed → inference → declared), so an app the parent
   // re-filed by hand is expanded under the category they chose, not ours.
   for (const app of catalog || []) {
-    if (app?.pkg && blockedCategories.has(app.categoryId)) blocked.add(policyKeyFor(app))
+    if (app?.pkg && blockedCategories.has(app.categoryId)) {
+      blocked.add(policyKeyFor(app))
+      scopedBlocked.add(catalogAppId(app))
+    }
   }
 
   // Keyed, not `entry.pkg`: the KEY is the platform-qualified id (`policyKeyFor`), and `pkg` is
   // the bare package it was reduced to for display. Reading the wrong one is what lost `steam:`.
   for (const [key, entry] of Object.entries(policy.entries || {})) {
     if (!key || !entry?.pkg) continue
-    if (entry.decision === 'block') blocked.add(deviceBlockId(key))
+    const { platform, pkg } = parseDeviceAppId(key)
+    const scopedId = toDeviceAppId(platform || 'android', pkg)
+    if (entry.decision === 'block') {
+      blocked.add(deviceBlockId(key))
+      scopedBlocked.add(scopedId)
+    }
     // An explicit allow is an exception to a blocked category, so it must be
-    // applied AFTER the expansion above rather than alongside it. Every spelling goes: the seed
-    // pass adds bare ids and the catalog pass adds qualified ones, so deleting only one shape
-    // would leave a parent's "block browsers, except this one" half-applied.
+    // applied AFTER the expansion above rather than alongside it. Only spellings
+    // for that app's platform are removed.
     else if (entry.decision === 'allow') {
       for (const spelling of blockIdSpellings(key)) blocked.delete(spelling)
+      scopedBlocked.delete(scopedId)
     }
   }
 
@@ -315,20 +344,29 @@ export function compileAppPolicy(
   // Mac floor entry (Finder, System Settings, the Dock) blockable in the UI and refused on the
   // device — the same invisible disagreement, one platform later.
   //
-  // Both spellings of each, for the same reason the allow pass above takes them all: since the
-  // catalog pass emits qualified ids, `macos:com.apple.finder` and `com.apple.finder` can both
-  // be in the set, and subtracting one shape would leave the other promising a block the device
-  // refuses.
-  for (const pkg of [...DEVICE_SAFETY_FLOOR_STATIC, ...DEVICE_SAFETY_FLOOR_MACOS]) {
+  // Each platform's floor is subtracted from its own ids only.
+  for (const pkg of DEVICE_SAFETY_FLOOR_STATIC) {
     blocked.delete(pkg)
+    scopedBlocked.delete(toDeviceAppId('android', pkg))
+  }
+  for (const pkg of DEVICE_SAFETY_FLOOR_MACOS) {
     blocked.delete(toDeviceAppId('macos', pkg))
+    scopedBlocked.delete(toDeviceAppId('macos', pkg))
+  }
+  for (const pkg of DEVICE_SAFETY_FLOOR_LINUX) {
+    blocked.delete(toDeviceAppId('linux', pkg))
+    scopedBlocked.delete(toDeviceAppId('linux', pkg))
+  }
+  for (const pkg of DEVICE_SAFETY_FLOOR_WINDOWS) {
+    blocked.delete(toDeviceAppId('windows', pkg))
+    scopedBlocked.delete(toDeviceAppId('windows', pkg))
   }
 
   // Nothing to enforce → no field at all, so a family that never opens the page
   // produces a ruleset byte-identical to today and `fingerprintOf` stays stable.
-  if (blocked.size === 0) return undefined
+  if (blocked.size === 0 && scopedBlocked.size === 0) return undefined
 
   // Sorted because `fingerprintOf(set)` hashes the JSON: an unstable order would
   // re-push an identical ruleset over IPC every 15 minutes forever.
-  return { blocked: [...blocked].sort() }
+  return { blocked: [...blocked].sort(), scopedBlocked: [...scopedBlocked].sort() }
 }

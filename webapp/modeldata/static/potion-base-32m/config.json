@@ -1,0 +1,10 @@
+{
+  "format": "kindredly-static-embedding",
+  "version": 1,
+  "name": "potion32m-384",
+  "dims": 384,
+  "vocabSize": 63091,
+  "quantization": "int8-row",
+  "normalize": true,
+  "source": "baai/bge-base-en-v1.5"
+}

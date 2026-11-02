@@ -178,3 +178,78 @@ export const DEVICE_SAFETY_FLOOR_MACOS: readonly string[] = [
   'com.apple.SecurityAgent',
   'com.kindredly.app',
 ];
+
+/**
+ * The same idea on Linux, by desktop file id (the `.desktop` name without the suffix), mirroring
+ * `tset-electron/src/rules/linuxSafetyFloor.ts`, which reads this list rather than keeping its own.
+ *
+ * Each desktop ships its own shell, file manager and settings under its own id, and the native and
+ * Flatpak builds of one app differ, so every spelling a family's desktop can report is listed.
+ * Browsers and terminals stay blockable, for the reasons given on the Mac list.
+ */
+export const DEVICE_SAFETY_FLOOR_LINUX: readonly string[] = [
+  // GNOME
+  'org.gnome.Shell',
+  'gnome-shell',
+  'org.gnome.Nautilus',
+  'nautilus',
+  'org.gnome.Settings',
+  'gnome-control-center',
+  // KDE Plasma
+  'org.kde.plasmashell',
+  'plasmashell',
+  'org.kde.dolphin',
+  'org.kde.systemsettings',
+  'systemsettings',
+  'org.kde.polkit-kde-authentication-agent-1',
+  // Cinnamon (Linux Mint)
+  'cinnamon',
+  'cinnamon-settings',
+  'nemo',
+  'nemo-desktop',
+  // Xfce
+  'thunar',
+  'xfdesktop',
+  'xfce4-panel',
+  'xfce4-settings-manager',
+  // MATE and LXQt
+  'caja',
+  'mate-panel',
+  'mate-control-center',
+  'pcmanfm',
+  'pcmanfm-qt',
+  'lxqt-panel',
+  // Authentication and the lock screen: blocking these locks the parent out too
+  'polkit-gnome-authentication-agent-1',
+  'gnome-screensaver',
+  'light-locker',
+  // The Companion itself, as the installer names its desktop file
+  'kindredly-companion',
+];
+
+/**
+ * The same idea on Windows, by program file name (lower case, no `.exe`), mirroring
+ * `tset-electron/src/rules/windowsSafetyFloor.ts`, which reads this list.
+ *
+ * Explorer is the desktop, the taskbar and the file manager in one program, so it is here; so are
+ * the Start menu, search, the lock and sign-in screens, the administrator prompt and Settings.
+ * Task Manager, the terminals and browsers stay blockable, for the reasons given on the Mac list.
+ */
+export const DEVICE_SAFETY_FLOOR_WINDOWS: readonly string[] = [
+  'explorer',
+  'startmenuexperiencehost',
+  'shellexperiencehost',
+  'shellhost',
+  'searchhost',
+  'searchapp',
+  'searchui',
+  'textinputhost',
+  'applicationframehost',
+  'lockapp',
+  'logonui',
+  'consent',
+  'credentialuibroker',
+  'systemsettings',
+  // The Companion itself: `Kindredly Companion.exe`, after electron-builder's `productName`
+  'kindredly companion',
+];

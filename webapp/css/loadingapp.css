@@ -17,8 +17,9 @@
     /* The app mounts ~1.5s into a cold load, and the old 4s ramp only reached
        full opacity at 2s — so this splash was never more than a faint ghost
        before Vue replaced it. Hold it invisible briefly (a warm load should not
-       flash a splash nobody needed), then come up fast and stay up. */
-    animation: fadeIn 0.3s ease-out 0.2s both;
+       flash a splash nobody needed), then come up fast and stay up. Held 0.5 s, not 0.2 s
+       (the founder, 2026-10-22). */
+    animation: fadeIn 0.3s ease-out 0.5s both;
     z-index: 9999;
   }
   
@@ -45,3 +46,114 @@
     0% { transform: rotate(0deg); }
     100% { transform: rotate(360deg); }
   }
+/* The start-up logo sits over the app until the first page has drawn (src/app/bootSplash.ts),
+   so it carries the theme's background, which theme-bootstrap.js put on the body. */
+#knd-boot {
+  background-color: inherit;
+}
+
+/* The extension, the iPhone app and the website (`data-knd-boot`, HAT-642, HAT-685). Without a
+   recorded wallpaper the screen is the plain theme colour, so the logo comes up after 1.5 s and a
+   slow start does not look stuck (1 s until the founder asked for it later, 2026-10-22). Home usually shows within half a second, so a fast start never
+   shows it. */
+html[data-knd-boot] #knd-boot {
+  animation-delay: 1.5s;
+}
+
+/* With a recorded wallpaper (theme-bootstrap.js, src/app/bootWallpaper.ts) the layer is the
+   wallpaper, laid out like Home's own (.app-wallpaper) and at the same size: its colour and its
+   picture from the first frame, with no fade or zoom (HAT-772). The screen already looks like
+   Home, so the logo waits 4 s and only a really slow start shows it. The layer itself stays
+   opaque, hiding the app as it loads, and is removed the moment Home appears
+   (src/app/bootSplash.ts), over Home's own wallpaper. */
+html[data-knd-boot].knd-boot-wallpaper #knd-boot {
+  animation: none;
+  opacity: 1;
+  background-color: var(--knd-boot-wallpaper-color);
+}
+
+html[data-knd-boot].knd-boot-wallpaper #knd-boot::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background-image: var(--knd-boot-wallpaper-image, none);
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+}
+
+/* On a computer the page keeps room for a scroll bar (`scrollbar-gutter: stable`, _base.scss)
+   until Home's wallpaper is on. This layer is that wallpaper, so the room goes from the first
+   frame; kept, the picture and the page sat half a scroll bar to the left and moved right when
+   Home took over (HAT-657). */
+html[data-knd-boot].knd-boot-wallpaper {
+  scrollbar-gutter: auto;
+}
+
+html[data-knd-boot].knd-boot-wallpaper #knd-boot .loading-overlay img {
+  animation: fadeIn 0.3s ease-out 4s both, spin 1s linear infinite;
+}
+
+/* The block page (HAT-799). theme-bootstrap.js marks it, and the layer is the page's own first
+   frame: the theme colour and the page's shield, from the first frame, with no logo. The shield's
+   spot, size and colours are the page's (`.knd-blocked--hero` and `.knd-blocked__badge` in
+   views/access_request/Blocked.vue); keep the two in step. The page takes over in place: the layer
+   turns see-through (`knd-boot--handoff`, app/bootSplash.ts) and its shield covers the page's own
+   while the page fades in beneath it. */
+html.knd-boot-blocked {
+  --knd-boot-badge-top: max(2.5rem, calc(50vh - 17rem));
+  /* A computer keeps room for a scroll bar on the page but not on this fixed layer, so the two
+     shields sat half a scroll bar apart (HAT-657 found the same for Home's wallpaper). */
+  scrollbar-gutter: auto;
+}
+
+html.knd-boot-blocked #knd-boot {
+  animation: none;
+  opacity: 1;
+}
+
+html.knd-boot-blocked #knd-boot .loading-overlay {
+  display: none;
+}
+
+html.knd-boot-blocked #knd-boot::before,
+html.knd-boot-blocked #knd-boot::after {
+  content: '';
+  position: absolute;
+  top: var(--knd-boot-badge-top);
+  left: 50%;
+  width: 4.25rem;
+  height: 4.25rem;
+  margin-left: -2.125rem;
+}
+
+/* The app's stylesheet is in the page's head, so the theme's own colours are here from the first
+   frame; the fallbacks are for the dev server, which loads it later. */
+html.knd-boot-blocked #knd-boot::before {
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--bs-primary, #2771b7) 12%, var(--bg-surface, #ffffff));
+}
+
+html.knd-boot-blocked.knd-pretheme-dark #knd-boot::before {
+  background: color-mix(in srgb, var(--bs-primary, #2771b7) 12%, var(--bg-surface, #202020));
+}
+
+html.knd-boot-blocked #knd-boot::after {
+  background-color: var(--bs-primary, #2771b7);
+  -webkit-mask: var(--knd-boot-badge-icon) center / 1.85rem 1.85rem no-repeat;
+  mask: var(--knd-boot-badge-icon) center / 1.85rem 1.85rem no-repeat;
+}
+
+html[data-knd-boot-badge="shield-fill"] {
+  --knd-boot-badge-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M5.072.56C6.157.265 7.31 0 8 0s1.843.265 2.928.56c1.11.3 2.229.655 2.887.87a1.54 1.54 0 0 1 1.044 1.262c.596 4.477-.787 7.795-2.465 9.99a11.8 11.8 0 0 1-2.517 2.453 7 7 0 0 1-1.048.625c-.28.132-.581.24-.829.24s-.548-.108-.829-.24a7 7 0 0 1-1.048-.625 11.8 11.8 0 0 1-2.517-2.453C1.928 10.487.545 7.169 1.141 2.692A1.54 1.54 0 0 1 2.185 1.43 63 63 0 0 1 5.072.56'/%3E%3C/svg%3E");
+}
+
+html[data-knd-boot-badge="clock-history"] {
+  --knd-boot-badge-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M8.515 1.019A7 7 0 0 0 8 1V0a8 8 0 0 1 .589.022zm2.004.45a7 7 0 0 0-.985-.299l.219-.976q.576.129 1.126.342zm1.37.71a7 7 0 0 0-.439-.27l.493-.87a8 8 0 0 1 .979.654l-.615.789a7 7 0 0 0-.418-.302zm1.834 1.79a7 7 0 0 0-.653-.796l.724-.69q.406.429.747.91zm.744 1.352a7 7 0 0 0-.214-.468l.893-.45a8 8 0 0 1 .45 1.088l-.95.313a7 7 0 0 0-.179-.483m.53 2.507a7 7 0 0 0-.1-1.025l.985-.17q.1.58.116 1.17zm-.131 1.538q.05-.254.081-.51l.993.123a8 8 0 0 1-.23 1.155l-.964-.267q.069-.247.12-.501m-.952 2.379q.276-.436.486-.908l.914.405q-.24.54-.555 1.038zm-.964 1.205q.183-.183.35-.378l.758.653a8 8 0 0 1-.401.432z'/%3E%3Cpath d='M8 1a7 7 0 1 0 4.95 11.95l.707.707A8.001 8.001 0 1 1 8 0z'/%3E%3Cpath d='M7.5 3a.5.5 0 0 1 .5.5v5.21l3.248 1.856a.5.5 0 0 1-.496.868l-3.5-2A.5.5 0 0 1 7 9V3.5a.5.5 0 0 1 .5-.5'/%3E%3C/svg%3E");
+}
+
+#knd-boot.knd-boot--handoff {
+  background: transparent;
+  pointer-events: none;
+}

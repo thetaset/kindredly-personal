@@ -311,9 +311,13 @@ const specialPaths = new Set([
   // calling its successor instead.
   asPath('/data/contentInfo'),
   asPath('/data/podcastFeedLookup'),
+  // Kinbot's addWork (HAT-794): up to six reads of Wikipedia, Wikidata and Open Library per call.
+  asPath('/data/findWork'),
   asPath('/user/image/upload'),
   asPath('/userfile/upload'),
   asPath('/user/publicProfileImage/upload'),
+  // Open to anyone before sign-up, and can email an invite on the caller's behalf (HAT-537).
+  asPath('/invite/findForSignup'),
 ]);
 const mediaPaths = new Set([
   asPath('/userfile/get'),

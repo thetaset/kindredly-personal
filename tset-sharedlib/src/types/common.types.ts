@@ -70,6 +70,20 @@ export type StreamResult = void
 
 // ==================== Version Types ====================
 
+/**
+ * Response from /system/updateCheck (HAT-917, LITE-32): whether a newer Kindredly Personal has
+ * been published. Both versions are the sync stamp's `clientVersion` — this box's own, and the one
+ * on the public repo's main branch. Null where it could not be read; `updateAvailable` is true only
+ * when both were read and the published one is newer. Always null and false off a Personal box.
+ */
+export interface PersonalUpdateInfo {
+  current: string | null;
+  latest: string | null;
+  updateAvailable: boolean;
+  /** Where the update instructions are: the public repo. */
+  repoUrl: string;
+}
+
 /** Response from /system/version endpoint */
 export interface ServerVersionInfo {
   serverVersion: string;

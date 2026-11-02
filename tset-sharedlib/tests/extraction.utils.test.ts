@@ -5,6 +5,8 @@ import {
   mergeMetadataBySourcePriority,
   sanitizeExtractedTitle,
 } from '../src/extraction.utils';
+import { readDeviceFeedLinks } from '../src/extraction.pure.utils';
+import { ItemResourceType } from '../src/constants';
 import { mergeOptions } from '../src/meta.utils';
 
 describe('YouTube channel identifier extraction', () => {
@@ -344,5 +346,165 @@ describe('extraction.utils Reddit helpers', () => {
 
     expect(meta.title).toBe('2025 ACM Turing Award');
     expect(meta.description).toContain('Charles H. Bennett and Gilles Brassard');
+  });
+});
+
+// HAT-168: the device's read of the open page beats the server's cookieless read, except where the
+// server knows more than the page does.
+describe('which source wins (HAT-168)', () => {
+  const live = {
+    title: 'Quarterly plan - Google Docs',
+    tsExtractedInfo: { pageType: null, sourceId: 'live_dom' as const },
+  };
+
+  test('the device read beats the server reading the same page without the person\'s sign-in', () => {
+    const merged = mergeMetadataBySourcePriority(live, {
+      title: 'Some other title',
+      description: 'From the server',
+      tsExtractedInfo: { pageType: ItemResourceType.SITE_ITEM, sourceId: 'parser_1' },
+    });
+
+    expect(merged.title).toBe('Quarterly plan - Google Docs');
+    expect(merged.description).toBe('From the server');
+    expect(merged.tsExtractedInfo?.sourceId).toBe('live_dom');
+  });
+
+  test("YouTube's own data beats the page, and keeps its channel ids", () => {
+    const merged = mergeMetadataBySourcePriority(
+      { title: 'The previous video', tsExtractedInfo: { pageType: null, sourceId: 'live_dom' } },
+      {
+        title: 'The video you are on',
+        tsExtractedInfo: {
+          pageType: ItemResourceType.YT_VIDEO,
+          sourceId: 'yt_api',
+          channelId: 'UC123',
+          youtubeChannelIds: ['UC123'],
+        },
+      },
+    );
+
+    expect(merged.title).toBe('The video you are on');
+    expect(merged.tsExtractedInfo?.pageType).toBe(ItemResourceType.YT_VIDEO);
+    expect(merged.tsExtractedInfo?.youtubeChannelIds).toEqual(['UC123']);
+  });
+
+  test('a media lookup answer beats the page even when it kept the page reader\'s id', () => {
+    const merged = mergeMetadataBySourcePriority(
+      { title: 'Atomic Habits Audiobook | James Clear | Audible.com', tsExtractedInfo: { pageType: null, sourceId: 'live_dom' } },
+      {
+        title: 'Atomic Habits',
+        tsManifest: { mediaMetadata: { provider: 'audible', subType: 'book' } },
+        tsExtractedInfo: { pageType: ItemResourceType.SITE_ITEM, sourceId: 'parser_1' },
+      },
+    );
+
+    expect(merged.title).toBe('Atomic Habits');
+  });
+
+  test('a title the media lookup made from the address loses to the page, but its details are kept', () => {
+    const merged = mergeMetadataBySourcePriority(
+      { title: 'Atomic Habits Audiobook', tsExtractedInfo: { pageType: null, sourceId: 'live_dom' } },
+      {
+        title: 'B07RFSSYBH',
+        url: 'https://www.audible.com/pd/B07RFSSYBH',
+        tsManifest: { mediaMetadata: { provider: 'audible' } },
+        tsExtractedInfo: { pageType: ItemResourceType.SITE_ITEM, sourceId: 'provider_url' },
+      },
+    );
+
+    expect(merged.title).toBe('Atomic Habits Audiobook');
+    expect(merged.tsManifest?.mediaMetadata).toEqual({ provider: 'audible' });
+  });
+
+  test('a shared title beats the server\'s read, which still brings the picture', () => {
+    const merged = mergeMetadataBySourcePriority(
+      { title: 'Quarterly plan', tsExtractedInfo: { pageType: null, sourceId: 'shared_title' } },
+      {
+        title: 'Google Docs',
+        imageSrc: 'https://example.com/docs.png',
+        tsExtractedInfo: { pageType: ItemResourceType.SITE_ITEM, sourceId: 'parser_1' },
+      },
+    );
+
+    expect(merged.title).toBe('Quarterly plan');
+    expect(merged.imageSrc).toBe('https://example.com/docs.png');
+  });
+
+  test("a PDF's landing page beats a shared title, which beats the file name", () => {
+    const landing = { title: 'A Study of Sleep', tsExtractedInfo: { pageType: null, sourceId: 'pdf_landing_page' as const } };
+    const shared = { title: 'sleep.pdf from a friend', tsExtractedInfo: { pageType: null, sourceId: 'shared_title' as const } };
+    const fileName = { title: 'Sleep', tsExtractedInfo: { pageType: null, sourceId: 'file_name' as const } };
+
+    expect(mergeMetadataBySourcePriority(shared, landing).title).toBe('A Study of Sleep');
+    expect(mergeMetadataBySourcePriority(shared, fileName).title).toBe('sleep.pdf from a friend');
+  });
+
+  test("the device read's empty page type no longer wipes the server's SITE_ROOT", () => {
+    const merged = mergeMetadataBySourcePriority(
+      { title: 'Example', tsExtractedInfo: { pageType: null, sourceId: 'live_dom' } },
+      { title: 'Example Inc', tsExtractedInfo: { pageType: ItemResourceType.SITE_ROOT, sourceId: 'parser_1' } },
+    );
+
+    expect(merged.tsExtractedInfo?.pageType).toBe(ItemResourceType.SITE_ROOT);
+    expect(merged.tsExtractedInfo?.sourceId).toBe('live_dom');
+  });
+
+  test('an empty list on the winner never wipes the other side\'s list', () => {
+    const merged = mergeMetadataBySourcePriority(
+      { title: 'A', tsExtractedInfo: { pageType: null, sourceId: 'live_dom', discoveredFeedLinks: [] } },
+      {
+        title: 'B',
+        tsExtractedInfo: {
+          pageType: null,
+          sourceId: 'parser_1',
+          discoveredFeedLinks: [{ url: 'https://example.com/feed.xml', type: 'rss', source: 'head' }],
+        },
+      },
+    );
+
+    expect(merged.tsExtractedInfo?.discoveredFeedLinks).toHaveLength(1);
+  });
+});
+
+describe('readDeviceFeedLinks', () => {
+  const raw = {
+    head: [
+      { rel: 'alternate', type: 'application/rss+xml', href: '/feed.xml', title: 'Main RSS Feed' },
+      { rel: 'stylesheet', type: 'text/css', href: '/site.css', title: null },
+    ],
+    anchors: [
+      { href: 'https://example.com/sections/politics/rss', type: null, title: 'Politics RSS', text: 'Politics feed' },
+      { href: '/about', type: null, title: null, text: 'About us' },
+    ],
+  };
+
+  test('reads head and anchor feeds the way the server parser does', () => {
+    expect(readDeviceFeedLinks('https://example.com/blog/post', raw)).toEqual([
+      { url: 'https://example.com/feed.xml', title: 'Main RSS Feed', type: 'rss', source: 'head' },
+      { url: 'https://example.com/sections/politics/rss', title: 'Politics RSS', type: 'rss', source: 'anchor' },
+    ]);
+  });
+
+  test('accepts the same object as a JSON string, as iOS sends it', () => {
+    expect(readDeviceFeedLinks('https://example.com/blog/post', JSON.stringify(raw))).toHaveLength(2);
+  });
+
+  test('reads junk as no feeds', () => {
+    expect(readDeviceFeedLinks('https://example.com/', '{ not json')).toEqual([]);
+    expect(readDeviceFeedLinks('https://example.com/', 7)).toEqual([]);
+    expect(readDeviceFeedLinks('https://example.com/', { head: 'nope', anchors: [null, 3] })).toEqual([]);
+  });
+});
+
+// UX-081: a title keeps its own spelling unless the page ran text together.
+describe('sanitizeExtractedTitle keeps brand names whole', () => {
+  test.each([
+    ['CrashCourse - YouTube'],
+    ['GitHub - scratchfoundation/scratch-gui'],
+    ['Error Page | eBay'],
+    ['Apple AirPods Pro'],
+    ['Project Hail Mary: A Novel eBook'],
+  ])('%s', (title) => {
+    expect(sanitizeExtractedTitle(title)).toBe(title);
   });
 });

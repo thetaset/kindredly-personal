@@ -10,6 +10,11 @@ import {BaseRepo} from './base.repo';
  */
 const LAST_ACTIVE_SQL = 'COALESCE("lastSeen", "lastLogin", "updatedAt", "createdAt")';
 
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+/** The windows the admin console counts clients over, in days (HAT-802). */
+export const CLIENT_SEEN_WINDOWS_DAYS = [1, 7, 30, 90];
+
 export class ClientInfoRepo extends BaseRepo<ClientInfo> {
   constructor(db: Knex = knex) {
     super('client_info', db);
@@ -40,6 +45,22 @@ export class ClientInfoRepo extends BaseRepo<ClientInfo> {
       query.whereRaw(`${LAST_ACTIVE_SQL} >= ?`, [options.activeSince]);
     }
     return query;
+  }
+
+  /**
+   * How many clients were last seen within each of CLIENT_SEEN_WINDOWS_DAYS, for the admin console
+   * (HAT-802): per app, platform and version, or one row of totals. A client is its `clientId`, one
+   * per install, so a computer two people sign in on counts once. Only a client's latest version is
+   * kept, and `lastSeen` is refreshed by every signed-in request. Plain columns; nothing encrypted.
+   */
+  seenQuery(now: Date, byVersion: boolean) {
+    const since = (days: number) => new Date(now.getTime() - days * DAY_MS);
+    const counts = CLIENT_SEEN_WINDOWS_DAYS.map((days) =>
+      this.knex.raw('count(distinct "clientId") filter (where "lastSeen" >= ?) as ??', [since(days), `seen${days}`]),
+    );
+    const query = this.query().where('lastSeen', '>=', since(Math.max(...CLIENT_SEEN_WINDOWS_DAYS)));
+    if (!byVersion) return query.select(counts);
+    return query.select(['appId', 'appType', 'appVersion', ...counts]).groupBy(['appId', 'appType', 'appVersion']);
   }
 
   async deleteInactiveForUser(userId: string, activeBefore: Date) {

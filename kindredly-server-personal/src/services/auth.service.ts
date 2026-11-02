@@ -1,12 +1,16 @@
 import {config} from '@/config';
 import {AccountRepo} from '@/db/account.repo';
 import {UserRepo} from '@/db/user.repo';
+import {RefStateRepo} from '@/db/ref_state.repo';
 import User from 'tset-sharedlib/schemas/public/User';
 import {buildAccountPlanUpdate, getDetailsByAccountType} from '@/defaults/products_and_plans';
 import {CreateUserDto} from '@dtos/users.dto';
 import {HttpException} from '@exceptions/HttpException';
 import {TokenData, type RemoveRecoveryKeyFromServerRequest} from 'tset-sharedlib/api/api-types';
-import {secureCompareSecrets, hashStringWithSalt, isEmpty} from '@/utils/crypto_util';
+import {isEmpty} from '@/utils/crypto_util';
+import {checkPinpass, pinWaitMessage} from '@/utils/pin_attempts';
+import {storedSecretMatches} from '@/utils/stored_password';
+import {secretForStorage} from '@/services/stored_secret.service';
 import {Request} from 'express';
 import {v4 as uuidv4} from 'uuid';
 import {sendEmail} from '../utils/email_utils';
@@ -52,10 +56,21 @@ export interface ApplePostData {
   error: string;
 }
 
-const passwordSalt = String(config.passwordSalt);
+/**
+ * The version of the Terms and Privacy Policy that the sign-up line refers to: the date either last
+ * changed. Change it whenever one of them does (EUP-6, EUP-7), so each account's acceptance names
+ * the text it accepted.
+ */
+export const SIGNUP_TERMS_VERSION = '2026-10-23';
 
-function hashString(st: string) {
-  return hashStringWithSalt(st, passwordSalt);
+/**
+ * The acceptance a new user record carries. Someone signing themselves up (nobody is signed in yet)
+ * saw the sign-up line: creating an account confirms an adult who accepts the Terms and Privacy
+ * Policy (EUP-10, decision 9). A child an admin creates did not, so carries none.
+ */
+export function signupAcceptance(currentUserId: string | null | undefined, now: Date) {
+  if (currentUserId != null) return {};
+  return {userInfo: {termsAccepted: {at: now.toISOString(), version: SIGNUP_TERMS_VERSION}}};
 }
 
 @injectable()
@@ -64,6 +79,7 @@ class AuthService {
 
   private users = new UserRepo();
   private accounts = new AccountRepo();
+  private refStates = new RefStateRepo();
   private auditService = new EventAuditService();
   private notificationsService = container.resolve(NotificationService);
   private verificationService = new VerificationService();
@@ -146,12 +162,72 @@ class AuthService {
     const user = await this.users.findByEmail(email);
 
     if (!!user) {
-      console.log('User exists with email!', email);
-      throw new HttpException(
-        400,
-        `A user already exists with this email but with a login provider such as Google or Apple.`,
-      );
+      console.log('Sign-up refused: an account already has this email');
+      // Any account holding this email, whatever it signs in with -- an email account, Google or Apple.
+      throw new HttpException(400, 'An account with this email already exists. Sign in instead.');
     }
+  }
+
+  /**
+   * Sign-up looks for a family invite sent to the email being registered, so someone who signs
+   * up without the invite link still finds the family that invited them (HAT-537).
+   *
+   * Google and Apple have checked the email, so they get the invite itself. An email sign-up has
+   * not: anyone can type any address, and the invite code is what proves the address is theirs.
+   * So it learns only that an invite exists, and the invite is emailed to that address again.
+   */
+  // ROUTE-METHOD
+  async findFamilyInviteForSignup(
+    userData: CreateUserDto,
+  ): Promise<{invited: boolean; code?: string; inviterName?: string; inviterEmail?: string; emailed?: boolean}> {
+    const emailIsChecked = userData.loginType == LoginType.google || userData.loginType == LoginType.apple;
+    let email = userData.email;
+    if (emailIsChecked) {
+      // Fills in the provider's own email; throws on a credential that does not verify.
+      const checked = {...userData} as CreateUserDto;
+      await this.authValidatorService.validateUserCredentialsForRegistration(checked);
+      email = checked.email;
+    }
+    if (!email) {
+      return {invited: false};
+    }
+
+    const invite = await this.verificationService._findPendingFamilyInviteForEmail(email);
+    const family = invite?.data?.accountId ? await this.accounts.findById(invite.data.accountId) : null;
+    if (!invite || !family || family.deleted) {
+      return {invited: false};
+    }
+
+    if (emailIsChecked) {
+      return {
+        invited: true,
+        code: invite._id,
+        inviterName: invite.data.inviterName,
+        inviterEmail: invite.data.inviterEmail,
+      };
+    }
+    await this._emailFamilyInviteAgain(invite);
+    return {invited: true, emailed: true};
+  }
+
+  /** At most once every 10 minutes per invite, counted from when it was sent, so typing an
+   * address into sign-up cannot be used to flood its inbox. */
+  private async _emailFamilyInviteAgain(invite: {
+    _id?: string;
+    createdAt?: Date | null;
+    data?: Record<string, any> | null;
+  }) {
+    const data = invite.data || {};
+    const lastSentAt = new Date(data.resentAt || invite.createdAt || 0).getTime();
+    if (Date.now() - lastSentAt < 10 * 60 * 1000) {
+      return;
+    }
+    const inviter = data.userId ? await this.users.findById(data.userId) : null;
+    if (!inviter) {
+      return;
+    }
+    await this.verificationService._updateVerificationData(invite._id, {...data, resentAt: new Date().toISOString()});
+    await this.notificationsService.notifyOfInvitation(data.email, data.inviterName, inviter, invite._id, data.message);
   }
 
   public async _createAccount(userData: CreateUserDto): Promise<User> {
@@ -247,7 +323,33 @@ class AuthService {
     return this._getSuccessfulUserAuthInfo(user, userData.clientInfoData, req);
   }
 
-  public async verifyDesktopCompanionAdmin(usernameOrEmail: string, pinpass: string): Promise<User> {
+  /** The user a Companion was last linked for, as Kindredly recorded it, by its device id (CMP-65). */
+  public async linkedChildOf(deviceId: string): Promise<string | undefined> {
+    const link = await this.refStates.findLatestBySubKey({
+      refType: 'device-guard',
+      refId: 'companion',
+      ownerType: 'user',
+      stateKey: 'provisioning',
+      stateSubKey: String(deviceId),
+    });
+    return link?.ownerId || undefined;
+  }
+
+  /**
+   * A parent's username or email and PIN or password, checked for the desktop Companion.
+   *
+   * With `childUserId`, also that this admin is in the child's family (same account). The block
+   * screen's "Ask in person" sends it (HAT-177): without it any Kindredly admin, from any family,
+   * could unlock an app on someone else's child's computer. With `deviceId` and no child, from a
+   * Companion that cannot read its own link record (CMP-65), the family of the child that computer
+   * was last linked for. Neither: any admin, for an unlinked computer.
+   */
+  public async verifyDesktopCompanionAdmin(
+    usernameOrEmail: string,
+    pinpass: string,
+    childUserId?: string,
+    deviceId?: string,
+  ): Promise<User> {
     const normalizedUsername = String(usernameOrEmail || '')
       .trim()
       .toLowerCase();
@@ -269,9 +371,27 @@ class AuthService {
       throw new HttpException(403, 'Only admins can approve this');
     }
 
-    const hashedPinpass = hashString(pinpass);
-    if (user.pin !== hashedPinpass && user.password !== hashedPinpass) {
-      throw new HttpException(409, 'Incorrect PIN or password');
+    const pinpassCheck = await checkPinpass(user, pinpass);
+    if (!pinpassCheck.ok) {
+      throw new HttpException(
+        409,
+        pinpassCheck.waitSec > 0 ? pinWaitMessage(pinpassCheck.waitSec) : 'Incorrect PIN or password',
+      );
+    }
+
+    let familyChildId = childUserId;
+    if (!familyChildId && deviceId) {
+      familyChildId = await this.linkedChildOf(deviceId);
+      if (!familyChildId) {
+        throw new HttpException(403, 'Not a parent in this family');
+      }
+    }
+
+    if (familyChildId) {
+      const child = await this.users.findById(String(familyChildId));
+      if (!child || child.deleted || !child.accountId || String(child.accountId) !== String(user.accountId)) {
+        throw new HttpException(403, 'Not a parent in this family');
+      }
     }
 
     return user;
@@ -360,12 +480,13 @@ class AuthService {
       username: username,
       displayedName,
       email: email,
-      password: password ? hashString(password) : null,
+      password: password ? await secretForStorage(userId, 'password', password) : null,
       passwordCopy: passwordCopy,
       type: userType,
       loginType: assignedLoginType,
       loginId: loginId,
       userData: userData ? userData.additionalInfo : null,
+      ...signupAcceptance(ctx.currentUserId, nowSt),
       dob: dob == null ? undefined : dob,
       options: options,
       updatedAt: nowSt,
@@ -391,7 +512,7 @@ class AuthService {
 
     let sharedCollectionResult: {collectionId: string; created: boolean} | null = null;
     try {
-      await this.itemService._createDefaultQuickBarCollection(ctx, userId);
+      // No Quickbar collection: the Quickbar is deprecated and Pinned replaces it (HAT-324).
       sharedCollectionResult = await this.itemService._createDefaultSharedCollection(ctx, userId);
     } catch (e) {
       console.error('Error creating default collections', e);
@@ -479,7 +600,7 @@ class AuthService {
     const effectiveCopy = (await this.serverKeyStorageBlocked(ctx)) ? null : passwordCopy;
 
     await this.users.updateWithId(userId, {
-      password: hashString(rawPassword),
+      password: await secretForStorage(userId, 'password', rawPassword),
       passwordCopy: encryptPassword(effectiveCopy),
     });
 
@@ -494,7 +615,16 @@ class AuthService {
   async checkPassword(ctx: RequestContext, targetUserId: string, password: string) {
     await ctx.verifySelfOrAdminOverUser(targetUserId);
     const user = await ctx.getUserById(targetUserId);
-    return !!user.password && secureCompareSecrets(user.password, hashString(password));
+    return !!user.password && (await storedSecretMatches(user.password, password));
+  }
+
+  // ROUTE-METHOD
+  // The signed-in person's own PIN (HAT-403): the iPhone app asks for it when it opens on a
+  // parent. Only their own, so it cannot be used to test anyone else's.
+  async checkPin(ctx: RequestContext, pin: string) {
+    if (!pin) return false;
+    const user = await ctx.getCurrentUser();
+    return !!user?.pin && (await storedSecretMatches(user.pin, pin));
   }
 
   // ROUTE-METHOD
@@ -605,7 +735,7 @@ class AuthService {
       if (
         !actingUser?.password ||
         !request.password ||
-        !secureCompareSecrets(actingUser.password, hashString(request.password))
+        !(await storedSecretMatches(actingUser.password, request.password))
       ) {
         throw new HttpException(401, 'Verification failed.');
       }
@@ -652,7 +782,7 @@ class AuthService {
   // ROUTE-METHOD
   async updatePIN(ctx: RequestContext, targetUserId: string, rawPin: string) {
     await ctx.verifySelfOrAdmin(targetUserId);
-    await this.users.updateWithId(targetUserId, {pin: hashString(rawPin)});
+    await this.users.updateWithId(targetUserId, {pin: await secretForStorage(targetUserId, 'pin', rawPin)});
   }
 
   // ROUTE-METHOD
@@ -664,10 +794,10 @@ class AuthService {
 
     let user = null;
     if (login.includes('@')) {
-      console.log('Getting user by email', login);
+      console.log('Getting user by email');
       user = await this.userService.getUserByEmail(login);
     } else {
-      console.log('Getting user by username', login);
+      console.log('Getting user by username');
       user = await this.userService.getUserByUsername(login);
     }
 
@@ -787,7 +917,7 @@ class AuthService {
         throw Error('Unable to reset password for this user.');
       }
       await this.users.updateWithId(data.userId, {
-        password: hashString(newPassword),
+        password: await secretForStorage(data.userId, 'password', newPassword),
         passwordCopy: null,
       });
       await this.verificationService._invalidateVerification(verificationCode);
@@ -843,9 +973,13 @@ class AuthService {
     if (!pinpass || pinpass == '') {
       await ctx.verifyAdminOverUser(targetUserId);
     } else {
-      const hashedPINPASS = hashString(pinpass);
-      if (targetUser.pin != hashedPINPASS && targetUser.password != hashedPINPASS) {
-        throw Error('Failed to switch user, incorrect password or PIN');
+      const pinpassCheck = await checkPinpass(targetUser, pinpass);
+      if (!pinpassCheck.ok) {
+        throw Error(
+          pinpassCheck.waitSec > 0
+            ? pinWaitMessage(pinpassCheck.waitSec)
+            : 'Failed to switch user, incorrect password or PIN',
+        );
       }
     }
 
@@ -930,9 +1064,9 @@ class AuthService {
       if (!pinpass || pinpass == '') {
         throw Error('pin or password required.');
       }
-      const hashedPINPASS = hashString(pinpass);
-      if (targetUser.pin != hashedPINPASS && targetUser.password != hashedPINPASS) {
-        throw Error('incorrect password or PIN');
+      const pinpassCheck = await checkPinpass(targetUser, pinpass);
+      if (!pinpassCheck.ok) {
+        throw Error(pinpassCheck.waitSec > 0 ? pinWaitMessage(pinpassCheck.waitSec) : 'incorrect password or PIN');
       }
     }
     const tokenData = _createTempToken(targetUser);
@@ -951,6 +1085,11 @@ class AuthService {
    * session. Minted for the CALLING user unless `targetUserId` names a child
    * the caller administers — the desktop Companion is linked by a parent from
    * their own session, and the device must upload as the child.
+   *
+   * A child's session links only with a parent's live approval (HAT-930): the phone's setup page
+   * opens while the child is signed in, and a parent enters their PIN there (`/auth/permissionOverride`).
+   * Linking names whose phone it is, so without this a child could link it to a sibling with looser
+   * limits, or re-link one a parent set up. The page is open to the child, so the check is here.
    */
   public async mintCompanionToken(
     ctx: RequestContext,
@@ -959,6 +1098,24 @@ class AuthService {
   ): Promise<{token: string; deviceId: string}> {
     if (!deviceId || typeof deviceId !== 'string' || deviceId.length > 64) {
       throw new HttpException(400, 'invalid deviceId');
+    }
+    // The session, not the acting user: a parent's override makes the parent the acting user,
+    // while the session stays the child's who is holding the phone.
+    const sessionUser = await ctx.getUserById(ctx.getSessionUserId());
+    if (sessionUser && sessionUser.type !== UserType.admin) {
+      const adminUserId = ctx.getTempAuthUserId();
+      const admin = adminUserId ? await ctx.getUserById(adminUserId) : null;
+      if (!admin || admin.type !== UserType.admin || admin.accountId !== ctx.accountId) {
+        throw new HttpException(403, 'A parent must approve this.');
+      }
+      // Without a target the phone is the child's holding it, never the parent who approved.
+      const linkUserId = targetUserId || sessionUser._id;
+      await ctx.verifySelfOrAdminOverUser(linkUserId);
+      const linkUser = await ctx.getUserById(linkUserId);
+      if (!linkUser || linkUser.type === UserType.admin)
+        throw new HttpException(400, 'Only a child can be linked here.');
+      const tokenData = _createCompanionToken(linkUser, deviceId);
+      return {token: tokenData.token, deviceId};
     }
     const currentUser = await ctx.getCurrentUser();
     if (targetUserId && targetUserId !== currentUser._id) {

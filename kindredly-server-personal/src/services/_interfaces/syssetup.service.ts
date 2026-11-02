@@ -14,7 +14,8 @@ export default interface SysSetupService {
       headers?: Record<string, string>;
       payload: {aps: {alert?: {title: string; body: string}; 'content-available'?: number}};
     };
-    android?: {priority?: 'normal' | 'high'};
+    /** `ttl` in ms: FCM drops a message not delivered by then. */
+    android?: {priority?: 'normal' | 'high'; ttl?: number};
     data: any;
     tokens: any[];
   }): void;

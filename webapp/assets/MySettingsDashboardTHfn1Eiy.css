@@ -1,0 +1,1 @@
+.my-overview__access--rules-hidden[data-v-bd3608df]:not(:has(.knd-setting-row,.knd-action-tile)){display:none}.dashboard-layout[data-v-bd3608df]{display:flex;flex-direction:column;gap:1.25rem;margin-top:1rem}.dashboard-layout[data-v-bd3608df]>:empty{display:none}:where(html:not(.knd-phone)) .dashboard-layout[data-v-bd3608df]{gap:1.5rem;margin-top:1.25rem}

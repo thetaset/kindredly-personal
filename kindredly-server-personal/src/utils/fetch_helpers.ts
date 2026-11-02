@@ -8,9 +8,14 @@ import {
   extractMetadata,
   extractMetadataFromOEmbed,
   extractMetadataFromRedditJson,
+  extractMetadataFromRedditOEmbed,
   convertRedditUrlToJson,
+  getRedditOEmbedEndpoint,
+  getRedditTitleFromAddress,
   getSocialOEmbedEndpoint,
   hasUsableMetadata,
+  isRedditChallengePage,
+  isRedditShareLink,
   mergeMetadataPreferPrimary,
   type SocialOEmbedResponse,
 } from 'tset-sharedlib/extraction.utils';
@@ -21,6 +26,14 @@ import {
   getPdfLandingPageCandidates,
 } from 'tset-sharedlib/pdf-metadata.utils';
 import {ItemMeta, ItemMetaExtracted, ItemMetaFileInfo} from 'tset-sharedlib/shared.types';
+import {isSignInRedirect} from 'tset-sharedlib/sign-in-page.utils';
+import {getSiteApiRecipe} from 'tset-sharedlib/site-api.utils';
+import {
+  googlePhotosFetchUrl,
+  googlePhotosToItemMeta,
+  isGooglePhotosShareUrl,
+  readGooglePhotosSharePage,
+} from 'tset-sharedlib/google-photos.utils';
 import {extractYTChannelInfo} from 'tset-sharedlib/text.utils';
 import {
   getSocialMetadataProvider,
@@ -190,13 +203,19 @@ export async function fetchRedditPageMetaDefault(url: string, options: FetchOpti
     return redditMeta;
   }
 
+  // The page read below gets Reddit's script challenge; oEmbed still gives the title (HAT-619).
+  if (!redditMeta?.title) {
+    const oembedMeta = await fetchRedditOEmbed(url, options);
+    if (oembedMeta) return oembedMeta;
+  }
+
   const htmlMeta = await fetchGenericHtmlMeta(url, {
     ...options,
     headers: defaultHeaders,
   });
 
   if (!redditMeta) {
-    return htmlMeta;
+    return withRedditAddressTitle(url, htmlMeta);
   }
 
   const mergedMeta = mergeMetadataPreferPrimary(redditMeta, htmlMeta);
@@ -206,6 +225,43 @@ export async function fetchRedditPageMetaDefault(url: string, options: FetchOpti
 
   return redditMeta;
 }
+
+/** Nothing could be read: name it from its address (r/<subreddit>, a post's words) rather than leave it blank. */
+function withRedditAddressTitle(url: string, meta: ItemMeta): ItemMeta {
+  if (meta.title?.trim()) return meta;
+  const title = getRedditTitleFromAddress(url);
+  if (!title) return meta;
+  return {
+    ...meta,
+    title,
+    siteName: meta.siteName || 'Reddit',
+    tsExtractedInfo: {
+      ...(meta.tsExtractedInfo || {pageType: ItemResourceType.SITE_ITEM}),
+      sourceId: 'provider_url',
+    } as ItemMetaExtracted,
+  };
+}
+
+/** A Reddit post's title from Reddit's oEmbed; a phone share link is followed to its post first. */
+async function fetchRedditOEmbed(url: string, options: FetchOptions = {}): Promise<ItemMeta | null> {
+  const headers = buildDefaultBrowserHeaders({Accept: 'application/json'});
+  try {
+    let postUrl = url;
+    if (isRedditShareLink(url)) {
+      const response = await axiosCall(url, {timeout: 8000, ...options, headers});
+      postUrl = (response.request as any)?.res?.responseUrl || url;
+    }
+    const endpoint = getRedditOEmbedEndpoint(postUrl);
+    if (!endpoint) return null;
+
+    const response = await axiosCall<SocialOEmbedResponse>(endpoint, {timeout: 8000, ...options, headers});
+    return extractMetadataFromRedditOEmbed(url, response.data || {});
+  } catch (error) {
+    console.error(`Error fetching Reddit oEmbed for URL: ${url}`, error);
+    return null;
+  }
+}
+
 export async function fetchYoutubeVideoMetaWithAPI(
   url: string,
   videoId: string,
@@ -465,7 +521,8 @@ export function isBotBlockPage(html: string): boolean {
     /<title[^>]*>\s*attention required/i.test(html) ||
     /<title[^>]*>\s*access denied/i.test(html) ||
     /<title[^>]*>\s*403 forbidden/i.test(html) ||
-    /<title[^>]*>\s*just a moment/i.test(html)
+    /<title[^>]*>\s*just a moment/i.test(html) ||
+    isRedditChallengePage(html)
   );
 }
 
@@ -496,6 +553,14 @@ export async function fetchGenericHtmlMeta(url: string, options: FetchOptions = 
         ...(options as any)?.headers,
       },
     });
+
+    // A page behind an account (a Google Doc) redirects a fetch without its cookies to the
+    // sign-in page. That page's title would replace the document's own (HAT-168).
+    const finalUrl: string | null = (response.request as any)?.res?.responseUrl || null;
+    if (isSignInRedirect(url, finalUrl)) {
+      console.warn(`Sign-in page instead of ${url} — returning empty metadata`);
+      return getDefaultMetadata(url, 'sign-in');
+    }
 
     const bytes = toUint8Array(response.data);
     const contentType = getHeaderValue(response.headers, 'content-type');
@@ -853,6 +918,54 @@ export async function fetchYoutubeChannelMetaWithApiByURL(
 }
 
 /**
+ * A shared Google Photos link's name (HAT-651), for a client that cannot read the share itself (the
+ * web app). A short link is asked for with the address that redirects to the album; plain, Google
+ * answers a browser with a page that moves on by script and names nothing. Neither the photos nor
+ * the cover (itself one of the photos) are kept, so the shared link cache holds no family's photo
+ * addresses: the client reads them from the share, and shows the first as the picture.
+ */
+export async function fetchGooglePhotosShareMeta(url: string, options: FetchOptions = {}): Promise<ItemMeta | null> {
+  if (!isGooglePhotosShareUrl(url)) return null;
+  try {
+    const response = await axiosCall<string>(googlePhotosFetchUrl(url), {
+      timeout: 12000,
+      ...options,
+      responseType: 'text',
+      headers: buildDefaultBrowserHeaders(),
+    });
+    const share = readGooglePhotosSharePage(String(response.data || ''), url);
+    return share ? googlePhotosToItemMeta(url, share, null, {cover: false}) : null;
+  } catch (error) {
+    console.error(`Error reading the Google Photos share for URL: ${url}`, error);
+    return null;
+  }
+}
+
+/** A site that refuses a page read but names the page through a public API: Stack Overflow (HAT-619). */
+export async function fetchSiteApiMeta(url: string, options: FetchOptions = {}): Promise<ItemMeta | null> {
+  const recipe = getSiteApiRecipe(url);
+  if (!recipe) return null;
+  try {
+    const response = await axiosCall(recipe.endpoint, {
+      timeout: 8000,
+      ...options,
+      headers: buildDefaultBrowserHeaders({Accept: 'application/json'}),
+    });
+    const found = recipe.parse(response.data);
+    if (!found) return null;
+    return {
+      url,
+      title: found.title,
+      description: found.description,
+      tsExtractedInfo: {pageType: ItemResourceType.SITE_ITEM, sourceId: 'provider_api'} as ItemMetaExtracted,
+    };
+  } catch (error) {
+    console.error(`Error fetching ${recipe.id} API for URL: ${url}`, error);
+    return null;
+  }
+}
+
+/**
  * URL router that auto-detects URL type and dispatches to specialized fetchers.
  *
  * For use when you don't know/care about URL type and just want metadata.
@@ -863,6 +976,8 @@ export async function fetchYoutubeChannelMetaWithApiByURL(
  * - Generic HTML: fetchGenericHtmlMeta()
  */
 export async function fetchRawMeta(url: string, options: FetchOptions = {}): Promise<ItemMeta | null> {
+  const apiMeta = await fetchSiteApiMeta(url, options);
+  if (apiMeta) return apiMeta;
   if (url.includes('youtube.com/watch?v=') || url.includes('youtu.be/') || url.includes('youtube.com/embed/')) {
     const videoId = extractYoutubeVideoId(url);
     if (videoId) {

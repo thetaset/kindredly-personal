@@ -48,7 +48,7 @@ class ClientInfoService {
   private async verifyManagedRemoteActionAccess(
     ctx: RequestContext,
     targetUserId: string,
-    options: {requireOpenUrl?: boolean; requireScreenshot?: boolean} = {},
+    options: {requireOpenUrl?: boolean} = {},
   ) {
     await ctx.verifyAdminOverUser(targetUserId);
 
@@ -90,10 +90,6 @@ class ClientInfoService {
 
     if (options.requireOpenUrl && remoteActionSettings?.allowOpenUrl !== true) {
       throw new Error('Open URL is disabled for this child');
-    }
-
-    if (options.requireScreenshot && remoteActionSettings?.allowScreenshot !== true) {
-      throw new Error('Screenshots are disabled for this child');
     }
 
     return {
@@ -501,18 +497,14 @@ class ClientInfoService {
       throw new Error('Encrypted payload is required');
     }
 
-    if (
-      input?.kind !== 'openUrl' &&
-      input?.kind !== 'forceSyncSettings' &&
-      input?.kind !== 'syncActivity' &&
-      input?.kind !== 'getScreenshot'
-    ) {
+    // No 'getScreenshot': a one-off screenshot ran with no notice to the child and reached the server
+    // unencrypted. Live View is the one way to see a child's screen (founder, 2026-10-22, EUP-4).
+    if (input?.kind !== 'openUrl' && input?.kind !== 'forceSyncSettings' && input?.kind !== 'syncActivity') {
       throw new Error('Unsupported remote action');
     }
 
     await this.verifyManagedRemoteActionAccess(ctx, targetUserId, {
       requireOpenUrl: input.kind === 'openUrl',
-      requireScreenshot: input.kind === 'getScreenshot',
     });
     const {liveConnection, clientId} = await this.resolveLiveRemoteCapableClientOrThrow(targetUserId, input.clientId);
 
@@ -608,7 +600,8 @@ class ClientInfoService {
       updatedAt: nowIso,
       completedAt: nowIso,
       errorMessage: input.status === 'failed' ? String(input?.errorMessage || 'Remote action failed') : null,
-      screenshotDataUrl: input.status === 'completed' ? String(input?.screenshotDataUrl || '') || null : null,
+      // An installed app that still answers an old screenshot request sends an image; it is not kept (EUP-4).
+      screenshotDataUrl: null,
     });
 
     await this.saveRemoteActionStatus(updatedAction);

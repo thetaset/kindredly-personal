@@ -15,7 +15,7 @@ export * from './user.types';
 export * from './item.types';
 
 // Content Classification
-export type { EduValue, MinAgeGroup, TargetAudience, Cost, Ads, CostDetails, ContentType, UseCriterias, UseCriteriaData, UseCriteriaDataWithDetails } from '../content.types';
+export type { EduValue, MinAgeGroup, TargetAudience, Cost, Ads, CostDetails, ContentType, Privacy, AiFeature, UseCriterias, UseCriteriaData, UseCriteriaDataWithDetails } from '../content.types';
 
 // Activity & Monitoring
 export * from './activity.types';
@@ -52,6 +52,7 @@ export * from './cache.types';
 
 // Usage Limits & Parental Controls
 export * from './usage-limits.types';
+export * from './earn-access.types';
 export * from './family-policy.types';
 
 // Tasks

@@ -1,6 +1,6 @@
 import { ItemResourceType } from './constants';
 
-export type RecognizedProvider = 'youtube' | 'reddit' | 'netflix' | 'generic';
+export type RecognizedProvider = 'youtube' | 'reddit' | 'netflix' | 'google_photos' | 'generic';
 
 /**
  * These are "recognized" resource types used for smarter behavior.
@@ -15,6 +15,7 @@ export type RecognizedResourceType =
   | 'NETFLIX_TITLE'
   | 'NETFLIX_SERIES'
   | 'NETFLIX_EPISODE'
+  | 'GOOGLE_PHOTOS_SHARE'
   | 'GENERIC_SITE';
 
 export type RecognizedContentKind =
@@ -27,6 +28,8 @@ export type RecognizedContentKind =
   | 'movie'
   | 'series'
   | 'episode'
+  | 'photo'
+  | 'album'
   | 'unknown';
 
 export interface RecognizedPageInfo {

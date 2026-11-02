@@ -59,10 +59,16 @@ export type DeviceHealth = {
    * - `noBrowserAttached`: a computer with no browser running Kindredly. Not "removed" (DCP-10).
    * - `kindredlyMissing`: a phone the Kindredly app was uninstalled from.
    * - `watchOnly`: a platform that records app time but cannot block apps.
+   * - `appTimeUnseen`: a Linux desktop that hides the app in front (GNOME or KDE on Wayland). Blocked
+   *   apps are still closed; app time is not counted.
+   * - `accountIsAdmin`: a child's Linux computer whose account is an administrator, so the child can
+   *   remove the Companion with sudo (HAT-198).
    */
   noBrowserAttached: boolean
   kindredlyMissing: boolean
   watchOnly: boolean
+  appTimeUnseen: boolean
+  accountIsAdmin: boolean
 }
 
 export function deviceHealth(
@@ -85,6 +91,8 @@ export function deviceHealth(
     noBrowserAttached: desktop && status?.bridgeLive === false,
     kindredlyMissing: !desktop && status?.mainAppPresent === false,
     watchOnly: !!status && !canEnforceAppBlocking(status.platform),
+    appTimeUnseen: status?.detection?.kind === 'running',
+    accountIsAdmin: status?.accountIsAdmin === true,
   } satisfies Omit<DeviceHealth, 'state'>
 
   if (!status || receivedAt == null || now - receivedAt > DEVICE_HEALTH_THRESHOLDS.quietGapMs) {

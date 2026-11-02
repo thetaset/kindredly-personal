@@ -290,3 +290,33 @@ describe('resolveAssistantScope', () => {
     expect(resolveAssistantScope('site', 'https://shop.example.co.uk/x')).toBe('site');
   });
 });
+
+// SMB-1: a match never ends in the middle of a word or a number.
+describe('URLIndexer prefix boundary', () => {
+  const index = (pattern: string) => {
+    const idx = new URLIndexer();
+    idx.add('item', [pattern]);
+    return idx;
+  };
+
+  it('opens the saved video and what is under it, not a longer id', () => {
+    const idx = index('*.tiktok.com/@user/video/123*');
+    expect(idx.getMatches('https://www.tiktok.com/@user/video/123')).toContain('item');
+    expect(idx.getMatches('https://www.tiktok.com/@user/video/123?lang=en')).toContain('item');
+    expect(idx.getMatches('https://www.tiktok.com/@user/video/123/')).toContain('item');
+    expect(idx.getMatches('https://www.tiktok.com/@user/video/1234')).toHaveLength(0);
+  });
+
+  it('keeps a hand-written prefix that ends before punctuation', () => {
+    const idx = index('example.com/blog*');
+    expect(idx.getMatches('https://example.com/blog-post')).toContain('item');
+    expect(idx.getMatches('https://example.com/blog/2024')).toContain('item');
+    expect(idx.getMatches('https://example.com/blogroll')).toHaveLength(0);
+  });
+
+  it('still matches everything under a directory pattern', () => {
+    const idx = index('example.com/docs/*');
+    expect(idx.getMatches('https://example.com/docs/x')).toContain('item');
+    expect(idx.getMatches('https://example.com/docs/xy/z')).toContain('item');
+  });
+});

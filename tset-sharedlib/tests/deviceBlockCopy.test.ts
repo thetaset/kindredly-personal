@@ -28,23 +28,42 @@ describe('deviceBlockCopy', () => {
 
   it('names a category limit by its rule, and the overall one by what it is', () => {
     expect(deviceBlockCopy({ ...base, reason: 'budget-exhausted', ruleName: 'Games' }).headline).toBe(
-      'Your time for Games is used up',
+      'No Games time left today',
     );
     // "All Content" is the stored name and is fine in a parent's settings list. It is wrong on the
     // one screen whose whole job is telling a kid why their computer stopped.
     expect(
       deviceBlockCopy({ ...base, reason: 'budget-exhausted', ruleName: 'All Content', coversEverything: true }).headline,
-    ).toBe('Your screen time is used up');
+    ).toBe('No screen time left today');
+  });
+
+  it('says in one sentence what is closed and when it opens, and why this app is under it (HAT-979)', () => {
+    const games = { ...base, ruleName: 'Games' };
+    expect(deviceBlockCopy({ ...games, reason: 'outside-schedule', unlockAtMs: NOON + 4 * 3_600_000 })).toEqual({
+      headline: 'Games opens at 16:00',
+      detail: 'Steam counts as Games.',
+    });
+    expect(deviceBlockCopy({ ...games, reason: 'budget-exhausted', unlockAtMs: null }).detail).toBe(
+      'Steam counts as Games. It comes back tomorrow.',
+    );
+    expect(deviceBlockCopy({ ...games, reason: 'always-blocked' })).toEqual({
+      headline: 'No Games today',
+      detail: 'Steam counts as Games. A parent set no time for this today.',
+    });
+    expect(
+      deviceBlockCopy({ ...base, ruleName: 'All Content', coversEverything: true, reason: 'outside-schedule', unlockAtMs: NOON + 3_600_000 }),
+    ).toEqual({ headline: 'Screen time opens at 13:00', detail: 'It is outside your screen time hours.' });
   });
 
   it('gives a real time when there is one and stays silent when there is not', () => {
-    expect(deviceBlockCopy({ ...base, reason: 'outside-schedule', unlockAtMs: NOON + 2 * 3_600_000 }).detail).toBe(
-      'Opens again at 14:00.',
+    expect(deviceBlockCopy({ ...base, reason: 'outside-schedule', unlockAtMs: NOON + 2 * 3_600_000 }).headline).toBe(
+      'Steam opens at 14:00',
     );
     // Tomorrow is named as tomorrow rather than as a clock time that has already passed today.
-    expect(deviceBlockCopy({ ...base, reason: 'outside-schedule', unlockAtMs: NOON + 20 * 3_600_000 }).detail).toBe(
-      'Opens again tomorrow.',
+    expect(deviceBlockCopy({ ...base, reason: 'outside-schedule', unlockAtMs: NOON + 20 * 3_600_000 }).headline).toBe(
+      'Steam opens tomorrow',
     );
+    expect(deviceBlockCopy({ ...base, reason: 'outside-schedule' }).headline).toBe("Steam isn't available right now");
     expect(deviceBlockCopy({ ...base, reason: 'budget-exhausted', unlockAtMs: null }).detail).toBe('It comes back tomorrow.');
   });
 
@@ -92,6 +111,15 @@ describe('deviceBlockCopy', () => {
 
   it('never renders a bare app id when the label is missing', () => {
     expect(deviceBlockCopy({ ...base, appLabel: '', reason: 'app-blocked' }).headline).toBe('This app is turned off');
+  });
+
+  it('sends a child held by Earn access to Kindredly, and promises no time', () => {
+    // HAT-836: the steps live in Kindredly, so that is where the shield sends them.
+    expect(deviceBlockCopy({ ...base, reason: 'earn-access', ruleName: 'Chores before games', unlockAtMs: NOON + 3_600_000 })).toEqual({
+      headline: 'Finish what comes first',
+      detail: "Open Kindredly to see what's left.",
+    });
+    expect(deviceBlockSubtitle({ ...base, reason: 'earn-access' })).toBe('Finish what comes first.');
   });
 });
 
@@ -145,8 +173,10 @@ describe('isDeviceBlockReason', () => {
   it('accepts what the device sends and refuses everything else', () => {
     expect(isDeviceBlockReason('budget-exhausted')).toBe(true);
     expect(isDeviceBlockReason('browser-unprotected')).toBe(true);
+    expect(isDeviceBlockReason('earn-access')).toBe(true);
     // A web ReasonCode is a different vocabulary and must not pass as a device one.
     expect(isDeviceBlockReason('time-exceeded')).toBe(false);
+    expect(isDeviceBlockReason('earn-access-pending')).toBe(false);
     expect(isDeviceBlockReason('')).toBe(false);
     expect(isDeviceBlockReason(null)).toBe(false);
   });

@@ -12,6 +12,7 @@ export const SECURITY_EVENT_TYPES = {
   AUTH_LOGIN_FAILED: 'auth.login_failed',
   AUTH_ADMIN_LOGIN_FAILED: 'auth.admin_login_failed',
   AUTH_JWT_REJECTED: 'auth.jwt_rejected',
+  AUTH_AGENT_KEY_REJECTED: 'auth.agent_key_rejected',
   AUTH_SESSION_REVOKED_USE: 'auth.session_revoked_use',
   RATELIMIT_EXCEEDED: 'ratelimit.exceeded',
   RATELIMIT_SSE_EXCEEDED: 'ratelimit.sse_exceeded',

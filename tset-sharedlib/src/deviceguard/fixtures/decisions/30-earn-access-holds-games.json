@@ -1,0 +1,90 @@
+{
+  "id": "30-earn-access-holds-games",
+  "behaviour": "An Earn access rule holding Games (HAT-836) closes every app of the Games type, the apps the Games limit counts, until it opens; other apps stay open.",
+  "clock": {
+    "nowMs": 1789585200000,
+    "familyTimeZone": "America/Los_Angeles",
+    "deviceTimeZone": "America/Los_Angeles"
+  },
+  "settings": {
+    "usageLimitsData": {
+      "contentUsageLimits": [],
+      "temporaryRules": []
+    },
+    "ruleOverrideSettings": {
+      "ruleOverrides": []
+    },
+    "accessControlSettings": {
+      "earnAccessSettings": {
+        "version": 1,
+        "rules": [
+          {
+            "id": "chores-first",
+            "name": "Chores before games",
+            "enabled": true,
+            "holds": [
+              "games"
+            ],
+            "steps": [
+              {
+                "id": "s1",
+                "type": "task",
+                "taskId": "task-dishes"
+              }
+            ],
+            "approval": false,
+            "reset": "day"
+          }
+        ]
+      }
+    },
+    "appPolicy": null,
+    "appPolicyStatus": "absent"
+  },
+  "installedApps": [
+    {
+      "pkg": "com.roblox.client",
+      "label": "Roblox",
+      "platform": "android"
+    },
+    {
+      "pkg": "com.mojang.minecraftpe",
+      "label": "Minecraft",
+      "platform": "android"
+    },
+    {
+      "pkg": "com.duolingo",
+      "label": "Duolingo",
+      "platform": "android"
+    }
+  ],
+  "floor": [],
+  "usage": {
+    "appMsByPkg": {},
+    "webLogs": []
+  },
+  "usageSeed": {
+    "perRuleUsedMs": {}
+  },
+  "expectDevice": [
+    {
+      "pkg": "com.roblox.client",
+      "action": "block",
+      "reason": "earn-access",
+      "ruleId": "chores-first"
+    },
+    {
+      "pkg": "com.mojang.minecraftpe",
+      "action": "block",
+      "reason": "earn-access",
+      "ruleId": "chores-first"
+    },
+    {
+      "pkg": "com.duolingo",
+      "action": "allow",
+      "reason": null,
+      "ruleId": null
+    }
+  ],
+  "browserNotApplicable": "Device-only here: the browser's Earn access is tested in ActivityService.earnAccess.test.ts and earnAccess.test.ts in sharedlib."
+}

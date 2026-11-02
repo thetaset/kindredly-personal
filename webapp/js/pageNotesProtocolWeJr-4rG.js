@@ -1,0 +1,1 @@
+const r="knd-page-notes",a="KND_PAGE_NOTES_OPEN";function E(t){return!!t&&typeof t=="object"&&t.source===r&&typeof t.type=="string"}function c(t){const o=Math.max(0,Math.floor(t)),s=Math.floor(o/3600),n=Math.floor(o%3600/60),e=String(o%60).padStart(2,"0");return s>0?`${s}:${String(n).padStart(2,"0")}:${e}`:`${n}:${e}`}export{r as P,a,c as f,E as i};

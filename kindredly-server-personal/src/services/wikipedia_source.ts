@@ -15,7 +15,19 @@ import type {AdminFeedGenResolvedSource, FeedGenerationSource} from 'tset-shared
 const USER_AGENT = 'KindredlyContentBot/1.0 (admin feed generation)';
 const MAX_SOURCE_TEXT_CHARS = 60_000;
 
-export type FetchedFeedGenSource = {resolved: AdminFeedGenResolvedSource; text: string};
+/** `truncated`: the source had more text than `maxChars`; callers must say so, never cut silently. */
+export type FetchedFeedGenSource = {resolved: AdminFeedGenResolvedSource; text: string; truncated?: boolean};
+
+/**
+ * `maxChars` raises the default cap (learning tracks read whole chapters and books);
+ * `sectionMarkers` keeps Wikipedia's section headings as `== Heading ==` lines;
+ * `userAgent` names the feature asking (learning tracks send their own).
+ */
+export type FetchSourceOptions = {maxChars?: number; sectionMarkers?: boolean; userAgent?: string};
+
+function capText(text: string, maxChars: number): {text: string; truncated: boolean} {
+  return text.length > maxChars ? {text: text.slice(0, maxChars), truncated: true} : {text, truncated: false};
+}
 
 // Short-lived cache so the plan call and the following generatePosts batches
 // don't re-fetch the same articles. Keyed by url; small and TTL-bounded.
@@ -73,7 +85,8 @@ function throttledWiki<T>(task: () => Promise<T>): Promise<T> {
   return run;
 }
 
-async function getWithRetry<T = any>(url: string, config: AxiosRequestConfig): Promise<AxiosResponse<T>> {
+/** A GET that waits and tries again on a 429 or 503, as Wikimedia asks. Also used by `work_lookup.service.ts`. */
+export async function getWithRetry<T = any>(url: string, config: AxiosRequestConfig): Promise<AxiosResponse<T>> {
   for (let attempt = 0; ; attempt++) {
     try {
       return await axios.get<T>(url, config);
@@ -147,13 +160,14 @@ async function searchMediaWiki(
   kind: 'wikipedia' | 'wikisource' | 'wikiquote',
   query: string,
   limit: number,
+  userAgent = USER_AGENT,
 ): Promise<FeedGenSourceCandidate[]> {
   const response = await throttledWiki(() =>
     getWithRetry(
       `https://${host}/w/api.php`,
       safeFetchConfig({
         timeout: 15000,
-        headers: {'User-Agent': USER_AGENT},
+        headers: {'User-Agent': userAgent},
         params: {
           action: 'query',
           format: 'json',
@@ -175,13 +189,66 @@ async function searchMediaWiki(
 }
 
 /** Search English Wikipedia; returns article candidates (encyclopedic — facts feeds). */
-export function searchWikipedia(query: string, limit = 8): Promise<FeedGenSourceCandidate[]> {
-  return searchMediaWiki('en.wikipedia.org', 'wikipedia', query, limit);
+export function searchWikipedia(query: string, limit = 8, userAgent?: string): Promise<FeedGenSourceCandidate[]> {
+  return searchMediaWiki('en.wikipedia.org', 'wikipedia', query, limit, userAgent);
+}
+
+/**
+ * Looks up English Wikipedia articles by exact title, in one request: redirects are followed, and a
+ * title that is missing or a disambiguation page is left out. In the order asked.
+ */
+export async function lookupWikipediaTitles(
+  titles: string[],
+  userAgent = USER_AGENT,
+): Promise<FeedGenSourceCandidate[]> {
+  const wanted = [...new Set(titles.map((t) => String(t || '').trim()).filter(Boolean))].slice(0, 20);
+  if (!wanted.length) return [];
+  const response = await throttledWiki(() =>
+    getWithRetry(
+      'https://en.wikipedia.org/w/api.php',
+      safeFetchConfig({
+        timeout: 15000,
+        headers: {'User-Agent': userAgent},
+        params: {
+          action: 'query',
+          format: 'json',
+          redirects: 1,
+          prop: 'pageprops',
+          ppprop: 'disambiguation',
+          titles: wanted.join('|'),
+        },
+      }),
+    ),
+  );
+  const query = response.data?.query || {};
+  const renamed = new Map<string, string>();
+  for (const n of [...(query.normalized || []), ...(query.redirects || [])]) {
+    if (typeof n?.from === 'string' && typeof n?.to === 'string') renamed.set(n.from, n.to);
+  }
+  const pages = new Map<string, any>();
+  for (const page of Object.values(query.pages || {}) as any[]) {
+    if (!page || page.ns !== 0 || 'missing' in page || 'invalid' in page) continue;
+    if (page.pageprops && 'disambiguation' in page.pageprops) continue;
+    if (typeof page.title === 'string') pages.set(page.title, page);
+  }
+  const out: FeedGenSourceCandidate[] = [];
+  for (const asked of wanted) {
+    let title = asked;
+    for (let i = 0; i < 3 && renamed.has(title); i++) title = renamed.get(title)!;
+    const page = pages.get(title);
+    if (!page || out.some((c) => c.title === page.title)) continue;
+    out.push({
+      url: `https://en.wikipedia.org/wiki/${encodeURIComponent(page.title.replace(/ /g, '_'))}`,
+      kind: 'wikipedia',
+      title: page.title,
+    });
+  }
+  return out;
 }
 
 /** Search English Wikisource; returns full-text work candidates (poems, essays, documents — verse feeds). */
-export function searchWikisource(query: string, limit = 8): Promise<FeedGenSourceCandidate[]> {
-  return searchMediaWiki('en.wikisource.org', 'wikisource', query, limit);
+export function searchWikisource(query: string, limit = 8, userAgent?: string): Promise<FeedGenSourceCandidate[]> {
+  return searchMediaWiki('en.wikisource.org', 'wikisource', query, limit, userAgent);
 }
 
 /** Search English Wikiquote; returns quotation-page candidates (sourced quotes — passage feeds). */
@@ -197,11 +264,61 @@ function pickGutenbergTextUrl(formats: Record<string, string> | undefined): stri
   return null;
 }
 
-/** Search Project Gutenberg (via the Gutendex API); candidates point at plain-text files. */
-export async function searchGutenberg(query: string, limit = 8): Promise<FeedGenSourceCandidate[]> {
+/** A catalog title in another language ends with it in brackets: "Les grandes espérances (French)". */
+const GUTENBERG_OTHER_LANGUAGE =
+  /\((?:French|German|Spanish|Italian|Dutch|Finnish|Portuguese|Latin|Swedish|Danish|Norwegian|Greek|Chinese|Japanese|Russian|Polish|Hungarian|Czech|Esperanto|Tagalog|Catalan|Welsh|Irish|Icelandic)\)\s*$/i;
+
+/**
+ * Project Gutenberg's own catalog search (the JSON its search box uses): answers in about a second,
+ * where Gutendex regularly takes longer than 15 seconds. Candidates point at plain-text files.
+ */
+async function searchGutenbergCatalog(
+  query: string,
+  limit: number,
+  userAgent: string,
+): Promise<FeedGenSourceCandidate[]> {
   const response = await getWithRetry(
-    'https://gutendex.com/books',
-    safeFetchConfig({timeout: 15000, headers: {'User-Agent': USER_AGENT}, params: {search: query}}),
+    'https://www.gutenberg.org/ebooks/search/',
+    safeFetchConfig({timeout: 10000, headers: {'User-Agent': userAgent}, params: {query, format: 'json'}}),
+  );
+  let data: any = response.data;
+  if (typeof data === 'string') data = JSON.parse(data);
+  // OpenSearch suggestions: [query, titles, authors, links]; the first row is a "Displaying results" line.
+  if (!Array.isArray(data) || !Array.isArray(data[1]))
+    throw new Error('Project Gutenberg answered in an unknown shape.');
+  const out: FeedGenSourceCandidate[] = [];
+  for (let i = 0; i < data[1].length && out.length < Math.max(1, Math.min(20, limit)); i++) {
+    const id = String(data[3]?.[i] || '').match(/^\/ebooks\/(\d+)\.json$/)?.[1];
+    const title = String(data[1][i] || '').trim();
+    if (!id || !title || GUTENBERG_OTHER_LANGUAGE.test(title)) continue;
+    const author = String(data[2]?.[i] || '').trim();
+    out.push({
+      url: `https://www.gutenberg.org/cache/epub/${id}/pg${id}.txt`,
+      kind: 'gutenberg',
+      title: author ? `${title} — ${author}` : title,
+    });
+  }
+  return out;
+}
+
+/** Search Project Gutenberg: its own catalog first, then the Gutendex API; candidates point at plain-text files. */
+export async function searchGutenberg(
+  query: string,
+  limit = 8,
+  userAgent = USER_AGENT,
+): Promise<FeedGenSourceCandidate[]> {
+  try {
+    return await searchGutenbergCatalog(query, limit, userAgent);
+  } catch {
+    return searchGutendex(query, limit, userAgent);
+  }
+}
+
+async function searchGutendex(query: string, limit: number, userAgent: string): Promise<FeedGenSourceCandidate[]> {
+  const response = await getWithRetry(
+    // With the slash: without it Gutendex answers with a redirect first.
+    'https://gutendex.com/books/',
+    safeFetchConfig({timeout: 15000, headers: {'User-Agent': userAgent}, params: {search: query}}),
   );
   const books: any[] = (response.data?.results || []).slice(0, Math.max(1, Math.min(20, limit)));
   return books
@@ -239,6 +356,7 @@ async function fetchMediaWikiExtract(
   src: FeedGenerationSource,
   parsed: URL,
   kind: 'wikipedia' | 'wikiquote',
+  options: Required<FetchSourceOptions>,
 ): Promise<FetchedFeedGenSource> {
   const title = wikipediaTitleFromUrl(parsed);
   if (!title) throw new Error(`Cannot derive a ${kind} page title from ${src.url}`);
@@ -248,14 +366,14 @@ async function fetchMediaWikiExtract(
       `${parsed.protocol}//${parsed.host}/w/api.php`,
       safeFetchConfig({
         timeout: 20000,
-        headers: {'User-Agent': USER_AGENT},
+        headers: {'User-Agent': options.userAgent},
         params: {
           action: 'query',
           format: 'json',
           redirects: 1,
           prop: 'extracts|revisions|pageimages',
           explaintext: 1,
-          exsectionformat: 'plain',
+          exsectionformat: options.sectionMarkers ? 'wiki' : 'plain',
           rvprop: 'ids',
           piprop: 'original',
           titles: title,
@@ -270,7 +388,7 @@ async function fetchMediaWikiExtract(
     throw new Error(`${kind} page not found: ${title}`);
   }
 
-  const text = String(page.extract || '').slice(0, MAX_SOURCE_TEXT_CHARS);
+  const {text, truncated} = capText(String(page.extract || ''), options.maxChars);
   // Provenance records the revision the text actually came from (the live one).
   // A caller-pinned revisionId that differs is surfaced as a plan warning.
   const liveRevisionId = Number(page.revisions?.[0]?.revid) || undefined;
@@ -281,7 +399,10 @@ async function fetchMediaWikiExtract(
   // Wikiquote rarely has lead images; the same title on Wikipedia (usually a
   // person) has the portrait.
   if (!bannerImageSrc && kind === 'wikiquote') {
-    bannerImageSrc = await fetchWikipediaLeadImage(typeof page.title === 'string' ? page.title : title);
+    bannerImageSrc = await fetchWikipediaLeadImage(
+      typeof page.title === 'string' ? page.title : title,
+      options.userAgent,
+    );
   }
 
   return {
@@ -292,9 +413,12 @@ async function fetchMediaWikiExtract(
       revisionId: liveRevisionId,
       retrievedAt: todayISODate(),
       bannerImageSrc,
+      // Wikipedia and Wikiquote text is CC BY-SA 4.0.
+      licenseNote: src.licenseNote || 'CC BY-SA 4.0',
       textLength: text.length,
     },
     text,
+    truncated,
   };
 }
 
@@ -304,14 +428,14 @@ async function fetchMediaWikiExtract(
  * Wikipedia article usually does (manuscript scan or portrait). Never throws —
  * an image is a nice-to-have, not part of the sourced content.
  */
-async function fetchWikipediaLeadImage(title: string): Promise<string | null> {
+async function fetchWikipediaLeadImage(title: string, userAgent = USER_AGENT): Promise<string | null> {
   try {
     const response = await throttledWiki(() =>
       getWithRetry(
         'https://en.wikipedia.org/w/api.php',
         safeFetchConfig({
           timeout: 15000,
-          headers: {'User-Agent': USER_AGENT},
+          headers: {'User-Agent': userAgent},
           params: {
             action: 'query',
             format: 'json',
@@ -365,14 +489,14 @@ function parseWikisourceYear(wikitext: string): string | null {
 }
 
 /** Wikitext of a Wikisource page (for root-page header fallbacks). Never throws. */
-async function fetchWikisourceWikitext(parsed: URL, page: string): Promise<string | null> {
+async function fetchWikisourceWikitext(parsed: URL, page: string, userAgent = USER_AGENT): Promise<string | null> {
   try {
     const response = await throttledWiki(() =>
       getWithRetry(
         `${parsed.protocol}//${parsed.host}/w/api.php`,
         safeFetchConfig({
           timeout: 15000,
-          headers: {'User-Agent': USER_AGENT},
+          headers: {'User-Agent': userAgent},
           params: {action: 'parse', format: 'json', redirects: 1, prop: 'wikitext', page},
         }),
       ),
@@ -445,13 +569,14 @@ export function wikisourceHtmlToText(html: string, titleHints: string[] = []): s
 async function parseWikisourcePage(
   parsed: URL,
   page: string,
+  userAgent = USER_AGENT,
 ): Promise<{html: string; wikitext: string; parseTitle: string; revisionId: number | undefined}> {
   const response = await throttledWiki(() =>
     getWithRetry(
       `${parsed.protocol}//${parsed.host}/w/api.php`,
       safeFetchConfig({
         timeout: 20000,
-        headers: {'User-Agent': USER_AGENT},
+        headers: {'User-Agent': userAgent},
         params: {
           action: 'parse',
           format: 'json',
@@ -473,10 +598,16 @@ async function parseWikisourcePage(
   };
 }
 
-/** First edition link on a {{versions}} disambiguation page, e.g. "* \"[[Mountain Interval/The Road Not Taken|…]]\", from …". */
-function firstVersionLink(wikitext: string): string | null {
-  const m = wikitext.match(/^\*[^\n]*?\[\[([^\]|#]+)/m);
-  return m ? m[1].trim() : null;
+/** The first published edition's link on a {{versions}} disambiguation page, e.g. "* \"[[Mountain Interval/The Road Not Taken|…]]\", from …". */
+export function firstVersionLink(wikitext: string): string | null {
+  const links = [...wikitext.matchAll(/^\*[^\n]*?\[\[([^\]|#]+)[^\n]*$/gm)].map((m) => ({
+    line: m[0],
+    page: m[1].trim(),
+  }));
+  // A draft or a manuscript transcription comes first on some lists ("Ozymandias"); readers want a
+  // published text, with its spelling and punctuation as printed.
+  const published = links.find((l) => !/\b(draft|manuscript|facsimile)\b/i.test(l.line));
+  return (published || links[0])?.page || null;
 }
 
 /**
@@ -485,18 +616,22 @@ function firstVersionLink(wikitext: string): string | null {
  * poem/body text from the HTML. Author/section/year come from the {{header}}
  * template; the text is public domain by Wikisource policy.
  */
-async function fetchWikisource(src: FeedGenerationSource, parsed: URL): Promise<FetchedFeedGenSource> {
+async function fetchWikisource(
+  src: FeedGenerationSource,
+  parsed: URL,
+  options: Required<FetchSourceOptions>,
+): Promise<FetchedFeedGenSource> {
   const title = wikipediaTitleFromUrl(parsed);
   if (!title) throw new Error(`Cannot derive a Wikisource page title from ${src.url}`);
 
-  let page = await parseWikisourcePage(parsed, title);
+  let page = await parseWikisourcePage(parsed, title, options.userAgent);
   let url = src.url;
   // Top-level poem titles are often {{versions}} disambiguation pages (a list
   // of editions, not the work) — follow the first listed edition.
   if (/\{\{\s*versions\b/i.test(page.wikitext)) {
     const edition = firstVersionLink(page.wikitext);
     if (!edition) throw new Error(`Wikisource page "${title}" is a versions list with no edition links`);
-    page = await parseWikisourcePage(parsed, edition);
+    page = await parseWikisourcePage(parsed, edition, options.userAgent);
     url = `${parsed.protocol}//${parsed.host}/wiki/${encodeURI(page.parseTitle.replace(/ /g, '_'))}`;
   }
   const {html, wikitext, parseTitle} = page;
@@ -510,7 +645,7 @@ async function fetchWikisource(src: FeedGenerationSource, parsed: URL): Promise<
   // Collection subpages often leave author/year blank in their own header —
   // the work's root page carries them.
   if ((!author || !workYear) && parseTitle.includes('/')) {
-    const rootWikitext = await fetchWikisourceWikitext(parsed, parseTitle.split('/')[0]);
+    const rootWikitext = await fetchWikisourceWikitext(parsed, parseTitle.split('/')[0], options.userAgent);
     if (rootWikitext) {
       author = author || parseWikisourceHeaderField(rootWikitext, 'author');
       workYear = workYear || parseWikisourceYear(rootWikitext);
@@ -518,7 +653,7 @@ async function fetchWikisource(src: FeedGenerationSource, parsed: URL): Promise<
   }
 
   const titleHints = [section, parseTitle.split('/').pop(), title.split('/').pop()].filter((h): h is string => !!h);
-  const text = wikisourceHtmlToText(html, titleHints).slice(0, MAX_SOURCE_TEXT_CHARS);
+  const {text, truncated} = capText(wikisourceHtmlToText(html, titleHints), options.maxChars);
   if (!text) throw new Error(`No readable text on Wikisource page: ${title}`);
 
   // Pair an image from Wikimedia: the header's own `wikipedia = <article>`
@@ -529,7 +664,7 @@ async function fetchWikisource(src: FeedGenerationSource, parsed: URL): Promise<
   );
   let bannerImageSrc: string | null = null;
   for (const candidate of imageCandidates) {
-    bannerImageSrc = await fetchWikipediaLeadImage(candidate);
+    bannerImageSrc = await fetchWikipediaLeadImage(candidate, options.userAgent);
     if (bannerImageSrc) break;
   }
 
@@ -548,11 +683,17 @@ async function fetchWikisource(src: FeedGenerationSource, parsed: URL): Promise<
       textLength: text.length,
     },
     text,
+    truncated,
   };
 }
 
-async function fetchGeneric(src: FeedGenerationSource): Promise<FetchedFeedGenSource> {
-  const text = (await fetchPageBodyText(src.url, MAX_SOURCE_TEXT_CHARS)) || '';
+async function fetchGeneric(
+  src: FeedGenerationSource,
+  options: Required<FetchSourceOptions>,
+): Promise<FetchedFeedGenSource> {
+  // One extra character tells a page that fits from one that was cut.
+  const fetched = (await fetchPageBodyText(src.url, options.maxChars + 1)) || '';
+  const {text, truncated} = capText(fetched, options.maxChars);
   if (!text) throw new Error(`No readable text at ${src.url}`);
   return {
     resolved: {
@@ -563,6 +704,7 @@ async function fetchGeneric(src: FeedGenerationSource): Promise<FetchedFeedGenSo
       textLength: text.length,
     },
     text,
+    truncated,
   };
 }
 
@@ -571,10 +713,13 @@ async function fetchGeneric(src: FeedGenerationSource): Promise<FetchedFeedGenSo
  * (*** START/END OF ... ***) so extraction works on the actual work; the title
  * is read from the "Title:" header line when present. PD by definition.
  */
-async function fetchGutenberg(src: FeedGenerationSource): Promise<FetchedFeedGenSource> {
+async function fetchGutenberg(
+  src: FeedGenerationSource,
+  options: Required<FetchSourceOptions>,
+): Promise<FetchedFeedGenSource> {
   const response = await getWithRetry<string>(
     src.url,
-    safeFetchConfig({timeout: 20000, headers: {'User-Agent': USER_AGENT}, responseType: 'text'}),
+    safeFetchConfig({timeout: 20000, headers: {'User-Agent': options.userAgent}, responseType: 'text'}),
   );
   const raw = typeof response.data === 'string' ? response.data : '';
   if (!raw.trim()) throw new Error(`No text at ${src.url}`);
@@ -584,7 +729,7 @@ async function fetchGutenberg(src: FeedGenerationSource): Promise<FetchedFeedGen
   const endMatch = raw.match(/\*\*\*\s*END OF (?:THE|THIS) PROJECT GUTENBERG[^\n]*\*\*\*/i);
   const start = startMatch ? raw.indexOf(startMatch[0]) + startMatch[0].length : 0;
   const end = endMatch ? raw.indexOf(endMatch[0]) : raw.length;
-  const text = raw.slice(start, end).trim().slice(0, MAX_SOURCE_TEXT_CHARS);
+  const {text, truncated} = capText(raw.slice(start, end).trim(), options.maxChars);
 
   return {
     resolved: {
@@ -597,26 +742,39 @@ async function fetchGutenberg(src: FeedGenerationSource): Promise<FetchedFeedGen
       textLength: text.length,
     },
     text,
+    truncated,
   };
 }
 
 /** Fetch one generation source (SSRF-guarded, cached). Throws on failure. */
-export async function fetchFeedGenSource(src: FeedGenerationSource): Promise<FetchedFeedGenSource> {
-  const cached = cacheGet(src.url);
+export async function fetchFeedGenSource(
+  src: FeedGenerationSource,
+  fetchOptions: FetchSourceOptions = {},
+): Promise<FetchedFeedGenSource> {
+  const options: Required<FetchSourceOptions> = {
+    maxChars: Math.max(1000, fetchOptions.maxChars ?? MAX_SOURCE_TEXT_CHARS),
+    sectionMarkers: fetchOptions.sectionMarkers === true,
+    userAgent: fetchOptions.userAgent || USER_AGENT,
+  };
+  const cacheKey =
+    options.maxChars === MAX_SOURCE_TEXT_CHARS && !options.sectionMarkers
+      ? src.url
+      : `${src.url}#max=${options.maxChars}&sections=${options.sectionMarkers ? 1 : 0}`;
+  const cached = cacheGet(cacheKey);
   if (cached) return cached;
 
   const parsed = assertSafeExternalUrl(src.url);
   const result =
     src.kind === 'wikisource' || isWikisourceUrl(src.url)
-      ? await fetchWikisource(src, parsed)
+      ? await fetchWikisource(src, parsed, options)
       : src.kind === 'wikiquote' || isWikiquoteUrl(src.url)
-        ? await fetchMediaWikiExtract(src, parsed, 'wikiquote')
+        ? await fetchMediaWikiExtract(src, parsed, 'wikiquote', options)
         : src.kind === 'wikipedia' || (src.kind !== 'gutenberg' && isWikipediaUrl(src.url))
-          ? await fetchMediaWikiExtract(src, parsed, 'wikipedia')
+          ? await fetchMediaWikiExtract(src, parsed, 'wikipedia', options)
           : src.kind === 'gutenberg' || isGutenbergUrl(src.url)
-            ? await fetchGutenberg(src)
-            : await fetchGeneric(src);
+            ? await fetchGutenberg(src, options)
+            : await fetchGeneric(src, options);
 
-  cacheSet(src.url, result);
+  cacheSet(cacheKey, result);
   return result;
 }

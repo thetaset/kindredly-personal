@@ -1,0 +1,97 @@
+{
+  "id": "28-games-limit",
+  "behaviour": "The Games limit (the game attribute, HAT-634) covers every app of the Games type, which share its budget; other apps are not counted.",
+  "clock": {
+    "nowMs": 1789491600000,
+    "familyTimeZone": "America/Los_Angeles",
+    "deviceTimeZone": "America/Los_Angeles"
+  },
+  "settings": {
+    "usageLimitsData": {
+      "contentUsageLimits": [
+        {
+          "id": "simple-custom-games",
+          "name": "Games",
+          "type": "advanced",
+          "conditions": [
+            {
+              "type": "attribute",
+              "values": [
+                "game"
+              ]
+            }
+          ],
+          "timeLimits": [
+            {
+              "hours": 1,
+              "daysOfWeek": [
+                0,
+                1,
+                2,
+                3,
+                4,
+                5,
+                6
+              ]
+            }
+          ]
+        }
+      ],
+      "temporaryRules": []
+    },
+    "ruleOverrideSettings": {
+      "ruleOverrides": []
+    },
+    "accessControlSettings": {},
+    "appPolicy": null,
+    "appPolicyStatus": "absent"
+  },
+  "installedApps": [
+    {
+      "pkg": "com.roblox.client",
+      "label": "Roblox",
+      "platform": "android"
+    },
+    {
+      "pkg": "com.mojang.minecraftpe",
+      "label": "Minecraft",
+      "platform": "android"
+    },
+    {
+      "pkg": "com.duolingo",
+      "label": "Duolingo",
+      "platform": "android"
+    }
+  ],
+  "floor": [],
+  "usage": {
+    "appMsByPkg": {
+      "com.roblox.client": 3660000
+    },
+    "webLogs": []
+  },
+  "usageSeed": {
+    "perRuleUsedMs": {}
+  },
+  "expectDevice": [
+    {
+      "pkg": "com.mojang.minecraftpe",
+      "action": "block",
+      "reason": "budget-exhausted",
+      "ruleId": "simple-custom-games"
+    },
+    {
+      "pkg": "com.roblox.client",
+      "action": "block",
+      "reason": "budget-exhausted",
+      "ruleId": "simple-custom-games"
+    },
+    {
+      "pkg": "com.duolingo",
+      "action": "allow",
+      "reason": null,
+      "ruleId": null
+    }
+  ],
+  "browserNotApplicable": "Device-only: game apps and per-app time exist only on the device; game sites are counted by the browser and reach the device as the usage seed."
+}

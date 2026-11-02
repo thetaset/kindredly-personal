@@ -2,7 +2,7 @@ import {Routes} from '@interfaces/routes.interface';
 import {Router} from 'express';
 import {ApiReq} from '@/types/api-types';
 
-import {authenticateJWT, errorHelper, getTargetUserId} from '@/utils/auth_utils';
+import {authenticateJWT, errorHelper, getAuthUserId} from '@/utils/auth_utils';
 import {encryptPassword, decryptPassword} from '@/utils/crypto_util';
 import {UserOauthSecretRepo} from '@/db/user_oauth_secret.repo';
 import {GmailOauthService} from '@/services/integrations/gmail_oauth.service';
@@ -14,6 +14,11 @@ type GmailSecret = {
   scope?: string;
 };
 
+/**
+ * A Gmail connection belongs to one person. Every route acts for the signed-in user and ignores any
+ * user id the request names: `getTargetUserId` would hand anyone another person's mailbox token
+ * (EUP-1).
+ */
 class UserIntegrationsGmailRoute implements Routes {
   public router = Router();
 
@@ -30,7 +35,7 @@ class UserIntegrationsGmailRoute implements Routes {
       '/user/integrations/gmail/oauth/status',
       authenticateJWT,
       errorHelper(async (req: ApiReq<'/user/integrations/gmail/oauth/status'>, res) => {
-        const userId = getTargetUserId(req);
+        const userId = getAuthUserId(req);
         const row = await this.oauthRepo.getByUserAndProvider(userId, PROVIDER);
         res.json({success: true, results: {connected: !!row}});
       }),
@@ -40,7 +45,7 @@ class UserIntegrationsGmailRoute implements Routes {
       '/user/integrations/gmail/oauth/disconnect',
       authenticateJWT,
       errorHelper(async (req: ApiReq<'/user/integrations/gmail/oauth/disconnect'>, res) => {
-        const userId = getTargetUserId(req);
+        const userId = getAuthUserId(req);
         await this.oauthRepo.deleteByUserAndProvider(userId, PROVIDER);
         res.json({success: true, results: {}});
       }),
@@ -50,7 +55,7 @@ class UserIntegrationsGmailRoute implements Routes {
       '/user/integrations/gmail/oauth/exchangeCode',
       authenticateJWT,
       errorHelper(async (req: ApiReq<'/user/integrations/gmail/oauth/exchangeCode'>, res) => {
-        const userId = getTargetUserId(req);
+        const userId = getAuthUserId(req);
 
         const code = String(req?.body?.code || '').trim();
         const redirectUri = String(req?.body?.redirectUri || '').trim();
@@ -107,7 +112,7 @@ class UserIntegrationsGmailRoute implements Routes {
       '/user/integrations/gmail/oauth/accessToken',
       authenticateJWT,
       errorHelper(async (req: ApiReq<'/user/integrations/gmail/oauth/accessToken'>, res) => {
-        const userId = getTargetUserId(req);
+        const userId = getAuthUserId(req);
         const row = await this.oauthRepo.getByUserAndProvider(userId, PROVIDER);
         if (!row?.secretEnc) {
           res.json({success: false, message: 'Gmail is not connected', status: 400});

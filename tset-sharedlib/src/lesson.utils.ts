@@ -28,6 +28,8 @@ export interface LessonMediaRef {
   previewAttachmentId?: string | null;
   /** Caption / alt text. */
   alt?: string;
+  /** true: `alt` is read aloud but not printed under the picture (Kindredly's lesson pictures). */
+  hideCaption?: boolean;
   /** Used only when `attachmentId` is absent (e.g. a YouTube video). */
   externalUrl?: string;
   provider?: 'youtube' | 'url';
@@ -216,6 +218,12 @@ export interface LessonSchemaV1 {
     subject?: string;
     tone?: string;
     coverMedia?: LessonMediaRef;
+    /**
+     * Set on a lesson Kindredly added to a Library from a built-in pack (`lessons/`), as
+     * `<pack key>/<lesson key>`. The Lessons app offers no Edit for it, so a child's results stay
+     * against the lesson as written.
+     */
+    packKey?: string;
   };
   scoring: LessonScoringConfig;
   /** The linear player walks these by `order`. */
@@ -232,6 +240,45 @@ export type LessonAnswerValue = string[] | boolean | string;
 // ---------------------------------------------------------------------------
 
 /** Write a lesson schema into an item's `info.schemas`, mirroring setMapEmbedSchemaOnInfo. */
+// A lesson Kindredly AI is writing right now (HAT-753). Writing takes minutes, so the lesson goes in
+// the Library first with this mark on it; whatever comes back is saved to it, and the mark comes
+// off, whether or not the builder is still open. A builder opened on a marked lesson waits for it.
+export const LESSON_WRITING_SCHEMA_ID = 'kindredly.lessonWriting.v1';
+
+/** When writing started, or null for a lesson not being written. */
+export function getLessonWriting(
+  source: { info?: ItemDetailsInfo | null; details?: { info?: ItemDetailsInfo | null } | null } | null | undefined,
+): { startedAt: string } | null {
+  const raw = (source?.info?.schemas?.[LESSON_WRITING_SCHEMA_ID] ||
+    source?.details?.info?.schemas?.[LESSON_WRITING_SCHEMA_ID]) as { startedAt?: unknown } | undefined;
+  return raw && typeof raw.startedAt === 'string' ? { startedAt: raw.startedAt } : null;
+}
+
+/** A mark older than this is from writing that never finished: the request gives up after four minutes. */
+export const LESSON_WRITING_GIVES_UP_MS = 5 * 60 * 1000;
+
+/** Being written now: marked, and not so long ago that the writing must have given up. */
+export function isLessonBeingWritten(
+  source: Parameters<typeof getLessonWriting>[0],
+  now: number = Date.now(),
+): boolean {
+  const writing = getLessonWriting(source);
+  const at = writing ? Date.parse(writing.startedAt) : Number.NaN;
+  return Number.isFinite(at) && now - at < LESSON_WRITING_GIVES_UP_MS;
+}
+
+/** The info with the mark on, or off with `null`. */
+export function setLessonWritingOnInfo(
+  info: ItemDetailsInfo | null | undefined,
+  writing: { startedAt: string } | null,
+): ItemDetailsInfo {
+  const schemas: Record<string, unknown> =
+    info?.schemas && typeof info.schemas === 'object' && !Array.isArray(info.schemas) ? { ...info.schemas } : {};
+  if (writing) schemas[LESSON_WRITING_SCHEMA_ID] = { startedAt: writing.startedAt };
+  else delete schemas[LESSON_WRITING_SCHEMA_ID];
+  return { ...(info || {}), schemas };
+}
+
 export function setLessonSchemaOnInfo(
   info: ItemDetailsInfo | null | undefined,
   schema: LessonSchemaV1,
@@ -264,6 +311,7 @@ function sanitizeMediaRef(raw: unknown): LessonMediaRef | null {
   if (isNonEmptyString(m.mimeType)) out.mimeType = m.mimeType;
   if (isNonEmptyString(m.previewAttachmentId)) out.previewAttachmentId = m.previewAttachmentId;
   if (isNonEmptyString(m.alt)) out.alt = m.alt;
+  if (m.hideCaption === true) out.hideCaption = true;
   if (m.provider === 'youtube' || m.provider === 'url') out.provider = m.provider;
   return out;
 }
@@ -361,6 +409,11 @@ function sanitizeQuestion(raw: unknown): LessonQuestion | null {
     default:
       return null;
   }
+}
+
+/** One question re-validated as a lesson would; used by learning track checks too. */
+export function sanitizeLessonQuestion(raw: unknown): LessonQuestion | null {
+  return sanitizeQuestion(raw);
 }
 
 function sanitizeStep(raw: unknown): LessonStep | null {
@@ -687,6 +740,8 @@ export interface LessonGenRequest {
   sources?: LessonGenSource[];
   /** Allowlisted model override. */
   model?: string;
+  /** How much the model reasons (`AI_REASONING_EFFORTS`), when an adult set one for Lessons. */
+  reasoningEffort?: 'none' | 'low' | 'medium' | 'high';
 }
 
 /** Result of grading one free-response answer with the model. */
@@ -711,7 +766,8 @@ export interface LessonGenResponse {
   warnings: string[];
 }
 
-function normalizeGeneratedQuestion(q: any, key: string): LessonQuestion | null {
+/** One question from the loose JSON a model writes, with its key; null for a type it does not know. */
+export function normalizeGeneratedQuestion(q: any, key: string): LessonQuestion | null {
   const prompt = typeof q?.prompt === 'string' ? q.prompt : '';
   const explanation = typeof q?.explanation === 'string' ? q.explanation : undefined;
   switch (q?.type) {

@@ -23,6 +23,12 @@ export class NotificationRepo extends BaseRepo<Notification> {
     return await this.where({_id: id}).delete();
   }
 
+  /** How many notifications of `type` one person caused since `since`: a cap for self-reported ones. */
+  async countFromSenderSince(senderId: string, type: string, since: Date): Promise<number> {
+    const row = await this.query().where({senderId, type}).where('createdAt', '>=', since).count({n: '*'}).first();
+    return Number((row as any)?.n || 0);
+  }
+
   async create(input: Notification) {
     return (await this.query().insert(input).onConflict('_id').merge().returning('*')) as any;
   }

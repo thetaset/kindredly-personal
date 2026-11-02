@@ -15,6 +15,7 @@ import {
   errorHelper,
   getTargetUserId,
   removeSensitiveInfoFromUser,
+  createCompanionApproval,
   verifyWithRing,
 } from '../utils/auth_utils';
 
@@ -115,13 +116,37 @@ class AuthRoute implements Routes {
       errorHelper(async (req: Request, res: Response): Promise<void> => {
         const usernameOrEmail = String(req.body?.usernameOrEmail || '').trim();
         const pinpass = String(req.body?.pinpass || '');
+        // Optional: "Ask in person" sends the linked child, and the admin must be in that family.
+        const childUserId = String(req.body?.childUserId || '').trim() || undefined;
+        // A Companion's own id: the family to check when it cannot read its link record (CMP-65), and
+        // the device a parent's approval below is for (CMP-70).
+        const deviceId =
+          String(req.body?.deviceId || '')
+            .trim()
+            .slice(0, 255) || undefined;
 
-        const user = await this.authService.verifyDesktopCompanionAdmin(usernameOrEmail, pinpass);
+        const user = await this.authService.verifyDesktopCompanionAdmin(
+          usernameOrEmail,
+          pinpass,
+          childUserId,
+          deviceId,
+        );
+
+        // The parent at that computer, approving it for this child: what lets the Companion take
+        // itself off the parent's list if they unlink it there (CMP-70). Only once the family check ran.
+        const approvalChildId = childUserId || (deviceId ? await this.authService.linkedChildOf(deviceId) : undefined);
+        const approval =
+          deviceId && approvalChildId
+            ? createCompanionApproval({adminUserId: String(user._id), childUserId: approvalChildId, deviceId})
+            : undefined;
 
         res.status(200).json({
           success: true,
           results: {
             user: removeSensitiveInfoFromUser(user),
+            // Says the family check ran, so a Companion can refuse a server too old to make it.
+            ...(childUserId || deviceId ? {childInFamily: true} : {}),
+            ...(approval ? {approval} : {}),
           },
         });
       }),
@@ -269,7 +294,7 @@ class AuthRoute implements Routes {
           RequestContext.instance(req),
           getTargetUserId(req),
           req.body.password,
-          req.body.passwordCopy,
+          req.body.passwordCopy ?? null,
         );
 
         const result = {
@@ -296,6 +321,16 @@ class AuthRoute implements Routes {
           results: {valid: results},
         };
         res.json(result);
+      }),
+    );
+
+    // SCH-OK
+    this.router.post(
+      '/auth/checkPin',
+      authenticateJWT,
+      errorHelper(async (req: ApiReq<'/auth/checkPin'>, res) => {
+        const valid = await this.authService.checkPin(RequestContext.instance(req), req.body.pin);
+        res.json({success: true, results: {valid}});
       }),
     );
 

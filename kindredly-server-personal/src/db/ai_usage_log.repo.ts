@@ -50,6 +50,46 @@ export class AIUsageLogRepo extends BaseRepo<AIUsageLogRow> {
     return Number((row as any)?.costUsd || 0);
   }
 
+  /** Web searches the account's rows since `since` record in `meta.webSearchRequests` (HAT-735). */
+  async sumWebSearchesSince(input: {accountId: string; since: Date}): Promise<number> {
+    const row = await this.query()
+      .where('accountId', input.accountId)
+      .andWhere('createdAt', '>=', input.since)
+      .whereRaw(`"meta"->>'webSearchRequests' IS NOT NULL`)
+      .sum({searches: this.knex.raw(`CAST("meta"->>'webSearchRequests' AS integer)`) as any})
+      .first();
+    return Number((row as any)?.searches || 0);
+  }
+
+  /**
+   * The account's calls since `since`, by feature: how many, how many had no price (so their spend
+   * is unknown, not zero), and their plan spend — the rows `sumPlanCostSince` adds up, split so a
+   * family can see what used its limit.
+   */
+  async sumSinceByFeature(input: {
+    accountId: string;
+    since: Date;
+  }): Promise<Array<{feature: string; uses: number; unmeasuredUses: number; planCostUsd: number}>> {
+    const rows = await this.query()
+      .select('feature')
+      .where('accountId', input.accountId)
+      .andWhere('createdAt', '>=', input.since)
+      .count({uses: '_id'})
+      .count({unmeasuredUses: this.knex.raw('CASE WHEN "costUsd" IS NULL THEN 1 END') as any})
+      .sum({
+        planCostUsd: this.knex.raw(
+          'CASE WHEN "billedTo" IS NULL OR "billedTo" = \'plan\' THEN "costUsd" ELSE 0 END',
+        ) as any,
+      })
+      .groupBy('feature');
+    return (rows as any[]).map((row) => ({
+      feature: String(row.feature),
+      uses: Number(row.uses || 0),
+      unmeasuredUses: Number(row.unmeasuredUses || 0),
+      planCostUsd: Number(row.planCostUsd || 0),
+    }));
+  }
+
   /**
    * When the account's rows for `features` were written since `since`, oldest first, however they
    * were billed: every hosted picture uses a picture credit, including ones from before credits.

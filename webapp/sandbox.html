@@ -1353,6 +1353,8 @@ window.createKindredlyHostApi = createKindredlyHostApi
     var ns = String(namespace || 'app')
     var key = String(opts.key || 'state')
     var shared = opts.shared === true
+    // Server-backed data is the person's own unless the app asks for the family's one copy.
+    var where = shared && opts.scope === 'account' ? { namespace: ns, scope: 'account' } : { namespace: ns }
     var base = isPlainObject(defaults) ? defaults : {}
 
     var listeners = []
@@ -1425,7 +1427,7 @@ window.createKindredlyHostApi = createKindredlyHostApi
       pendingSave = Promise.resolve(pendingSave)
         .catch(function () {})
         .then(function () {
-          return target.set(key, snapshot, { namespace: ns })
+          return target.set(key, snapshot, where)
         })
         .then(function () {
           store.error = null
@@ -1454,7 +1456,7 @@ window.createKindredlyHostApi = createKindredlyHostApi
       }
       return Promise.resolve()
         .then(function () {
-          return target.get(key, { namespace: ns })
+          return target.get(key, where)
         })
         .then(function (stored) {
           // The host returns the value directly, or wrapped — accept both rather than guessing.
@@ -1644,6 +1646,724 @@ window.createKindredlyHostApi = createKindredlyHostApi
 })()
 
   </script>
+  <!-- How the App Builder tries an app: click, type, press, expect. Inert until the host sends a
+       `test-step` message, which only the App Builder's hidden test frame does (HAT-101). -->
+  <script>/* sandbox-test.js */
+/**
+ * The App Builder's hands: how it tries an app the way a person would (HAT-101).
+ *
+ * Loaded by sandbox.html and sandbox-nonet.html, and inert until the host sends a `test-step`
+ * message — an ordinary app run never calls it. The host only sends one to the App Builder's
+ * hidden test frame, whose storage writes are thrown away (AppIFrame `testRun`), so a test that
+ * presses Delete deletes nothing.
+ *
+ * `window.__kndTest.run(step)` performs one step and says what happened:
+ *
+ *   click      a button, link, checkbox or any text on screen, found by its words
+ *   type       text into a field found by its label, placeholder or name (replaces what it held)
+ *   press      a key — Enter, Escape, an arrow, a letter — on a field, a button or the game canvas
+ *   select     an option of a <select>, by its text
+ *   expect     wait up to 2 s for text to be on screen
+ *   expectnot  wait up to 2 s for text to be gone
+ *   wait       let time pass
+ *   probe      the generic check `checkapp` runs: fill every field, press the main button, type
+ *              one character. Also what `evals/harness/renderApp.ts` runs, so there is one probe.
+ *
+ * Everything is found the way a person finds it — a button by its words, a field by its label —
+ * because that is what the model sees in the DOM summary, and because a test that clicks
+ * `#btn-3` passes on an app whose button nobody could find. A CSS selector is the fallback.
+ */
+;(function () {
+  'use strict'
+
+  // Long enough for knd.store's 250ms save and the render that follows it.
+  var SETTLE_MS = 300
+  var EXPECT_WAIT_MS = 2000
+  var TYPE_CHAR_MS = 12
+  var MAX_TYPED = 200
+  var PROBE_TEXT = '<b>Probe</b>'
+
+  function norm(s) {
+    return String(s == null ? '' : s).replace(/\s+/g, ' ').trim()
+  }
+  function low(s) {
+    return norm(s).toLowerCase()
+  }
+  function sleep(ms) {
+    return new Promise(function (resolve) { setTimeout(resolve, ms) })
+  }
+  function quote(s, max) {
+    var t = norm(s)
+    var cap = max || 60
+    return '“' + (t.length > cap ? t.slice(0, cap) + '…' : t) + '”'
+  }
+  function all(selector, root) {
+    try {
+      return Array.prototype.slice.call((root || document).querySelectorAll(selector))
+    } catch (e) {
+      return []
+    }
+  }
+
+  // jsdom (the unit tests) has no layout. A real browser always does, even in the 1px hidden frame.
+  function hasLayout() {
+    var body = document.body
+    return !!body && body.getBoundingClientRect().width > 0
+  }
+
+  function isShown(el, layout) {
+    if (!el || el.nodeType !== 1 || !el.isConnected) return false
+    if (el.closest('[hidden]')) return false
+    var own = window.getComputedStyle(el)
+    if (own.visibility === 'hidden') return false
+    for (var n = el; n && n.nodeType === 1; n = n.parentElement) {
+      if (window.getComputedStyle(n).display === 'none') return false
+    }
+    if (layout) {
+      var r = el.getBoundingClientRect()
+      if (r.width <= 0 || r.height <= 0) return false
+    }
+    return true
+  }
+
+  function textOf(el) {
+    // innerText follows CSS (hidden text is not read); jsdom does not implement it.
+    return norm(typeof el.innerText === 'string' && hasLayout() ? el.innerText : el.textContent)
+  }
+
+  /** A label's words without the words of the controls inside it (a <select>'s options). */
+  function labelText(label) {
+    var clone = label.cloneNode(true)
+    all('input, select, textarea, button', clone).forEach(function (c) { c.remove() })
+    return norm(clone.textContent)
+  }
+
+  /** What a person would call this control. */
+  function nameOf(el) {
+    var aria = norm(el.getAttribute('aria-label'))
+    if (aria) return aria
+    var by = el.getAttribute('aria-labelledby')
+    if (by) {
+      var joined = norm(by.split(/\s+/).map(function (id) {
+        var n = document.getElementById(id)
+        return n ? textOf(n) : ''
+      }).join(' '))
+      if (joined) return joined
+    }
+    if (el.tagName === 'INPUT') {
+      var type = (el.getAttribute('type') || 'text').toLowerCase()
+      if (type === 'submit' || type === 'reset' || type === 'button') {
+        return norm(el.value) || (type === 'submit' ? 'Submit' : type === 'reset' ? 'Reset' : '')
+      }
+    }
+    var text = textOf(el)
+    if (text) return text
+    var titled = norm(el.getAttribute('title') || el.getAttribute('alt'))
+    if (titled) return titled
+    // An icon-only button: the icon's own name is the best there is.
+    var icon = el.querySelector && el.querySelector('knd-icon[name], img[alt]')
+    if (icon) return norm(icon.getAttribute('name') || icon.getAttribute('alt'))
+    return ''
+  }
+
+  function fieldNames(el) {
+    var names = []
+    if (el.labels) {
+      for (var i = 0; i < el.labels.length; i++) names.push(labelText(el.labels[i]))
+    }
+    names.push(el.getAttribute('aria-label'), el.getAttribute('placeholder'), el.getAttribute('name'), el.id, el.getAttribute('title'))
+    return names.map(norm).filter(Boolean)
+  }
+
+  function inputType(el) {
+    if (el.tagName === 'INPUT') return (el.getAttribute('type') || 'text').toLowerCase()
+    return el.tagName.toLowerCase()
+  }
+
+  var NOT_TYPEABLE = ['hidden', 'button', 'submit', 'reset', 'image', 'checkbox', 'radio', 'file']
+  var TEXTISH = ['text', 'search', 'url', 'tel', 'email', 'password', 'textarea']
+
+  function fields() {
+    var layout = hasLayout()
+    return all('input, textarea, select, [contenteditable=""], [contenteditable="true"]').filter(function (el) {
+      return NOT_TYPEABLE.indexOf(inputType(el)) < 0 && isShown(el, layout)
+    })
+  }
+
+  function bySelector(query) {
+    try {
+      var el = document.querySelector(query)
+      return el && isShown(el, hasLayout()) ? el : null
+    } catch (e) {
+      return null
+    }
+  }
+
+  function findField(query) {
+    var list = fields()
+    if (!norm(query)) return list[0] || null
+    var q = low(query)
+    var exact = list.filter(function (el) { return fieldNames(el).some(function (n) { return low(n) === q }) })
+    if (exact.length) return exact[0]
+    var partial = list.filter(function (el) { return fieldNames(el).some(function (n) { return low(n).indexOf(q) >= 0 }) })
+    if (partial.length) return partial[0]
+    var picked = bySelector(query)
+    return picked && /^(INPUT|TEXTAREA|SELECT)$/.test(picked.tagName) ? picked : null
+  }
+
+  var CLICKABLE = [
+    'button', 'a', 'summary', 'label', 'select',
+    'input[type="button"]', 'input[type="submit"]', 'input[type="reset"]', 'input[type="checkbox"]', 'input[type="radio"]',
+    '[role="button"]', '[role="link"]', '[role="tab"]', '[role="menuitem"]', '[role="option"]', '[role="switch"]',
+    '[role="checkbox"]', '[tabindex]', '[onclick]',
+  ].join(', ')
+
+  function namesFor(el) {
+    var names = [nameOf(el)]
+    if (el.tagName === 'INPUT' || el.tagName === 'SELECT') names = names.concat(fieldNames(el))
+    return names.filter(Boolean)
+  }
+
+  function findClickable(query) {
+    var q = low(query)
+    if (!q) return null
+    var layout = hasLayout()
+    var cands = all(CLICKABLE).filter(function (el) { return isShown(el, layout) })
+    var exact = cands.filter(function (el) { return namesFor(el).some(function (n) { return low(n) === q }) })
+    if (exact.length) return exact[0]
+    var partial = cands.filter(function (el) { return namesFor(el).some(function (n) { return low(n).indexOf(q) >= 0 }) })
+    if (partial.length) {
+      // "Add" should find "Add" before "Add a reminder": the shortest name is the closest match.
+      partial.sort(function (a, b) { return nameOf(a).length - nameOf(b).length })
+      return partial[0]
+    }
+    // Anything showing those words: a flashcard, a list row, a tile. The innermost element wins,
+    // because the whole page also "contains" the text.
+    var shown = all('body *').filter(function (el) {
+      return !/^(SCRIPT|STYLE|TEMPLATE)$/.test(el.tagName) && isShown(el, layout)
+    })
+    var best = null
+    var bestLen = Infinity
+    shown.forEach(function (el) {
+      var t = low(textOf(el))
+      if (t.indexOf(q) < 0) return
+      if (t.length <= bestLen) {
+        best = el
+        bestLen = t.length
+      }
+    })
+    return best || bySelector(query)
+  }
+
+  function describeButtons() {
+    var layout = hasLayout()
+    var names = all('button, [role="button"], a, input[type="submit"], input[type="button"]')
+      .filter(function (el) { return isShown(el, layout) })
+      .map(nameOf)
+      .filter(Boolean)
+      .slice(0, 8)
+    return names.length ? 'Buttons on screen: ' + names.map(function (n) { return quote(n, 30) }).join(', ') + '.' : 'There are no buttons on screen.'
+  }
+
+  function describeFields() {
+    var list = fields().slice(0, 8).map(function (el) {
+      var name = fieldNames(el)[0] || '(no label)'
+      return quote(name, 30) + ' (' + inputType(el) + ')'
+    })
+    return list.length ? 'Fields on screen: ' + list.join(', ') + '.' : 'There are no fields on screen.'
+  }
+
+  /** Everything a person can read: the page's text plus what the fields hold. */
+  function screenText() {
+    var body = document.body
+    if (!body) return ''
+    var parts = [textOf(body)]
+    fields().forEach(function (el) {
+      if (el.tagName === 'SELECT') {
+        var opt = el.options[el.selectedIndex]
+        if (opt) parts.push(opt.text)
+      } else if (typeof el.value === 'string' && el.value) {
+        parts.push(el.value)
+      }
+    })
+    return norm(parts.join(' '))
+  }
+
+  function snapshot() {
+    return { text: screenText(), count: document.body ? document.body.querySelectorAll('*').length : 0 }
+  }
+  function changedSince(before) {
+    var now = snapshot()
+    return now.text !== before.text || now.count !== before.count
+  }
+
+  function fire(el, type, init) {
+    var opts = Object.assign({ bubbles: true, cancelable: true, composed: true }, init || {})
+    var ev
+    try {
+      if (/^pointer/.test(type) && typeof PointerEvent === 'function') ev = new PointerEvent(type, opts)
+      else if (/^(mouse|click)/.test(type)) ev = new MouseEvent(type, opts)
+      else ev = new Event(type, opts)
+    } catch (e) {
+      ev = new Event(type, opts)
+    }
+    el.dispatchEvent(ev)
+    return ev
+  }
+
+  function clickEl(el) {
+    var r = el.getBoundingClientRect()
+    var at = { clientX: r.left + r.width / 2, clientY: r.top + r.height / 2, button: 0 }
+    // Some apps listen for pointerdown, some for mousedown, most for click. A finger sends all three.
+    fire(el, 'pointerdown', at)
+    fire(el, 'mousedown', at)
+    fire(el, 'pointerup', at)
+    fire(el, 'mouseup', at)
+    el.click()
+  }
+
+  var KEY_NAMES = {
+    enter: 'Enter', return: 'Enter', space: ' ', spacebar: ' ', esc: 'Escape', escape: 'Escape',
+    tab: 'Tab', backspace: 'Backspace', delete: 'Delete', del: 'Delete',
+    up: 'ArrowUp', down: 'ArrowDown', left: 'ArrowLeft', right: 'ArrowRight',
+    arrowup: 'ArrowUp', arrowdown: 'ArrowDown', arrowleft: 'ArrowLeft', arrowright: 'ArrowRight',
+  }
+  var KEY_CODES = { Enter: 13, ' ': 32, Escape: 27, Tab: 9, Backspace: 8, Delete: 46, ArrowLeft: 37, ArrowUp: 38, ArrowRight: 39, ArrowDown: 40 }
+
+  function normalizeKey(raw) {
+    var s = String(raw == null ? '' : raw)
+    if (s === ' ') return ' '
+    s = s.trim()
+    if (!s) return ''
+    if (s.length === 1) return s
+    return KEY_NAMES[s.toLowerCase()] || s
+  }
+
+  function keyEvent(type, key) {
+    var code = key === ' ' ? 'Space' : /^[a-z]$/i.test(key) ? 'Key' + key.toUpperCase() : /^[0-9]$/.test(key) ? 'Digit' + key : key
+    var keyCode = KEY_CODES[key] || (key.length === 1 ? key.toUpperCase().charCodeAt(0) : 0)
+    var ev
+    try {
+      ev = new KeyboardEvent(type, { key: key, code: code, bubbles: true, cancelable: true, composed: true })
+    } catch (e) {
+      ev = new Event(type, { bubbles: true, cancelable: true })
+      try { Object.defineProperty(ev, 'key', { get: function () { return key } }) } catch (e2) { /* ignore */ }
+    }
+    // Older code still reads keyCode, which the constructor cannot set.
+    try { Object.defineProperty(ev, 'keyCode', { get: function () { return keyCode } }) } catch (e) { /* ignore */ }
+    try { Object.defineProperty(ev, 'which', { get: function () { return keyCode } }) } catch (e) { /* ignore */ }
+    return ev
+  }
+
+  /**
+   * Enter in a field submits its form only when the browser would: the form has a submit button,
+   * or this is its only text field. A synthetic key press gets none of this for free, and pressing
+   * Enter in a form a person could not submit must not pass.
+   */
+  function implicitSubmit(field) {
+    var form = field.form
+    if (!form) return false
+    var submitter = form.querySelector('button:not([type]), button[type="submit"], input[type="submit"], input[type="image"]')
+    var textFields = all('input', form).filter(function (el) { return NOT_TYPEABLE.indexOf(inputType(el)) < 0 })
+    if (!submitter && textFields.length !== 1) return false
+    if (submitter && submitter.disabled) return false
+    if (typeof form.requestSubmit === 'function') form.requestSubmit(submitter || undefined)
+    else form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }))
+    return true
+  }
+
+  // --- The field being typed into, by identity rather than by node -------------------------------
+  // A re-render legitimately replaces the node (knd.paint does, and puts the caret back), so
+  // comparing element references would fail every correct app. What a person notices is whether
+  // THE FIELD still has the caret.
+  var lastField = null
+
+  function identify(el) {
+    return { tag: el.tagName, id: el.id || '', name: el.getAttribute('name') || '', label: fieldNames(el)[0] || '', index: fields().indexOf(el) }
+  }
+  function isSameField(el, ident) {
+    if (!el || !ident || el.tagName !== ident.tag) return false
+    if (ident.id) return el.id === ident.id
+    if (ident.name) return el.getAttribute('name') === ident.name
+    return (fieldNames(el)[0] || '') === ident.label
+  }
+  function refind(ident) {
+    if (!ident) return null
+    var list = fields()
+    for (var i = 0; i < list.length; i++) if (isSameField(list[i], ident)) return list[i]
+    return ident.index >= 0 && list[ident.index] && list[ident.index].tagName === ident.tag ? list[ident.index] : null
+  }
+  function tryFocus(el) {
+    try { el.focus({ preventScroll: true }) } catch (e) { /* ignore */ }
+    return document.activeElement === el
+  }
+
+  function ok(note, extra) {
+    return Object.assign({ ok: true }, note ? { note: note } : {}, extra || {})
+  }
+  function fail(note, extra) {
+    return Object.assign({ ok: false, note: note }, extra || {})
+  }
+
+  // --- Steps -------------------------------------------------------------------------------------
+
+  async function doClick(step) {
+    var target = step.target != null ? step.target : step.text
+    var el = findClickable(target)
+    if (!el) return fail('Nothing on screen matches ' + quote(target) + '. ' + describeButtons())
+    if (el.disabled || el.getAttribute('aria-disabled') === 'true') return fail(quote(nameOf(el) || target) + ' is disabled.')
+    var before = snapshot()
+    clickEl(el)
+    await sleep(SETTLE_MS)
+    return changedSince(before) ? ok('') : ok('Nothing on screen changed.')
+  }
+
+  async function setWholeValue(el, text) {
+    el.value = text
+    fire(el, 'input')
+    fire(el, 'change')
+    await sleep(SETTLE_MS)
+  }
+
+  async function doType(step) {
+    var el = findField(step.target)
+    if (!el) return fail((norm(step.target) ? 'No field matches ' + quote(step.target) + '. ' : 'There is no field to type into. ') + describeFields())
+    if (el.disabled) return fail(quote(fieldNames(el)[0] || step.target) + ' is disabled.')
+    if (el.readOnly) return fail(quote(fieldNames(el)[0] || step.target) + ' is read-only.')
+    var text = String(step.text == null ? '' : step.text).slice(0, MAX_TYPED)
+    if (el.tagName === 'SELECT') return selectOption(el, text)
+    lastField = identify(el)
+    var type = inputType(el)
+
+    if (el.isContentEditable) {
+      el.textContent = text
+      fire(el, 'input')
+      await sleep(SETTLE_MS)
+      return ok('')
+    }
+
+    // A number, a date, a colour: the browser takes the whole value or nothing, so give it whole.
+    if (TEXTISH.indexOf(type) < 0) {
+      await setWholeValue(el, text)
+      var after = refind(lastField)
+      if (after && text && after.value !== text) return fail(quote(fieldNames(el)[0] || type) + ' did not take ' + quote(text) + ' — a ' + type + ' field.')
+      return ok('')
+    }
+
+    // Text arrives one character at a time, the way a keyboard delivers it. An app that re-renders
+    // the field on every keystroke is caught here the way a person catches it: mid-word.
+    var tracksFocus = tryFocus(el)
+    el.value = ''
+    fire(el, 'input')
+    var lost = ''
+    var current = el
+    for (var i = 0; i < text.length; i++) {
+      var ch = text.charAt(i)
+      if (tracksFocus) {
+        var active = document.activeElement
+        if (isSameField(active, lastField)) {
+          current = active
+        } else {
+          if (!lost) {
+            lost = i === 0
+              ? 'Clearing ' + quote(lastField.label || type) + ' took the caret out of it — a re-render replaced the field.'
+              : 'After typing ' + quote(text.slice(0, i)) + ', the field lost the caret — a re-render replaced it, so a person\'s next letters would go nowhere.'
+          }
+          current = refind(lastField)
+          if (current) tryFocus(current)
+        }
+      } else {
+        current = refind(lastField) || current
+      }
+      if (!current || !current.isConnected) return fail('The field disappeared after typing ' + quote(text.slice(0, i)) + '.')
+      var down = keyEvent('keydown', ch)
+      current.dispatchEvent(down)
+      if (!down.defaultPrevented) {
+        current.dispatchEvent(keyEvent('keypress', ch))
+        current.value = (current.value || '') + ch
+        var input
+        try {
+          input = new InputEvent('input', { bubbles: true, cancelable: false, data: ch, inputType: 'insertText' })
+        } catch (e) {
+          input = new Event('input', { bubbles: true })
+        }
+        current.dispatchEvent(input)
+      }
+      current.dispatchEvent(keyEvent('keyup', ch))
+      await sleep(TYPE_CHAR_MS)
+    }
+    var final = refind(lastField) || current
+    if (final) fire(final, 'change')
+    await sleep(SETTLE_MS)
+    if (lost) return fail(lost)
+    final = refind(lastField)
+    if (final && text && low(final.value).indexOf(low(text)) < 0) {
+      return fail('After typing ' + quote(text) + ', the field holds ' + quote(final.value) + ' — a re-render overwrote it.')
+    }
+    return ok('')
+  }
+
+  async function selectOption(el, wanted) {
+    var q = low(wanted)
+    var opts = Array.prototype.slice.call(el.options || [])
+    var match = opts.find(function (o) { return low(o.text) === q || low(o.value) === q }) ||
+      opts.find(function (o) { return low(o.text).indexOf(q) >= 0 })
+    if (!match) {
+      return fail('No option ' + quote(wanted) + '. Options: ' + opts.slice(0, 10).map(function (o) { return quote(o.text, 30) }).join(', ') + '.')
+    }
+    lastField = identify(el)
+    var before = snapshot()
+    el.value = match.value
+    fire(el, 'input')
+    fire(el, 'change')
+    await sleep(SETTLE_MS)
+    return changedSince(before) ? ok('') : ok('Nothing on screen changed.')
+  }
+
+  async function doSelect(step) {
+    var el = findField(step.target)
+    if (el && el.tagName === 'SELECT') return selectOption(el, step.text)
+    // A radio group reads as a choice too: pick the radio whose label is the option.
+    var radio = findClickable(step.text)
+    if (radio && radio.tagName === 'INPUT' && inputType(radio) === 'radio') return doClick({ target: step.text })
+    return fail('No list matches ' + quote(step.target) + '. ' + describeFields())
+  }
+
+  function pressTarget() {
+    var field = refind(lastField)
+    if (field) return field
+    var active = document.activeElement
+    if (active && active !== document.body && active !== document.documentElement) return active
+    return document.querySelector('canvas') || document.body
+  }
+
+  async function doPress(step) {
+    var key = normalizeKey(step.key != null ? step.key : step.text)
+    if (!key) return fail('press needs a key, for example { "action": "press", "key": "Enter" }.')
+    var el = pressTarget()
+    if (norm(step.target)) {
+      el = findField(step.target) || findClickable(step.target)
+      if (!el) return fail('Nothing on screen matches ' + quote(step.target) + '. ' + describeButtons())
+    }
+    var before = snapshot()
+    var down = keyEvent('keydown', key)
+    el.dispatchEvent(down)
+    if (key.length === 1 || key === 'Enter') el.dispatchEvent(keyEvent('keypress', key))
+    // Holding a key is how a game moves a sprite more than a pixel.
+    var hold = Math.max(0, Math.min(3000, Number(step.ms) || 0))
+    if (hold) await sleep(hold)
+    el.dispatchEvent(keyEvent('keyup', key))
+    if (!down.defaultPrevented) {
+      var tag = el.tagName
+      if (key === 'Enter' && tag === 'INPUT') implicitSubmit(el)
+      else if ((key === 'Enter' || key === ' ') && (tag === 'BUTTON' || el.getAttribute('role') === 'button')) el.click()
+    }
+    await sleep(SETTLE_MS)
+    return changedSince(before) ? ok('') : ok('Nothing on screen changed.')
+  }
+
+  async function doExpect(step, present) {
+    var raw = step.text != null ? step.text : step.target
+    var want = low(raw)
+    if (!want) return fail((present ? 'expect' : 'expectnot') + ' needs text, for example { "action": "expect", "text": "Milk" }.')
+    var deadline = Date.now() + EXPECT_WAIT_MS
+    for (;;) {
+      var has = low(screenText()).indexOf(want) >= 0
+      if (has === present) return ok('')
+      if (Date.now() >= deadline) break
+      await sleep(100)
+    }
+    return present
+      ? fail(quote(raw) + ' is not on screen. The screen shows: ' + quote(screenText(), 300))
+      : fail(quote(raw) + ' is still on screen.')
+  }
+
+  async function doWait(step) {
+    await sleep(Math.max(0, Math.min(5000, Number(step.ms) || 500)))
+    return ok('')
+  }
+
+  /**
+   * The generic check (APPQ-17, moved here from the eval harness so the product and the eval run
+   * the same one). It knows nothing about what any app means. It fills whatever fields it finds,
+   * presses the one button that looks like the primary action, and reports three things that are
+   * unambiguous whatever the app is: it threw (the host collects that), nothing happened, or the
+   * text it typed came back as live HTML.
+   *
+   * The probe text is deliberately markup. An app that concatenates user input into `innerHTML`
+   * turns it into a real <b> element; one that escapes, or uses textContent, shows the characters.
+   */
+  async function probe() {
+    var doc = document
+    var app = doc.getElementById('app')
+    if (!app) return { attempted: false, reason: 'no #app' }
+
+    // A game or a drawing pad is driven entirely through pixels. Pressing its left-arrow pad moves
+    // a sprite and changes no text at all, so "nothing happened" would be a lie about a working
+    // app. Nothing here can tell a moved sprite from a dead button, so it declines to guess.
+    if (doc.querySelector('canvas')) return { attempted: false, reason: 'canvas app — no form to drive' }
+
+    var layout = hasLayout()
+    var before = {
+      text: textOf(app),
+      children: app.querySelectorAll('*').length,
+      bolds: app.querySelectorAll('b').length,
+    }
+
+    // Fill every field the user could type in. A number field gets a number: an app that parses
+    // "<b>Probe</b>" as pages-read and renders NaN is a different bug, and not this one's.
+    //
+    // One field at a time, found again each time: an app that redraws on every keystroke replaces
+    // the fields, and filling the node that was there a moment ago fills nothing. After each one,
+    // check the fields already filled still hold what was typed. A recipe box redrew its whole
+    // screen when the search box changed, which wiped the half-typed recipe, and the probe used to
+    // report that as "Add recipe does nothing" — true, and blaming the wrong thing.
+    var filled = 0
+    var done = []
+    var cleared = null
+    var targets = all('input, textarea, select', app)
+      .filter(function (el) {
+        var type = inputType(el)
+        return !(type === 'checkbox' || type === 'radio' || type === 'hidden' || type === 'button' || type === 'submit')
+      })
+      .map(identify)
+    targets.forEach(function (ident) {
+      var el = refind(ident)
+      if (!el) return
+      var type = inputType(el)
+      if (el.tagName === 'SELECT') {
+        if (el.options.length > 0) el.selectedIndex = 0
+      } else if (type === 'number' || el.getAttribute('inputmode') === 'numeric') {
+        el.value = '7'
+      } else if (type === 'date') {
+        el.value = '2026-01-02'
+      } else {
+        el.value = PROBE_TEXT
+      }
+      fire(el, 'input')
+      fire(el, 'change')
+      filled++
+      // What the field holds once the app has reacted — an app that formats "7" as "7.00" has
+      // not wiped anything.
+      var settled = refind(ident)
+      var value = settled ? settled.value : el.value
+      if (!cleared) {
+        // Only a field that went EMPTY: that is the redraw wiping it, not the app reformatting.
+        var lost = done.filter(function (d) {
+          var now = refind(d.ident)
+          return now && d.value !== '' && now.value === ''
+        })
+        if (lost.length) cleared = { by: ident.label || type, lost: lost.map(function (d) { return d.ident.label || 'a field' }) }
+      }
+      done.push({ ident: ident, value: value })
+    })
+
+    // The primary action, as a person would read it: a submit button, else the first button that
+    // is not obviously a setting, a reset or a navigation control. The avoid-list gates
+    // EVERYTHING, including the submit preference: a chore chart put "Reset all chores" and
+    // "Add chore" in two separate forms, both type=submit, and preferring submit first pressed
+    // Reset, saw the empty list stay empty, and reported a working app as broken.
+    // Searching is not the main action either: pressing "Search" over an empty list rightly
+    // changes nothing, and reported a working recipe box as a dead button.
+    var AVOID = /setting|reset|clear|delete|remove|close|cancel|menu|option|undo|back|next|prev|shuffle|search|find|filter/i
+    var visible = all('button, [role="button"]', app).filter(function (b) { return isShown(b, layout) && !b.disabled })
+    var safe = visible.filter(function (b) { return !AVOID.test(nameOf(b)) })
+    var primary = safe.find(function (b) { return (b.getAttribute('type') || '') === 'submit' }) || safe[0]
+    // Only destructive or navigational controls on screen means there is no primary action to test.
+    if (!primary) return { attempted: false, reason: 'no primary action to press', filled: filled }
+
+    var label = (nameOf(primary) || 'button').slice(0, 30)
+    var threw = null
+    try {
+      primary.click()
+    } catch (e) {
+      threw = String((e && e.message) || e).slice(0, 300)
+    }
+    await sleep(450)
+
+    // Does typing survive? A parent hit this in the real app: the notes app mirrored the title
+    // field into knd.store on every keystroke, the store fired onChange, render() replaced
+    // app.innerHTML, and the caret left the field after a single letter.
+    //
+    // Allowlisted, not denylisted. A number or date input REJECTS the letter this types, which
+    // would read as "wiped by a re-render" and fail a perfectly good app.
+    var keepsFocus = true
+    var focusDetail = ''
+    var typeable = all('input, textarea', app).filter(function (el) {
+      if (!isShown(el, layout)) return false
+      if (el.tagName === 'TEXTAREA') return true
+      return ['text', 'search', 'url', 'tel', 'email', 'password'].indexOf(inputType(el)) >= 0
+    })
+    if (typeable.length) {
+      var field = typeable[0]
+      var mark = { id: field.id || '', name: field.getAttribute('name') || '', tag: field.tagName }
+      // Focus from a hidden frame may be refused (Chromium asks for a user gesture). Then there is
+      // no caret to lose and nothing to report — never a failure.
+      if (tryFocus(field)) {
+        field.value = (field.value || '') + 'a'
+        fire(field, 'input')
+        await sleep(350)
+        var now = document.activeElement
+        var same =
+          !!now &&
+          now.tagName === mark.tag &&
+          (mark.id ? now.id === mark.id : true) &&
+          (mark.name ? (now.getAttribute && now.getAttribute('name')) === mark.name : true)
+        if (!same) {
+          keepsFocus = false
+          focusDetail =
+            now && (now.tagName === 'INPUT' || now.tagName === 'TEXTAREA')
+              ? 'the caret jumped to a different field'
+              : 'the field lost the caret — a re-render replaced it and nothing put focus back'
+        } else if (String(now.value || '').indexOf('a') < 0) {
+          keepsFocus = false
+          focusDetail = 'the typed character was wiped by a re-render'
+        }
+      }
+    }
+
+    var after = {
+      text: textOf(app),
+      children: app.querySelectorAll('*').length,
+      bolds: app.querySelectorAll('b').length,
+    }
+    return {
+      attempted: true,
+      filled: filled,
+      clearedFields: cleared
+        ? 'Typing into ' + quote(cleared.by) + ' cleared ' + cleared.lost.map(function (l) { return quote(l) }).join(', ')
+        : '',
+      clicked: label,
+      threw: threw,
+      // A real <b> that was not there before means the probe was parsed as markup, not shown as text.
+      injectedHtml: after.bolds > before.bolds,
+      keepsFocus: keepsFocus,
+      focusDetail: focusDetail,
+      // Either the page redrew, or it said something. Both count as "the button did something".
+      changed: after.text !== before.text || after.children !== before.children,
+      textAfter: after.text.slice(0, 200),
+    }
+  }
+
+  async function run(step) {
+    var s = step && typeof step === 'object' ? step : {}
+    switch (String(s.action || '').toLowerCase()) {
+      case 'click': return doClick(s)
+      case 'type': return doType(s)
+      case 'press': return doPress(s)
+      case 'select': return doSelect(s)
+      case 'expect': return doExpect(s, true)
+      case 'expectnot': return doExpect(s, false)
+      case 'wait': return doWait(s)
+      case 'probe': return ok('', { probe: await probe() })
+      default: return fail('Unknown step ' + quote(s.action) + '.')
+    }
+  }
+
+  window.__kndTest = { run: run, probe: probe }
+})()
+
+  </script>
 
   <!--
     Theme sync: the host (AppIFrame) passes the current Kindredly theme via ?knd_theme=<name>
@@ -1730,295 +2450,400 @@ window.createKindredlyHostApi = createKindredlyHostApi
     JS here; this script only EXECUTES it. window.createKindredlyHostApi comes from the classic
     sandbox-host-api.js loaded in <head>.
   -->
-  <script>
-    let currentRunId = null;
-    let hostToken = null;
-    let parentOrigin = null;
+  <script>/* sandbox-runtime.js */
+/**
+ * The sandbox's run loop, shared by every sandbox page (sandbox.html, sandbox-nonet.html,
+ * sandbox-v2.html, sandbox-v2-nonet.html). Loaded LAST in <body>, after #app exists and after
+ * sandbox-host-api.js has defined window.createKindredlyHostApi.
+ *
+ * Classic (non-module) script. The iframe runs with an opaque `null` origin, so ES-module
+ * imports and wasm fetches would be CORS-blocked against capacitor://localhost on mobile.
+ * Instead, the host (AppIFrame) builds the app in the real origin and sends already-compiled
+ * JS here; this script only EXECUTES it. Inlined into each page at build time, like every other
+ * sandbox file (src/core/sandboxDocument.ts).
+ */
+let currentRunId = null;
+let hostToken = null;
+let parentOrigin = null;
 
-    function createRequestId() {
-      try {
-        return (crypto && crypto.randomUUID) ? crypto.randomUUID() : String(Date.now()) + '_' + String(Math.random()).slice(2)
-      } catch {
-        return String(Date.now()) + '_' + String(Math.random()).slice(2)
-      }
-    }
+function createRequestId() {
+  try {
+    return (crypto && crypto.randomUUID) ? crypto.randomUUID() : String(Date.now()) + '_' + String(Math.random()).slice(2)
+  } catch {
+    return String(Date.now()) + '_' + String(Math.random()).slice(2)
+  }
+}
 
-    const hostApi = window.createKindredlyHostApi({ createRequestId })
-    hostApi.install()
+const hostApi = window.createKindredlyHostApi({ createRequestId })
+hostApi.install()
 
-    // install() REPLACES window.kindredly, so the icon API is attached after it rather than by
-    // sandbox-icons.js itself. window.kndIcon / window.kndIcons keep working either way.
-    if (window.kndIcons) window.kindredly.icons = window.kndIcons
+// install() REPLACES window.kindredly, so the icon API is attached after it rather than by
+// sandbox-icons.js itself. window.kndIcon / window.kndIcons keep working either way.
+if (window.kndIcons) window.kindredly.icons = window.kndIcons
 
-    // localStorage persistence: the head shim keeps writes in memory; back it with the per-app
-    // refState host API so data survives reloads. Hydrated once before the first run; writes are
-    // flushed debounced. Fail-soft: with no host itemId (e.g. attachment previews) the hydrate
-    // times out and storage stays in-memory for this load.
-    const LOCAL_STORAGE_STATE_KEY = '__knd_localstorage';
-    const LOCAL_STORAGE_MAX_CHARS = 800 * 1024;
-    let storageHydration = null;
-    function setupPersistentStorage() {
-      const shim = window.__kndStorageShims && window.__kndStorageShims.localStorage;
-      if (!shim) return Promise.resolve();
-      if (storageHydration) return storageHydration;
-      storageHydration = (async () => {
-        try {
-          const stored = await Promise.race([
-            window.kindredly.refState.get(LOCAL_STORAGE_STATE_KEY),
-            new Promise((resolve) => setTimeout(resolve, 3000)),
-          ]);
-          if (stored && typeof stored === 'object') shim.hydrate(stored);
-        } catch { /* in-memory only */ }
+// What a run leaves running is taken down before the next run in this document: a React root's
+// effects and timers, the kit's stores. The @kindredly/ui kit registers each one (runtime 2).
+// A runtime 1 app registers nothing, so for it this is a no-op.
+const runCleanups = [];
+window.__kndRuntime = {
+  onCleanup: function (fn) {
+    if (typeof fn === 'function') runCleanups.push(fn);
+  },
+};
+// Counts run-code messages, so one that waited can tell a newer one has arrived.
+let runCodeSeq = 0;
 
-        let flushTimer = null;
-        let warnedTooBig = false;
-        const flush = () => {
-          flushTimer = null;
-          try {
-            const snapshot = shim.snapshot();
-            if (JSON.stringify(snapshot).length > LOCAL_STORAGE_MAX_CHARS) {
-              if (!warnedTooBig) {
-                warnedTooBig = true;
-                console.warn('localStorage exceeds the ~800KB persistence limit; data is kept in memory only. Store less here, or use kindredly.refState for larger data.');
-              }
-              return;
-            }
-            warnedTooBig = false;
-            window.kindredly.refState.set(LOCAL_STORAGE_STATE_KEY, snapshot).catch(() => {});
-          } catch { /* ignore */ }
-        };
-        shim.onWrite(() => {
-          if (flushTimer) clearTimeout(flushTimer);
-          flushTimer = setTimeout(flush, 400);
-        });
-        window.addEventListener('pagehide', () => {
-          if (flushTimer) { clearTimeout(flushTimer); flush(); }
-        });
-      })();
-      return storageHydration;
-    }
-
-    // Runtime error positions: app code executes via new Function(code), so reported line
-    // numbers are offset by the function wrapper and refer to COMPILED js. Measure the wrapper
-    // offset once with a probe error; the host (AppIFrame) maps the compiled position back to
-    // the user's source via the esbuild source map.
-    let fnLineOffset = 0;
-    function parseEvaluatedPosition(stack) {
-      if (!stack || typeof stack !== 'string') return null;
-      const m = /<anonymous>:(\d+):(\d+)/.exec(stack)
-        || /> (?:eval|Function):(\d+):(\d+)/.exec(stack)
-        || /\banonymous@.*:(\d+):(\d+)/.exec(stack);
-      return m ? { line: parseInt(m[1], 10), column: parseInt(m[2], 10) } : null;
-    }
+function cleanupPreviousRun() {
+  while (runCleanups.length) {
+    const fn = runCleanups.pop();
     try {
-      new Function('throw new Error("__probe__")')();
-    } catch (probeErr) {
-      const probePos = parseEvaluatedPosition(probeErr && probeErr.stack);
-      if (probePos && probePos.line >= 1) fnLineOffset = probePos.line - 1;
+      fn();
+    } catch (e) {
+      // A broken cleanup must not stop the next run.
     }
-    function compiledPositionFromStack(stack) {
-      const pos = parseEvaluatedPosition(stack);
-      if (!pos || pos.line <= fnLineOffset) return null;
-      return { line: pos.line - fnLineOffset, column: pos.column };
-    }
+  }
+}
 
-    // Snapshot of what actually rendered, sent with run-complete so the editor agent can
-    // verify the UI instead of trusting a clean console (catches "runs fine, shows nothing").
-    function buildDomSummary() {
+// Runtime 2: the libraries an app imports (React, the kit, …) arrive WITH the run, as text — a
+// `<script src>` cannot load in this frame on WebKit (src/core/sandboxDocument.ts). Each runs once
+// per document; a later run reuses it.
+const loadedLibs = new Set();
+function loadRunLibs(libs) {
+  if (!Array.isArray(libs)) return;
+  for (const lib of libs) {
+    if (!lib || typeof lib.id !== 'string' || typeof lib.code !== 'string' || loadedLibs.has(lib.id)) continue;
+    const el = document.createElement('script');
+    el.textContent = lib.code + '\n//# sourceURL=knd-lib/' + lib.id + '.js';
+    document.head.appendChild(el);
+    loadedLibs.add(lib.id);
+  }
+}
+
+// Runtime 2: the app's own CSS (Tailwind, built by the host), replaced on every run.
+function applyRunCss(css) {
+  if (typeof css !== 'string') return;
+  let el = document.getElementById('knd-app-css');
+  if (!el) {
+    el = document.createElement('style');
+    el.id = 'knd-app-css';
+    document.head.appendChild(el);
+  }
+  el.textContent = css;
+}
+
+// localStorage persistence: the head shim keeps writes in memory; back it with the per-app
+// refState host API so data survives reloads. Hydrated once before the first run; writes are
+// flushed debounced. Fail-soft: with no host itemId (e.g. attachment previews) the hydrate
+// times out and storage stays in-memory for this load.
+const LOCAL_STORAGE_STATE_KEY = '__knd_localstorage';
+const LOCAL_STORAGE_MAX_CHARS = 800 * 1024;
+let storageHydration = null;
+function setupPersistentStorage() {
+  const shim = window.__kndStorageShims && window.__kndStorageShims.localStorage;
+  if (!shim) return Promise.resolve();
+  if (storageHydration) return storageHydration;
+  storageHydration = (async () => {
+    try {
+      const stored = await Promise.race([
+        window.kindredly.refState.get(LOCAL_STORAGE_STATE_KEY),
+        new Promise((resolve) => setTimeout(resolve, 3000)),
+      ]);
+      if (stored && typeof stored === 'object') shim.hydrate(stored);
+    } catch { /* in-memory only */ }
+
+    let flushTimer = null;
+    let warnedTooBig = false;
+    const flush = () => {
+      flushTimer = null;
       try {
-        const app = document.getElementById('app');
-        const texts = function (nodes, cap) {
-          const out = [];
-          for (let i = 0; i < nodes.length && out.length < cap; i++) {
-            const t = (nodes[i].textContent || '').replace(/\s+/g, ' ').trim().slice(0, 60);
-            if (t) out.push(t);
+        const snapshot = shim.snapshot();
+        if (JSON.stringify(snapshot).length > LOCAL_STORAGE_MAX_CHARS) {
+          if (!warnedTooBig) {
+            warnedTooBig = true;
+            console.warn('localStorage exceeds the ~800KB persistence limit; data is kept in memory only. Store less here, or use kindredly.refState for larger data.');
           }
-          return out;
-        };
-        const childCount = app ? app.children.length : 0;
-        const textPreview = app ? (app.innerText || '').replace(/\s+/g, ' ').trim().slice(0, 300) : '';
-        const hasCanvas = !!document.querySelector('canvas'); // Kaboom appends its canvas to <body>
-        return {
-          appChildCount: childCount,
-          textPreview: textPreview,
-          headings: app ? texts(app.querySelectorAll('h1,h2,h3'), 5) : [],
-          buttons: app ? texts(app.querySelectorAll('button,[role="button"]'), 8) : [],
-          inputCount: app ? app.querySelectorAll('input,select,textarea').length : 0,
-          hasCanvas: hasCanvas,
-          renderedNothing: childCount === 0 && !textPreview && !hasCanvas,
-        };
-      } catch (e) {
-        return null;
-      }
-    }
-
-    function safeToString(value) {
-      try {
-        if (typeof value === 'string') return value;
-        if (value instanceof Error) return value.stack || value.message || String(value);
-        return JSON.stringify(value);
-      } catch {
-        try {
-          return String(value);
-        } catch {
-          return '[unserializable]';
+          return;
         }
-      }
-    }
+        warnedTooBig = false;
+        window.kindredly.refState.set(LOCAL_STORAGE_STATE_KEY, snapshot).catch(() => {});
+      } catch { /* ignore */ }
+    };
+    shim.onWrite(() => {
+      if (flushTimer) clearTimeout(flushTimer);
+      flushTimer = setTimeout(flush, 400);
+    });
+    window.addEventListener('pagehide', () => {
+      if (flushTimer) { clearTimeout(flushTimer); flush(); }
+    });
+  })();
+  return storageHydration;
+}
 
-    function postToParent(payload) {
+// Runtime error positions: app code executes via new Function(code), so reported line
+// numbers are offset by the function wrapper and refer to COMPILED js. Measure the wrapper
+// offset once with a probe error; the host (AppIFrame) maps the compiled position back to
+// the user's source via the esbuild source map.
+let fnLineOffset = 0;
+function parseEvaluatedPosition(stack) {
+  if (!stack || typeof stack !== 'string') return null;
+  const m = /<anonymous>:(\d+):(\d+)/.exec(stack)
+    || /> (?:eval|Function):(\d+):(\d+)/.exec(stack)
+    || /\banonymous@.*:(\d+):(\d+)/.exec(stack);
+  return m ? { line: parseInt(m[1], 10), column: parseInt(m[2], 10) } : null;
+}
+try {
+  new Function('throw new Error("__probe__")')();
+} catch (probeErr) {
+  const probePos = parseEvaluatedPosition(probeErr && probeErr.stack);
+  if (probePos && probePos.line >= 1) fnLineOffset = probePos.line - 1;
+}
+function compiledPositionFromStack(stack) {
+  const pos = parseEvaluatedPosition(stack);
+  if (!pos || pos.line <= fnLineOffset) return null;
+  return { line: pos.line - fnLineOffset, column: pos.column };
+}
+
+// Snapshot of what actually rendered, sent with run-complete so the editor agent can
+// verify the UI instead of trusting a clean console (catches "runs fine, shows nothing").
+function buildDomSummary() {
+  try {
+    const app = document.getElementById('app');
+    const texts = function (nodes, cap) {
+      const out = [];
+      for (let i = 0; i < nodes.length && out.length < cap; i++) {
+        const t = (nodes[i].textContent || '').replace(/\s+/g, ' ').trim().slice(0, 60);
+        if (t) out.push(t);
+      }
+      return out;
+    };
+    // A button by what a person — or a screen reader — calls it. An icon-only button (a trash
+    // can labelled "Remove entry") has no text at all, and listing buttons by text alone hid
+    // it from the model, which then reported that the app had no way to remove anything.
+    const buttonNames = function (nodes, cap) {
+      const out = [];
+      for (let i = 0; i < nodes.length && out.length < cap; i++) {
+        const n = nodes[i];
+        const t = (n.getAttribute('aria-label') || n.textContent || n.getAttribute('title') || '').replace(/\s+/g, ' ').trim().slice(0, 60);
+        if (t) out.push(t);
+      }
+      return out;
+    };
+    const childCount = app ? app.children.length : 0;
+    const textPreview = app ? (app.innerText || '').replace(/\s+/g, ' ').trim().slice(0, 300) : '';
+    const hasCanvas = !!document.querySelector('canvas'); // Kaboom appends its canvas to <body>
+    return {
+      appChildCount: childCount,
+      textPreview: textPreview,
+      headings: app ? texts(app.querySelectorAll('h1,h2,h3'), 5) : [],
+      buttons: app ? buttonNames(app.querySelectorAll('button,[role="button"]'), 8) : [],
+      inputCount: app ? app.querySelectorAll('input,select,textarea').length : 0,
+      hasCanvas: hasCanvas,
+      renderedNothing: childCount === 0 && !textPreview && !hasCanvas,
+    };
+  } catch (e) {
+    return null;
+  }
+}
+
+function safeToString(value) {
+  try {
+    if (typeof value === 'string') return value;
+    if (value instanceof Error) return value.stack || value.message || String(value);
+    return JSON.stringify(value);
+  } catch {
+    try {
+      return String(value);
+    } catch {
+      return '[unserializable]';
+    }
+  }
+}
+
+function postToParent(payload) {
+  try {
+    if (window.parent && window.parent !== window) {
+      const targetOrigin = parentOrigin || '*'
+      // Payloads may pin their own runId (delayed run-complete must not adopt a newer run's id).
+      const runId = payload && payload.runId !== undefined ? payload.runId : currentRunId;
+      window.parent.postMessage({ ...payload, runId, token: hostToken }, targetOrigin);
+    }
+  } catch {
+    // ignore
+  }
+}
+
+// Host API is installed via sandbox-host-api.js
+
+// Mirror console output to parent for agent verification.
+(function wrapConsole() {
+  const levels = ['log', 'warn', 'error', 'info', 'debug'];
+  for (const level of levels) {
+    const original = console[level];
+    console[level] = function(...args) {
       try {
-        if (window.parent && window.parent !== window) {
-          const targetOrigin = parentOrigin || '*'
-          // Payloads may pin their own runId (delayed run-complete must not adopt a newer run's id).
-          const runId = payload && payload.runId !== undefined ? payload.runId : currentRunId;
-          window.parent.postMessage({ ...payload, runId, token: hostToken }, targetOrigin);
-        }
+        postToParent({
+          type: 'sandbox-console',
+          level,
+          args: args.map(a => safeToString(a)).slice(0, 20),
+          ts: Date.now(),
+        });
       } catch {
         // ignore
       }
+      return original.apply(console, args);
+    };
+  }
+})();
+
+window.onerror = function(msg, url, line, col, error) {
+  const div = document.createElement('div');
+  div.className = 'error';
+  div.textContent = 'Error: ' + msg;
+  document.body.appendChild(div);
+  postToParent({
+    type: 'sandbox-error',
+    kind: 'runtime',
+    message: String(msg || 'Unknown error'),
+    stack: error && error.stack ? String(error.stack) : undefined,
+    position: compiledPositionFromStack(error && error.stack),
+    ts: Date.now(),
+  });
+  return false;
+};
+
+window.onunhandledrejection = function(event) {
+  const reason = event && event.reason ? event.reason : 'Unhandled rejection';
+  const div = document.createElement('div');
+  div.className = 'error';
+  div.textContent = 'Unhandled Promise Rejection: ' + safeToString(reason);
+  document.body.appendChild(div);
+  postToParent({
+    type: 'sandbox-error',
+    kind: 'unhandledrejection',
+    message: safeToString(reason),
+    position: compiledPositionFromStack(reason && reason.stack),
+    ts: Date.now(),
+  });
+  return false;
+};
+
+// Listen for code from parent window
+window.addEventListener('message', async function(event) {
+  // Only accept commands from our parent, on the same origin.
+  if (window.parent === window) {
+    return;
+  }
+  if (event.source !== window.parent) {
+    return;
+  }
+
+  // If we're running without allow-same-origin, our origin will be opaque ("null").
+  // Capture the parent origin on first message and use a shared token for validation.
+  if (!parentOrigin && typeof event.origin === 'string' && event.origin) {
+    parentOrigin = event.origin
+    hostApi.setParentOrigin(parentOrigin)
+  }
+
+  if (event.data && event.data.type === 'test-step') {
+    // The App Builder trying the app (sandbox-test.js). Only the host that started the
+    // current run may drive it. Errors the step raises reach the host through window.onerror
+    // as usual, before this result does.
+    if (!hostToken || event.data.token !== hostToken) return;
+    let result;
+    try {
+      const runner = window.__kndTest;
+      result = runner ? await runner.run(event.data.step || {}) : { ok: false, note: 'The test runner did not load.' };
+    } catch (err) {
+      result = { ok: false, note: 'The step could not run: ' + safeToString(err) };
+    }
+    postToParent({
+      type: 'sandbox-test-step-result',
+      stepId: event.data.stepId,
+      result: result,
+      dom: buildDomSummary(),
+      ts: Date.now(),
+    });
+    return;
+  }
+
+  if (event.data && event.data.type === 'run-code') {
+    const runSeq = ++runCodeSeq;
+    hostToken = event.data.token || hostToken
+    hostApi.setHostToken(hostToken)
+    const runStartedAt = Date.now();
+    // Hydrate persisted localStorage before app code runs (no-op after the first run).
+    await setupPersistentStorage();
+    // A newer run arrived while this one waited for storage: it replaces this one. Without this,
+    // both would run, the first never torn down, and its result reported under the second's id.
+    if (runSeq !== runCodeSeq) return;
+
+    // Take down what the previous run left mounted, then clear what it drew.
+    cleanupPreviousRun();
+    const app = document.getElementById('app');
+    while (app.firstChild) {
+      app.removeChild(app.firstChild);
     }
 
-    // Host API is installed via sandbox-host-api.js
+    // Remove previous error messages
+    const errors = document.querySelectorAll('.error');
+    errors.forEach(err => err.remove());
 
-    // Mirror console output to parent for agent verification.
-    (function wrapConsole() {
-      const levels = ['log', 'warn', 'error', 'info', 'debug'];
-      for (const level of levels) {
-        const original = console[level];
-        console[level] = function(...args) {
-          try {
-            postToParent({
-              type: 'sandbox-console',
-              level,
-              args: args.map(a => safeToString(a)).slice(0, 20),
-              ts: Date.now(),
-            });
-          } catch {
-            // ignore
-          }
-          return original.apply(console, args);
-        };
-      }
-    })();
+    currentRunId = event.data.runId || null;
+    try {
+      // Runtime 2 sends its libraries and CSS with the code; runtime 1 sends neither.
+      loadRunLibs(event.data.libs);
+      applyRunCss(event.data.css);
+      // event.data.code is already compiled to JS by the host (AppIFrame). Just execute it.
+      const fn = new Function(event.data.code);
+      fn();
 
-    window.onerror = function(msg, url, line, col, error) {
+      // Give async rendering (Alpine init, rAF paints) a beat before snapshotting the DOM,
+      // so the run report reflects what the user actually sees. runId is pinned in case a
+      // newer run starts during the delay.
+      const durationMs = Date.now() - runStartedAt;
+      const completedRunId = currentRunId;
+      setTimeout(function () {
+        postToParent({
+          type: 'sandbox-run-complete',
+          success: true,
+          durationMs: durationMs,
+          dom: buildDomSummary(),
+          runId: completedRunId,
+          ts: Date.now(),
+        });
+      }, 250);
+    } catch (err) {
       const div = document.createElement('div');
       div.className = 'error';
-      div.textContent = 'Error: ' + msg;
+      div.textContent = 'Error: ' + safeToString(err);
       document.body.appendChild(div);
+      console.error(err);
+
       postToParent({
         type: 'sandbox-error',
         kind: 'runtime',
-        message: String(msg || 'Unknown error'),
-        stack: error && error.stack ? String(error.stack) : undefined,
-        position: compiledPositionFromStack(error && error.stack),
+        message: err && err.message ? String(err.message) : safeToString(err),
+        stack: err && err.stack ? String(err.stack) : undefined,
+        position: compiledPositionFromStack(err && err.stack),
         ts: Date.now(),
       });
-      return false;
-    };
-
-    window.onunhandledrejection = function(event) {
-      const reason = event && event.reason ? event.reason : 'Unhandled rejection';
-      const div = document.createElement('div');
-      div.className = 'error';
-      div.textContent = 'Unhandled Promise Rejection: ' + safeToString(reason);
-      document.body.appendChild(div);
       postToParent({
-        type: 'sandbox-error',
-        kind: 'unhandledrejection',
-        message: safeToString(reason),
-        position: compiledPositionFromStack(reason && reason.stack),
+        type: 'sandbox-run-complete',
+        success: false,
+        durationMs: Date.now() - runStartedAt,
+        dom: buildDomSummary(),
         ts: Date.now(),
       });
-      return false;
-    };
-
-    // Listen for code from parent window
-    window.addEventListener('message', async function(event) {
-      // Only accept commands from our parent, on the same origin.
-      if (window.parent === window) {
-        return;
-      }
-      if (event.source !== window.parent) {
-        return;
-      }
-
-      // If we're running without allow-same-origin, our origin will be opaque ("null").
-      // Capture the parent origin on first message and use a shared token for validation.
-      if (!parentOrigin && typeof event.origin === 'string' && event.origin) {
-        parentOrigin = event.origin
-        hostApi.setParentOrigin(parentOrigin)
-      }
-
-      if (event.data && event.data.type === 'run-code') {
-        // Clear previous content (only when starting a new run)
-        const app = document.getElementById('app');
-        while (app.firstChild) {
-          app.removeChild(app.firstChild);
-        }
-
-        // Remove previous error messages
-        const errors = document.querySelectorAll('.error');
-        errors.forEach(err => err.remove());
-
-        hostToken = event.data.token || hostToken
-        hostApi.setHostToken(hostToken)
-        currentRunId = event.data.runId || null;
-        const runStartedAt = Date.now();
-        // Hydrate persisted localStorage before app code runs (no-op after the first run).
-        await setupPersistentStorage();
-        try {
-          // event.data.code is already compiled to JS by the host (AppIFrame). Just execute it.
-          const fn = new Function(event.data.code);
-          fn();
-
-          // Give async rendering (Alpine init, rAF paints) a beat before snapshotting the DOM,
-          // so the run report reflects what the user actually sees. runId is pinned in case a
-          // newer run starts during the delay.
-          const durationMs = Date.now() - runStartedAt;
-          const completedRunId = currentRunId;
-          setTimeout(function () {
-            postToParent({
-              type: 'sandbox-run-complete',
-              success: true,
-              durationMs: durationMs,
-              dom: buildDomSummary(),
-              runId: completedRunId,
-              ts: Date.now(),
-            });
-          }, 250);
-        } catch (err) {
-          const div = document.createElement('div');
-          div.className = 'error';
-          div.textContent = 'Error: ' + safeToString(err);
-          document.body.appendChild(div);
-          console.error(err);
-
-          postToParent({
-            type: 'sandbox-error',
-            kind: 'runtime',
-            message: err && err.message ? String(err.message) : safeToString(err),
-            stack: err && err.stack ? String(err.stack) : undefined,
-            position: compiledPositionFromStack(err && err.stack),
-            ts: Date.now(),
-          });
-          postToParent({
-            type: 'sandbox-run-complete',
-            success: false,
-            durationMs: Date.now() - runStartedAt,
-            dom: buildDomSummary(),
-            ts: Date.now(),
-          });
-        }
-      }
-    });
-
-    // Signal ready
-    if (window.parent !== window) {
-      // We don't know the parent origin yet; it will be captured on first message.
-      window.parent.postMessage({ type: 'sandbox-ready' }, '*');
     }
+  }
+});
+
+// Signal ready
+if (window.parent !== window) {
+  // We don't know the parent origin yet; it will be captured on first message.
+  window.parent.postMessage({ type: 'sandbox-ready' }, '*');
+}
+
   </script>
   <script>/* alpine.min.js */
 (()=>{var rt=!1,nt=!1,U=[],it=-1;function qt(e){Cn(e)}function Cn(e){U.includes(e)||U.push(e),Tn()}function Ee(e){let t=U.indexOf(e);t!==-1&&t>it&&U.splice(t,1)}function Tn(){!nt&&!rt&&(rt=!0,queueMicrotask(Rn))}function Rn(){rt=!1,nt=!0;for(let e=0;e<U.length;e++)U[e](),it=e;U.length=0,it=-1,nt=!1}var R,D,L,st,ot=!0;function Ut(e){ot=!1,e(),ot=!0}function Wt(e){R=e.reactive,L=e.release,D=t=>e.effect(t,{scheduler:r=>{ot?qt(r):r()}}),st=e.raw}function at(e){D=e}function Gt(e){let t=()=>{};return[n=>{let i=D(n);return e._x_effects||(e._x_effects=new Set,e._x_runEffects=()=>{e._x_effects.forEach(o=>o())}),e._x_effects.add(i),t=()=>{i!==void 0&&(e._x_effects.delete(i),L(i))},i},()=>{t()}]}function ve(e,t){let r=!0,n,i=D(()=>{let o=e();JSON.stringify(o),r?n=o:queueMicrotask(()=>{t(o,n),n=o}),r=!1});return()=>L(i)}var Jt=[],Yt=[],Xt=[];function Zt(e){Xt.push(e)}function ee(e,t){typeof t=="function"?(e._x_cleanups||(e._x_cleanups=[]),e._x_cleanups.push(t)):(t=e,Yt.push(t))}function Ae(e){Jt.push(e)}function Oe(e,t,r){e._x_attributeCleanups||(e._x_attributeCleanups={}),e._x_attributeCleanups[t]||(e._x_attributeCleanups[t]=[]),e._x_attributeCleanups[t].push(r)}function ct(e,t){e._x_attributeCleanups&&Object.entries(e._x_attributeCleanups).forEach(([r,n])=>{(t===void 0||t.includes(r))&&(n.forEach(i=>i()),delete e._x_attributeCleanups[r])})}function Qt(e){if(e._x_cleanups)for(;e._x_cleanups.length;)e._x_cleanups.pop()()}var lt=new MutationObserver(pt),ut=!1;function le(){lt.observe(document,{subtree:!0,childList:!0,attributes:!0,attributeOldValue:!0}),ut=!0}function ft(){Mn(),lt.disconnect(),ut=!1}var ce=[];function Mn(){let e=lt.takeRecords();ce.push(()=>e.length>0&&pt(e));let t=ce.length;queueMicrotask(()=>{if(ce.length===t)for(;ce.length>0;)ce.shift()()})}function _(e){if(!ut)return e();ft();let t=e();return le(),t}var dt=!1,Se=[];function er(){dt=!0}function tr(){dt=!1,pt(Se),Se=[]}function pt(e){if(dt){Se=Se.concat(e);return}let t=new Set,r=new Set,n=new Map,i=new Map;for(let o=0;o<e.length;o++)if(!e[o].target._x_ignoreMutationObserver&&(e[o].type==="childList"&&(e[o].addedNodes.forEach(s=>s.nodeType===1&&t.add(s)),e[o].removedNodes.forEach(s=>s.nodeType===1&&r.add(s))),e[o].type==="attributes")){let s=e[o].target,a=e[o].attributeName,c=e[o].oldValue,l=()=>{n.has(s)||n.set(s,[]),n.get(s).push({name:a,value:s.getAttribute(a)})},u=()=>{i.has(s)||i.set(s,[]),i.get(s).push(a)};s.hasAttribute(a)&&c===null?l():s.hasAttribute(a)?(u(),l()):u()}i.forEach((o,s)=>{ct(s,o)}),n.forEach((o,s)=>{Jt.forEach(a=>a(s,o))});for(let o of r)t.has(o)||Yt.forEach(s=>s(o));t.forEach(o=>{o._x_ignoreSelf=!0,o._x_ignore=!0});for(let o of t)r.has(o)||o.isConnected&&(delete o._x_ignoreSelf,delete o._x_ignore,Xt.forEach(s=>s(o)),o._x_ignore=!0,o._x_ignoreSelf=!0);t.forEach(o=>{delete o._x_ignoreSelf,delete o._x_ignore}),t=null,r=null,n=null,i=null}function Ce(e){return F(j(e))}function P(e,t,r){return e._x_dataStack=[t,...j(r||e)],()=>{e._x_dataStack=e._x_dataStack.filter(n=>n!==t)}}function j(e){return e._x_dataStack?e._x_dataStack:typeof ShadowRoot=="function"&&e instanceof ShadowRoot?j(e.host):e.parentNode?j(e.parentNode):[]}function F(e){return new Proxy({objects:e},Nn)}var Nn={ownKeys({objects:e}){return Array.from(new Set(e.flatMap(t=>Object.keys(t))))},has({objects:e},t){return t==Symbol.unscopables?!1:e.some(r=>Object.prototype.hasOwnProperty.call(r,t)||Reflect.has(r,t))},get({objects:e},t,r){return t=="toJSON"?Dn:Reflect.get(e.find(n=>Reflect.has(n,t))||{},t,r)},set({objects:e},t,r,n){let i=e.find(s=>Object.prototype.hasOwnProperty.call(s,t))||e[e.length-1],o=Object.getOwnPropertyDescriptor(i,t);return o?.set&&o?.get?o.set.call(n,r)||!0:Reflect.set(i,t,r)}};function Dn(){return Reflect.ownKeys(this).reduce((t,r)=>(t[r]=Reflect.get(this,r),t),{})}function Te(e){let t=n=>typeof n=="object"&&!Array.isArray(n)&&n!==null,r=(n,i="")=>{Object.entries(Object.getOwnPropertyDescriptors(n)).forEach(([o,{value:s,enumerable:a}])=>{if(a===!1||s===void 0||typeof s=="object"&&s!==null&&s.__v_skip)return;let c=i===""?o:`${i}.${o}`;typeof s=="object"&&s!==null&&s._x_interceptor?n[o]=s.initialize(e,c,o):t(s)&&s!==n&&!(s instanceof Element)&&r(s,c)})};return r(e)}function Re(e,t=()=>{}){let r={initialValue:void 0,_x_interceptor:!0,initialize(n,i,o){return e(this.initialValue,()=>Pn(n,i),s=>mt(n,i,s),i,o)}};return t(r),n=>{if(typeof n=="object"&&n!==null&&n._x_interceptor){let i=r.initialize.bind(r);r.initialize=(o,s,a)=>{let c=n.initialize(o,s,a);return r.initialValue=c,i(o,s,a)}}else r.initialValue=n;return r}}function Pn(e,t){return t.split(".").reduce((r,n)=>r[n],e)}function mt(e,t,r){if(typeof t=="string"&&(t=t.split(".")),t.length===1)e[t[0]]=r;else{if(t.length===0)throw error;return e[t[0]]||(e[t[0]]={}),mt(e[t[0]],t.slice(1),r)}}var rr={};function y(e,t){rr[e]=t}function ue(e,t){return Object.entries(rr).forEach(([r,n])=>{let i=null;function o(){if(i)return i;{let[s,a]=_t(t);return i={interceptor:Re,...s},ee(t,a),i}}Object.defineProperty(e,`${r}`,{get(){return n(t,o())},enumerable:!1})}),e}function nr(e,t,r,...n){try{return r(...n)}catch(i){te(i,e,t)}}function te(e,t,r=void 0){e=Object.assign(e??{message:"No error message given."},{el:t,expression:r}),console.warn(`Alpine Expression Error: ${e.message}

@@ -2,6 +2,7 @@ import {RequestContext} from '@/base/request_context';
 import UserFileService from '@/services/user_file.service';
 import {streamToBase64} from '@/utils/binary_utils';
 import {awaitWritableDrain} from '@/utils/stream_utils';
+import {isServableImageName} from '@/utils/public_image_name';
 import {Routes} from '@interfaces/routes.interface';
 import express, {Router} from 'express';
 import {ApiReq} from '@/types/api-types';
@@ -63,6 +64,10 @@ class UserFileDataRoute implements Routes {
     this.router.get(
       '/image/get/:filename',
       errorHelper(async (req, res, next) => {
+        if (!isServableImageName(req.params.filename)) {
+          res.sendStatus(404);
+          return;
+        }
         try {
           const s = await this.userFileService.fileAccessProvider.getImageStream(req.params.filename);
           s.on('error', function (e) {

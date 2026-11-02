@@ -7,6 +7,7 @@
 
 import type { ItemMeta, ItemMetaExtracted } from './item.types';
 import type { ItemResourceType } from '../constants';
+import type { MediaMetadataResourceType } from '../media-metadata.utils';
 
 /**
  * Cache entry for external metadata
@@ -35,7 +36,7 @@ export interface ExternalMetaCacheEntry {
  * Resource types for external content
  * Extends ItemResourceType with additional types for caching purposes
  */
-export type ExternalResourceType = ItemResourceType | 
+export type ExternalResourceType = ItemResourceType | MediaMetadataResourceType |
   'REDDIT_POST' | 
   'REDDIT_SUBREDDIT' |
   'NETFLIX_SERIES' |
@@ -93,6 +94,17 @@ export const EXTERNAL_META_TTL: Record<string, number> = {
   SITE_ROOT: 7 * 24 * 60 * 60 * 1000,          // 7 days
   SITE_ITEM: 24 * 60 * 60 * 1000,              // 24 hours
   GENERIC_SITE: 24 * 60 * 60 * 1000,           // 24 hours default
+  AUDIBLE_BOOK: 30 * 24 * 60 * 60 * 1000,      // 30 days - publication metadata is stable
+  AMAZON_BOOK: 30 * 24 * 60 * 60 * 1000,
+  AMAZON_MUSIC: 7 * 24 * 60 * 60 * 1000,
+  LIBRARY_BOOK: 7 * 24 * 60 * 60 * 1000,
+  SPOTIFY_ITEM: 7 * 24 * 60 * 60 * 1000,
+  APPLE_MEDIA: 7 * 24 * 60 * 60 * 1000,
+  GOOGLE_BOOK: 30 * 24 * 60 * 60 * 1000,
+  BOOK_PROVIDER_ITEM: 30 * 24 * 60 * 60 * 1000,
+  AUDIO_PROVIDER_ITEM: 7 * 24 * 60 * 60 * 1000,
+  STREAMING_VIDEO: 7 * 24 * 60 * 60 * 1000,
+  MOVIE_DATABASE_ITEM: 30 * 24 * 60 * 60 * 1000,
 };
 
 /**

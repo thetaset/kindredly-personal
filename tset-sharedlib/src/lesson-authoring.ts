@@ -10,14 +10,26 @@ export interface LessonGenModelOption {
   id: string;
   label: string;
   blurb: string;
+  /** How long writing a lesson takes on it, as measured on 2026-10-15 (HAT-503). */
+  wait: string;
 }
-/** Ids must be a subset of the server AI_MODEL_ALLOWLIST. */
+/** Ids must be a subset of the server AI_MODEL_ALLOWLIST: GPT-6 Luna alone (HAT-503). */
 export const LESSON_GEN_MODELS: LessonGenModelOption[] = [
-  { id: 'gpt-5.4', label: 'Best', blurb: 'Deepest, most careful — slower' },
-  { id: 'gpt-5.4-mini', label: 'Balanced', blurb: 'Good depth, faster' },
-  { id: 'gpt-5.4-nano', label: 'Fast', blurb: 'Quick and basic — shallower' },
+  { id: 'gpt-6-luna', label: 'Standard', blurb: 'Good depth', wait: 'about 15 seconds' },
 ];
-export const DEFAULT_LESSON_GEN_MODEL = 'gpt-5.4';
+export const DEFAULT_LESSON_GEN_MODEL = 'gpt-6-luna';
+
+/**
+ * The server refused Lesson Builder's chat (HAT-762): it is for an adult, on Plus, with AI tools on.
+ * The refusal's message says which.
+ */
+export const LESSON_BUILDER_UNAVAILABLE = 'LESSON_BUILDER_UNAVAILABLE';
+
+/** The chat mode, as the client sends it to `/ai/sendMessageStream`. */
+export const LESSON_BUILDER_CHAT_MODE = 'lesson-builder';
+
+/** How many sources of their own a parent can give one lesson: links and pasted text (HAT-762). */
+export const LESSON_MAX_OWN_SOURCES = 8;
 
 export interface LessonDepthPreset {
   id: string;

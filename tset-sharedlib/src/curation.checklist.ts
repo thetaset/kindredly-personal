@@ -18,6 +18,7 @@
  */
 import {
   adsTagList,
+  aiFeatureTagList,
   costTagList,
   designTagList,
   eduTagList,
@@ -25,6 +26,7 @@ import {
   freshnessTagList,
   minAgeTagList,
   normalizeEduValueAlias,
+  privacyTagList,
 } from './content.types';
 import {DECLINE_REASONS, type DeclineReasonCode} from './publish.rules';
 
@@ -35,6 +37,8 @@ export type CurationVerdict = 'pass' | 'concern' | 'fail';
 export type CurationAnswerStatus = CurationVerdict | typeof NOT_CHECKED;
 
 export type CurationFacetAxis = 'eduValue' | 'minAgeGroup' | 'ads' | 'design' | 'freshness' | 'cost';
+/** The multi-select `useCriteria` axes a review writes by marking boxes. */
+export type CurationFlagsAxis = 'privacy' | 'aiFeatures';
 
 export type CurationAnswerSpec =
   | {kind: 'verdict'; labels: Record<CurationVerdict, string>}
@@ -45,8 +49,21 @@ export type CurationAnswerSpec =
       concernValues?: readonly string[];
       failValues?: readonly string[];
     }
-  /** Any of the options that were found. An empty list means none were found. */
-  | {kind: 'flags'; options: readonly string[]};
+  /**
+   * Any of the options that were found. An empty list means none were found. `labels` names each
+   * option; a check without them (Mature content) takes its names from `flagOptions`.
+   *
+   * With an `axis`, the options are `useCriteria` tags: finishing a review writes the marked ones
+   * onto the item, and writes `noneTag` when the curator marked nothing, so "checked and clean"
+   * can be told apart from "nobody has checked".
+   */
+  | {
+      kind: 'flags';
+      options: readonly string[];
+      labels?: Readonly<Record<string, string>>;
+      axis?: CurationFlagsAxis;
+      noneTag?: string;
+    };
 
 export type CurationCheckGroup = 'basics' | 'learning' | 'distraction' | 'safety';
 
@@ -77,12 +94,26 @@ export type CurationChecklist = {
   checks: readonly CurationCheck[];
 };
 
+/** In the order a curator answers them and a family reads them: what parents ask about first. */
 export const CURATION_CHECK_GROUPS: ReadonlyArray<{key: CurationCheckGroup; label: string}> = [
-  {key: 'basics', label: 'The basics'},
-  {key: 'learning', label: 'Learning and trust'},
   {key: 'distraction', label: 'Ads and distractions'},
   {key: 'safety', label: 'Safety and age'},
+  {key: 'learning', label: 'Learning and trust'},
+  {key: 'basics', label: 'The basics'},
 ];
+
+/**
+ * The key checks: what parents ask about first. Families read every answer in these groups, a pass
+ * included; in the other groups they read only what was found, or a curator's note.
+ */
+export const CURATION_KEY_GROUPS: readonly CurationCheckGroup[] = ['distraction', 'safety'];
+
+/**
+ * Checks from checklists 1 to 3 that were the curator's own housekeeping. Families never read them,
+ * on any version: the server opens the link and looks for the same item in the catalog itself, and
+ * a wrong description is fixed on the item rather than recorded.
+ */
+export const CURATION_CURATOR_ONLY_CHECKS: readonly string[] = ['link_works', 'description_accurate', 'duplicate'];
 
 export type CurationAnswer = {
   /** A verdict, a facet tag key, a list of flag keys, or `not_checked`. */
@@ -493,8 +524,160 @@ function checklistV2(): CurationChecklist {
 
 const CHECKLIST_V2 = checklistV2();
 
-export const CURATION_CHECKLISTS: Readonly<Record<number, CurationChecklist>> = {1: CHECKLIST_V1, 2: CHECKLIST_V2};
-export const CURRENT_CURATION_CHECKLIST_VERSION = 2;
+/**
+ * Version 3 (2026-09-19, HAT-021) adds two checks parents asked about, answered by marking what was
+ * found, like Mature content. Privacy: what a child is asked for, tracking for advertising, and no
+ * privacy policy. AI and homework: chat with an AI, an AI friend, and tools that do the thinking for
+ * the child ("cognitive offloading"). A marked box is a concern and never a fail, so neither check
+ * keeps an item out of the catalog. Chat and strangers becomes Chat and posting and counts posts and
+ * uploads others can see; Sign-up leaves what it asks a child for to Privacy. Every other check, and
+ * every existing answer shape, is unchanged from version 2. The sources are in docs/specs/curation-review.md.
+ */
+/**
+ * The boxes are `useCriteria` tags, so a finished review writes them onto the item and families read
+ * them in the details table beside Ads and Cost. The names come from the tag lists, so the review
+ * and the item page never call the same tag two different things. `priv_none` and `ai_none` are not
+ * boxes a curator marks: `mergeReviewFacets` writes one when the curator marked nothing.
+ */
+const labelsFor = (list: ReadonlyArray<{key: string; name: string}>, exclude: readonly string[]) =>
+  Object.fromEntries(list.filter((tag) => !exclude.includes(tag.key)).map((tag) => [tag.key, tag.name]));
+
+const PRIVACY_NONE = 'priv_none';
+const AI_NONE = 'ai_none';
+const PRIVACY_OPTIONS = labelsFor(privacyTagList, [PRIVACY_NONE]);
+const AI_AND_HOMEWORK_OPTIONS = labelsFor(aiFeatureTagList, [AI_NONE]);
+
+const V3_NEW_CHECKS: readonly CurationCheck[] = [
+  {
+    key: 'ai_and_homework',
+    group: 'safety',
+    publicLabel: 'AI and homework',
+    question: 'Does it have any of these?',
+    instructions:
+      'Mark each one a child could reach. ' +
+      'Chat with an AI: a chatbot a child can type anything to. A help bot that only answers questions about the site does not count, ' +
+      'and an AI playing a character for a lesson counts here and nowhere else. ' +
+      'AI friend or companion: an AI that acts as a friend, companion or confidant. ' +
+      'Does the thinking for them: it hands over finished answers, writing or solutions in place of the child working them out, ' +
+      'whether or not it uses AI, such as answer sites, essay writers and solvers that show only the answer. ' +
+      'Hints, questions back, calculators, dictionaries and search do not count. ' +
+      'Mark nothing if you found none.',
+    answer: {
+      kind: 'flags',
+      options: Object.keys(AI_AND_HOMEWORK_OPTIONS),
+      labels: AI_AND_HOMEWORK_OPTIONS,
+      axis: 'aiFeatures',
+      noneTag: AI_NONE,
+    },
+    required: false,
+    appliesTo: 'link',
+    ai: 'draft',
+    publicScreenshots: true,
+  },
+  {
+    key: 'privacy',
+    group: 'safety',
+    publicLabel: 'Privacy',
+    question: 'Does it do any of these?',
+    instructions:
+      'Mark each one you found. ' +
+      'Asks a child for personal details: a name, email, phone number, photo or voice, address or location, on a form or in a chatbot. ' +
+      'Do not mark it when a parent has to approve first. ' +
+      "Tracks for advertising: ad trackers on the page, or ads chosen from what someone does. The site's own analytics alone do not count. " +
+      'No privacy policy: mark it only when the site asks for details or tracks; a site that collects nothing does not need one. ' +
+      'Mark nothing if you found none.',
+    answer: {
+      kind: 'flags',
+      options: Object.keys(PRIVACY_OPTIONS),
+      labels: PRIVACY_OPTIONS,
+      axis: 'privacy',
+      noneTag: PRIVACY_NONE,
+    },
+    required: false,
+    appliesTo: 'link',
+    ai: 'draft',
+    publicScreenshots: true,
+  },
+];
+
+const V3_CHANGES: Readonly<Record<string, Partial<CurationCheck>>> = {
+  signup: {
+    instructions:
+      'Try to reach the main content. Pass: it is usable without an account. ' +
+      'Concern: an account unlocks part of it; say what is behind the sign-up. ' +
+      'Fail: nothing useful can be reached before signing up. ' +
+      'Whether it costs money is the Cost check, and what it asks a child for is the Privacy check.',
+  },
+  user_contact: {
+    publicLabel: 'Chat and posting',
+    question: 'Can people contact each other, or post where others can see it?',
+    instructions:
+      'Pass: no chat, comments, messaging, public profiles or uploads, or only moderated comments that cannot be used to contact someone directly. ' +
+      'Concern: open comments or forums, chat limited to preset phrases, or posts, uploads or a profile that others can see; say where. ' +
+      'Fail: open chat or direct messages with strangers, or it encourages sharing personal details. ' +
+      'A chatbot is not a person: it belongs to the AI and homework check.',
+  },
+};
+
+function checklistV3(): CurationChecklist {
+  const checks = CHECKLIST_V2.checks.map((check) => ({...check, ...(V3_CHANGES[check.key] || {})}) as CurationCheck);
+  checks.splice(checks.findIndex((check) => check.key === 'user_contact') + 1, 0, ...V3_NEW_CHECKS);
+  return {version: 3, checks};
+}
+
+const CHECKLIST_V3 = checklistV3();
+
+/**
+ * Version 4 (2026-09-21) leaves out the curator's housekeeping and makes the key checks the ones a
+ * review cannot skip. Link works is measured by the server when a review opens and shown to the
+ * curator only when something is wrong; Not a duplicate is a warning the server works out from the
+ * catalog; Description and picture is fixed on the item's Details tab rather than recorded. Every
+ * check in Ads and distractions and in Safety and age is required. Aging is a concern, as Outdated
+ * is, so families hear when a source is going stale. AI and homework is AI and answer tools: an
+ * answer site does the thinking without any AI. Every other check, and every answer shape, is
+ * unchanged from version 3.
+ */
+const V4_REMOVED: readonly string[] = CURATION_CURATOR_ONLY_CHECKS;
+
+const V4_CHANGES: Readonly<Record<string, Partial<CurationCheck>>> = {
+  freshness: {
+    instructions:
+      'Look for recent dates, updates, new posts or new releases. ' +
+      'Actively updated: changed within the last year. ' +
+      'Aging: updated infrequently; the newest material is one to three years old. ' +
+      'Outdated: nothing new for more than three years, or it says it is no longer maintained. ' +
+      'Aging and Outdated are concerns, and families read them; Actively updated is not shown. ' +
+      'Timeless material, such as a classic book or a historical archive, can be outdated and still belong; say so in the note.',
+    answer: {
+      kind: 'facet',
+      axis: 'freshness',
+      options: keysOf(freshnessTagList, ['fresh_unknown']),
+      concernValues: ['fresh_aging', 'fresh_outdated'],
+    },
+  },
+  design: {required: true},
+  attention_traps: {required: true},
+  user_contact: {required: true},
+  ai_and_homework: {publicLabel: 'AI and answer tools', required: true},
+  privacy: {required: true},
+};
+
+function checklistV4(): CurationChecklist {
+  const checks = CHECKLIST_V3.checks
+    .filter((check) => !V4_REMOVED.includes(check.key))
+    .map((check) => ({...check, ...(V4_CHANGES[check.key] || {})}) as CurationCheck);
+  return {version: 4, checks};
+}
+
+const CHECKLIST_V4 = checklistV4();
+
+export const CURATION_CHECKLISTS: Readonly<Record<number, CurationChecklist>> = {
+  1: CHECKLIST_V1,
+  2: CHECKLIST_V2,
+  3: CHECKLIST_V3,
+  4: CHECKLIST_V4,
+};
+export const CURRENT_CURATION_CHECKLIST_VERSION = 4;
 
 /**
  * An open review's answers moved to the current checklist: answers to checks it no longer has are
@@ -549,16 +732,29 @@ function facetPrefixes(axis: CurationFacetAxis): string[] {
   }
 }
 
-/** The useCriteria prefixes a review owns. A curator edits these in the review, nowhere else. */
-export function reviewOwnedCriteriaPrefixes(checklist: CurationChecklist = CHECKLIST_V1): string[] {
+/**
+ * The useCriteria prefixes a review owns. A curator edits these in the review, nowhere else. Both
+ * kinds of check that write tags count: a facet (eduval_, minage_, ads_, …) and marked boxes
+ * (priv_, ai_). With no checklist given, every version's: an item may carry tags a review of any
+ * version wrote, and none of them may be changed outside a review.
+ */
+let allVersionsPrefixes: string[] | null = null;
+
+export function reviewOwnedCriteriaPrefixes(checklist?: CurationChecklist): string[] {
+  // Called for every tag of every item edit; the checklists never change at run time.
+  if (!checklist && allVersionsPrefixes) return allVersionsPrefixes;
   const prefixes = new Set<string>();
-  for (const check of checklist.checks) {
-    if (check.answer.kind === 'facet') facetPrefixes(check.answer.axis).forEach((prefix) => prefixes.add(prefix));
+  for (const list of checklist ? [checklist] : Object.values(CURATION_CHECKLISTS)) {
+    for (const check of list.checks) {
+      if (check.answer.kind === 'facet') facetPrefixes(check.answer.axis).forEach((prefix) => prefixes.add(prefix));
+      if (check.answer.kind === 'flags' && check.answer.axis) prefixes.add(flagsAxisPrefix(check.answer.axis));
+    }
   }
+  if (!checklist) allVersionsPrefixes = [...prefixes];
   return [...prefixes];
 }
 
-export function isReviewOwnedCriteriaTag(tag: string, checklist: CurationChecklist = CHECKLIST_V1): boolean {
+export function isReviewOwnedCriteriaTag(tag: string, checklist?: CurationChecklist): boolean {
   return reviewOwnedCriteriaPrefixes(checklist).some((prefix) => tag.startsWith(prefix));
 }
 
@@ -573,8 +769,28 @@ export function currentFacetValue(check: CurationCheck, useCriteria: readonly st
 }
 
 /**
- * The item's useCriteria after a finalized review: each answered facet check replaces that
- * axis; unanswered checks and every other tag are left exactly as they were.
+ * The boxes an item already carries for a marked-box check: the marked tags, or an empty list when
+ * it carries the "none found" tag. Null when the item carries nothing for that axis, so a form can
+ * tell "nobody has said" from "checked, nothing found".
+ */
+export function currentFlagValues(check: CurationCheck, useCriteria: readonly string[] | null | undefined): string[] | null {
+  const spec = check.answer;
+  if (spec.kind !== 'flags' || !spec.axis || !Array.isArray(useCriteria)) return null;
+  const prefix = flagsAxisPrefix(spec.axis);
+  const carried = useCriteria.filter((tag): tag is string => typeof tag === 'string' && tag.startsWith(prefix));
+  if (carried.length === 0) return null;
+  return carried.filter((tag) => spec.options.includes(tag));
+}
+
+/** The tag prefix a marked-box axis owns. */
+export function flagsAxisPrefix(axis: CurationFlagsAxis): string {
+  return axis === 'privacy' ? 'priv_' : 'ai_';
+}
+
+/**
+ * The item's useCriteria after a finalized review. An answered facet check replaces its axis. An
+ * answered box check replaces its axis with the boxes the curator marked, or with its "none found"
+ * tag when they marked nothing. Unanswered checks and every other tag are left exactly as they were.
  */
 export function mergeReviewFacets(
   useCriteria: readonly string[] | null | undefined,
@@ -583,13 +799,28 @@ export function mergeReviewFacets(
   answers: CurationAnswers,
 ): string[] {
   let tags = Array.isArray(useCriteria) ? useCriteria.filter((t): t is string => typeof t === 'string') : [];
-  for (const check of checksFor(checklist, context)) {
-    if (check.answer.kind !== 'facet') continue;
-    const value = answers[check.key]?.value;
-    if (typeof value !== 'string' || !check.answer.options.includes(value)) continue;
-    const prefixes = facetPrefixes(check.answer.axis);
+  const replaceAxis = (prefixes: readonly string[], written: readonly string[]) => {
     tags = tags.filter((tag) => !prefixes.some((prefix) => tag.startsWith(prefix)));
-    tags.push(value);
+    tags.push(...written);
+  };
+
+  for (const check of checksFor(checklist, context)) {
+    const spec = check.answer;
+    const value = answers[check.key]?.value;
+
+    if (spec.kind === 'facet') {
+      if (typeof value !== 'string' || !spec.options.includes(value)) continue;
+      replaceAxis(facetPrefixes(spec.axis), [value]);
+      continue;
+    }
+
+    if (spec.kind === 'flags' && spec.axis && spec.noneTag) {
+      // Not answered at all leaves whatever the item carries; "none found" is an answer, and writes a tag.
+      if (!Array.isArray(value)) continue;
+      const marked = value.filter((tag) => typeof tag === 'string' && spec.options.includes(tag));
+      if (marked.length !== value.length) continue;
+      replaceAxis([flagsAxisPrefix(spec.axis)], marked.length > 0 ? marked : [spec.noneTag]);
+    }
   }
   return tags;
 }
@@ -629,7 +860,7 @@ export function answerLabel(check: CurationCheck, answer: CurationAnswer | null 
   if (spec.kind === 'facet') return facetOptionLabel(spec.axis, answer!.value as string);
   const found = answer!.value as string[];
   if (found.length === 0) return 'None found';
-  return found.map((key) => (flagOptions as Record<string, string>)[key] || key).join(', ');
+  return found.map((key) => flagOptionLabel(spec, key)).join(', ');
 }
 
 const FACET_TAG_LISTS: Record<CurationFacetAxis, ReadonlyArray<{key: string; name: string; selectedName?: string}>> = {
@@ -644,6 +875,34 @@ const FACET_TAG_LISTS: Record<CurationFacetAxis, ReadonlyArray<{key: string; nam
 export function facetOptionLabel(axis: CurationFacetAxis, key: string): string {
   const tag = FACET_TAG_LISTS[axis].find((t) => t.key === key);
   return tag?.selectedName || tag?.name || key;
+}
+
+/** The name families read for one flag: the check's own label, else the Mature content name. */
+export function flagOptionLabel(spec: Extract<CurationAnswerSpec, {kind: 'flags'}>, key: string): string {
+  return spec.labels?.[key] || (flagOptions as Record<string, string>)[key] || key;
+}
+
+const FLAG_DESCRIPTIONS: Readonly<Record<string, string>> = Object.fromEntries(
+  [...privacyTagList, ...aiFeatureTagList].filter((tag) => !!tag.description).map((tag) => [tag.key, tag.description!]),
+);
+
+/** One line on what a marked box means, for the boxes that have one (Privacy, AI and answer tools). */
+export function flagOptionDescription(key: string): string | null {
+  return FLAG_DESCRIPTIONS[key] ?? null;
+}
+
+/**
+ * Whether families read this answer in a finished review. Never the curator's housekeeping, and a
+ * check nobody answered only for the curator's note. A key check is read whatever it found; any
+ * other check only when it found something, or carries a note.
+ */
+export function shownToFamilies(check: CurationCheck, answer: CurationAnswer | null | undefined): boolean {
+  if (CURATION_CURATOR_ONLY_CHECKS.includes(check.key)) return false;
+  const hasNote = !!answer?.comment || (answer?.screenshots?.length || 0) > 0;
+  const status = answerStatus(check, answer);
+  if (status === NOT_CHECKED) return hasNote;
+  if (CURATION_KEY_GROUPS.includes(check.group)) return true;
+  return status !== 'pass' || hasNote;
 }
 
 export type CurationValidationIssue = {key: string; message: string};
@@ -727,13 +986,10 @@ export function validateCurationAnswers(
       errors.push({key: F.outcome, message: 'Choose whether it goes in the catalog.'});
     }
 
+    // A comment is never required: the answer stands on its own, and a note is added when there is more to say.
     for (const check of applicable) {
       const answer = answers?.[check.key];
       const status = answerStatus(check, answer);
-      const hasComment = typeof answer?.comment === 'string' && answer.comment.trim().length > 0;
-      if ((status === 'concern' || status === 'fail') && !hasComment) {
-        errors.push({key: check.key, message: 'Say what you found; families read this.'});
-      }
       if (finalize.outcome === 'curate') {
         if (check.required && status === NOT_CHECKED) {
           errors.push({key: check.key, message: 'Answer this before adding it to the catalog.'});
@@ -804,7 +1060,7 @@ function allowedValuesText(check: CurationCheck): string {
     const options = spec.options.map((key) => `"${key}" (${facetOptionLabel(spec.axis, key)})`).join(', ');
     return `one of ${options}, or "${NOT_CHECKED}"`;
   }
-  const options = spec.options.map((key) => `"${key}" (${(flagOptions as Record<string, string>)[key] || key})`).join(', ');
+  const options = spec.options.map((key) => `"${key}" (${flagOptionLabel(spec, key)})`).join(', ');
   return `a list of any of ${options}; an empty list means none found; or "${NOT_CHECKED}"`;
 }
 

@@ -60,6 +60,9 @@ export type FamilyPolicyTermMode = typeof FAMILY_POLICY_TERM_MODES[number];
 
 export const FAMILY_POLICY_RULE_SOURCES = [
   'manual',
+  // A guardian deliberately chose "Everyone in the family" for a site block.
+  // Keep it distinct from old list mirrors so migration never narrows that choice.
+  'manual_family_block',
   'migration_classification_override',
   'migration_blocked_pattern',
   'server_sync',

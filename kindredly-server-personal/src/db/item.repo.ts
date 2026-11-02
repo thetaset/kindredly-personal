@@ -46,6 +46,18 @@ export class ItemRepo extends BaseRepo<Item> {
     return await this.query().whereIn('_id', vals);
   }
 
+  /**
+   * Which of these picture names (`uf_<fileId>`) some item still shows. Reads the plaintext column
+   * only: an sv:2 item keeps its picture name in the encrypted blob, out of the server's sight.
+   */
+  async listImageFilenamesInUse(names: string[]): Promise<Set<string>> {
+    if (!names.length) return new Set();
+    const rows = (await this.query().whereIn('imageFilename', names).select('imageFilename')) as Array<{
+      imageFilename: string;
+    }>;
+    return new Set(rows.map((r) => r.imageFilename));
+  }
+
   async findWhereIdInAndInAccount(vals: string[], accountId: string, keyCol = '_id'): Promise<Item[]> {
     if (!accountId) throw new Error('accountId is required');
     return await this.query().whereIn(keyCol, vals).andWhere({accountId});

@@ -25,6 +25,9 @@ import {ListLibraryRootRequest} from 'tset-sharedlib/api';
 import {clampPerPage} from '@/utils/pagination_utils';
 import UserPerm from 'tset-sharedlib/schemas/public/UserPerm';
 
+/** Most archived items one `/library/archivedByIds` call returns: a sync page's size. */
+export const ARCHIVED_FETCH_MAX = 500;
+
 class ItemListService {
   // /library/uncategorized page bound, applied AFTER the visible-parent
   // exclusion so it caps genuinely uncategorized items, not candidates.
@@ -560,6 +563,7 @@ class ItemListService {
     targetUserId: string,
     requestedItemIdsSet: Set<string>,
     includePermissions: boolean = false,
+    opts: {archived?: boolean} = {},
   ): Promise<ItemInfoView[]> {
     await ctx.verifySelfOrAdminOverUser(targetUserId);
     let requestedItemIds = Array.from(requestedItemIdsSet);
@@ -573,7 +577,10 @@ class ItemListService {
       })
       .whereIn('item._id', requestedItemIds)
       .where(function () {
-        this.where('item.archived', '<>', true).orWhereNull('item.archived');
+        // Sync pages ask for the library, which leaves archived items out; archive search asks
+        // for the archived ones alone (HAT-884). Permissions below are checked the same way.
+        if (opts.archived) this.where('item.archived', true);
+        else this.where('item.archived', '<>', true).orWhereNull('item.archived');
       })
       .select('item.*', ...feedbackFieldNaming);
 
@@ -607,18 +614,22 @@ class ItemListService {
     }
     let parentIds = itemParentsRelations.map((v) => v.collectionId);
 
-    // Get permissions for items and parents
-    let directItemAndParentPerms = await this.permissions
+    // Get permissions for items and parents. One read gives both the rows that count and the
+    // owner's own "taken out of my library" rows (HAT-984).
+    const userPermRows = await this.permissions
       .query()
       .from('user_perm')
       .where({'user_perm.userId': targetUserId} as any)
-      .andWhere(function () {
-        this.whereNull('user_perm.notInLibrary').orWhere('user_perm.notInLibrary', false);
-      })
       .whereIn('itemId', [...requestedItemIds, ...parentIds])
-      .select('itemId', 'permission as permission');
+      .select('itemId', 'permission as permission', 'notInLibrary');
+    const directItemAndParentPerms = userPermRows.filter((v: any) => v.notInLibrary !== true);
 
     let directPermLookup = Object.fromEntries(directItemAndParentPerms.map((v) => [v.itemId, v.permission]));
+
+    // An owner who took an item out of their library keeps a row saying so; full sync honours it
+    // (libraryMembershipWhere) and this must too, or the item comes back on the next change. A
+    // link posted without Add to my library and a friend's copy are owned and start out this way.
+    const ownerHiddenIds = new Set(userPermRows.filter((v: any) => v.notInLibrary === true).map((v: any) => v.itemId));
 
     // Parent collections OWNED by the target grant access to their children even
     // without a user_perm row (owned items carry no explicit permission). Legacy
@@ -643,6 +654,7 @@ class ItemListService {
     // add direct permission to items
     for (const item of items) {
       if (targetUserId == item?.userId) {
+        if (ownerHiddenIds.has(item._id)) continue;
         item.permission = 'owner';
         item.permissionUserId = targetUserId;
       } else if (item._id in directPermLookup) {
@@ -828,13 +840,16 @@ class ItemListService {
 
     const isAdmin = await ctx.isAdmin();
 
+    // A nested collection follows the same rules as getItemInfoById: "shared" is for its own family,
+    // and an admin's pass covers their own family only — never another family's collection inside
+    // one shared with them (CLN-75).
     resultItems = resultItems.filter((v) => {
       return (
         v.type != ItemTypeEnum.collection ||
         v._id in directPermLookup ||
-        v.visibility === 'shared' ||
+        (v.visibility === 'shared' && v.accountId === ctx.accountId) ||
         v.visibility === 'network' ||
-        isAdmin
+        (isAdmin && v.accountId === ctx.accountId)
       );
     });
     let missingItemsRelationIds = resultItems.filter((v) => v._id == null).map((v) => v.collectionRelationId);
@@ -889,10 +904,34 @@ class ItemListService {
     return await this.itemRepo.findWhereIdInAndInAccount(itemIds, accountId);
   }
 
+  // ROUTE-METHOD
+  /**
+   * The ids of every archived item in this person's library, for the archive search index (HAT-884).
+   * Ids only: the device asks for these at most once a minute while searching, and whole rows
+   * (~15 KB each) for an archive of thousands would be read from the database just to be dropped.
+   */
+  async listArchivedIds(ctx: RequestContext, targetUserId: string): Promise<string[]> {
+    const items = await this.listArchived(ctx, targetUserId, {idsOnly: true});
+    // Hidden ones are left out, as the rows fetched by id leave them out.
+    return items.filter((v) => v.feedback?.isHidden !== true).map((v) => v.itemId);
+  }
+
+  // ROUTE-METHOD
+  /** Archived items by id, at most ARCHIVED_FETCH_MAX at once, with the permission checks a sync page has. */
+  async listArchivedByIds(ctx: RequestContext, targetUserId: string, itemIds: string[]): Promise<ItemInfoView[]> {
+    const ids = new Set((Array.isArray(itemIds) ? itemIds : []).filter((id) => typeof id === 'string' && id));
+    if (ids.size === 0) return [];
+    if (ids.size > ARCHIVED_FETCH_MAX) {
+      throw new HttpException(400, `At most ${ARCHIVED_FETCH_MAX} items at once`);
+    }
+    return await this.listItemsWithInfoByUserForItemIds(ctx, targetUserId, ids, true, {archived: true});
+  }
+
   // RESTORED: Was deleted during item.query.service.ts refactoring (Nov 2025)
   // ROUTE-METHOD
-  async listArchived(ctx: RequestContext, targetUserId: string) {
+  async listArchived(ctx: RequestContext, targetUserId: string, opts: {idsOnly?: boolean} = {}) {
     await ctx.verifySelfOrAdmin(targetUserId);
+    const columns = opts.idsOnly ? 'item._id' : 'item.*';
 
     let explicitPermissions = await this.permissions
       .query()
@@ -912,16 +951,16 @@ class ItemListService {
           } as any);
       })
       .where('item.archived', true)
-      .select('item.*');
+      .select(columns);
 
-    // 1) first get all collections that can have children
+    // 1) first get all collections that can have children (only their ids are used)
     let collections = await this.permissions
       .query()
       .from('user_perm')
       .where({'user_perm.userId': targetUserId} as any)
       .leftJoin('item', 'item._id', '=', 'user_perm.itemId')
       .where('item.type', 'col')
-      .select('item.*');
+      .select('item._id');
 
     // 2) get all items in those collections
     let items = await this.itemRepo
@@ -940,7 +979,7 @@ class ItemListService {
         'item_relation.collectionId',
         collections.map((v) => v._id),
       )
-      .select('item.*');
+      .select(columns);
 
     let allRecords = [...explicitPermissions, ...items];
 
@@ -985,9 +1024,19 @@ class ItemListService {
     if (!isValidFeedbackField(feedbackType)) {
       throw new Error('Invalid feedback type');
     }
+
+    // Someone else's Star, Read Later, Done and Hidden are theirs alone; only a heart is shown to
+    // others, and only on items the viewer can open (HAT-473). An admin can open everything in
+    // the account. Before this, anyone in the family could list anyone's marks of any kind.
+    const othersHeartsOnly = !(await ctx.isSelfOrAdmin(targetUserId));
+    if (othersHeartsOnly && feedbackType !== 'reactionDate') {
+      throw new HttpException(403, "No permission to list this person's items");
+    }
+
     // Historical default of 1000 kept, but now also a ceiling: unclamped, one
     // request could materialize every feedback-bearing item with full rows.
-    limit = clampPerPage(limit, 1000, 1000);
+    // Someone else's list is checked item by item below, so it is capped lower.
+    limit = clampPerPage(limit, 1000, othersHeartsOnly ? 100 : 1000);
 
     let allRecords = await this.feedbackService.itemFeedbackRepo
       .query()
@@ -999,7 +1048,14 @@ class ItemListService {
       .orderBy(`item_feedback.${feedbackType}`, 'desc')
       .limit(limit);
 
-    const resultItems = allRecords;
+    let resultItems = allRecords;
+    if (othersHeartsOnly) {
+      const viewable: typeof allRecords = [];
+      for (const row of allRecords) {
+        if (row._id != null && (await this.itemService.canUserViewItem(ctx, row._id))) viewable.push(row);
+      }
+      resultItems = viewable;
+    }
 
     return resultItems
       .filter((v) => v._id != null)
@@ -1100,7 +1156,12 @@ class ItemListService {
 
   // RESTORED: Was deleted during item.query.service.ts refactoring (Nov 2025)
   // ROUTE-METHOD
-  async listSharedWithUser(ctx: RequestContext, targetUserId: string, sharedByUserId?: string) {
+  async listSharedWithUser(
+    ctx: RequestContext,
+    targetUserId: string,
+    sharedByUserId?: string,
+    options: {sinceMs?: number; limit?: number; fromFriends?: boolean} = {},
+  ) {
     await ctx.verifySelfOrAdmin(targetUserId);
 
     let query = this.permissions
@@ -1120,6 +1181,7 @@ class ItemListService {
         'user_perm.permission as permission',
         'user_perm.userId as permissionUserId',
         'user_perm.sharedByUserId as sharedByUserId',
+        'user.username as sharedByUsername',
         'user_perm.notInLibrary as notInLibrary',
         ...feedbackFieldNaming,
       )
@@ -1127,6 +1189,26 @@ class ItemListService {
 
     if (sharedByUserId) {
       query = query.where('user_perm.sharedByUserId', sharedByUserId);
+    }
+    // The Library page's Shared with you asks for the last few weeks only (HAT-877).
+    if (Number.isFinite(options.sinceMs)) {
+      query = query.where('user_perm.createdAt', '>=', new Date(options.sinceMs as number));
+    }
+    // ...from friends, and from family only while it waits to be added (HAT-984): a guardian
+    // adding to a child's library is not news, a share left under Not in library is.
+    if (options.fromFriends) {
+      query = query.where(function (this: any) {
+        this.whereExists(function (this: any) {
+          this.select(1)
+            .from('friend')
+            .where('friend.userId', targetUserId)
+            .whereRaw('friend."friendUserId" = user_perm."sharedByUserId"')
+            .where('friend.confirmed', true);
+        }).orWhere('user_perm.notInLibrary', true);
+      });
+    }
+    if (Number.isInteger(options.limit) && (options.limit as number) > 0) {
+      query = query.limit(clampPerPage(options.limit, 100));
     }
 
     let items = await query;
@@ -1138,6 +1220,83 @@ class ItemListService {
         feedback: getFeedbackData(v),
       };
     });
+  }
+
+  /**
+   * Not in library (HAT-984): everything this person can open whose own row keeps it out of their
+   * library — shares they have not added, things they took out, links they posted without adding.
+   * Nothing that exists is then out of everyone's reach. Newest first. `othersHaveIt` says whether
+   * anyone else holds a row on it, which decides what Remove may do.
+   */
+  async listNotInLibrary(
+    ctx: RequestContext,
+    targetUserId: string,
+    options: {limit?: number; countOnly?: boolean} = {},
+  ): Promise<{items: ItemInfoView[]; total: number}> {
+    await ctx.verifySelfOrAdmin(targetUserId);
+
+    const base = () =>
+      this.permissions
+        .query()
+        .from('user_perm')
+        .join('item', 'item._id', '=', 'user_perm.itemId')
+        .where({'user_perm.userId': targetUserId, 'user_perm.notInLibrary': true} as any)
+        .where(function (this: any) {
+          this.whereNull('item.deleted').orWhere('item.deleted', false);
+        });
+
+    const countRow: any = await base().count({count: 'user_perm._id'}).first();
+    const total = Number(countRow?.count || 0);
+    if (options.countOnly || total === 0) return {items: [], total};
+
+    const rows = await base()
+      .leftJoin('user', 'user._id', '=', 'user_perm.sharedByUserId')
+      .leftJoin('item_feedback', function () {
+        this.on('item_feedback.itemId', '=', 'item._id').andOn('item_feedback.userId', '=', 'user_perm.userId');
+      })
+      .select(
+        'item.*',
+        'user_perm.createdAt as sharedAt',
+        'user_perm.permission as permission',
+        'user_perm.sharedByUserId as sharedByUserId',
+        'user.username as sharedByUsername',
+        'user_perm.notInLibrary as notInLibrary',
+        this.permissions
+          .query()
+          .from('user_perm as others')
+          .count('*')
+          .whereRaw('others."itemId" = item."_id"')
+          .whereNot('others.userId', targetUserId)
+          .as('othersCount'),
+        this.permissions
+          .query()
+          .from('item_relation')
+          .count('*')
+          .whereRaw('item_relation."itemId" = item."_id"')
+          .as('collectionCount'),
+        ...feedbackFieldNaming,
+      )
+      .orderBy('sharedAt', 'desc')
+      .limit(clampPerPage(options.limit ?? 200, 500));
+
+    return {
+      total,
+      items: rows.map((v: any) => {
+        const {othersCount, collectionCount, ...details} = v;
+        if (details.userId === targetUserId) details.permission = 'owner';
+        // Anyone else able to open it: a row of their own, a collection, or family/network visibility.
+        const othersHaveIt =
+          Number(othersCount || 0) > 0 ||
+          Number(collectionCount || 0) > 0 ||
+          details.visibility === 'shared' ||
+          details.visibility === 'network';
+        return {
+          itemId: v._id,
+          details: {...details, othersHaveIt},
+          feedback: getFeedbackData(v),
+        };
+      }),
+    };
   }
 
   async listRecentAccessibleByUser(ctx: RequestContext, targetUserId: string, limit = 80): Promise<ItemInfoView[]> {

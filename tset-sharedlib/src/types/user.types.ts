@@ -1,4 +1,5 @@
 import type { TokenData } from '../api';
+import type { PageNoteReminder } from '../pageNote.utils';
 import type User from '../schemas/public/User';
 import type { DateString, DynObj } from './common.types';
 import type { ContentOpenBehaviorOverrides } from './client.types';
@@ -7,6 +8,8 @@ import type { RewardSettings, DailyRewardStates } from './reward.types';
 import { AccountOptions, SystemOptions } from '../schemas/public/Account';
 import type { CategorySet } from './categoryExplorer.types';
 import type { SearchProviderId } from '../search-provider.utils';
+import type { AllowList } from '../restrictions/alwaysAllowed';
+import type { SocialMediaSettings } from '../restrictions/socialMedia';
 
 export enum UserType {
   admin = 'admin',
@@ -39,10 +42,26 @@ export interface UserOptions {
   codeInjectionEnabled: boolean;
   contentFilteringEnabled: boolean;
   usageLimitsData?: any;
+  /** Always allowed (HAT-152): opens whatever this person's time. See `restrictions/alwaysAllowed.ts`. */
+  alwaysAllowed?: AllowList;
+  /** Block social media and its Exceptions (SMB). Absent = the older rules decide. See `restrictions/socialMedia.ts`. */
+  socialMedia?: SocialMediaSettings;
+  /** Page notes reminders (PGN-9): on these YouTube channels and sites, offer Take notes. See `pageNote.utils.ts`. */
+  pageNoteReminders?: PageNoteReminder[];
   logActivity: boolean;
   /** Keep all links inside the in-app browser instead of opening external apps. */
   containLinksInternally?: boolean;
+  /** "Open YouTube in the YouTube app" (`other-apps.ts`). Absent means off; never for a child. */
+  openYouTubeInApp?: boolean;
+  /** Kinbot, the chat assistant. Off until an admin turns it on for this person (`family-ai.ts`). */
   aiChatEnabled?: boolean;
+  /**
+   * AI tools — scanning a page, image generation, suggestions, lessons. Absent = on; an admin turns
+   * it off for one person. Independent of Kinbot, so a child can have AI tools without chat.
+   */
+  aiToolsEnabled?: boolean;
+  /** Kinbot may search the web (HAT-288). Off until an admin turns it on (`personAllowsWebSearch`). */
+  aiWebSearchEnabled?: boolean;
   /**
    * "Assistant reviews requests": whether blocked-site requests from this child get
    * checked against the family's guidelines before reaching a parent.
@@ -59,6 +78,18 @@ export interface UserOptions {
   assistantReviewEnabled?: boolean;
   /** App Builder: create and edit the code behind Kindredly apps. Admin-granted per child. */
   appEditorEnabled?: boolean;
+  /**
+   * Command bar: "/" to search, go anywhere and run commands, in the bar and in the chat window.
+   * Admin-granted per person, including for themselves; off until an admin turns it on.
+   */
+  commandBarEnabled?: boolean;
+  /**
+   * Search your history: pages this person visited come up on the Search page, in their own
+   * group. Their own history only. While it is on, a few keywords from each page are kept in
+   * their (encrypted) history so those pages can be found by more than title and address.
+   * Admin-granted per person; off until an admin turns it on.
+   */
+  historySearchEnabled?: boolean;
   /**
    * Curated email: whether this person has the Email app at all. Admin-granted per person, so a
    * child cannot switch their own inbox on — the reason every permission below lives here rather
@@ -81,9 +112,17 @@ export interface UserOptions {
   companionDevicesEnabled?: boolean;
   /** Remote actions into a managed child browser session. Admin-granted per person. */
   remoteChildActionsEnabled?: boolean;
+  /** Shopping carts: products saved from stores, in a collection with a cart view. Admin-granted per person. */
+  shoppingCartEnabled?: boolean;
   /** Library-mode kids: allow browsing the published catalog and requesting adds. */
   explorePublishedEnabled?: boolean;
   accessControlSettings?: any;
+  /**
+   * Sent, never stored: the fields of `accessControlSettings` a save changes, `null` removing one.
+   * A server that knows it applies it to its own copy instead of the whole object sent beside it.
+   * See `restrictions/accessControlSettingsPatch.ts` (HAT-327, REG-7).
+   */
+  accessControlSettingsPatch?: Record<string, unknown>;
   ruleOverrideSettings?: RuleOverrideSettings;
   /** Reward rules and categories configured for this user. */
   rewardSettings?: RewardSettings;
@@ -96,6 +135,12 @@ export interface UserOptions {
    * which is exactly why grants live here and not in userPrefs.
    */
   appCapabilityGrants?: Record<string, Partial<Record<string, AppCapabilityGrant>>>;
+  /**
+   * Blocked apps a guardian allowed from a request, each until `until` (HAT-178,
+   * `restrictions/appGrants.ts`). Written by a guardian via /user/options/update and sent to the
+   * child's devices with their settings.
+   */
+  appGrants?: { appId: string; until: number; grantedAt?: number; grantedBy?: string }[];
   /**
    * Email addresses this (restricted) user is allowed to correspond with, written by a
    * guardian via /user/options/update. Same reasoning as appCapabilityGrants above: the
@@ -157,24 +202,6 @@ export interface UserPreferences {
 }
 
 /**
- * A user-curated Essentials category: a labelled group of collections surfaced in
- * the launcher. Stored in `essentials.categoryList`.
- *
- * Essentials is retired — the launcher block is off by default and its entry points
- * are gone, but saved categories are kept so turning it back on restores everything.
- */
-export interface EssentialsCategory {
-  id: string;
-  title: string;
-  /** Bootstrap icon name (e.g. 'heart-pulse'). */
-  icon: string;
-  /** Ordered ids of the collections that fill this category. */
-  collectionIds: string[];
-  /** Set when seeded from a suggested preset, so it's hidden from suggestions. */
-  suggestedKey?: string;
-}
-
-/**
  * Opt-in to contributing image-filtering decisions.
  *
  * Shared because the server re-checks it before accepting an upload — the two
@@ -197,6 +224,10 @@ export interface UserPrefsData {
   redditHideSearch?: boolean | null;
   redditHideComments?: boolean | null;
   redditHideOtherDistractions?: boolean | null;
+  tiktokPlayOnce?: boolean | null;
+  instagramPlayOnce?: boolean | null;
+  youtubeShortsPlayOnce?: boolean | null;
+  googleAILimit?: 'noChat' | 'hideAll' | null;
   customCategorySets?: CategorySet[];
   /**
    * "Big and Simple" appearance scale — larger type, taller controls, higher
@@ -210,12 +241,6 @@ export interface UserPrefsData {
    * not silently flip on a birthday.
    */
   'appearance.bigSimple.enabled'?: boolean | null;
-  /**
-   * Big and Simple on phones, kept apart from the key above because the scale
-   * does not fit a phone's width well. Never derived from age and never seeded:
-   * unset means off, and only turning it on from a phone sets it.
-   */
-  'appearance.bigSimple.mobile.enabled'?: boolean | null;
   'features.searchSidekick.enabled'?: boolean | null;
   'features.monitorWidget.enabled'?: boolean | null;
   'features.categoryExplorer.enabled'?: boolean | null;
@@ -225,6 +250,10 @@ export interface UserPrefsData {
   'features.entityNotesAI.enabled'?: boolean | null;
   'features.unifiedFeedHome.enabled'?: boolean | null;
   'features.learnedClassifier.mode'?: 'off' | 'shadow' | 'on' | null;
+  /** The text model that reads pages: an id from the client's model list (HAT-784). Developer Mode. */
+  'features.textModel'?: string | null;
+  /** The picture filter's engine: 'tfjs' or 'onnx' (HAT-784). Developer Mode. */
+  'features.pictureEngine'?: 'tfjs' | 'onnx' | null;
   /**
    * Contribute image-filtering decisions so the filter can be improved.
    *
@@ -247,10 +276,6 @@ export interface UserPrefsData {
   'kinds.hiddenSlots'?: string[] | null;
   /** Home top-bar "Apps" shortcut (mobile entry to the all-apps grid) — default on */
   'home.shortcuts.apps.visible'?: boolean | null;
-  /** Show the Essentials block inside the app launcher overlay — retired, default OFF */
-  'essentials.launcher.visible'?: boolean | null;
-  /** Two-level Essentials: categories that each group one or more collections */
-  'essentials.categoryList'?: EssentialsCategory[] | null;
   /**
    * How the library browse grids (Categories / Item Types / Usage Types) draw a tile:
    * `compact` rows (default) or the original `card` poster tiles. One shared value, so

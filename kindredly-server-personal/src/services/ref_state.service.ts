@@ -91,6 +91,34 @@ export class RefStateService {
       return;
     }
     if (refType === 'app_global') return;
+
+    /**
+     * A person's own state about a published item they read, such as their answer to a learning
+     * track's check (TRK-7). User-scoped only: `resolveOwner` pins the row to the caller, or to a
+     * child the calling guardian manages, so a guardian can see a child's answer and nobody else
+     * can. Keyed by an id the reader already has; nothing about the item is stored here.
+     */
+    if (refType === 'published') {
+      if (ownerType === 'account') {
+        throw new Error('Published-item state is user-scoped; account scope is not allowed');
+      }
+      return;
+    }
+
+    /**
+     * Data of an app added from published content, keyed by the app's stable identity (its
+     * appRef `sourceId`) so it survives removing and adding the app again. See the client's
+     * `appStorageRef.ts`.
+     *
+     * No per-app check is possible: which apps a member has added lives in the encrypted appRef,
+     * so the server cannot tell. User scope needs none — `resolveOwner` pins the row to the
+     * caller, or to a child the calling guardian manages. Account scope is ungated on purpose:
+     * it is an app's family-shared data (a poll, a chore chart) that children write to as well,
+     * every member can already decrypt it with the family key, and it is the access a member
+     * already has to an App Creator app they can open, whose data is keyed by `item`. Nothing a
+     * child must not change belongs under this refType — see `agent-changeset` below.
+     */
+    if (refType === 'app') return;
     if (refType === 'post' || refType === 'feed_item') return;
     // Companion device-guard state (provisioning record, app inventory, status):
     // ownership + parent-over-child access is enforced by resolveOwner (owner is
@@ -133,6 +161,33 @@ export class RefStateService {
     if (refType === 'job') {
       if (ownerType === 'account') {
         throw new Error('Background jobs are user-scoped; account scope is not allowed');
+      }
+      return;
+    }
+
+    /**
+     * A person's words hidden from AI (HAT-254): names and phrases the client swaps for placeholders
+     * before anything reaches a model, so they are the most sensitive thing on this list. User-scoped
+     * only — account scope is ungated (see `agent-changeset` above), and nobody else in the family has
+     * any business reading someone's list. `resolveOwner` pins the row to the caller, or to a child the
+     * calling guardian manages. The data is end-to-end encrypted like every user ref_state row.
+     */
+    if (refType === 'ai-hidden-words') {
+      if (ownerType === 'account') {
+        throw new Error('Words hidden from AI are user-scoped; account scope is not allowed');
+      }
+      return;
+    }
+
+    /**
+     * A person's dismissed subscription items (HAT-371): which feed entries they hid, often named by
+     * URL, so they decide the next work-through item and Today's counts on every device. User-scoped
+     * only, for the same reason as `ai-hidden-words`; `resolveOwner` pins the row to the caller, or
+     * to a child the calling guardian manages. End-to-end encrypted like every user ref_state row.
+     */
+    if (refType === 'subscriptions') {
+      if (ownerType === 'account') {
+        throw new Error('Dismissed subscription items are user-scoped; account scope is not allowed');
       }
       return;
     }

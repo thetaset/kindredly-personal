@@ -48,7 +48,12 @@ export type DeviceBlockReason =
    * Family Downtime is on. Checked before everything but the safety floor, and lifted by nothing a
    * child can ask for, so its words never mention asking.
    */
-  | 'family-downtime';
+  | 'family-downtime'
+  /**
+   * An Earn access rule holds this app until its steps are done (HAT-836). Not a time and not a
+   * parent's off switch: the child can open it, and Kindredly says what is left.
+   */
+  | 'earn-access';
 
 const DEVICE_BLOCK_REASONS: readonly string[] = [
   'budget-exhausted',
@@ -57,6 +62,7 @@ const DEVICE_BLOCK_REASONS: readonly string[] = [
   'app-blocked',
   'browser-unprotected',
   'family-downtime',
+  'earn-access',
 ];
 
 /**
@@ -133,6 +139,21 @@ export function localClock(ms: number, tzOffsetMinutes: number): string {
 function sameLocalDay(a: number, b: number, tzOffsetMinutes: number): boolean {
   const day = (ms: number) => Math.floor((ms + tzOffsetMinutes * 60_000) / 86_400_000);
   return day(a) === day(b);
+}
+
+/**
+ * What a time block is about, named the way the headline says it (HAT-979): "Screen time" for the
+ * overall allowance, the rule's name for a category, the app's own name when no rule covers it.
+ */
+function timeSubject(input: DeviceBlockCopyInput, appLabel: string): string {
+  if (input.coversEverything) return 'Screen time';
+  return input.ruleName || appLabel;
+}
+
+/** "Steam counts as Games." — why this app is under that limit. Nothing when the limit is the app's own. */
+function countsAsLine(input: DeviceBlockCopyInput, appLabel: string): string {
+  if (input.coversEverything || !input.ruleName || input.ruleName === appLabel) return '';
+  return `${appLabel} counts as ${input.ruleName}.`;
 }
 
 function unlockLine(input: DeviceBlockCopyInput): string {
@@ -218,14 +239,31 @@ export function deviceBlockCopy(input: DeviceBlockCopyInput): DeviceBlockCopy {
         detail: `Use a browser with Kindredly in it, or ask a parent to add Kindredly to ${appLabel}.`,
       };
     }
+    case 'earn-access':
+      // No time to give: it opens when the steps are done, and only Kindredly can show those.
+      return { headline: 'Finish what comes first', detail: "Open Kindredly to see what's left." };
+    // A time block's headline is one sentence that names the limit and when it opens (HAT-979);
+    // the detail says why this app is under it.
     case 'always-blocked':
-      return { headline: `${appLabel} is off today`, detail: 'A parent set no time for this today.' };
-    case 'outside-schedule':
-      return { headline: `${appLabel} isn't available right now`, detail: opens || `This is outside the hours set for ${subject}.` };
+      return {
+        headline: input.ruleName && !input.coversEverything ? `No ${input.ruleName} today` : `${appLabel} is off today`,
+        detail: [countsAsLine(input, appLabel), 'A parent set no time for this today.'].filter(Boolean).join(' '),
+      };
+    case 'outside-schedule': {
+      const name = timeSubject(input, appLabel);
+      const counts = countsAsLine(input, appLabel);
+      if (input.unlockAtMs == null) {
+        return { headline: `${appLabel} isn't available right now`, detail: counts || `This is outside the hours set for ${subject}.` };
+      }
+      const headline = sameLocalDay(input.nowMs, input.unlockAtMs, input.tzOffsetMinutes)
+        ? `${name} opens at ${localClock(input.unlockAtMs, input.tzOffsetMinutes)}`
+        : `${name} opens tomorrow`;
+      return { headline, detail: counts || (input.coversEverything ? 'It is outside your screen time hours.' : '') };
+    }
     case 'budget-exhausted':
       return {
-        headline: input.coversEverything ? 'Your screen time is used up' : `Your time for ${subject} is used up`,
-        detail: opens || 'It comes back tomorrow.',
+        headline: input.coversEverything ? 'No screen time left today' : `No ${timeSubject(input, appLabel)} time left today`,
+        detail: [countsAsLine(input, appLabel), opens || 'It comes back tomorrow.'].filter(Boolean).join(' '),
       };
     default:
       return { headline: `${appLabel} isn't available right now`, detail: opens };
@@ -253,10 +291,14 @@ export function deviceBlockSubtitle(input: DeviceBlockCopyInput): string {
         ? `Use ${open} instead.`
         : `Use a browser with Kindredly in it, or ask a parent to add it to ${input.appLabel || 'this browser'}.`;
     }
+    case 'earn-access':
+      // The web block page's own words for an Earn access block with no rule name to show.
+      return 'Finish what comes first.';
     case 'always-blocked':
       return 'A parent set no time for this today.';
     case 'outside-schedule':
-      return unlockLine(input) || 'This is outside the hours set for it.';
+      // The headline says when it opens (HAT-979); without a time, this line says why.
+      return input.unlockAtMs == null ? 'This is outside the hours set for it.' : '';
     case 'budget-exhausted':
       return unlockLine(input) || "Ask a parent if you'd like more time.";
     default:

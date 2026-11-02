@@ -47,6 +47,11 @@ function getLookupPathnames(path: string) {
   // short meant a pattern of `docs/*` never matched `docs/x` (it did match `docs/xy`),
   // because `docs/*` was the one prefix the visited path never produced.
   for (let i = 0; i <= parts.length - 1; i++) {
+    // A prefix never ends in the middle of a word or a number (SMB-1): an item saved as
+    // `…/video/123` became the pattern `…/video/123*`, and that also opened `…/video/1234`.
+    // A cut between two letters or digits is skipped; a cut at `/`, `?`, `-` and the like
+    // stays, so a hand-written `blog*` still matches `blog-post`.
+    if (i > 0 && /[A-Za-z0-9]/.test(parts[i - 1]) && /[A-Za-z0-9]/.test(parts[i])) continue;
     lookupnames.push(path.substring(0, i) + '*');
 
     if (/[\%\&\?\#\=]/.test(parts[i])) {

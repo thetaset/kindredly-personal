@@ -1,0 +1,97 @@
+{
+  "id": "36-earn-access-held-again-without-recompile",
+  "behaviour": "A daily rule opened on Wednesday holds again on Thursday morning on a device still using Wednesday's ruleset, with no settings of its own to recompile from (EA-15).",
+  "clock": {
+    "nowMs": 1789585200000,
+    "decideAtMs": 1789660800000,
+    "familyTimeZone": "America/Los_Angeles",
+    "deviceTimeZone": "America/Los_Angeles"
+  },
+  "settings": {
+    "usageLimitsData": {
+      "contentUsageLimits": [],
+      "temporaryRules": []
+    },
+    "ruleOverrideSettings": {
+      "ruleOverrides": []
+    },
+    "accessControlSettings": {
+      "earnAccessSettings": {
+        "version": 1,
+        "rules": [
+          {
+            "id": "chores-first",
+            "name": "Chores before games",
+            "enabled": true,
+            "holds": [
+              "games"
+            ],
+            "steps": [
+              {
+                "id": "s1",
+                "type": "task",
+                "taskId": "task-dishes"
+              }
+            ],
+            "approval": false,
+            "reset": "day"
+          }
+        ]
+      },
+      "earnAccessOpenings": {
+        "chores-first": {
+          "openedAtMs": 1789570800000,
+          "bySelf": true
+        }
+      }
+    },
+    "appPolicy": null,
+    "appPolicyStatus": "absent"
+  },
+  "installedApps": [
+    {
+      "pkg": "com.roblox.client",
+      "label": "Roblox",
+      "platform": "android"
+    },
+    {
+      "pkg": "com.mojang.minecraftpe",
+      "label": "Minecraft",
+      "platform": "android"
+    },
+    {
+      "pkg": "com.duolingo",
+      "label": "Duolingo",
+      "platform": "android"
+    }
+  ],
+  "floor": [],
+  "usage": {
+    "appMsByPkg": {},
+    "webLogs": []
+  },
+  "usageSeed": {
+    "perRuleUsedMs": {}
+  },
+  "expectDevice": [
+    {
+      "pkg": "com.roblox.client",
+      "action": "block",
+      "reason": "earn-access",
+      "ruleId": "chores-first"
+    },
+    {
+      "pkg": "com.mojang.minecraftpe",
+      "action": "block",
+      "reason": "earn-access",
+      "ruleId": "chores-first"
+    },
+    {
+      "pkg": "com.duolingo",
+      "action": "allow",
+      "reason": null,
+      "ruleId": null
+    }
+  ],
+  "browserNotApplicable": "Device-only here: the browser recomputes holding on every check, so it has no ruleset to go stale. Its Earn access is tested in ActivityService.earnAccess.test.ts and earnAccess.test.ts in sharedlib."
+}

@@ -110,4 +110,11 @@ export default interface Published {
 
   /** When the last finished curation review said to check it again. */
   nextReviewAt?: Date | null;
+
+  /**
+   * Set while a curator has archived this row: out of the catalog, search and every
+   * recommendation, though its page still opens and subscriptions stand. Only an archived row can
+   * be deleted (CWS-2).
+   */
+  archivedAt?: Date | null;
 }

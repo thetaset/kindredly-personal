@@ -1,0 +1,1 @@
+const e={shell:{settings:"Settings",search:"Search settings",clearSearch:"Clear settings search",clear:"Clear",userProfile:"User Profile",adminUser:"You cannot manage an admin user.",userSettings:"User Settings",searchPlace:"{name}'s settings"},usage:{profile:"Profile",setUpWithAi:"Set up with AI",setUpName:"Set up {name}"}};export{e as u};

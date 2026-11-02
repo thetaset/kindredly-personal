@@ -1,7 +1,7 @@
 import type { ReasonCode } from './activity.types'
 
 export const REASON_LABELS: Partial<Record<ReasonCode, string>> = {
-  'custom-blocked-url': 'Blocked URL',
+  'custom-blocked-url': 'Blocked site',
   'short-form-video': 'Short-form video',
   'social-media': 'Social media',
   'strong-language': 'Strong language',
@@ -10,12 +10,13 @@ export const REASON_LABELS: Partial<Record<ReasonCode, string>> = {
   extremism: 'Extremism',
   'adult-content': 'Adult content',
   inappropriate: 'Inappropriate',
-  'no-time-given': 'No time set today',
+  'no-time-given': 'Not allowed today',
   'time-exceeded': 'No time left',
   'out-of-time-range': 'Outside allowed hours',
   'no-matching-rule': 'No time allowed',
   'reqs-not-met': 'Requirements not met',
   'checkpoint-pending': 'Daily Check-in',
+  'earn-access-pending': 'Earn access',
   'not-in-library': 'Not in library',
   'library-syncing': 'Library syncing',
   'restrict-all': 'Restricted',
@@ -72,23 +73,26 @@ export const REASON_UI_COPY: Partial<Record<ReasonCode, ReasonUICopy>> = {
     detailBody:
       'Short-form video URLs are currently blocked by your content filter settings.',
   },
+  // Block social media (SMB-12): a parent's setting, named as one, with the way to ask.
   'social-media': {
-    title: 'Social media blocked.',
-    detailTitle: 'Social media blocked',
+    title: 'Social media is blocked.',
+    detailTitle: 'Social media is blocked',
     detailBody:
-      'Social media URLs are currently blocked by your content filter settings.',
+      'A parent set this. Ask a parent if you would like to see this page.',
   },
+  // Blocked's words (BTL-7): what stopped the page, not the rule type behind it.
   'custom-blocked-url': {
-    title: 'Blocked by custom URL rule.',
-    detailTitle: 'Blocked by custom URL rule',
+    title: 'This site is blocked.',
+    detailTitle: 'This site is blocked',
     detailBody:
-      'This URL matches a custom blocked pattern configured in filter settings.',
+      'A parent turned this site off. It stays off even when you have time left.',
   },
+  // Zero time reads "Not allowed" (A2), the same words Time limits uses.
   'no-time-given': {
-    title: 'No time set for today.',
-    detailTitle: 'No time set today',
+    title: 'Not allowed today.',
+    detailTitle: 'Not allowed today',
     detailBody:
-      'No usage time is configured today for this usage type. Ask a parent to add time in Schedule, or request time below.',
+      'This kind of content is set to Not allowed today. Ask a parent if you would like time for it, or request time below.',
   },
   'time-exceeded': {
     title: 'No time left.',
@@ -107,6 +111,11 @@ export const REASON_UI_COPY: Partial<Record<ReasonCode, ReasonUICopy>> = {
     detailBody:
       'A parent has to unblock you before you can get online today. Ask them below, or ask them in person.',
   },
+  'earn-access-pending': {
+    title: 'Finish what comes first.',
+    detailTitle: 'Earn access',
+    detailBody: 'This opens once the steps for it are done.',
+  },
   'out-of-time-range': {
     title: 'Outside allowed hours.',
     detailTitle: 'Outside allowed hours',
@@ -124,10 +133,20 @@ export const REASON_UI_COPY: Partial<Record<ReasonCode, ReasonUICopy>> = {
     detailBody:
       "This device hasn't finished downloading your library yet, so we can't tell whether this page is approved. Try again in a moment.",
   },
+  // Only "Block all web access" produces this; "a rule" sent a child looking for one about this
+  // site. It can be set with an end time, and by an admin for their own account, so it names the
+  // setting and both ways it ends rather than a parent who turns it off.
   'restrict-all': {
-    title: 'Access to this content is restricted.',
-    detailTitle: 'Restricted by your settings',
-    detailBody: 'A rule is currently restricting access to this content.',
+    title: 'All web access is blocked.',
+    detailTitle: 'All web access is blocked',
+    detailBody:
+      'Block all web access is on for this account, so no site opens until it is turned off or its time runs out.',
+  },
+  // Had no copy, so the block page fell back to "This page is blocked" with nothing under it.
+  'no-matching-rule': {
+    title: 'No time allowed.',
+    detailTitle: 'No time allowed',
+    detailBody: "Your time limits don't give any time to this kind of site.",
   },
   'family-downtime': {
     title: 'Family Downtime.',

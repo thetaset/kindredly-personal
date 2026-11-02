@@ -1,0 +1,1 @@
+const e={theme:"A new one every day",course:"All at once"},n={theme:"One piece a day, each standing on its own.",course:"Every piece there from the start, each building on the one before."};export{e as T,n as a};

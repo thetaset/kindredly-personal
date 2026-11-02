@@ -5,6 +5,8 @@ import {RequestContext} from '../base/request_context';
 import axios from 'axios';
 import {assertSafeExternalUrl, safeFetchConfig} from '@/utils/safe_fetch';
 import {buildDefaultBrowserHeaders} from '@/utils/fetch_helpers';
+import {fetchYouTubeFeedFallback} from '@/utils/youtube_feed_fallback';
+import {config} from '@/config';
 import {classifyUpstreamBlock, readStreamPrefix, type UpstreamBlockVerdict} from '@/utils/upstream_block';
 import {recordSecurityEvent, SECURITY_EVENT_TYPES} from '@/services/security_event.service';
 import type {Response} from 'express';
@@ -896,6 +898,18 @@ class ExternalDataService {
         blocked: verdict.blocked,
         signal: verdict.signal,
       });
+
+      // YouTube's own feed fails for every channel for hours at a time; the
+      // channel's Videos page, or else the YouTube Data API, carries on through
+      // it. Ahead of the stale body, which would be up to a day old.
+      const youTubeFeed = await fetchYouTubeFeedFallback(url, cached?.body, {apiKey: config.googleServiceApiKey});
+      if (youTubeFeed) {
+        const youTubeContentType = 'application/atom+xml; charset=utf-8';
+        // No validators, so the next refresh asks YouTube's feed again in full.
+        await setFeedCacheEntry(url, {body: youTubeFeed.body, contentType: youTubeContentType, fetchedAt: Date.now()});
+        this.sendFeedBody(res, youTubeFeed.body, youTubeContentType, youTubeFeed.source);
+        return;
+      }
 
       if (verdict.blocked) {
         // Deliberately not served from stale cache. A block is a persistent

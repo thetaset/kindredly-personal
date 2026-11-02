@@ -6,6 +6,7 @@ import NotificationService from './notification.service';
 import {RequestContext} from '../base/request_context';
 import {container} from '@/inversify.config';
 import type {SharedItemReactionView} from 'tset-sharedlib/shared.types';
+import {HEART_REACTION} from 'tset-sharedlib/feedback.utils';
 
 enum FeedbackRefType {
   POST = 'post',
@@ -286,7 +287,8 @@ class FeedbackService {
       username: row.username,
       displayedName: row.displayedName || undefined,
       profileImage: row.profileImage || undefined,
-      reaction: row.reaction,
+      // Any stored reaction is a heart (HAT-473); a restored backup can still hold like or haha.
+      reaction: HEART_REACTION,
       reactionDate: row.reactionDate ? new Date(row.reactionDate).toISOString() : undefined,
     }));
   }

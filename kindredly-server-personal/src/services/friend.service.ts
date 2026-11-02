@@ -12,12 +12,26 @@ import {RequestContext} from '../base/request_context';
 import {EventRecordName, EventRecordType, NotificationType} from '@/typing/enum_strings';
 import {BasicFriendInfo, filterBasicFriendInfo} from '@/utils/user.utils';
 import {container} from '@/inversify.config';
+import {HttpException} from '@/exceptions/HttpException';
+import {UserType} from 'tset-sharedlib/shared.types';
 
 class FriendService {
   private users = new UserRepo();
   private evenLogService = new EventAuditService();
   private notificationsService = container.resolve(NotificationService);
   private friends = new FriendRepo();
+
+  /**
+   * A child never sends or accepts a friend request themselves: the app hides those buttons from
+   * them, and an admin does it for them. Without this, a child's account could still reach anyone
+   * by calling the route directly (EUP-16). Declining and removing stay open; they only cut contact.
+   */
+  private async refuseChildCaller(ctx: RequestContext) {
+    const caller = await ctx.getCurrentUser();
+    if (caller?.type == UserType.restricted) {
+      throw new HttpException(403, 'An admin manages friends for children');
+    }
+  }
 
   async checkFriendRequestsForNewAccount(ctx: RequestContext, userId, accountId, email) {
     if (!email) return;
@@ -138,6 +152,7 @@ class FriendService {
   async confirmFriend(ctx: RequestContext, targetUserId: string, friendUserId: string) {
     const user = await this.users.findById(targetUserId);
     await ctx.verifySelfOrAdmin(targetUserId);
+    await this.refuseChildCaller(ctx);
 
     const id1 = this.createFriendId(targetUserId, friendUserId);
     const friendEntry1 = await this.friends.findById(id1);
@@ -207,6 +222,7 @@ class FriendService {
   async sendFriendRequest(ctx: RequestContext, targetUserId, requestData) {
     const targetUser = await ctx.getUserById(targetUserId);
     await ctx.verifySelfOrAdmin(targetUserId);
+    await this.refuseChildCaller(ctx);
 
     if (!requestData || !requestData.email) {
       throw new Error('invalid friend request');

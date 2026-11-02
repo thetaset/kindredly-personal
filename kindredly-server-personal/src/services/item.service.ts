@@ -4,6 +4,7 @@ import EventAuditService from './record_event.service';
 
 import {AccountRepo} from '@/db/account.repo';
 import {ItemRepo} from '@/db/item.repo';
+import {PostRepo} from '@/db/post.repo';
 import {UserRepo} from '@/db/user.repo';
 import Item from 'tset-sharedlib/schemas/public/Item';
 import AccessRequestService from './access_request.service';
@@ -15,6 +16,7 @@ import {AuditLogService} from './audit_log.service';
 import {RequestContext} from '../base/request_context';
 import {UserPermRepo} from '@/db/user_perm.repo';
 import {ItemRelationRepo} from '@/db/item_relation.repo';
+import {SubscriptionRepo, SUBSCRIPTION_LIBRARY_COLLECTION_REF_TYPES} from '@/db/subscription.repo';
 import ChangeLogService from './change_log.service';
 import UserFileService from './user_file.service';
 import {EventRecordName, EventRecordType, NotificationType} from '@/typing/enum_strings';
@@ -38,10 +40,22 @@ import {SysInfoRepo} from '@/db/sysinfo.repo';
 import {container} from '@/inversify.config';
 import {CANONICAL_CATEGORIES} from 'tset-sharedlib/publishedCategoryMapping';
 import {SaveItemRequest, SaveItemResponse, CreateCollectionOptions} from 'tset-sharedlib/api';
+import {postAttachmentCopyKey, postCopyItemId} from 'tset-sharedlib/post-copy';
 import {getFeedbackData} from '@/utils/feedback_helpers';
+import {escapeHtml} from '@/utils/text_utils';
 import {computeFeedbackUpdate} from 'tset-sharedlib/feedback.utils';
 import {isEligibleForRestrictedLibraryHide, normalizeSubTypeForType} from 'tset-sharedlib/content.types';
 import {getDetailsByAccountType} from '@/defaults/products_and_plans';
+
+/**
+ * How long after filing an item a "let them know" still counts as being about that add.
+ * Generous on purpose -- the popup's checkbox is answered in seconds, and this only has to be
+ * short enough that it cannot be used to re-announce something from last week.
+ */
+const NOTIFY_AFTER_ADD_WINDOW_MS = 10 * 60 * 1000;
+
+/** Most items one `/item/archiveMany` call takes. Each costs a few permission reads; the client sends 200. */
+export const ARCHIVE_ITEMS_MAX = 500;
 
 const validAttributes = new Set([
   'name',
@@ -122,6 +136,8 @@ class ItemService {
   private feedbackService = new FeedbackService();
 
   private itemRepo = new ItemRepo();
+  private postRepo = new PostRepo();
+  private subscriptionRepo = new SubscriptionRepo();
   private notificationsService = container.resolve(NotificationService);
 
   private permissionService = new PermissionService();
@@ -259,12 +275,41 @@ class ItemService {
       refId?: string | null;
     }> = [];
 
-    for (const uf of scanList as any[]) {
-      const fileId = uf?._id;
-      if (!fileId) continue;
-      // If any item still references this fileId, treat as in-use.
-      const itemsWithFile = await this.itemRepo.findItemsWithFileId(fileId);
-      if (!itemsWithFile || itemsWithFile.length === 0) {
+    // A file is unused only when nothing can still need it. "No item's attachments name it" is not
+    // that: an item's picture is named by `imageFilename` and a post's pictures by the post, so
+    // the sweep offered every item picture and post image for deletion (CLN-76).
+    const files = (scanList as any[]).filter((uf) => !!uf?._id);
+    const ownerIds = (refType: string) =>
+      Array.from(new Set(files.filter((uf) => uf.refType === refType && uf.refId).map((uf) => uf.refId as string)));
+    const itemOwnerIds = ownerIds('item');
+    const postOwnerIds = ownerIds('post');
+    const ownerItemById = new Map(
+      (itemOwnerIds.length ? await this.itemRepo.findWhereIdIn(itemOwnerIds) : []).map((i) => [i._id, i]),
+    );
+    const livePostIds = new Set(
+      (postOwnerIds.length ? await this.postRepo.findWhereIdIn(postOwnerIds) : []).map((p) => p._id),
+    );
+    const picturesInUse = await this.itemRepo.listImageFilenamesInUse(
+      files.filter((uf) => uf.refType === 'item').map((uf) => 'uf_' + uf._id),
+    );
+
+    const isUnused = async (uf: any): Promise<boolean> => {
+      // A post's pictures live as long as the post.
+      if (uf.refType === 'post') return !!uf.refId && !livePostIds.has(uf.refId);
+      // Any other kind is one this sweep cannot check, so it is never offered.
+      if (uf.refType !== 'item' || !uf.refId) return false;
+      if (picturesInUse.has('uf_' + uf._id)) return false;
+      const itemsWithFile = await this.itemRepo.findItemsWithFileId(uf._id);
+      if (itemsWithFile && itemsWithFile.length > 0) return false;
+      const owner = ownerItemById.get(uf.refId) as any;
+      if (!owner) return true;
+      // An sv:2 item keeps its picture name in the encrypted blob; the server cannot tell.
+      return Number(owner.encInfo?.sv ?? 1) < 2;
+    };
+
+    for (const uf of files) {
+      const fileId = uf._id;
+      if (await isUnused(uf)) {
         candidates.push({
           fileId,
           filename: uf?.filename ?? null,
@@ -341,6 +386,21 @@ class ItemService {
 
   async _getCollectionCount(accountId: string) {
     return await this.itemRepo.countRows({accountId, type: ItemTypeEnum.collection});
+  }
+
+  /** Collections someone made, leaving out the one-per-person system collections every account
+   * gets (`SYSTEM_COLLECTION_SUBTYPES` in tset-sharedlib's itemFile.ts holds the same three). */
+  async _getMadeCollectionCount(accountId: string) {
+    return await this.itemRepo.countFromQuery(
+      this.itemRepo
+        .query()
+        .where({accountId, type: ItemTypeEnum.collection})
+        .where((q) =>
+          q
+            .whereNull('subType')
+            .orWhereNotIn('subType', ['defaultQuickbar', 'defaultSharedCollection', 'defaultShowcaseCollection']),
+        ),
+    );
   }
 
   async _getLibraryItemCount(accountId: string) {
@@ -572,7 +632,7 @@ class ItemService {
       for (const cid of collectionIds) {
         await this.permissionService._removeUserPermission(targetUserId, cid);
       }
-      return {};
+      return {added: [...collectionIds] as string[], unchanged: [] as string[], refused: [] as string[]};
     }
 
     const targetUser = await ctx.getUserById(targetUserId);
@@ -593,9 +653,62 @@ class ItemService {
   }
 
   // ROUTE-METHOD
+  /**
+   * Remove on Not in library (HAT-984), for the signed-in person only. Something shared with them
+   * ends their access; something they own is deleted, but only while no one else can open it — no
+   * one else's row, no collection, not visible to the family or network — so a link a guardian
+   * posted to the family is never deleted out from under the others.
+   */
+  async removeFromNotInLibrary(ctx: RequestContext, itemIds: string[] = []) {
+    const userId = ctx.currentUserId;
+    const removed: string[] = [];
+    const refused: string[] = [];
+
+    for (const itemId of Array.from(new Set((itemIds || []).filter(Boolean)))) {
+      const permId = this.permissionService.createPermissionKey(userId, itemId);
+      const row = await this.permissionsRepo.findById(permId);
+      if (!row || row.notInLibrary !== true) {
+        refused.push(itemId);
+        continue;
+      }
+
+      const item = await this.itemRepo.findById(itemId);
+      if (item && item.userId === userId) {
+        const others: any = await this.permissionsRepo
+          .query()
+          .where({itemId} as any)
+          .whereNot('userId', userId)
+          .count({count: '_id'})
+          .first();
+        const inCollections: any = await this.itemRelations
+          .query()
+          .where({itemId} as any)
+          .count({count: '_id'})
+          .first();
+        const visibleToOthers = item.visibility === 'shared' || item.visibility === 'network';
+        if (Number(others?.count || 0) > 0 || Number(inCollections?.count || 0) > 0 || visibleToOthers) {
+          refused.push(itemId);
+          continue;
+        }
+        await this.changeLoggerService.logRemovalOfItems(ctx, [itemId], () => this.deleteItem(ctx, itemId));
+      } else {
+        await this.permissionsRepo.deleteWithId(permId);
+        await this.changeLoggerService.logItemChangeForUserIds([userId], [itemId]);
+      }
+      removed.push(itemId);
+    }
+
+    return {removed, refused};
+  }
+
+  // ROUTE-METHOD
   async removeUserItemsFromLibrary(ctx: RequestContext, targetUserId: string, itemIds = []) {
+    // Same rule as removeUserCollections: only a restricted user is limited to
+    // classified items. Passing `true` for everyone refused every adult's
+    // "Remove from library" (popup and item page) with "Only restricted users...".
+    const targetUser = await ctx.getUserById(targetUserId);
     return await this.updateUserLibraryMembership(ctx, targetUserId, itemIds, true, {
-      requireClassified: true,
+      requireClassified: targetUser?.type === UserType.restricted,
     });
   }
 
@@ -674,7 +787,7 @@ class ItemService {
 
     const targetUser = await ctx.getUserById(targetUserId);
     if (options.requireClassified && targetUser?.type !== UserType.restricted) {
-      throw new Error('Only restricted users can hide classified items from their library');
+      throw new HttpException(403, 'Only restricted users can hide classified items from their library');
     }
 
     // Restricted (library-only) users do not self-add visible items; a guardian
@@ -795,38 +908,6 @@ class ItemService {
       unchanged,
       refused,
     };
-  }
-
-  async _createDefaultQuickBarCollection(ctx: RequestContext, targetUserId: string) {
-    const user = await ctx.getUserById(targetUserId);
-    if (user.quickBarCollectionId) {
-      // A `quickBarCollectionId` can outlive the collection it points at, and `findById` neither
-      // returns a row for a deleted id nor filters soft-deletes — so a dangling pointer arrives
-      // here as `undefined` and reading `.subType` off it threw a TypeError, abandoning the user
-      // with no quickbar at all. Treat dangling and soft-deleted alike as "no quickbar" and fall
-      // through: the create below repoints `user.quickBarCollectionId`, which repairs the row.
-      const col = await this.itemRepo.findById(user.quickBarCollectionId);
-      if (col && !col.deleted && col.subType == 'defaultQuickbar') {
-        console.log('Quickbar exists');
-        return false;
-      }
-    }
-
-    const newCollectionId = await this.createCollection(
-      ctx,
-      targetUserId,
-      {
-        name: 'Quickbar',
-        subType: 'defaultQuickbar',
-        permanent: true,
-      },
-      {skipNotifications: true},
-    );
-
-    await this.users.updateWithId(user._id, {
-      quickBarCollectionId: newCollectionId,
-    });
-    return true;
   }
 
   async _createDefaultSharedCollection(
@@ -1162,6 +1243,7 @@ class ItemService {
 
     await this.itemRelationService._removeCollectionItems(ctx, collectionId);
     await this.permissionService._deleteCollectionFromAllUserPermissions(collectionId);
+    await this.subscriptionRepo.deleteByRefIds([collectionId], SUBSCRIPTION_LIBRARY_COLLECTION_REF_TYPES);
     await this.itemRepo.deleteWithId(collectionId);
 
     return true;
@@ -1186,11 +1268,15 @@ class ItemService {
       throw new Error('No permission to delete item');
     }
 
+    // Collections deleted along with this one; whoever subscribed to them is unsubscribed below.
+    let deletedCollectionIds: string[] = [];
+
     // Collection-specific deletion logic (merged from removeCollectionById)
     if (item.type === ItemTypeEnum.collection && deleteChildren) {
       const {itemIds, collectionIdsPostOrder} = await this._collectDeletableDescendantsForCollection(itemId);
 
       const allDescendantIds = [...itemIds, ...collectionIdsPostOrder];
+      deletedCollectionIds = collectionIdsPostOrder;
 
       if (allDescendantIds.length > 0) {
         await this.permissionsRepo.deleteWhereIn('itemId', allDescendantIds);
@@ -1233,6 +1319,13 @@ class ItemService {
     } catch (e) {
       console.error('Error removing attachments', e);
     }
+
+    // A subscription to a deleted collection can never load again. A feed subscription is kept:
+    // its feed URL is stored on the subscription, so it still works without the saved page.
+    await this.subscriptionRepo.deleteByRefIds(
+      [itemId, ...deletedCollectionIds],
+      SUBSCRIPTION_LIBRARY_COLLECTION_REF_TYPES,
+    );
 
     await this.itemRepo.deleteWithId(itemId);
     return true;
@@ -1280,48 +1373,53 @@ class ItemService {
       // Only collections.
       collections = (collections || []).filter((v) => v?.type == ItemTypeEnum.collection);
 
-      // Filter by access (non-admin):
+      // Filter by access:
+      // - An admin: every collection in their own family, never another family's (CLN-75)
       // - Direct permission (including owner)
       // - Same-account discoverable (shared/network)
       // - Cross-account discoverable (network + friend/family relationship)
-      if (!(await ctx.isAdmin())) {
-        const permissions = await this.permissionService._getUserDirectPermissionLookupExcludingOwner(targetUserId);
+      const isAdmin = await ctx.isAdmin();
+      const permissions = await this.permissionService._getUserDirectPermissionLookupExcludingOwner(targetUserId);
 
-        const allowed: Item[] = [];
-        for (const col of collections) {
-          if (!col?._id) continue;
+      const allowed: Item[] = [];
+      for (const col of collections) {
+        if (!col?._id) continue;
 
-          // Direct permission always wins.
-          const perm = (permissions as any)[col._id];
-          if (perm && PermissionTypeList.includes(perm.permission)) {
-            allowed.push(col);
-            continue;
-          }
+        if (isAdmin && col.accountId === ctx.accountId) {
+          allowed.push(col);
+          continue;
+        }
 
-          // Same-account visibility-derived access.
-          if (col.accountId === ctx.accountId && (col.visibility === 'shared' || col.visibility === 'network')) {
-            allowed.push(col);
-            continue;
-          }
+        // Direct permission always wins.
+        const perm = (permissions as any)[col._id];
+        if (perm && PermissionTypeList.includes(perm.permission)) {
+          allowed.push(col);
+          continue;
+        }
 
-          // Cross-account friend/family discoverability.
-          if (col.visibility === 'network') {
-            const ownerUserId = (col as any).userId;
-            if (ownerUserId && (await ctx.isInNetwork(ownerUserId))) {
-              allowed.push(col);
-              continue;
-            }
-          }
+        // Same-account visibility-derived access.
+        if (col.accountId === ctx.accountId && (col.visibility === 'shared' || col.visibility === 'network')) {
+          allowed.push(col);
+          continue;
+        }
 
-          // Public collections (if any) should be safe to show.
-          if (col.visibility === 'public') {
+        // Cross-account friend/family discoverability.
+        if (col.visibility === 'network') {
+          const ownerUserId = (col as any).userId;
+          if (ownerUserId && (await ctx.isInNetwork(ownerUserId))) {
             allowed.push(col);
             continue;
           }
         }
 
-        collections = allowed;
+        // Public collections (if any) should be safe to show.
+        if (col.visibility === 'public') {
+          allowed.push(col);
+          continue;
+        }
       }
+
+      collections = allowed;
 
       // Reorder to match requested ids.
       const lookup = Object.fromEntries((collections || []).map((v) => [v._id, v]));
@@ -1529,12 +1627,12 @@ class ItemService {
     }
 
     let isCollection = itemDetails.type == ItemTypeEnum.collection;
-    const isAdmin = await ctx.isAdmin();
 
+    // An admin sees every collection in their own family, never another family's (CLN-75).
     const canViewCollectionByVisibilityOrNetwork = async (collectionId: string): Promise<boolean> => {
-      if (isAdmin) return true;
       const col = await ctx.getItemById(collectionId);
       if (!col) return false;
+      if (await ctx.isAdminInAccount(col.accountId)) return true;
 
       // Same-account "shared" and "network" are discoverable (family members).
       if (col.accountId === ctx.accountId && (col.visibility === 'shared' || col.visibility === 'network')) {
@@ -1604,7 +1702,7 @@ class ItemService {
       ((itemDetails.accountId === ctx.accountId &&
         (itemDetails.visibility === 'shared' || itemDetails.visibility === 'network')) ||
         (itemDetails.visibility === 'network' && (await ctx.isInNetwork(itemDetails.userId))) ||
-        isAdmin);
+        (await ctx.isAdminInAccount(itemDetails.accountId)));
 
     if (!hasPerm) hasPerm = await this.permissionService._hasAnyPermissionDirectOrAsAdmin(ctx, itemId);
 
@@ -1682,7 +1780,12 @@ class ItemService {
     return await this.feedbackService.listItemReactions(itemId);
   }
 
-  async _createItem(ctx: RequestContext, itemDetails: Item, assignDirectOwnerPermission: boolean = false) {
+  async _createItem(
+    ctx: RequestContext,
+    itemDetails: Item,
+    assignDirectOwnerPermission: boolean = false,
+    fixedItemId: string | null = null,
+  ) {
     if (itemDetails.type !== ItemTypeEnum.collection) {
       await this.assertCanCreateLibraryItem(ctx);
     }
@@ -1692,7 +1795,8 @@ class ItemService {
     if (!itemDetails.type) {
       throw new Error('Must provide type if creating new item');
     }
-    const itemId = itemDetails.type == ItemTypeEnum.collection ? `col_${uuidv4()}` : `item_${uuidv4()}`;
+    const itemId =
+      fixedItemId || (itemDetails.type == ItemTypeEnum.collection ? `col_${uuidv4()}` : `item_${uuidv4()}`);
 
     let encrypted = checkIfItemIsEncrypted(itemDetails);
 
@@ -1758,6 +1862,9 @@ class ItemService {
       quickShareUserIds = [],
       accessRequestId,
       feedbackUpdate,
+      notifyOthers = false,
+      notInLibrary = false,
+      copyOfPostAttachment,
     } = saveRequest;
 
     if (!details) {
@@ -1804,6 +1911,15 @@ class ItemService {
         await ctx.verifySelfOrAdmin(targetUserId);
       }
 
+      if (copyOfPostAttachment) {
+        if (targetUserId || accessRequestId) {
+          throw new HttpException(400, 'A copy of a shared post attachment is only made for yourself');
+        }
+        const copy = await this.resolvePostAttachmentCopy(ctx, copyOfPostAttachment);
+        const made = await this.createPostAttachmentCopy(ctx, details, copy);
+        return {itemId: made};
+      }
+
       itemId = await this._createItem(
         useAccessRequestOverrideFlow ? targetCtx : directTargetCreateCtx,
         details,
@@ -1817,6 +1933,17 @@ class ItemService {
     }
 
     const savedItem = await this.itemRepo.findById(itemId);
+
+    // Made but kept out of the owner's library (HAT-984): a link shared in a post without
+    // "Add to my library". Not for a child, whose library is what lets them open things.
+    if (isNew && notInLibrary && !useAccessRequestOverrideFlow && savedItem?.userId) {
+      const owner = await ctx.getUserById(savedItem.userId);
+      if (owner && owner.type !== UserType.restricted) {
+        await this.updateUserLibraryMembership(ctx, savedItem.userId, [itemId], true);
+        await this.changeLoggerService.logItemChangeForUserIds([savedItem.userId], [itemId]);
+      }
+    }
+
     const quickShareTargets =
       useAccessRequestOverrideFlow && savedItem?.userId
         ? quickShareUserIds.filter((userId) => userId && userId !== savedItem.userId)
@@ -1837,7 +1964,10 @@ class ItemService {
           )
         : ctx;
 
-      await this.updateItemParents(parentUpdateCtx, itemId, collectionIds, removeMissingCollections);
+      // Telling the other people on a shared collection is the adder's choice, not automatic
+      // (founder decision, 2026-09-19). Before this it fired for everyone with direct
+      // permission on the collection and no form could stop it.
+      await this.updateItemParents(parentUpdateCtx, itemId, collectionIds, removeMissingCollections, !notifyOthers);
     }
 
     if (accessRequestId) {
@@ -1867,6 +1997,84 @@ class ItemService {
       itemId,
       feedback: savedFeedback,
     };
+  }
+
+  /**
+   * Who may have a copy of a post attachment, and its id (HAT-984): someone the post was shared
+   * with, in another family than its author. Within a family the post shares the item itself. A
+   * library-only child keeps asking for it instead: an item they own would open its own link.
+   */
+  private async resolvePostAttachmentCopy(
+    ctx: RequestContext,
+    request: {postId: string; key: string},
+  ): Promise<{itemId: string; sharedByUserId: string}> {
+    const {postId, key} = request || ({} as any);
+    if (!postId || !key) throw new HttpException(400, 'postId and key are required');
+
+    const post = await this.postRepo.findById(postId);
+    if (!post || post.deletedAt) throw new HttpException(404, 'Post not found');
+    if (post.userId === ctx.currentUserId || !(post.sharedWith || []).includes(ctx.currentUserId)) {
+      throw new HttpException(403, 'This post was not shared with you');
+    }
+
+    const author = await ctx.getUserById(post.userId);
+    if (!author || author.accountId === ctx.accountId) {
+      throw new HttpException(400, 'Within a family a post shares the item itself, not a copy');
+    }
+
+    const currentUser = await ctx.getCurrentUser();
+    if (currentUser?.type === UserType.restricted && currentUser?.options?.whitelistingEnabled === true) {
+      throw new HttpException(403, 'Ask a guardian to add it to your library');
+    }
+
+    const attachments =
+      Array.isArray(post.attachedItems) && post.attachedItems.length > 0
+        ? post.attachedItems
+        : Array.isArray((post.data as any)?.attachedItems)
+          ? (post.data as any).attachedItems
+          : [];
+    const attachment = attachments.find(
+      (a: any) => (a?.type === 'libItem' || a?.type === 'libItemBundle') && postAttachmentCopyKey(a) === key,
+    );
+    if (!attachment) throw new HttpException(404, 'That attachment is not in this post');
+
+    return {itemId: postCopyItemId(ctx.currentUserId, postId, key), sharedByUserId: post.userId};
+  }
+
+  /** Makes the copy once, kept out of the library and recorded as shared by the post's author. */
+  private async createPostAttachmentCopy(
+    ctx: RequestContext,
+    details: Partial<Item>,
+    copy: {itemId: string; sharedByUserId: string},
+  ): Promise<string> {
+    const existing = await this.itemRepo.findById(copy.itemId);
+    if (existing) {
+      if (existing.userId !== ctx.currentUserId) throw new HttpException(403, 'Not your copy');
+      return copy.itemId;
+    }
+
+    try {
+      await this._createItem(ctx, details as Item, true, copy.itemId);
+    } catch (e: any) {
+      // Another device made it first.
+      if (e?.code === '23505' && (await this.itemRepo.findById(copy.itemId))?.userId === ctx.currentUserId) {
+        return copy.itemId;
+      }
+      throw e;
+    }
+
+    await this.permissionsRepo.create({
+      _id: this.permissionService.createPermissionKey(ctx.currentUserId, copy.itemId),
+      userId: ctx.currentUserId,
+      itemId: copy.itemId,
+      permission: null,
+      notInLibrary: true,
+      sharedByUserId: copy.sharedByUserId,
+      createdAt: new Date(),
+    } as any);
+    // Again, now that it is out of the library: a device that synced since creation drops it.
+    await this.changeLoggerService.logItemChangeForUserIds([ctx.currentUserId], [copy.itemId]);
+    return copy.itemId;
   }
 
   private async selectSaveItemUpdateContext(sessionCtx: RequestContext, targetCtx: RequestContext, itemId: string) {
@@ -1955,6 +2163,23 @@ class ItemService {
         currColIds,
         PermissionTypeEditableList,
       );
+    } else {
+      // An admin can change any collection in their own family. A shared item can also sit in
+      // another family's collections; those need edit rights, as for anyone, or a save with
+      // removeMissingCollections would take the item out of them (CLN-75).
+      const ownColIds = new Set(
+        ((await this.itemRepo.findWhereIdInAndInAccount(currColIds, ctx.accountId)) || []).map((c) => c._id),
+      );
+      const otherColIds = currColIds.filter((id) => !ownColIds.has(id));
+      const editableOtherColIds =
+        otherColIds.length > 0
+          ? await this.permissionService._filterToItemIdsWithPermissionForUser(
+              currentUser?._id,
+              otherColIds,
+              PermissionTypeEditableList,
+            )
+          : [];
+      currColIds = currColIds.filter((id) => ownColIds.has(id) || editableOtherColIds.includes(id));
     }
 
     const toAddColIds = collectionIds.filter((a: string) => !currColIds.includes(a));
@@ -2000,28 +2225,91 @@ class ItemService {
 
     //send notifications
     if (!skipNotifications) {
-      for (const userId of addUserIds) {
-        if (userId == ctx.currentUserId || item.type == ItemTypeEnum.collection) continue;
-        const notificationData = {
-          title: `You have a new item in you library!`,
-          message: `<a href="/kindredapp/#/item/${itemId}">A new item</a> was added to a collection in your library by ${currentUser.username}.`,
-          refInfo: {
-            refId: itemId,
-            refType: item.type,
-          },
-        };
-        this.notificationsService.addUserNotification(
-          ctx,
-          NotificationType.NEW_ITEM,
-          ctx.currentUserId,
-          ctx.accountId,
-          userId,
-          notificationData,
-        );
-      }
+      this._notifyUsersOfItemAdded(ctx, item, addUserIds, currentUser?.username);
     }
 
     return;
+  }
+
+  /**
+   * Tells the given people that an item landed in a collection of theirs.
+   *
+   * Split out of updateItemParents so it can also run on its own: in the extension popup,
+   * picking a collection IS the save, so the adder cannot answer "tell them?" until after the
+   * request has gone. `notifyAddedToCollections` lets a later yes still reach them.
+   *
+   * Never notifies the actor, and never for a collection being filed into another collection.
+   */
+  private _notifyUsersOfItemAdded(ctx: RequestContext, item: any, userIds: string[], actorName?: string) {
+    for (const userId of userIds) {
+      if (userId == ctx.currentUserId || item.type == ItemTypeEnum.collection) continue;
+      const notificationData = {
+        title: `You have a new item in you library!`,
+        message: `<a href="/kindredapp/#/item/${item._id}">A new item</a> was added to a collection in your library by ${escapeHtml(actorName || 'someone')}.`,
+        refInfo: {
+          refId: item._id,
+          refType: item.type,
+        },
+      };
+      this.notificationsService.addUserNotification(
+        ctx,
+        NotificationType.NEW_ITEM,
+        ctx.currentUserId,
+        ctx.accountId,
+        userId,
+        notificationData,
+      );
+    }
+  }
+
+  /**
+   * ROUTE-METHOD. Tell the people on these collections about an item the caller just added.
+   *
+   * The popup saves the moment a collection is picked, so this is how a checkbox ticked after
+   * that still does something. It must reach nobody the add itself would not have, which takes
+   * three gates, not one: the caller edits the item, the caller edits each named collection
+   * (`updateItemParents` demands both), and the add being confirmed is the caller's own and
+   * recent. Membership alone is not enough — `_getItemParentIdsForUser` admits a collection on
+   * visibility alone, so without these an item you own, filed by someone else into a shared or
+   * network collection, would let you message everyone on it.
+   */
+  async notifyAddedToCollections(ctx: RequestContext, itemId: string, collectionIds: string[]) {
+    if (!itemId || !collectionIds?.length) return;
+
+    // The adder needs edit rights on the item, exactly as adding it to a collection did.
+    if (!(await this.permissionService._hasEditPermissionDirectOrAsAdmin(ctx, itemId))) {
+      throw new HttpException(403, 'No permission to notify about this item');
+    }
+
+    const item = await this.itemRepo.findById(itemId);
+    if (!item) throw new HttpException(404, 'Item not found');
+
+    // The relation records who filed the item and when. This checkbox is answered seconds after
+    // the save, so an add made by somebody else, or one from last week, is not what the caller
+    // is saying yes to -- and replaying it must not notify that collection again.
+    const relations = await this.itemRelationService._getParentRelationsForItem(itemId);
+    const requested = new Set(collectionIds);
+    const cutoff = Date.now() - NOTIFY_AFTER_ADD_WINDOW_MS;
+    const ownRecent = (relations || []).filter(
+      (rel: any) =>
+        requested.has(rel.collectionId) &&
+        rel.userId === ctx.currentUserId &&
+        new Date(rel.createdAt).getTime() >= cutoff,
+    );
+
+    const targets: string[] = [];
+    for (const rel of ownRecent) {
+      // Seeing a collection is not adding to it. The add path checks this per collection, so
+      // this one does too, in case permission was withdrawn between the add and the yes.
+      if (await this.permissionService._hasEditPermissionDirectOrAsAdmin(ctx, rel.collectionId)) {
+        targets.push(rel.collectionId);
+      }
+    }
+    if (!targets.length) return;
+
+    const userIds = await this.permissionService._listUserIdsOfAllUserWithDirectPermissionsToItems(ctx, targets);
+    const currentUser = await ctx.getCurrentUser();
+    this._notifyUsersOfItemAdded(ctx, item, userIds, currentUser?.username);
   }
 
   // ROUTE-METHOD
@@ -2140,6 +2428,60 @@ class ItemService {
     } else {
       await this.itemRepo.updateWithId(itemId, {archived: value});
     }
+  }
+
+  // ROUTE-METHOD
+  /**
+   * Archive or unarchive many items at once (Library Health → Cleanup).
+   *
+   * `archived` is on the item, and every person's sync leaves archived items out, so archiving
+   * one that someone else has takes it out of their library too, a child's included. When
+   * archiving, those are left as they were and returned in `sharedIds` unless `includeShared`
+   * is set. Unarchiving only ever gives back, so it never holds anything.
+   */
+  async archiveItems(ctx: RequestContext, itemIds: string[], value: boolean, includeShared = false) {
+    const ids = [...new Set((Array.isArray(itemIds) ? itemIds : []).filter((id) => typeof id === 'string' && id))];
+    if (ids.length > ARCHIVE_ITEMS_MAX) {
+      throw new HttpException(400, `At most ${ARCHIVE_ITEMS_MAX} items at once`);
+    }
+
+    const changed: {itemId: string; userIds: string[]}[] = [];
+    const sharedIds: string[] = [];
+    const failedIds: string[] = [];
+
+    for (const itemId of ids) {
+      if (!(await this.permissionService._hasEditPermissionDirectOrAsAdmin(ctx, itemId))) {
+        failedIds.push(itemId);
+        continue;
+      }
+      // Everyone who has the item: also the people whose devices must hear that it changed.
+      const userIds = await this.permissionService._listUserIdsWithPermissionsToItem(ctx, itemId, true);
+      if (value && !includeShared && userIds.some((userId) => userId !== ctx.currentUserId)) {
+        sharedIds.push(itemId);
+        continue;
+      }
+      changed.push({itemId, userIds});
+    }
+
+    const changedIds = changed.map((c) => c.itemId);
+    if (changed.length > 0) {
+      await this.itemRepo.query().whereIn('_id', changedIds).update({archived: value});
+
+      // After the write, as logRemovalOfItems does: logging first wakes devices while the item
+      // still reads as it was. One journal write per set of recipients, not one per item.
+      const byRecipients = new Map<string, {userIds: string[]; itemIds: string[]}>();
+      for (const {itemId, userIds} of changed) {
+        const key = [...userIds].sort().join(',');
+        const entry = byRecipients.get(key) || {userIds, itemIds: []};
+        entry.itemIds.push(itemId);
+        byRecipients.set(key, entry);
+      }
+      for (const {userIds, itemIds} of byRecipients.values()) {
+        await this.changeLoggerService.logItemChangeForUserIds(userIds, itemIds);
+      }
+    }
+
+    return {changedIds, sharedIds, failedIds};
   }
 
   // ROUTE-METHOD

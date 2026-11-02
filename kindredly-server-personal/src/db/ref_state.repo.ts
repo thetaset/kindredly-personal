@@ -41,6 +41,17 @@ export class RefStateRepo {
     });
   }
 
+  /** Inserts the row unless its key already exists. True only for the call that inserted it. */
+  async insertIfAbsent(row: Omit<RefStateRow, 'createdAt' | 'updatedAt'>): Promise<boolean> {
+    const now = this.knex.fn.now();
+    const inserted = await this.knex('ref_state')
+      .insert({...row, createdAt: now, updatedAt: now})
+      .onConflict(['ownerType', 'ownerId', 'refType', 'refId', 'stateKey', 'stateSubKey'])
+      .ignore()
+      .returning('_id');
+    return inserted.length > 0;
+  }
+
   private async upsertOn(
     db: Knex | Knex.Transaction,
     row: Omit<RefStateRow, 'createdAt' | 'updatedAt'>,
@@ -163,6 +174,30 @@ export class RefStateRepo {
     }
 
     return await query;
+  }
+
+  /**
+   * The newest row for one key and sub-key, whoever owns it. For finding who a Companion was linked
+   * for by its own id when it cannot read its link record (CMP-65). Rare, and the caller decides
+   * what the owner may see; there is no RequestContext here.
+   */
+  async findLatestBySubKey(input: {
+    refType: string;
+    refId: string;
+    ownerType: string;
+    stateKey: string;
+    stateSubKey: string;
+  }): Promise<RefStateRow | undefined> {
+    return await this.knex<RefStateRow>('ref_state')
+      .where({
+        refType: input.refType,
+        refId: input.refId,
+        ownerType: input.ownerType,
+        stateKey: input.stateKey,
+        stateSubKey: input.stateSubKey,
+      })
+      .orderBy('updatedAt', 'desc')
+      .first();
   }
 
   /**

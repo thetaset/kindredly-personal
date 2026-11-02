@@ -94,3 +94,22 @@ describe('deviceHealth', () => {
     expect(worstDeviceHealth([])).toBeNull();
   });
 });
+
+describe('deviceHealth on a Linux desktop that hides the app in front (DCP-13)', () => {
+  it('blocks, and says app time is not counted', () => {
+    const linux = status({ platform: 'linux', bridgeLive: true, detection: { kind: 'running' } });
+    expect(deviceHealth(linux, NOW - MIN, NOW)).toMatchObject({ state: 'protected', watchOnly: false, appTimeUnseen: true });
+  });
+
+  it('an X11 desktop that sees the app in front is plain protected', () => {
+    const linux = status({ platform: 'linux', bridgeLive: true, detection: { kind: 'events' } });
+    expect(deviceHealth(linux, NOW - MIN, NOW)).toMatchObject({ state: 'protected', watchOnly: false, appTimeUnseen: false });
+  });
+
+  // HAT-198: still protected (it blocks), with the fact the parent's card states beside it.
+  it("names a child's administrator account, which can remove the Companion", () => {
+    const admin = status({ platform: 'linux', bridgeLive: true, detection: { kind: 'poll' }, accountIsAdmin: true });
+    expect(deviceHealth(admin, NOW - MIN, NOW)).toMatchObject({ state: 'protected', accountIsAdmin: true });
+    expect(deviceHealth(status({ platform: 'linux' }), NOW - MIN, NOW).accountIsAdmin).toBe(false);
+  });
+});

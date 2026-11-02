@@ -1,0 +1,1 @@
+function i(e){var r;if(!e)return"available";const o=(r=e.timeLimit)==null?void 0:r.hours;return e.reasonCode==="no-time-given"||typeof o=="number"&&o<=0?"no-time-today":e.reasonCode==="time-exceeded"||typeof e.timeLeft=="number"&&e.timeLeft<=0?"time-used-up":e.reasonCode==="out-of-time-range"?"outside-allowed-hours":"available"}export{i as u};

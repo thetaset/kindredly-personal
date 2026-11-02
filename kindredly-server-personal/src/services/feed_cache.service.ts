@@ -172,3 +172,45 @@ export async function waitForFeedCacheEntry(
 
   return null;
 }
+
+/**
+ * How long the YouTube Data API's answer for a channel is kept. The API is the
+ * last of a YouTube feed's three sources (after YouTube's own feed and the
+ * channel's Videos page) and has a daily quota, so a channel is asked about at
+ * most once a day, whoever is reading it.
+ */
+export const YOUTUBE_API_TTL_SECONDS = 24 * 60 * 60;
+
+const YOUTUBE_API_PREFIX = 'kindredly:youtube-api:v1:';
+
+export type YouTubeApiUploads = {
+  title: string;
+  videos: {videoId: string; title: string; description: string; publishedAt: number}[];
+};
+
+/** The API's last answer for a channel, if it is under a day old. */
+export async function getYouTubeApiUploads(channelId: string): Promise<YouTubeApiUploads | null> {
+  try {
+    const raw = await getKeyValueStore().get(YOUTUBE_API_PREFIX + channelId);
+    if (!raw) return null;
+
+    const parsed = JSON.parse(raw) as YouTubeApiUploads;
+    return Array.isArray(parsed?.videos) ? parsed : null;
+  } catch (error) {
+    logger.error('getYouTubeApiUploads failed', error);
+    return null;
+  }
+}
+
+export async function setYouTubeApiUploads(channelId: string, uploads: YouTubeApiUploads): Promise<void> {
+  try {
+    await getKeyValueStore().set(
+      YOUTUBE_API_PREFIX + channelId,
+      JSON.stringify(uploads),
+      'EX',
+      YOUTUBE_API_TTL_SECONDS,
+    );
+  } catch (error) {
+    logger.error('setYouTubeApiUploads failed', error);
+  }
+}

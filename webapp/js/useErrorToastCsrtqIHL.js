@@ -1,0 +1,1 @@
+import{a as t}from"./subscription.storeDgI-qPhv.js";import{a0 as a,w as e}from"./vue-runtimetcX7J1Xt.js";function u(o){if(!a(o)){console.warn("useErrorToast: errorMessage must be a ref");return}e(o,(r,s)=>{r&&r!==s&&t(r,{title:"Error",variant:"danger",solid:!0})})}export{u};

@@ -152,7 +152,10 @@ class PasskeyRoute implements Routes {
       authenticateJWT,
       errorHelper(async (req: ApiReq<'/auth/passkey/delete'>, res) => {
         const ctx = RequestContext.instance(req);
-        const userId = ctx.userId;
+        // UNL-21: a guardian removes a child's passkey, as listing them already allows; the child
+        // can't reach the page that lists them. Never another adult's.
+        const userId = getTargetUserId(req) || ctx.userId;
+        await ctx.verifySelfOrAdminOverUser(userId);
         const {credentialId} = req.body;
 
         const success = await this.passkeyService.deletePasskey(userId, credentialId);

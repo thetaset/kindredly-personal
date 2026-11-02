@@ -52,7 +52,7 @@ class UserFileService {
     const maxUploadBytes = Math.min(Number(limits?.maxUploadBytes ?? config.maxFileSize), config.maxFileSize);
 
     if (fileSize > maxUploadBytes) {
-      const limit = maxUploadBytes / 1024 / 1024;
+      const limit = Math.round(maxUploadBytes / 1024 / 1024);
       throw new Error(`File too large. File size limit is ${limit} MB. Current Size is ${fileSize / 1024 / 1024} MB.`);
     }
 

@@ -22,17 +22,18 @@ const USAGE_TYPE_PREFIX = 'eduval_';
 export function missingPublicRequirements(fields: PublicPublishFields): string[] {
   const missing: string[] = [];
   const tags = Array.isArray(fields.useCriteria) ? fields.useCriteria : [];
-  if (!fields.categories || fields.categories.length === 0) missing.push('at least one category');
+  // `categories` is the subject tree, called Topics on screen; "category" is the eduval_* value (PUX-8).
+  if (!fields.categories || fields.categories.length === 0) missing.push('at least one topic');
   if (!fields.name || fields.name.length < PUBLIC_PUBLISH_MIN_NAME_LENGTH)
     missing.push(`a name of at least ${PUBLIC_PUBLISH_MIN_NAME_LENGTH} characters`);
-  // The form's label for this has always been "an age group and usage type"; the tags are
-  // minage_* and eduval_*. It used to be a count of six tags, which most real collections
+  // The tags are minage_* and eduval_*; the form calls the second a category.
+  // It used to be a count of six tags, which most real collections
   // never reach (they carry three to five).
   const hasAgeGroup = tags.some((tag) => typeof tag === 'string' && tag.startsWith(AGE_GROUP_PREFIX));
   const hasUsageType = tags.some((tag) => typeof tag === 'string' && tag.startsWith(USAGE_TYPE_PREFIX));
-  if (!hasAgeGroup && !hasUsageType) missing.push('an age group and usage type');
+  if (!hasAgeGroup && !hasUsageType) missing.push('an age group and category');
   else if (!hasAgeGroup) missing.push('an age group');
-  else if (!hasUsageType) missing.push('a usage type');
+  else if (!hasUsageType) missing.push('a category');
   if (!fields.imageFilename || fields.imageFilename.length === 0) missing.push('an image');
   return missing;
 }
@@ -66,14 +67,39 @@ export function isDeclineReasonCode(value: unknown): value is DeclineReasonCode 
 /**
  * Whether a catalog row may be recommended: offered by search, category chips, galleries, the
  * Knowledge Map, starter bundles or the Activity Finder. A row an open curation review has taken
- * out (`underReviewAt` set) is not, though its page still opens and a family's own choices stand.
+ * out (`underReviewAt` set) is not, nor one a curator archived (`archivedAt` set), though the page
+ * of either still opens and a family's own choices stand.
  *
- * The SQL twin is the literal `"underReviewAt" IS NULL` in the server's published read paths;
- * this is for rows already in memory.
+ * The SQL twins are the literals `"underReviewAt" IS NULL` and `"archivedAt" IS NULL` in the
+ * server's published read paths; this is for rows already in memory.
  */
-export function isRecommendable(row: {underReviewAt?: Date | string | null} | null | undefined): boolean {
-  return !!row && (row.underReviewAt === null || row.underReviewAt === undefined);
+export function isRecommendable(
+  row: {underReviewAt?: Date | string | null; archivedAt?: Date | string | null} | null | undefined,
+): boolean {
+  return !!row && row.underReviewAt == null && !isArchived(row);
 }
+
+/** Whether a curator archived this catalog row (CWS-2). */
+export function isArchived(row: {archivedAt?: Date | string | null} | null | undefined): boolean {
+  return !!row && row.archivedAt != null;
+}
+
+/**
+ * Why a family does not see a row a gallery lists, as Featured Galleries reports it. The server
+ * decides (`familyHiddenReason` in published_visibility.ts); this is the wording both sides read.
+ */
+export const FAMILY_HIDDEN_REASONS = {
+  missing: 'Not found',
+  unpublished: 'Unpublished',
+  blocked: 'Blocked',
+  archived: 'Archived',
+  under_review: 'Under review',
+  scheduled: 'Not out yet',
+  friends_only: 'Friends only',
+  not_curated: 'Not curated',
+} as const;
+
+export type FamilyHiddenReason = keyof typeof FAMILY_HIDDEN_REASONS;
 
 /**
  * A contributor is an ordinary family account the admin marked as one in user_public.verifiedType:

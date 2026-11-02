@@ -69,12 +69,14 @@ class CommentService {
       // This should mirror ItemService.getItemInfoById permission behavior.
 
       if (await this.permissionService._hasAnyPermissionDirectOrAsAdmin(ctx, refId)) return;
-      if (await ctx.isAdmin()) return;
 
       const item = await ctx.getItemById(refId);
       if (!item) {
         throw new Error("You don't have permission to access this item");
       }
+
+      // An admin of the item's own family, never any admin (CLN-75).
+      if (await ctx.isAdminInAccount(item.accountId)) return;
 
       // If the ref is a collection, visibility rules apply directly.
       const isCollection = item.type === ItemTypeEnum.collection;

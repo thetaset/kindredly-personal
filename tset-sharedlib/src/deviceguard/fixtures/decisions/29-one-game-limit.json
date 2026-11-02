@@ -1,0 +1,120 @@
+{
+  "id": "29-one-game-limit",
+  "behaviour": "A limit on one game (the game condition, HAT-634) covers that game's app on each platform from the games list — Minecraft is com.mojang.minecraftpe on Android and com.mojang.minecraftlauncher on a Mac — with or without it in the catalog; another game is not counted.",
+  "clock": {
+    "nowMs": 1789491600000,
+    "familyTimeZone": "America/Los_Angeles",
+    "deviceTimeZone": "America/Los_Angeles"
+  },
+  "settings": {
+    "usageLimitsData": {
+      "contentUsageLimits": [
+        {
+          "id": "simple-custom-game-minecraft",
+          "name": "Minecraft",
+          "type": "advanced",
+          "conditions": [
+            {
+              "type": "game",
+              "values": [
+                "minecraft"
+              ]
+            }
+          ],
+          "timeLimits": [
+            {
+              "hours": 0.5,
+              "daysOfWeek": [
+                0,
+                1,
+                2,
+                3,
+                4,
+                5,
+                6
+              ]
+            }
+          ]
+        }
+      ],
+      "temporaryRules": []
+    },
+    "ruleOverrideSettings": {
+      "ruleOverrides": []
+    },
+    "accessControlSettings": {},
+    "appPolicy": null,
+    "appPolicyStatus": "absent"
+  },
+  "installedApps": [
+    {
+      "pkg": "com.roblox.client",
+      "label": "Roblox",
+      "platform": "android"
+    },
+    {
+      "pkg": "com.mojang.minecraftpe",
+      "label": "Minecraft",
+      "platform": "android"
+    },
+    {
+      "pkg": "com.mojang.minecraftlauncher",
+      "label": "Minecraft Launcher",
+      "platform": "android"
+    }
+  ],
+  "floor": [],
+  "usage": {
+    "appMsByPkg": {
+      "com.mojang.minecraftpe": 1860000,
+      "com.mojang.minecraftlauncher": 1860000
+    },
+    "webLogs": []
+  },
+  "usageSeed": {
+    "perRuleUsedMs": {}
+  },
+  "expectDevice": [
+    {
+      "pkg": "com.mojang.minecraftpe",
+      "action": "block",
+      "reason": "budget-exhausted",
+      "ruleId": "simple-custom-game-minecraft"
+    },
+    {
+      "pkg": "com.mojang.minecraftlauncher",
+      "action": "allow",
+      "reason": null,
+      "ruleId": null
+    },
+    {
+      "pkg": "com.roblox.client",
+      "action": "allow",
+      "reason": null,
+      "ruleId": null
+    }
+  ],
+  "expectDeviceByPlatform": {
+    "macos": [
+      {
+        "pkg": "com.mojang.minecraftlauncher",
+        "action": "block",
+        "reason": "budget-exhausted",
+        "ruleId": "simple-custom-game-minecraft"
+      },
+      {
+        "pkg": "com.mojang.minecraftpe",
+        "action": "allow",
+        "reason": null,
+        "ruleId": null
+      },
+      {
+        "pkg": "com.roblox.client",
+        "action": "allow",
+        "reason": null,
+        "ruleId": null
+      }
+    ]
+  },
+  "browserNotApplicable": "Device-only: per-app time exists only on the device; the game's sites are counted by the browser and reach the device as the usage seed."
+}

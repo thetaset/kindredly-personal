@@ -30,6 +30,10 @@ class VerificationService {
     await this.verifications.deleteWithId(id);
   }
 
+  async _findPendingFamilyInviteForEmail(email: string) {
+    return await this.verifications.findPendingFamilyInviteForEmail(email);
+  }
+
   // ROUTE-METHOD
   async getFamilyInviteInfo(code: string) {
     const verification = await this.verifications.findById(code);

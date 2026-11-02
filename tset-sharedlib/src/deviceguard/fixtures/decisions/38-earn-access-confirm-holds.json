@@ -1,0 +1,90 @@
+{
+  "id": "38-earn-access-confirm-holds",
+  "behaviour": "A rule whose only step is I've done it (HAT-912) holds like any other until it is opened this period: the devices cannot check the step, and need not, since only an opening lets the apps through.",
+  "clock": {
+    "nowMs": 1789585200000,
+    "familyTimeZone": "America/Los_Angeles",
+    "deviceTimeZone": "America/Los_Angeles"
+  },
+  "settings": {
+    "usageLimitsData": {
+      "contentUsageLimits": [],
+      "temporaryRules": []
+    },
+    "ruleOverrideSettings": {
+      "ruleOverrides": []
+    },
+    "accessControlSettings": {
+      "earnAccessSettings": {
+        "version": 1,
+        "rules": [
+          {
+            "id": "reading-first",
+            "name": "Reading before games",
+            "enabled": true,
+            "holds": [
+              "games"
+            ],
+            "steps": [
+              {
+                "id": "c1",
+                "type": "confirm"
+              }
+            ],
+            "approval": false,
+            "reset": "day",
+            "instructions": "Read a book for 20 minutes, then tap I’ve done it."
+          }
+        ]
+      }
+    },
+    "appPolicy": null,
+    "appPolicyStatus": "absent"
+  },
+  "installedApps": [
+    {
+      "pkg": "com.roblox.client",
+      "label": "Roblox",
+      "platform": "android"
+    },
+    {
+      "pkg": "com.mojang.minecraftpe",
+      "label": "Minecraft",
+      "platform": "android"
+    },
+    {
+      "pkg": "com.duolingo",
+      "label": "Duolingo",
+      "platform": "android"
+    }
+  ],
+  "floor": [],
+  "usage": {
+    "appMsByPkg": {},
+    "webLogs": []
+  },
+  "usageSeed": {
+    "perRuleUsedMs": {}
+  },
+  "expectDevice": [
+    {
+      "pkg": "com.roblox.client",
+      "action": "block",
+      "reason": "earn-access",
+      "ruleId": "reading-first"
+    },
+    {
+      "pkg": "com.mojang.minecraftpe",
+      "action": "block",
+      "reason": "earn-access",
+      "ruleId": "reading-first"
+    },
+    {
+      "pkg": "com.duolingo",
+      "action": "allow",
+      "reason": null,
+      "ruleId": null
+    }
+  ],
+  "browserNotApplicable": "Device-only here: the browser's Earn access is tested in ActivityService.earnAccess.test.ts and earnAccess.test.ts in sharedlib."
+}

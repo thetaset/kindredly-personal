@@ -2,6 +2,8 @@ import {RequestContext} from '@/base/request_context';
 import {UserPrefRepo} from '@/db/user_pref.repo';
 import {UserRepo} from '@/db/user.repo';
 import knex from '@/db/knex_config';
+import ItemService from '@/services/item.service';
+import {HEART_REACTION} from 'tset-sharedlib/feedback.utils';
 import type {
   SharedFeedbackFeedListRequest,
   SharedFeedbackFeedListResponse,
@@ -44,6 +46,7 @@ function maxIso(a?: string, b?: string): string | undefined {
 export class SharedFeedbackFeedService {
   private users = new UserRepo();
   private userPref = new UserPrefRepo();
+  private itemService = new ItemService();
 
   async list(
     ctx: RequestContext,
@@ -105,30 +108,41 @@ export class SharedFeedbackFeedService {
         'f.reactionDate as reactionDate',
       ]);
 
-    const events = rows.map((r: any) => {
-      const at = typeof r.reactionDate === 'string' ? r.reactionDate : new Date(r.reactionDate).toISOString();
+    // A heart is seen only by people who can open the item (HAT-473). This used to send every
+    // family member's hearts with the item's name and link, so a parent's heart on a private
+    // item reached a child's feed. An admin can open everything in the account, so sees all.
+    const itemIds: string[] = Array.from(new Set<string>(rows.map((r: any) => r.itemId)));
+    const viewable = new Set<string>();
+    for (const itemId of itemIds) {
+      if (await this.itemService.canUserViewItem(ctx, itemId)) viewable.add(itemId);
+    }
 
-      return {
-        eventId: `${r.actorUserId}:${r.itemId}:reaction:${at}`,
-        actor: {
-          userId: r.actorUserId,
-          displayedName: r.actorDisplayedName || undefined,
-          username: r.actorUsername,
-          profileImage: r.actorProfileImage || undefined,
-        },
-        item: {
-          id: r.itemId,
-          type: r.itemType,
-          url: r.itemUrl || undefined,
-          name: r.itemName || undefined,
-        },
-        feedback: {
-          type: 'reaction' as const,
-          reaction: r.reaction,
-          at,
-        },
-      };
-    });
+    const events = rows
+      .filter((r: any) => viewable.has(r.itemId))
+      .map((r: any) => {
+        const at = typeof r.reactionDate === 'string' ? r.reactionDate : new Date(r.reactionDate).toISOString();
+
+        return {
+          eventId: `${r.actorUserId}:${r.itemId}:reaction:${at}`,
+          actor: {
+            userId: r.actorUserId,
+            displayedName: r.actorDisplayedName || undefined,
+            username: r.actorUsername,
+            profileImage: r.actorProfileImage || undefined,
+          },
+          item: {
+            id: r.itemId,
+            type: r.itemType,
+            url: r.itemUrl || undefined,
+            name: r.itemName || undefined,
+          },
+          feedback: {
+            type: 'reaction' as const,
+            reaction: HEART_REACTION,
+            at,
+          },
+        };
+      });
 
     return {events, prefs};
   }

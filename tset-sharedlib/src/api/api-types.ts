@@ -1,6 +1,7 @@
 import { UsageStatus, UsageSummaryData, TakeBreakAdvisory } from '../types';
 import type { CategorySet } from '../types/categoryExplorer.types';
 import type { FamilyDowntimeAdvisory } from '../restrictions/familyDowntime';
+import type { AiUsageKind } from '../ai-usage-kinds';
 import type { SiteStyleEntryV1 } from '../types/item.types';
 import type {
   AccountType,
@@ -35,7 +36,7 @@ import type {
   UserType,
   UserView
 } from '../shared.types';
-import type { ContentType, EduValue, MinAgeGroup, TopicTag } from '../content.types';
+import type { ContentType, EduValue, MinAgeGroup, TargetAudience, TopicTag } from '../content.types';
 import type { SearchProviderId, SearchProviderPageState } from '../search-provider.utils';
 import type { PostImportProcessingState, ResourceFetchInfoResponse } from '../types/item.types';
 import { SystemOptions } from '../schemas/public/Account';
@@ -133,6 +134,8 @@ export interface PasskeyListResponse {
 
 export interface PasskeyDeleteRequest {
   credentialId: string;
+  /** A guardian removing a child's passkey (UNL-21); the signed-in person's own when left out. */
+  userId?: string;
 }
 
 export type RemoveRecoveryKeyFromServerRequest =
@@ -371,8 +374,19 @@ export interface CategorySetsResponse {
 }
 
 // ---- Category coverage: which parts of the taxonomy actually have published content.
-// The public shape carries no numbers (users only need to know what's worth showing);
-// the admin shape carries the counts that say where to publish next. ----
+// The public shape says what's worth showing and how many curated items each topic holds;
+// the admin shape carries the backlog counts that say where to publish next. ----
+
+/**
+ * Curated items behind one topic: `all`, then per age group what each lens shows (`fitsLens`,
+ * tset-sharedlib/exploreAudience): `madeFor` when a parent picked a child of that age, `shownTo`
+ * when a child of that age is signed in. An age group with none is left out.
+ */
+export type TopicItemCounts = {
+  all: number;
+  madeFor?: Partial<Record<TargetAudience, number>>;
+  shownTo?: Partial<Record<TargetAudience, number>>;
+};
 
 /** Node ids worth showing, per set. Consumed by the published Category Explorer. */
 export interface PublishedCategoryCoverageResponse {
@@ -383,6 +397,27 @@ export interface PublishedCategoryCoverageResponse {
    * topic empty for Kids but full for adults is absent from `kids` and present in `general`.
    */
   populated: Record<string, string[]>;
+  /** Set id -> leaf id -> its curated items, for Explore's topic cards (HAT-554). Older servers send none. */
+  counts?: Record<string, Record<string, TopicItemCounts>>;
+}
+
+/**
+ * One group of a gallery (`galleryGroupDB_<db>` in sys_info), edited on Featured Galleries. Its
+ * items are the newest published (`query: 'recent'`), a published collection's (`collectionId`,
+ * which also gives Subscribe), or a fixed list in the curator's order (`itemIds`). On Explore a
+ * group is a pick (HAT-554).
+ */
+export interface GalleryGroup {
+  _id: string;
+  name: string;
+  itemIds: string[];
+  query?: string;
+  showTitle?: boolean;
+  collectionId?: string;
+  /** A sentence or two under the name on Explore, saying what the pick is. */
+  description?: string;
+  /** General topics (`gen_*`) whose page this pick heads. */
+  topicIds?: string[];
 }
 
 export interface AdminCategoryCoverageLeaf {
@@ -401,6 +436,8 @@ export interface AdminCategoryCoverageLeaf {
    * `countCurated < count` means the topic has content nobody has curated yet.
    */
   countCurated: number;
+  /** Of `countCurated`, how many each lens shows per age group (`fitsLens`); an age group with none is left out. */
+  curatedByAudience?: Pick<TopicItemCounts, 'madeFor' | 'shownTo'>;
 }
 
 export interface AdminCategoryCoverageGroup {
@@ -609,13 +646,20 @@ export type AdminAiPromptKey =
   | 'feedGenPost'
   | 'feedGenExtract'
   | 'lessonGenLesson'
+  // Checks a written lesson against its sources; what it names is cut by code (HAT-491).
+  | 'lessonCheck'
   | 'lessonGradeAnswer'
   // The collection builder's copy/paste authoring prompt. Only `prompt` is used
   // (it carries the JSON format spec); `system` is unused.
   | 'collectionAuthoring'
   // Drafts a curation review's answers for a curator to confirm. Framing only: the checks and
   // their instructions are always appended from tset-sharedlib/src/curation.checklist.ts.
-  | 'curationReviewDraft';
+  | 'curationReviewDraft'
+  // Learning tracks (tset-sharedlib/src/track-generation.ts): the sources, the plan, one item, and the critic.
+  | 'trackSearch'
+  | 'trackSyllabus'
+  | 'trackWrite'
+  | 'trackCritic';
 
 export interface AdminAiPromptOverride {
   system?: string;
@@ -640,6 +684,11 @@ export interface AdminAiImageGenSettings {
 export interface AdminAiModelPrice {
   inputPerMillion: number; // USD per 1M prompt tokens
   outputPerMillion: number; // USD per 1M completion tokens
+  /**
+   * USD per 1M prompt tokens the provider served from its prompt cache. Absent = charged at
+   * `inputPerMillion`. Shipped in code only, never typed in the admin form.
+   */
+  cachedInputPerMillion?: number;
   /**
    * Where the rates came from: the list price shipped in code (`stamped`, dated by
    * `AdminAiPricing.pricesAsOf`) or a figure an admin typed. Set on configs the server returns.
@@ -750,6 +799,27 @@ export interface SaveItemRequest {
   quickShareUserIds?: string[];
   accessRequestId?: string;
   feedbackUpdate?: { attr: string; value: any };
+  /**
+   * Tell the other people on these collections that this landed in their library.
+   *
+   * Off unless the person adding it says so (founder decision, 2026-09-19). It used to fire on
+   * its own for everyone with direct permission on the collection, with nothing in any form to
+   * stop it.
+   */
+  notifyOthers?: boolean;
+  /**
+   * New items only: the item is made but not put in the saver's library (HAT-984). A link
+   * shared in a post without "Add to my library" is saved this way; it is listed under Not in
+   * library until its owner adds it.
+   */
+  notInLibrary?: boolean;
+  /**
+   * New items only: this is the saver's own copy of an attachment in a post a friend shared
+   * with them (HAT-984, `tset-sharedlib/post-copy`). The server checks the post, gives the copy
+   * its fixed id, keeps it out of the library and records who shared it. Asking again returns
+   * the copy already made.
+   */
+  copyOfPostAttachment?: { postId: string; key: string };
   options?: CreateCollectionOptions;
   targetUserId?: string;
   tempAuthToken?: TokenData;
@@ -867,6 +937,8 @@ export interface ItemRelationshipInfo {
 export interface GetItemsWithInfoRequest {
   userId?: string;
   ids?: string[];
+  /** Only what this device holds; ids it lacks are left out instead of fetched. */
+  localOnly?: boolean;
 }
 
 export interface ListItemsWithFeedbackRequest {
@@ -1045,10 +1117,62 @@ export interface SearchItemsResponse {
   hasMore?: boolean;
 }
 
+/**
+ * Where a search looks (HAT-630): the place named by the chip at the start of the search box.
+ * `collection` searches inside one collection and its sub-collections; `id` is the collection's.
+ * `settings` with an `id` searches one child's settings pages; `id` is the child's user id.
+ * `posts` is searched by the Posts page itself, so the background search answers it with nothing.
+ * `person` searches one child's library, for an admin (HAT-631); `id` is the child's user id.
+ */
+export type SearchPlaceKind = 'library' | 'readlater' | 'collection' | 'settings' | 'posts' | 'myfeed' | 'person' | 'archive';
+export type SearchPlace = { kind: SearchPlaceKind; id?: string };
+
 export interface SearchMainRequest {
   searchType: string;
   searchLookupValue: string;
   filters?: any;
+  place?: SearchPlace;
+}
+
+/**
+ * What "Search your history" can tell the page about itself, most decisive first:
+ * `off` — the person does not have the feature, or is in Device-only mode;
+ * `not-recording` — no history is being kept now, though older pages still answer;
+ * `loading` — a warm-up call while the index is still being built;
+ * `ready` — searched.
+ */
+export type HistorySearchState = 'off' | 'not-recording' | 'loading' | 'ready';
+
+/** Deliberately has no user id: a person searches their own history and nobody else's. */
+export interface SearchHistoryRequest {
+  query?: string;
+  /** "Keep history for", from the page, which knows the account's plan. Capped in the background. */
+  keptDays?: number | null;
+  limit?: number;
+  /** Build the index without searching, so the first search is not the one that waits. */
+  warmOnly?: boolean;
+}
+
+export interface HistorySearchPageView {
+  url: string;
+  /** Empty when the page never reported a title. */
+  title: string;
+  host: string;
+  lastVisitMs: number;
+  visitCount: number;
+  timeSpentMs: number;
+  matchedIn: Array<'title' | 'keywords' | 'address'>;
+}
+
+export interface SearchHistoryResponse {
+  state: HistorySearchState;
+  /** How many days back this answer covers. */
+  windowDays: number;
+  pages: HistorySearchPageView[];
+  /** Matches found, which can exceed `pages.length`. */
+  total: number;
+  builtAtMs?: number;
+  diagnostics?: { buildMs: number; entryCount: number; pageCount: number };
 }
 
 
@@ -1511,6 +1635,30 @@ export interface RemoveLogEntryRequest {
   clientId?: string;
 }
 
+/** A visit as History shows it; a delete also removes the redirects folded into it (HAT-640). */
+export type HistoryVisitKey = {
+  url: string;
+  startTime: number;
+  endTime?: number;
+  srcId?: string | number;
+  monitorId?: string;
+};
+
+/**
+ * Delete part of History (HAT-640): every visit since `since`, or the visits listed. An admin's own
+ * History or a family member's; never a child's own request.
+ */
+export interface RemoveLogEntriesRequest {
+  userId?: string;
+  since?: number;
+  visits?: HistoryVisitKey[];
+}
+
+export interface RemoveLogEntriesResponse {
+  /** How many visits were deleted; 0 when the range held none. */
+  removed: number;
+}
+
 export interface InvalidateActivityMonitorsRequest {
   userId?: string;
 }
@@ -1567,6 +1715,8 @@ export interface GroupedEntryView {
   activeDurationMs: number;
   spanDurationMs: number;
   activityPhases?: UsageSummaryPhase[];
+  /** How many different pages of the site the row holds (PUX-6). */
+  pageCount?: number;
   entries?: any[];
 }
 
@@ -1957,6 +2107,8 @@ export interface AISendMessageRequest {
   mode?: string;
   /** Optional model override (DEV/debug). */
   model?: string;
+  /** Guide mode: which guide (config/guides). Without it every guide ran as the setup review. */
+  playbookId?: string;
 }
 
 export interface AISendMessageResponse {
@@ -2006,6 +2158,8 @@ export interface AITextRequest {
   userId?: string;
   context?: any;
   schema?: any;
+  /** The capability this request serves (`AI_CAPABILITIES`); its task's model on this device runs it. */
+  capability?: string;
 }
 
 export interface AITextResponse {
@@ -2049,6 +2203,35 @@ export interface AIUsageGetSummaryResponse {
    * actually admitted against, in AI requests. Null on a device-only install.
    */
   limits?: AiRequestLimitState | null;
+  /**
+   * What the open weekly window was used for, by kind. Null when no weekly window is open (nothing
+   * used this week) or on a device-only install. Absent from servers older than 2026-09-18.
+   */
+  usageByKind?: AiUsageByKind | null;
+}
+
+/** One kind of Kindredly.ai use in the open weekly window. */
+export interface AiUsageByKindRow {
+  kind: AiUsageKind;
+  /** Calls made, however they were billed. For `images`, the images made. */
+  uses: number;
+  /**
+   * Of those, calls whose model had no price, so their spend is unknown rather than zero. When any
+   * are, `requests` undercounts and the page gives the count alone. Absent from servers before it.
+   */
+  unmeasuredUses?: number;
+  /**
+   * The plan spend of those calls in AI requests, rounded down — the same spend and unit the weekly
+   * limit counts, so the kinds add up to it. Zero when `limits.measured` is false.
+   */
+  requests: number;
+}
+
+export interface AiUsageByKind {
+  /** When the open weekly window started, ISO. */
+  since: string;
+  /** Only kinds with at least one use, in no particular order. */
+  rows: AiUsageByKindRow[];
 }
 
 /** Which hosted AI limit window. */
@@ -2170,19 +2353,25 @@ export interface AIUsageSpendSummary {
 export interface AISessionResponse {
   id: string;
   name: string;
-  sessionType: 'general' | 'app-editor';
+  sessionType: 'general' | 'app-editor' | 'guide' | 'feed-builder' | 'lesson-builder';
   step: number;
   createdAt?: string;
   updatedAt?: string;
 }
 
 export interface UserTaskRequest 
-{ taskname: string; data: any; system?: string; prompt?: string, maxTokens?: number; model?: string }
+{ taskname: string; data: any; system?: string; prompt?: string, maxTokens?: number; model?: string;
+  /** How much the model reasons (`AI_REASONING_EFFORTS`). Absent = the model's own level. */
+  reasoningEffort?: 'none' | 'low' | 'medium' | 'high' }
 
 /** Request type for streaming AI tasks */
 export interface UserTaskStreamRequest {
   taskname: 'agentInteraction';
   data: { messages: Array<{ role: string; content: string }> };
+  /** The task's hosted model; the plan still caps it. Absent = the plan's default. */
+  model?: string;
+  /** How much the model reasons (`AI_REASONING_EFFORTS`). Absent = the model's own level. */
+  reasoningEffort?: 'none' | 'low' | 'medium' | 'high';
 }
 
 /** A single tool (function) declaration passed through to the provider. */
@@ -2222,6 +2411,42 @@ export interface AISendMessageStreamRequest {
    */
   tools?: AIToolDeclaration[];
   toolChoice?: 'auto' | 'none' | 'required';
+  /**
+   * How much the model reasons for this task (`AI_REASONING_EFFORTS`). Absent = the model's own
+   * level. With tools, a level above `none` runs on the Responses API (AIR-16).
+   */
+  reasoningEffort?: 'none' | 'low' | 'medium' | 'high';
+}
+
+/** One model a task could run on, with how well it suits the task (HAT-071). */
+export interface AITaskModelOption {
+  engineId: string;
+  /** "Kindredly AI · GPT-6 Luna", "Ollama · llama3.2", "Chrome’s built-in model". */
+  label: string;
+  fit: 'recommended' | 'works' | 'not-recommended' | 'unsupported';
+  reason: string;
+  disabled: boolean;
+  /** Why it cannot be chosen: the task, the plan, or the family AI setting. */
+  disabledReason?: string;
+}
+
+/** An AI task as Settings → AI → Advanced shows it: its model and reasoning level on this device. */
+export interface AITaskModelEntry {
+  id: string;
+  label: string;
+  description?: string;
+  /** Runs on Kindredly AI only; private models are listed but cannot be chosen. */
+  hostedOnly: boolean;
+  /** The model this task saved on this device; null follows the default. */
+  selectedEngineId: string | null;
+  /** What the default runs on right now. */
+  defaultEngineId: string;
+  defaultLabel: string;
+  /** The reasoning level saved on this device; null uses the task's own. */
+  effort: 'none' | 'low' | 'medium' | 'high' | null;
+  /** The task's own level on its model; null when the model decides. */
+  defaultEffort: 'none' | 'low' | 'medium' | 'high' | null;
+  options: AITaskModelOption[];
 }
 
 /** SSE events from streaming chat endpoint */
@@ -3091,10 +3316,15 @@ export type FeedExtractionMode = 'verbatim' | 'light_edit' | 'paraphrase';
  * - `facts`   — 1–2 sentence intro + fact bullets (the default).
  * - `verse`   — one complete poem/song reproduced exactly, plus attribution.
  * - `passage` — one notable exact excerpt/quote, plus attribution.
+ * - `activity` — "Try it": one thing to do away from the screen, inspired by a subject (RACK-8).
+ *   Intro + numbered steps; its facts come from the source, its steps are written.
+ * - `day` — "This day in history" for one calendar day, from that day's Wikipedia page
+ *   (RACK-10). The record's `meta.day` holds the day as "MM-DD".
  * `verse` and `passage` are always verbatim (extracted, never written) — the
  * body is sliced straight from the cited source, so there is nothing to invent.
+ * `activity` and `day` are always written.
  */
-export type FeedPostType = 'facts' | 'verse' | 'passage';
+export type FeedPostType = 'facts' | 'verse' | 'passage' | 'activity' | 'day';
 
 /** Wikimedia + open-text projects the generator can source from, plus a generic URL fallback. */
 export type FeedGenerationSourceKind = 'wikipedia' | 'wikisource' | 'wikiquote' | 'gutenberg' | 'url';
@@ -3354,6 +3584,22 @@ export interface AdminPublishedPackageExportRequest {
   includeChildren?: boolean;
 }
 
+/**
+ * The stored settings the published catalog is arranged by, exactly as saved — no
+ * defaults merged in. Read by scripts/syncPublished.mjs; an allowlist, so AI
+ * settings, account limits and the invite code never leave the server this way.
+ */
+export interface AdminPublishedSettingsExportResponse {
+  /** gallery_*, galleryGroupDB_*, content_bundles_default, setup_catalog_default, curation_policy, cats */
+  sysInfo: Array<{_id: string; data: unknown}>;
+  /** category-sets-admin.json and banner-catalog.json from image storage; text is null when the file does not exist */
+  files: Array<{name: string; text: string | null}>;
+  /** Images those settings point at: Banner Library images and custom category-set icons */
+  imageNames: string[];
+  /** Names of the other sys_info rows, which are not exported */
+  otherKeys: string[];
+}
+
 export interface AdminPublishedPackageExportResponse {
   manifest: AdminPublishedPackageDataManifest;
   bundleBase64?: string | null;
@@ -3603,6 +3849,8 @@ export interface EditSubscriptionRequest {
   subscriptionId: string;
   data?: any;
   encInfo?: any;
+  /** The `updatedAt` the caller read; a row written since is not overwritten. */
+  expectedUpdatedAt?: string | null;
 }
 
 export interface ListSubscriptionsForUserRequest {
@@ -3617,7 +3865,7 @@ export interface ListSubscriptionsForRefRequest {
 
 // RefState (generic encrypted/plaintext state storage)
 export type RefStateOwnerType = 'user' | 'account' | 'session';
-export type RefStateRefType = 'item' | 'post' | 'feed_item' | 'app_global' | 'device-guard' | 'agent-changeset' | 'job';
+export type RefStateRefType = 'item' | 'post' | 'feed_item' | 'app_global' | 'app' | 'device-guard' | 'agent-changeset' | 'job' | 'ai-hidden-words' | 'subscriptions';
 
 export type RefStateEntry = {
   _id: string;
@@ -3896,6 +4144,54 @@ export type ArtifactSyncPendingResponse = {
   synced: number;
   failed: number;
 };
+
+/**
+ * Continue (CNT-1): one row per thing a person has started, with where they were. Kept per person
+ * as artifacts under `app_global` / `continue`, so one list call returns them all. Courses and daily
+ * reads are not here: their place lives in the subscription (`workThrough`).
+ */
+/** `audio`: an audio file in the library, such as an audiobook's .m4b (HAT-943). */
+export type ContinueKind = 'ebook' | 'lesson' | 'audio';
+
+export type ContinueEntry = {
+  /** `${kind}:${itemId}` */
+  key: string;
+  kind: ContinueKind;
+  itemId: string;
+  name: string;
+  /** Where you were, in words: a chapter's name, "Step 3 of 8". */
+  place: string;
+  /** How far along, 0–100, when known. */
+  pct: number | null;
+  /** When it was last opened, ISO. */
+  openedAt: string;
+  finished: boolean;
+};
+
+export type ContinueRecordRequest = {
+  kind: ContinueKind;
+  itemId: string;
+  name: string;
+  place: string;
+  pct?: number | null;
+  finished?: boolean;
+};
+
+export type ContinueRecordResponse = { entry: ContinueEntry | null };
+
+/** `forceRemote` also reads rows written on the person's other devices. */
+export type ContinueListRequest = { forceRemote?: boolean };
+
+/** Unfinished entries only, last opened first. */
+export type ContinueListResponse = {
+  entries: ContinueEntry[];
+  /** False when the server was asked and could not be read, so this device's rows came instead. */
+  fromServer?: boolean;
+};
+
+export type ContinueRemoveRequest = { kind: ContinueKind; itemId: string };
+
+export type ContinueRemoveResponse = { removed: boolean };
 
 export interface AccountInfoResponse {
   _id: string;
@@ -4535,6 +4831,8 @@ export interface ListLibraryRootRequest {
   userId?: string;
   includeUserPermissions?: boolean;
   limit?: number;
+  /** This device's copy only, never sent to the server; it carries no permissions (HAT-747). */
+  localOnly?: boolean;
 }
 
 export interface GetItemPathTreeRequest {
@@ -4551,6 +4849,12 @@ export interface GetItemParentsRequest {
 export interface ListSharedWithUserRequest {
   userId?: string;
   sharedByUserId?: string;
+  /** Only what was shared at or after this time (ms since epoch). */
+  sinceMs?: number;
+  /** At most this many, newest first. */
+  limit?: number;
+  /** What a confirmed friend shared, and what their family shared that is not yet in their library (HAT-984). */
+  fromFriends?: boolean;
 }
 
 export interface ListSharedByUserRequest {
@@ -4580,12 +4884,33 @@ export interface RediscoverQueueRequest {
 
 export interface LibraryCleanupCandidatesRequest {
   limit?: number,
-  minItemAgeDays?: number,
-  minSinceTouchedDays?: number,
+  /** Only items nobody has used for this many days: saved, opened, edited, starred, read (`lastUsedMs`). 0 or absent: any age. */
+  notUsedDays?: number,
+  /** Choices that differ from the default, by `LibraryCleanupGroup.key`. A group not named keeps its default: links of every kind except websites are chosen. */
+  groupChoices?: Record<string, boolean>,
+  /** Items filed in a collection are left out unless this is set: filing one says it is wanted (a recipe used every other year). */
+  includeFiled?: boolean,
   includeCollections?: boolean,
   includeReadLater?: boolean,
   includeStarred?: boolean,
   onlyKept?: boolean,
+}
+
+/** Cleanup candidates of one type ("Link", "YouTube Video", "Note"), chosen or not. */
+export interface LibraryCleanupGroup {
+  key: string,
+  label: string,
+  count: number,
+  chosen: boolean,
+}
+
+export interface LibraryCleanupCandidatesResponse {
+  /** Every type with a matching item, chosen or not, so any group can be switched on. */
+  groups: LibraryCleanupGroup[],
+  /** The first `limit` items of the chosen groups, least recently used first. */
+  items: ItemInfoView[],
+  /** Every matching item in the chosen groups: what Archive archives when nothing is ticked. */
+  itemIds: string[],
 }
 
 /** One exact canonical-URL duplicate set surfaced by the stable cleanup flow. */
@@ -4846,6 +5171,13 @@ export interface ItemQueryFilters {
   subTypes?: string[];
 
   /**
+   * Subtypes to leave out (e.g. `['product']` for the library's New list). An item with no
+   * subType always passes — both predicates spell that out, because SQL `whereNotIn` alone
+   * drops NULL rows and would empty the list it is meant to trim.
+   */
+  excludeSubTypes?: string[];
+
+  /**
    * Effective-type filter — matches resolveEffectiveItemType(), which reads meta/feeds
    * that the server cannot index (a podcast is derived from an audio feed and is never
    * stamped on item.subType, so `subTypes: ['podcast']` under-matches).
@@ -4874,6 +5206,29 @@ export interface ItemQueryFilters {
    * the server cannot evaluate them. ItemQueryService throws rather than fall back.
    */
   tags?: string[];
+
+  /**
+   * Only items an AI wrote (AIM-5): the origin record's `content` is `ai`, edited by a person or not.
+   *
+   * CLIENT-LOCAL ONLY, like `tags` — the origin record is inside the encrypted `info`.
+   */
+  madeWithAi?: boolean;
+
+  /**
+   * Only items never opened (AIM-11): no visit recorded on the item. CLIENT-LOCAL ONLY — visits are
+   * read from the item's feedback on this device.
+   */
+  notOpened?: boolean;
+
+  /**
+   * Text search over name, description and URL, case-insensitive. Applied before sorting
+   * and pagination, so a search reaches the whole library rather than the first page.
+   *
+   * CLIENT-LOCAL — names are E2E-encrypted, so the server cannot evaluate it. For another
+   * user's library ItemQueryService strips it, fetches the server's largest page and
+   * filters that, so the search covers at most that many rows in the requested order.
+   */
+  text?: string;
 
   // Collection context
   inCollections?: string[];
@@ -5170,10 +5525,399 @@ export interface CurationQueueEntry {
   heldReason?: string | null;
 }
 
+// ── Curator workspace (docs/trackers/curator-workspace-tracker.md) ─────────────────────────────
+// Catalog work on /curate, for curators who are not admins: archive, restore, delete from Archive,
+// block, change type, add links, approve, and the item's history. Every route checks for an active
+// curator on the server.
+
+/** One thing a curator, the admin console, the curation AI or the catalog monitor did to an item. */
+export interface CuratorItemAction {
+  _id: string;
+  action: string;
+  actorKind: 'curator' | 'admin' | 'ai' | 'monitor';
+  /** The curator's public name; null for the monitor and the admin console. */
+  actorName: string | null;
+  /** Field names, states and reasons; never page content. */
+  detail: Record<string, any> | null;
+  createdAt: string;
+}
+
+/** What the catalog monitor last saw at one address of the item (MON-5). */
+export interface CuratorItemCheck {
+  kind: 'page' | 'feed' | 'privacy' | 'terms';
+  url: string;
+  checkedAt: string | null;
+  nextCheckAt: string | null;
+  /** 'ok' | 'not_modified' | 'not_checked' | 'failed' */
+  result: string | null;
+  reason: string | null;
+  httpStatus: number | null;
+  finalUrl: string | null;
+  title: string | null;
+  newestPostAt: string | null;
+  changedAt: string | null;
+  findings: Array<{code: string; since: string; detail?: Record<string, any>}>;
+}
+
+export interface CuratorItemHistoryResponse {
+  actions: CuratorItemAction[];
+  checks: CuratorItemCheck[];
+}
+
+export interface CuratorAddLinksResponse {
+  added: Array<{url: string; itemId: string}>;
+  /** Already in the catalog, not a web address, or one we never fetch. */
+  skipped: Array<{url: string; reason: string; itemId?: string | null}>;
+}
+
+/** One row of the queue's Added list or the Archived list (CWS-7). */
+export interface CuratorListEntry {
+  _id: string;
+  name: string | null;
+  imageFilename?: string | null;
+  url?: string | null;
+  createdAt?: string | null;
+  archivedAt?: string | null;
+  /** postImportProcessing.state: 'ready' can be approved; the rest are still being read or were held. */
+  processingState?: string | null;
+  /** The safety check held it; approving overrides that only in the admin console. */
+  flagged?: boolean;
+}
+
+export interface CuratorApproveResponse {
+  approved: string[];
+  skipped: Array<{itemId: string; reason: string}>;
+}
+
+/** One manifest row as a curator's import would treat it (CWS-6). */
+export interface CuratorManifestRow {
+  localId: string;
+  name: string | null;
+  type: string | null;
+  url: string | null;
+  /** 'skip': a conflict, an invalid row, or a row matching a family's item, which a manifest never changes. */
+  decision: 'create' | 'update' | 'skip';
+  reason: string | null;
+  /** The catalog item an update changes, or the one a skipped row matched. */
+  itemId: string | null;
+}
+
+export interface CuratorManifestPreviewResponse {
+  /** Sent back with the import, so a manifest changed after the preview is refused. */
+  manifestHash: string;
+  rows: CuratorManifestRow[];
+  createCount: number;
+  updateCount: number;
+  skipCount: number;
+}
+
+export interface CuratorManifestImportResponse {
+  createdCount: number;
+  updatedCount: number;
+  /** Held by the safety check: still added, and approving it stays in the admin console. */
+  heldForReviewCount: number;
+  itemIds: string[];
+}
+
+// ── Curation proposals (docs/guides/curation-agent-mcp.md) ─────────────────────────────────────
+// An AI with a curation key proposes changes to catalog items; nothing reaches an item until a
+// curator presses Apply. Mark curated is always the curator's own action.
+
+/** The fields a proposal may change. A field left out stays as it is. */
+export interface CurationProposalChanges {
+  name?: string;
+  description?: string;
+  /** A picture saved when it was proposed, under its own filename; never the item's live file. */
+  imageFilename?: string;
+  categories?: string[];
+  useCriteria?: string[];
+  /**
+   * The item's whole feed list (`info.feeds`), replacing the current one. A feed is what makes a
+   * podcast or news source subscribable; a new link is checked to be a real feed when proposed.
+   */
+  feeds?: AdminContentLoaderManifestFeed[];
+}
+
+export type CurationProposalStatus = 'pending' | 'applied' | 'rejected' | 'withdrawn';
+
+export interface CurationProposalView {
+  _id: string;
+  publishedId: string;
+  status: CurationProposalStatus;
+  changes: CurationProposalChanges;
+  /** Where a proposed picture was downloaded from. */
+  imageSourceUrl: string | null;
+  reason: string | null;
+  /** The AI thinks the item is ready to be marked curated. Only a curator can mark it. */
+  recommendCurated: boolean;
+  /** The AI suggests taking the item out of the catalog; a proposal of its own, with no changes (HAT-623). */
+  recommendRemoval: boolean;
+  /** The name of the key that proposed it. */
+  proposedBy: string | null;
+  createdAt: string;
+  updatedAt: string;
+  decidedAt: string | null;
+  decisionNote: string | null;
+}
+
+/** The item as it is now, beside a pending proposal, so the queue shows before and after. */
+export interface CurationProposalItemNow {
+  _id: string;
+  name: string | null;
+  description: string | null;
+  imageFilename: string | null;
+  /**
+   * The picture families see, by the app's rule: the saved one, else the page's, else the
+   * site's icon. A link, or a name in the server's image store. Null when there is none.
+   */
+  picture: string | null;
+  pictureKind: 'saved' | 'page' | 'icon' | null;
+  categories: string[];
+  useCriteria: string[];
+  feeds: AdminContentLoaderManifestFeed[];
+  url: string | null;
+  curated: boolean;
+  /** Kindredly's own row. A family's suggestion keeps the family's name and description. */
+  official: boolean;
+}
+
+export interface CurationProposalQueueEntry extends CurationProposalView {
+  /** Null when the item no longer exists. */
+  item: CurationProposalItemNow | null;
+  /** The item's newest rejected proposal: what the curator said, and the reason it answered (HAT-626). */
+  previousRejection?: {decidedAt: string | null; decisionNote: string | null; reason: string | null} | null;
+}
+
+export interface CurationProposalApplyRequest {
+  proposalId: string;
+  /** Also mark the item curated, as the curation page's Mark curated does. */
+  markCurated?: boolean;
+  /**
+   * The proposal as the curator edited it under Proposed changes (HAT-625). A field left out is not
+   * applied. Only the proposal's own fields; a feed must be one it proposed or the item has, and the
+   * picture only the one it saved. Left out entirely, the proposal applies as it stands.
+   */
+  changes?: CurationProposalChanges;
+}
+
+export interface CurationProposalApplyResponse {
+  /** The fields written to the item. */
+  applied: string[];
+  /** Fields the item would not take, with the reason. */
+  skipped: {field: string; reason: string}[];
+  markedCurated: boolean;
+}
+
+/** One MCP message (JSON-RPC 2.0). A message with no id is a notification and gets no reply. */
+export interface McpJsonRpcMessage {
+  jsonrpc: '2.0';
+  id?: string | number | null;
+  method: string;
+  params?: Record<string, unknown>;
+}
+
+export interface McpJsonRpcResponse {
+  jsonrpc: '2.0';
+  id: string | number | null;
+  result?: unknown;
+  error?: {code: number; message: string; data?: unknown};
+}
+
+/** A key an AI uses to reach a narrow MCP endpoint. The key itself is shown once, when made. */
+export interface AgentKeyView {
+  _id: string;
+  label: string;
+  scope: 'curation-propose';
+  createdAt: string;
+  lastUsedAt: string | null;
+  revokedAt: string | null;
+}
+
+// ── Connected AI apps (HAT-616, docs/proposals/connected-ai-apps.md) ─────────────────────────────
+
+/** What the settings page needs to draw itself. The server checks the same things on every call. */
+export interface McpRelayStatus {
+  /** Kindredly made Connected AI apps available to this family. When false, nothing is shown. */
+  available: boolean;
+  familyAiOn: boolean;
+  /** The family's Connected AI apps switch. Off until an adult turns it on. */
+  enabled: boolean;
+  /** The signed-in person is an adult, so may turn the switch on and connect an AI app. */
+  canConnect: boolean;
+}
+
+/** One connected AI app. The credential itself is shown once, when it is made. */
+export interface McpRelayConnectionView {
+  _id: string;
+  /** The adult the AI app acts as. */
+  userId: string;
+  /** What the person, or the AI app at sign-in, called it. */
+  clientName: string;
+  /** End-to-end encrypted (true) or not (false). Fixed when the connection is made. */
+  sealed: boolean;
+  createdAt: string;
+  /** Day precision: when the AI app last called. Nothing else about a call is kept. */
+  lastUsedAt: string | null;
+  mine: boolean;
+  /** The version the AI app gave when it last started a session (AIM-10); absent until it has. */
+  appVersion?: string;
+}
+
+/**
+ * Which Kindredly answers this adult's AI apps (HAT-814, HAT-847), saved as their own user pref
+ * `MCP_RELAY_ROUTING_PREF_KEY` and read by the relay on every call.
+ * - `askFirst` (default true): an AI app waits for Agree on a Kindredly before its first call.
+ *   Off, it connects to the Kindredly used last, without asking.
+ * - `device`: `agreed` (default) keeps the Kindredly where Agree was tapped; `recent` follows the
+ *   Kindredly used last. With `askFirst` off it is always `recent`.
+ * Every way shows the bar with Disconnect on the Kindredly answering.
+ */
+export interface McpRelayRouting {
+  askFirst: boolean;
+  device: 'agreed' | 'recent';
+}
+
+export const MCP_RELAY_ROUTING_PREF_KEY = 'connectedAiApps.routing';
+
+/** The saved pref as a full `McpRelayRouting`: anything missing or unknown is the default. */
+export function readMcpRelayRouting(value: unknown): McpRelayRouting {
+  const v = (value && typeof value === 'object' ? value : {}) as Partial<McpRelayRouting>;
+  return {askFirst: v.askFirst !== false, device: v.device === 'recent' ? 'recent' : 'agreed'};
+}
+
+/**
+ * How long an adult's Agree lasts for one AI app (HAT-880), chosen on the ask or in Settings.
+ * `connect`: the AI app connects without asking, as with `askFirst` off, for this AI app only.
+ * `changes`: its library and task changes run without asking; parental changes always ask.
+ * Each AI app and kind is its own user pref of the adult's (`mcpRelayAgreedUntilPrefKey`), an ISO
+ * time, so a save is one write and two saves never overwrite each other. The relay reads `connect`
+ * on every call; the answering Kindredly reads `changes` before asking.
+ */
+export const MCP_RELAY_AGREE_PERIODS = ['2h', '24h', 'week', 'month', 'year'] as const;
+export type McpRelayAgreePeriod = (typeof MCP_RELAY_AGREE_PERIODS)[number];
+export const MCP_RELAY_AGREED_KINDS = ['connect', 'changes'] as const;
+export type McpRelayAgreedKind = (typeof MCP_RELAY_AGREED_KINDS)[number];
+
+export function mcpRelayAgreedUntilPrefKey(connectionId: string, kind: McpRelayAgreedKind): string {
+  return `connectedAiApps.agreedUntil.${connectionId}.${kind}`;
+}
+
+const HOUR_MS = 3600_000;
+const AGREE_PERIOD_MS: Record<McpRelayAgreePeriod, number> = {
+  '2h': 2 * HOUR_MS,
+  '24h': 24 * HOUR_MS,
+  week: 7 * 24 * HOUR_MS,
+  month: 30 * 24 * HOUR_MS,
+  year: 365 * 24 * HOUR_MS,
+};
+
+/** The value to save for `period` from now: when it ends, as an ISO time. */
+export function mcpRelayAgreedUntilValue(period: McpRelayAgreePeriod, now = Date.now()): string {
+  return new Date(now + AGREE_PERIOD_MS[period]).toISOString();
+}
+
+/** Until when (ms) a saved value lets the AI app connect or change without asking, or null when it must ask. */
+export function readMcpRelayAgreedUntil(value: unknown, now = Date.now()): number | null {
+  const until = typeof value === 'string' ? Date.parse(value) : NaN;
+  // Never past the longest choice, so an edited pref cannot make it last for ever. A day of slack:
+  // the time was worked out on the saving device's clock, which can differ from this one's.
+  return Number.isFinite(until) && until > now && until <= now + AGREE_PERIOD_MS.year + 24 * HOUR_MS ? until : null;
+}
+
+/** A connected AI app as one Kindredly sees it: answering here, or asking for Agree (HAT-814). */
+export interface McpRelaySessionView {
+  connectionId: string;
+  clientName: string;
+  state: 'here' | 'asking';
+  /** While `here`: when the session ends if the AI app makes no call before then. */
+  until: string | null;
+}
+
+/** One call, sent down the answering device's stream as the `mcpRelayFrame` event. */
+export interface McpRelayFrame {
+  frameId: string;
+  /** The server process waiting for this call. The device sends it back with its reply. */
+  replyTo: string;
+  connectionId: string;
+  /**
+   * The adult the connection belongs to. A device signed in as anyone else replies `notHere`
+   * without running the call. Absent from a server older than 2026-10-21.
+   */
+  userId?: string;
+  sealed: boolean;
+  op: 'listTools' | 'callTool';
+  name?: string;
+  arguments?: Record<string, unknown>;
+  clientName?: string;
+  /** The version the AI app gave in `initialize` (AIM-1). Absent from a server older than 2026-11-02. */
+  clientVersion?: string;
+}
+
+/**
+ * The answering device's reply. `undeliverable` carries no reason, so the server learns nothing.
+ * `notHere`: this device is signed in as someone other than the connection's adult and ran nothing,
+ * so the server tries the adult's next device.
+ */
+export interface McpRelayReplyRequest {
+  frameId: string;
+  /** `McpRelayFrame.replyTo`, unchanged. */
+  replyTo: string;
+  status: 'ok' | 'undeliverable' | 'notHere';
+  result?: unknown;
+}
+
+/**
+ * A connected AI app asking an adult's permission (HAT-690). `blob` is what is asked, encrypted on the
+ * asking device with the adult's own key: the server cannot read it.
+ */
+export interface McpPermissionRequestView {
+  _id: string;
+  blob: string;
+  createdAt: string;
+}
+
+/** Where a permission request stands. `expired`: gone after ten minutes, or someone else's. */
+export type McpPermissionStatus = 'pending' | 'approved' | 'denied' | 'used' | 'expired';
+
+/**
+ * A new device of this person asking to open their data (UNL-14), as their other devices see it: the
+ * device's name and its one-time public key, from which both screens work out the same four words.
+ */
+export interface DeviceUnlockRequestView {
+  _id: string;
+  publicKey: string;
+  deviceLabel: string;
+  createdAt: string;
+}
+
+/** Where a new device's request stands, as that device reads it. `expired`: gone, taken, or not its own. */
+export type DeviceUnlockStatus = 'pending' | 'approved' | 'denied' | 'expired';
+
+/** What Dynamic Client Registration returns to the AI app (RFC 7591 §3.2.1). */
+export interface McpRelayOauthClientRegistration {
+  client_id: string;
+  client_id_issued_at: number;
+  client_name: string;
+  redirect_uris: string[];
+  grant_types: string[];
+  response_types: string[];
+  token_endpoint_auth_method: 'none';
+}
+
+/** What the token endpoint returns (RFC 6749 §5.1). The refresh token rotates on every use. */
+export interface McpRelayOauthTokenResponse {
+  access_token: string;
+  token_type: 'Bearer';
+  expires_in: number;
+  refresh_token: string;
+  scope: string;
+}
+
 // ── Curation review (docs/specs/curation-review.md) ────────────────────────────────────────────
 
 export type CurationReviewStatus = 'open' | 'finalized' | 'closed';
-export type CurationReviewOpenReason = 'report' | 'scheduled' | 'backfill' | 'suggestion' | 'curator';
+/** `agent`: the curation AI drafted it through the curation MCP (HAT-623). */
+export type CurationReviewOpenReason = 'report' | 'scheduled' | 'backfill' | 'suggestion' | 'curator' | 'agent' | 'monitor';
 /** Where the curator's answer started: their own, an AI suggestion they confirmed, or the last review's. */
 export type CurationReviewAnswerSource = 'human' | 'ai_confirmed' | 'previous_confirmed';
 
@@ -5197,12 +5941,34 @@ export interface CurationReviewAiDraft {
   completedAt?: string | null;
   answers?: Record<
     string,
-    {value: string | string[]; confidence?: number | null; rationale?: string | null; suggestedComment?: string | null}
+    {
+      value: string | string[];
+      confidence?: number | null;
+      rationale?: string | null;
+      suggestedComment?: string | null;
+      /** Written by the curation AI through the curation MCP; a fresh model draft keeps it. */
+      fromMcp?: boolean;
+    }
   >;
   summary?: string | null;
+  /** The summary (suggested Curator note) is the curation AI's; a fresh model draft keeps it. */
+  summaryFromMcp?: boolean;
   suggestedOutcome?: 'curate' | 'decline' | 'unsure' | null;
   suggestedDeclineReason?: string | null;
   reviewAgainMonths?: number | null;
+  /**
+   * What the server found when it opened the link, decided without a model. The curator sees it
+   * only when something is wrong; families never do. Drafts written before checklist v4 carry it as
+   * `answers.link_works` instead.
+   */
+  linkCheck?: {value: 'pass' | 'concern' | 'fail' | 'not_checked'; rationale: string; finalUrl?: string | null} | null;
+}
+
+/** A catalog row that may be the same thing as the one under review, and why the server thinks so. */
+export interface CurationPossibleDuplicate {
+  _id: string;
+  name: string | null;
+  reason: 'same_link' | 'same_link_after_redirect' | 'same_name_same_site' | 'same_name' | 'same_items';
 }
 
 /** A review as a curator sees it. */
@@ -5246,6 +6012,8 @@ export interface CurationReviewForCuratorResponse {
   ownSuggestion: boolean;
   /** How many curators this item needs, and where this curator's own answers stand. */
   signoffs?: CurationReviewSignoffState;
+  /** Catalog rows that may be the same thing: a warning at the top of the form, never a block. */
+  possibleDuplicates?: CurationPossibleDuplicate[];
 }
 
 /** One curator's own answers to a review. Adding an item takes several (curation.signoff.ts). */
@@ -5378,3 +6146,52 @@ export interface CurationReviewListForItemResponse {
   open: {openedAt: string | null; underReview: boolean; reasons: string[]} | null;
   nextReviewAt: string | null;
 }
+
+// ── Files in pieces (IFX-14) ─────────────────────────────────────────────────────────────────
+// A large file moves between the page and the background a few 2 MB pieces per request, so no
+// request carries it whole. The background encrypts each piece before it leaves the device and
+// decrypts each one on the way back; the server only ever holds ciphertext.
+
+/** The error message when an upload or read session has gone (the background restarted); start again. */
+export const FILE_PIECES_ENDED = 'file_pieces_ended';
+
+export type ItemAttachmentPiecesStartRequest = {
+  itemId: string;
+  encInfo: any;
+  attachmentInfo: {
+    filename: string;
+    fileType: string;
+    filesize: number;
+    meta?: Record<string, unknown>;
+    attachmentType?: 'file' | 'snapshot';
+    createDate?: number;
+  };
+};
+export type FilePiecesStartResponse = { uploadId: string; pieceSize: number };
+/** `data` is base64 of whole pieces starting at piece `index`; only the file's last piece may be short. */
+export type FilePiecesPutRequest = { uploadId: string; index: number; data: string };
+export type FilePiecesPutResponse = { next: number };
+export type ItemAttachmentPiecesFinishRequest = { uploadId: string; imagePreview?: string; imageType?: string };
+export type ItemAttachmentPiecesFinishResponse = { attachmentId: string; fileId: string };
+export type FilePiecesOpenRequest = { fileId: string };
+export type FilePiecesOpenResponse = { readId: string; size: number; fileType: string | null; filename: string | null };
+export type FilePiecesReadRequest = { readId: string; offset: number; length: number };
+export type FilePiecesReadResponse = { data: string };
+export type FilePiecesCloseRequest = { readId?: string; uploadId?: string };
+
+/**
+ * A project (AIM-13): the display name and note of a `project:` tag. The tag on each item never
+ * changes; renaming changes only this record.
+ */
+export interface ProjectView {
+  tag: string;
+  name: string;
+  note?: string;
+  createdAt: string;
+}
+export type ProjectListRequest = { refresh?: boolean };
+export type ProjectListResponse = { projects: ProjectView[] };
+export type ProjectCreateRequest = { name: string };
+export type ProjectRenameRequest = { tag: string; name: string };
+export type ProjectSetNoteRequest = { tag: string; note: string };
+export type ProjectResponse = { project: ProjectView };

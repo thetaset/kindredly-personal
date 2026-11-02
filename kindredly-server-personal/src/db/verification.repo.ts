@@ -22,4 +22,14 @@ export class VerificationRepo extends BaseRepo<Verification> {
   async create(input: Verification) {
     return await this.query().insert(input);
   }
+
+  /** The newest unexpired family invite sent to this email. Emails compare without case. */
+  async findPendingFamilyInviteForEmail(email: string): Promise<Verification | undefined> {
+    return await this.query()
+      .where({type: 'joinFamily'})
+      .whereRaw(`lower(data->>'email') = ?`, [email.trim().toLowerCase()])
+      .where((q) => q.whereNull('expiresAt').orWhere('expiresAt', '>', new Date()))
+      .orderBy('createdAt', 'desc')
+      .first();
+  }
 }

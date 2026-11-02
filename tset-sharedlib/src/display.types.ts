@@ -81,6 +81,8 @@ export interface LibraryDisplayItem extends BaseDisplayItem {
   sharedByUserId?: string;
   sharedWithUserId?: string;
   sharedAt?: string;
+  /** Shared with this person but not in their library, so Shared with me offers Add to Library. */
+  notInLibrary?: boolean;
   permList?: {userId:string; permission: PermissionType}[];
   
   publishId?: string;
@@ -148,6 +150,8 @@ export interface PublishedDisplayItem extends Omit<LibraryDisplayItem, 'baseType
   curatorComment?: string;
   /** An open curation review has taken it out of recommendations. */
   underReview?: boolean;
+  /** A curator archived it: out of the catalog, its page still opens (CWS-2). */
+  archived?: boolean;
   nextReviewAt?: string;
 
   inLibrary?: boolean;

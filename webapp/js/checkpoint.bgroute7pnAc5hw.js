@@ -1,0 +1,1 @@
+import{cA as r}from"./appLifecycle.storeCIRbKlhW.js";import"./vue-runtimetcX7J1Xt.js";import"./cjs-helpersC4iS2aBk.js";import"./dexie2jmnBxhj.js";import"./bootstrap-vue-nextBII_jLmU.js";const t=[];t.push({path:"/checkpoint/taskgate/status",handler:async(o,e,s)=>await r.instance.evaluate((e==null?void 0:e.userId)??null,(e==null?void 0:e.forceRefresh)===!0)});export{t as default};

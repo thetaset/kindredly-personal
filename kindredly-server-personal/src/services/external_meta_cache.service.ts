@@ -18,6 +18,8 @@ import type Published from 'tset-sharedlib/schemas/public/Published';
 import {
   fetchGenericHtmlMeta,
   fetchRedditPageMetaDefault,
+  fetchSiteApiMeta,
+  fetchGooglePhotosShareMeta,
   fetchSocialPageMetaDefault,
   fetchYoutubeVideoInfo,
   fetchYoutubeChannelMetaWithApiByURL,
@@ -34,10 +36,26 @@ import {
   urlToKey,
 } from 'tset-sharedlib/url.utils';
 import {extractYTChannelID, extractYTVideoID} from 'tset-sharedlib/text.utils';
+import {recognizeMediaMetadataUrl} from 'tset-sharedlib/media-metadata.utils';
+import {isLikelyChallengeTitle} from 'tset-sharedlib/extraction.pure.utils';
+import {isGooglePhotosShareUrl} from 'tset-sharedlib/google-photos.utils';
+import {resolveMediaMetadata} from './media_metadata_resolver.service';
+
+/** A Google Photos share's metadata without its cover, which is one of the family's photos (HAT-651). */
+function withoutShareCover(url: string, meta: ItemMeta | null): ItemMeta | null {
+  if (!meta || !meta.imageSrc || !isGooglePhotosShareUrl(url)) return meta;
+  const withoutCover = {...meta};
+  delete withoutCover.imageSrc;
+  return withoutCover;
+}
 
 class ExternalMetaCacheService {
   private repo = new ExternalMetaCacheRepo();
   private publishedRepo = new PublishedRepo();
+  private static inFlight = new Map<
+    string,
+    Promise<{meta: ItemMeta | null; extendedInfo: ExternalMetaExtendedInfo | null}>
+  >();
 
   private coerceBoolean(value: unknown): boolean | undefined {
     return typeof value === 'boolean' ? value : undefined;
@@ -186,40 +204,70 @@ class ExternalMetaCacheService {
     }
 
     const resource = this.categorizeUrl(url);
+    let staleEntry: ExternalMetaCacheEntry | null = null;
 
     if (!options.skipCache && !options.forceRefresh) {
       const cached = await this.lookup(resource.resourceType, resource.externalId);
+      // An entry stored before sign-in and challenge pages were screened out carries that page's
+      // title ("Google Docs: Sign-in", HAT-168). It is neither served nor kept as the fallback,
+      // so the next fetch replaces it.
+      if (cached.entry && isLikelyChallengeTitle(cached.entry.meta?.title)) {
+        cached.entry = null;
+        cached.cacheHit = false;
+      }
       if (cached.cacheHit && cached.isFresh) {
         await this.repo.touch(cached.entry!._id);
         return {
-          meta: cached.entry!.meta || null,
+          meta: withoutShareCover(url, cached.entry!.meta || null),
           extendedInfo: cached.entry!.extendedInfo || null,
           fromCache: true,
           source: 'cache',
         };
       }
+      staleEntry = cached.entry;
     }
 
-    const {meta, extendedInfo} = await this.fetchFreshMetadata(url, resource.resourceType, resource.externalId);
+    const inFlightKey = `${resource.resourceType}:${resource.externalId}`;
+    const existingFetch = ExternalMetaCacheService.inFlight.get(inFlightKey);
+    if (existingFetch) {
+      const result = await existingFetch;
+      return {...result, fromCache: false, source: 'coalesced'};
+    }
 
-    // `fileInfo` counts as content: a PDF whose filename yields no usable title is
-    // still a fully recognised file, not a parse failure, and negative-caching it
-    // for an hour would hide that from the popup.
-    const hasContent = !!(meta?.title || meta?.description || meta?.imageSrc || meta?.fileInfo || extendedInfo);
-    await this.store(
-      {
-        resourceType: resource.resourceType,
-        externalId: resource.externalId,
-        parentExternalId: resource.parentExternalId,
-        canonicalUrl: url,
-        meta: meta || null,
-        extendedInfo: extendedInfo || null,
-        sourceId: meta?.tsExtractedInfo?.sourceId || (hasContent ? 'html_parser' : 'parser_err'),
-      },
-      hasContent ? undefined : 60 * 60 * 1000,
-    );
+    const fetchAndStore = (async () => {
+      const result = await this.fetchFreshMetadata(url, resource.resourceType, resource.externalId);
+      const {meta, extendedInfo} = result;
 
-    return {meta, extendedInfo, fromCache: false, source: 'fetch'};
+      // `fileInfo` counts as content: a PDF whose filename yields no usable title is
+      // still a fully recognised file, not a parse failure, and negative-caching it
+      // for an hour would hide that from the popup.
+      const hasContent = !!(meta?.title || meta?.description || meta?.imageSrc || meta?.fileInfo || extendedInfo);
+      if (!hasContent && staleEntry && (staleEntry.meta || staleEntry.extendedInfo)) {
+        return {meta: withoutShareCover(url, staleEntry.meta || null), extendedInfo: staleEntry.extendedInfo || null};
+      }
+      await this.store(
+        {
+          resourceType: resource.resourceType,
+          externalId: resource.externalId,
+          parentExternalId: resource.parentExternalId,
+          canonicalUrl: resource.canonicalUrl || url,
+          meta: meta || null,
+          extendedInfo: extendedInfo || null,
+          sourceId: meta?.tsExtractedInfo?.sourceId || (hasContent ? 'html_parser' : 'parser_err'),
+        },
+        hasContent ? undefined : 60 * 60 * 1000,
+      );
+      return result;
+    })();
+    ExternalMetaCacheService.inFlight.set(inFlightKey, fetchAndStore);
+    try {
+      const result = await fetchAndStore;
+      return {...result, fromCache: false, source: 'fetch'};
+    } finally {
+      if (ExternalMetaCacheService.inFlight.get(inFlightKey) === fetchAndStore) {
+        ExternalMetaCacheService.inFlight.delete(inFlightKey);
+      }
+    }
   }
 
   /**
@@ -276,7 +324,17 @@ class ExternalMetaCacheService {
     resourceType: ExternalResourceType;
     externalId: string;
     parentExternalId?: string;
+    canonicalUrl?: string;
   } {
+    const media = recognizeMediaMetadataUrl(url);
+    if (media) {
+      return {
+        resourceType: media.resourceType,
+        externalId: `${media.provider}:${media.externalId}`,
+        canonicalUrl: media.canonicalUrl,
+      };
+    }
+
     if (isYTVideoURL(url)) {
       const videoId = extractYoutubeVideoId(url);
       if (videoId) {
@@ -316,6 +374,15 @@ class ExternalMetaCacheService {
     externalId: string,
   ): Promise<{meta: ItemMeta | null; extendedInfo: ExternalMetaExtendedInfo | null}> {
     try {
+      if (recognizeMediaMetadataUrl(url)) {
+        const resolved = await resolveMediaMetadata(url);
+        if (!resolved) return {meta: null, extendedInfo: null};
+        // The resolver always returns extendedInfo, even when it found nothing. Keep it
+        // only for a resolved title: otherwise a provider's one-off stall would count as
+        // content, earn the provider's 7-30 day TTL, and overwrite an older good entry.
+        return {meta: resolved.meta, extendedInfo: resolved.meta.resolved ? resolved.extendedInfo : null};
+      }
+
       if (resourceType === ItemResourceType.YT_VIDEO) {
         const result = await this.fetchYouTubeVideoMeta(url, externalId);
         // The YouTube Data API path is entirely key/quota dependent and returns
@@ -338,8 +405,12 @@ class ExternalMetaCacheService {
         return {meta, extendedInfo: null};
       }
 
-      const meta = await fetchGenericHtmlMeta(url);
-      return {meta, extendedInfo: null};
+      // A site that refuses a page read but names the page through a public API (HAT-619).
+      const meta =
+        (await fetchSiteApiMeta(url)) || (await fetchGooglePhotosShareMeta(url)) || (await fetchGenericHtmlMeta(url));
+      // A Google Photos share's cover is one of the family's photos, and this cache is shared: none is
+      // kept, even from the plain page read used when the share's own reader found nothing (HAT-651).
+      return {meta: withoutShareCover(url, meta), extendedInfo: null};
     } catch (error) {
       console.error(`Error fetching metadata for ${url}:`, error);
       return {meta: null, extendedInfo: null};

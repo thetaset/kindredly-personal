@@ -14,9 +14,11 @@ import {userPrefDefaults} from 'tset-sharedlib/schemas/public/UserPref';
 import {NotificationGroupType, NotificationMethod, NotificationType} from '@/typing/enum_strings';
 import {UserType} from 'tset-sharedlib/shared.types';
 import ClientInfoService from './client_info.service';
+import SSEManager from './sse.manager';
 import VerificationService from './verification.service';
 import {ACCOUNT_INVITE_MSG, INVITATION_TO_ACCOUNT} from '@/defaults/message_templates';
 import {clampOffset, clampPerPage} from '@/utils/pagination_utils';
+import {escapeHtml} from '@/utils/text_utils';
 
 // Whitelist: `sort` is a client-supplied column name going straight into
 // .orderBy(), so anything outside this set falls back to createdAt.
@@ -35,11 +37,17 @@ const typeToTitle = {
   NEW_POST: 'New Post',
   NEW_COMMENT: 'New Comment',
   NEW_ITEM: 'New Item Added to Your Library',
-  SHARED_ITEM: 'New Shared Item',
+  SHARED_ITEM: 'Shared with you',
   RESTRICTED_USER_PUBLISHED: 'Restricted User Published',
   DEVICE_PROTECTION_ALERT: 'Device Protection Alert',
+  CHILD_SAFETY_ALERT: 'A child may need you',
   PLATFORM_ALERT: 'Platform Alert',
+  LESSON_PART_DONE: 'Digital citizenship',
+  ACTIVITY_REPORT: 'Activity report',
 };
+
+/** At most this many lesson notices per child a day: a pack has five parts, and the child's device reports them. */
+const LESSON_PART_DONE_PER_DAY = 5;
 
 function notiticationTypeToTitle(type: string) {
   if (typeToTitle[type]) {
@@ -50,9 +58,14 @@ function notiticationTypeToTitle(type: string) {
 }
 
 const maxAgeOfDevicesInDays = 10;
+
+/** The Family Downtime notice's tag on Android and identifier on iOS. The phones' code uses the same strings. */
+export const FAMILY_DOWNTIME_NOTICE_ID = 'family-downtime';
+export const CLEAR_FAMILY_DOWNTIME_NOTICE = 'clearFamilyDowntimeNotice';
 import {TYPES} from '@/types';
 import type SetupService from './_interfaces/syssetup.service';
 import {inject} from 'inversify';
+import {parseAppSiteGrantKey} from 'tset-sharedlib/app-outside-services';
 class NotificationService {
   constructor(@inject(TYPES.SetupService) private setupService: SetupService) {}
 
@@ -87,7 +100,9 @@ class NotificationService {
         tokens: tokens,
       };
 
-      console.log('Sending push notification', message);
+      // Never the message itself: it names the child and the site they asked for, and these logs
+      // go to CloudWatch (EUP-3).
+      console.log(`Sending push notification to ${tokens.length} device(s)`);
 
       this.setupService.sendPushNotification(message);
     }
@@ -124,6 +139,95 @@ class NotificationService {
       tokens,
     });
 
+    return {sent: tokens.length};
+  }
+
+  /**
+   * "Send what you have recorded, now." Shows the child nothing, exactly like the rule sync above.
+   *
+   * A separate action rather than a reuse of `syncDeviceRules`: that one means "fetch your
+   * settings", and a device that answered it by also uploading would upload on every block a
+   * parent sets, which is a different and much more frequent event. Older Guard builds ignore an
+   * action they do not know, so this degrades to the fifteen-minute cycle rather than failing.
+   */
+  async sendSilentDeviceUploadRequest(userId: string) {
+    const tokens = await this.clientInfoService.listDeviceTokensUsedSinceXDaysAgo(userId, maxAgeOfDevicesInDays);
+    if (tokens.length === 0) return {sent: 0};
+
+    this.setupService.sendPushNotification({
+      apns: {
+        headers: {'apns-push-type': 'background', 'apns-priority': '5'},
+        payload: {aps: {'content-available': 1}},
+      },
+      android: {priority: 'high'},
+      data: {
+        kndAction: 'uploadActivityNow',
+        targetUserId: userId,
+      },
+      tokens,
+    });
+
+    return {sent: tokens.length};
+  }
+
+  /**
+   * "Family Downtime / On until 9:00 PM." on an admin's phone, gone when downtime ends (HAT-380).
+   *
+   * One notice per phone, replaced rather than stacked: Android posts it under a fixed tag and
+   * removes it by itself at `endsAtMs`; iOS shows it under the `apns-collapse-id`. Neither is
+   * delivered after downtime ends (`ttl`, `apns-expiration`), so a phone that was off never shows a
+   * stale one. `sendFamilyDowntimeNoticeClear` removes it when downtime ends early.
+   */
+  async sendFamilyDowntimeNotice(
+    userId: string,
+    notice: {title: string; body: string; endsAtMs: number; nowMs: number},
+  ) {
+    const tokens = await this.clientInfoService.listDeviceTokensUsedSinceXDaysAgo(userId, maxAgeOfDevicesInDays);
+    if (tokens.length === 0 || notice.endsAtMs <= notice.nowMs) return {sent: 0};
+
+    this.setupService.sendPushNotification({
+      apns: {
+        headers: {
+          'apns-push-type': 'alert',
+          'apns-collapse-id': FAMILY_DOWNTIME_NOTICE_ID,
+          'apns-expiration': String(Math.floor(notice.endsAtMs / 1000)),
+        },
+        payload: {aps: {alert: {title: notice.title, body: notice.body}}},
+      },
+      android: {priority: 'high', ttl: notice.endsAtMs - notice.nowMs},
+      data: {
+        kndKind: FAMILY_DOWNTIME_NOTICE_ID,
+        notificationTag: FAMILY_DOWNTIME_NOTICE_ID,
+        endsAtMs: String(notice.endsAtMs),
+        // Tapping it opens the Family Downtime page.
+        type: 'NAVIGATE_PATH',
+        path: '/family/downtime',
+        title: notice.title,
+        body: notice.body,
+        targetUserId: userId,
+      },
+      tokens,
+    });
+    return {sent: tokens.length};
+  }
+
+  /** Removes the Family Downtime notice. Silent, like the rule sync: it shows nothing of its own. */
+  async sendFamilyDowntimeNoticeClear(userIds: string[]) {
+    const tokens = await this.clientInfoService.listDeviceTokensForUsersUsedSinceXDaysAgo(
+      userIds,
+      maxAgeOfDevicesInDays,
+    );
+    if (tokens.length === 0) return {sent: 0};
+
+    this.setupService.sendPushNotification({
+      apns: {
+        headers: {'apns-push-type': 'background', 'apns-priority': '5'},
+        payload: {aps: {'content-available': 1}},
+      },
+      android: {priority: 'high'},
+      data: {kndAction: CLEAR_FAMILY_DOWNTIME_NOTICE},
+      tokens,
+    });
     return {sent: tokens.length};
   }
 
@@ -204,6 +308,7 @@ class NotificationService {
       shortMessage?: string | null;
       highPriority?: boolean;
       refInfo?: any;
+      actions?: Array<{name: string; label: string; data?: any}>;
     },
     sendPush = false,
   ) {
@@ -238,7 +343,9 @@ class NotificationService {
         },
         {
           ...data.refInfo,
-          type: type,
+          // The notification's type wins over refInfo's, except a `NAVIGATE_PATH`: that is what makes
+          // a tap on the push open `refInfo.path` (useNativeIntegration), as account notices do.
+          type: data.refInfo?.type === 'NAVIGATE_PATH' ? 'NAVIGATE_PATH' : type,
         },
       ).catch((err) => {
         console.log(err);
@@ -281,8 +388,11 @@ class NotificationService {
         // reaches the parent, and a parent whose phone is off is exactly the
         // situation in which a child picks to try.
         NotificationType.DEVICE_PROTECTION_ALERT,
+        NotificationType.CHILD_SAFETY_ALERT,
         // Staff ops alerts (bug reports): email is one of the three required channels.
         NotificationType.PLATFORM_ALERT,
+        // Email starts off, so this only mails an admin who turned it on (HAT-655).
+        NotificationType.ACTIVITY_REPORT,
       ].includes(type)
     ) {
       if (targetUser.email != null && targetUser.email.length > 0) {
@@ -341,6 +451,51 @@ class NotificationService {
     await this.notificationsRepo.deleteWhere({targetKey: ctx.currentUserId});
   }
 
+  /**
+   * A child finished a part of a built-in lesson pack (Digital citizenship, HAT-577), so the family's
+   * guardians can talk it over with them. The child's own device reports it: lesson progress is
+   * end-to-end encrypted, so nothing else knows a part was finished.
+   *
+   * The notice names the child and the pack, never the part or its questions. Some parts are about
+   * sextortion and image abuse, and this text is stored in the clear, pushed through FCM and shown on
+   * lock screens. The Talk it over questions are on the child's Digital citizenship page, which the
+   * notice opens. Self-reported, so capped per child per day.
+   */
+  async addLessonPartDoneNotification(ctx: RequestContext, nowMs = Date.now()): Promise<{notified: boolean}> {
+    const childUserId = ctx.getSessionUserId();
+    if (!childUserId || !ctx.accountId) return {notified: false};
+    const child = await ctx.getUserById(childUserId);
+    // A guardian doing the lessons themselves is not told about it.
+    if (!child || child.type === UserType.admin) return {notified: false};
+
+    const since = new Date(nowMs - 24 * 60 * 60 * 1000);
+    const sentToday = await this.notificationsRepo.countFromSenderSince(
+      childUserId,
+      NotificationType.LESSON_PART_DONE,
+      since,
+    );
+    if (sentToday >= LESSON_PART_DONE_PER_DAY) return {notified: false};
+
+    const name = child.displayedName || child.username || 'Your child';
+    const path = `/manage/user/${childUserId}/digitalcitizenship`;
+    await this.addAccountNotification(
+      ctx,
+      NotificationType.LESSON_PART_DONE,
+      childUserId,
+      ctx.accountId,
+      {
+        title: `${name} finished a part of Digital citizenship`,
+        message: escapeHtml(`Talk it over together. The questions are on ${name}'s Digital citizenship page.`),
+        shortMessage: `${name} finished a part of Digital citizenship. Talk it over together.`,
+        // A tap on the push opens the page too (`NAVIGATE_PATH` replaces the push's type).
+        refInfo: {type: 'NAVIGATE_PATH', path, resourceType: 'lessonPack', resourceId: childUserId},
+        actions: [{name: 'openPath', label: 'Talk it over', data: {path}}],
+      },
+      true,
+    );
+    return {notified: true};
+  }
+
   async addAccountNotification(
     ctx: RequestContext,
     type: string,
@@ -352,6 +507,7 @@ class NotificationService {
       message?: string | null;
       shortMessage?: string | null;
       refInfo?: any;
+      actions?: Array<{name: string; label: string; data?: any}>;
     },
     sendPush = false,
   ) {
@@ -435,6 +591,22 @@ class NotificationService {
             [],
             'Kindredly <notify-noreply@thetaset.com>',
           );
+        }
+      }
+    }
+
+    // Device protection alerts (Guard tamper alerts, the extension being removed) are mailed as
+    // well as pushed. `createAndSendEmail` has always listed this type, but account-wide
+    // notifications never reached it, so every one of these alerts was push-only.
+    if (type === NotificationType.DEVICE_PROTECTION_ALERT || type === NotificationType.CHILD_SAFETY_ALERT) {
+      for (const admin of adminSettings) {
+        if (await this.canSend(admin.notificationSettings, NotificationMethod.email, type)) {
+          this.createAndSendEmail(type as NotificationType, admin.user, {
+            ...data,
+            message: data.message ?? undefined,
+          }).catch((err) => {
+            console.log(err);
+          });
         }
       }
     }
@@ -602,6 +774,13 @@ class NotificationService {
       const itemName = details?.srcTitle || details?.name || 'an item';
       title = 'Library add request';
       summary = `${requesterName} wants "${itemName}" added to their library.`;
+    } else if (type === 'earnAccess') {
+      // Earn access (HAT-836): the rule's own name is what the parent judges.
+      const ruleName = typeof details?.earnAccessRuleName === 'string' ? details.earnAccessRuleName.trim() : '';
+      title = 'Earn access';
+      summary = ruleName
+        ? `${requesterName} is asking you to open "${ruleName}".`
+        : `${requesterName} is asking you to open an Earn access rule.`;
     } else if (type === 'checkpoint') {
       title = 'Daily Check-in';
       // Lead with the parent's own reminder when there is one — it is the thing
@@ -612,14 +791,26 @@ class NotificationService {
         : `${requesterName} is asking to get online.`;
     } else if (type === 'appCapability') {
       const appName = details?.itemName || 'an app';
-      const capability =
-        details?.capability === 'location'
-          ? 'Location'
-          : details?.capability === 'capture.photo'
-            ? 'Camera'
-            : 'a device feature';
+      const site = parseAppSiteGrantKey(details?.capability);
+      const ask = site
+        ? `${site.kind === 'fetch' ? 'get data from' : 'send data to'} ${site.host}`
+        : `use ${
+            details?.capability === 'location'
+              ? 'Location'
+              : details?.capability === 'capture.photo'
+                ? 'Camera'
+                : 'a device feature'
+          }`;
       title = 'App permission request';
-      summary = `${requesterName}'s app "${appName}" wants to use ${capability}.`;
+      summary = `${requesterName}'s app "${appName}" wants to ${ask}.`;
+    } else if (type === 'pause') {
+      // "Ask to install something" (HAT-766), from the Companion or the app. The computer's name when
+      // the Companion sent it, so a parent with two of them knows which one.
+      const device = typeof details?.srcTitle === 'string' && details.srcTitle.trim() ? details.srcTitle.trim() : '';
+      title = 'Pause request';
+      summary = device
+        ? `${requesterName} asks you to pause restrictions on ${device}, to install something.`
+        : `${requesterName} asks you to pause restrictions, to install something.`;
     } else if (type === 'emailSender') {
       const address = (details?.emailAddress || String(key || '').replace(/^EMAIL:/, '') || 'someone new').trim();
       title = 'Email contact request';
@@ -654,8 +845,9 @@ class NotificationService {
       shortMessage: summary,
       // Keep an inline review link in the message so older clients still have a
       // working way to act; newer clients render a dedicated "Review request" button.
-      message: `${summary} <a href="${requestPath}">Review request</a>`,
-      emailMessage: `${summary}
+      // The summary is text: the child's name, what they asked for and the assistant's reading.
+      message: `${escapeHtml(summary)} <a href="${requestPath}">Review request</a>`,
+      emailMessage: `${escapeHtml(summary)}
         <br/>
         <br/>
         <a class="button" href="${config.serverHostname}${requestPath}">Open Request</a>`,
@@ -670,11 +862,15 @@ class NotificationService {
         resourceName:
           type === 'time'
             ? 'More screen time'
-            : type === 'checkpoint'
-              ? 'Daily Check-in'
-              : type === 'publishedItem'
-                ? details?.srcTitle || key
-                : key,
+            : type === 'pause'
+              ? 'Pause restrictions'
+              : type === 'checkpoint'
+                ? 'Daily Check-in'
+                : type === 'earnAccess'
+                  ? details?.earnAccessRuleName || 'Earn access'
+                  : type === 'publishedItem'
+                    ? details?.srcTitle || key
+                    : key,
       },
     };
 
@@ -686,6 +882,25 @@ class NotificationService {
       notificationData,
       true,
     );
+    this.nudgeAdminsOfAccessRequest(ctx.accountId);
+  }
+
+  /**
+   * Tell each admin's open Kindredly that a request came in, so it can show it at once (HAT-658).
+   * Content-free: the app reads the request list itself. Never awaited, and never allowed to fail the
+   * child's request.
+   */
+  private nudgeAdminsOfAccessRequest(accountId: string | null | undefined): void {
+    if (!accountId) return;
+    void (async () => {
+      const users = await this.userRepo.listByAccountId(accountId);
+      const sse = SSEManager.getInstance();
+      for (const user of users.filter((u) => u.type == UserType.admin)) {
+        sse.broadcastToUser(user._id, 'accessRequestAdded', {}).catch((e) => {
+          console.warn('[access-request] SSE nudge failed', e?.message || e);
+        });
+      }
+    })().catch((e) => console.warn('[access-request] could not list admins to nudge', e?.message || e));
   }
 
   async notifyOfInvitation(email: string, inviterName: string, accountUser: User, inviteCode: string, message: string) {
@@ -885,11 +1100,14 @@ class NotificationService {
     ctx: RequestContext,
     friendUser: any,
   ) {
+    // The sender writes their name and the message: escaped where they go into HTML.
+    const fromHtml =
+      escapeHtml(displayedInviterName) + (targetUser?.email ? ' (' + escapeHtml(targetUser.email) + ')' : '');
     const notificationData = {
       title: `Friend Request from ${displayedInviterName}`,
       shortMessage: `You have a new friend request from ${displayedInviterName}${targetUser?.email ? ' (' + targetUser.email + ')' : ''}!${message ? ' --' + message : ''}!`,
-      message: `You have a new friend request from ${displayedInviterName}${targetUser?.email ? ' (' + targetUser.email + ')' : ''}! <br/><br/>${message ? 'Invite Message:' + message : ''}<br/> <br/><a href="/kindredapp/#/people?show=friends">Click here to approve or deny friend requests</a>`,
-      emailMessage: `You have a new friend request from ${displayedInviterName}${targetUser?.email ? ' (' + targetUser.email + ')' : ''}!  <br/> <br/><a href="${config.serverHostname}/kindredapp/#/people?show=friends">Click here to approve or deny friend requests</a>`,
+      message: `You have a new friend request from ${fromHtml}! <br/><br/>${message ? 'Invite Message:' + escapeHtml(message) : ''}<br/> <br/><a href="/kindredapp/#/people?show=friends">Click here to approve or deny friend requests</a>`,
+      emailMessage: `You have a new friend request from ${fromHtml}!  <br/> <br/><a href="${config.serverHostname}/kindredapp/#/people?show=friends">Click here to approve or deny friend requests</a>`,
       refInfo: {
         friendRequestId: id1,
         requestingUserId: targetUserId,

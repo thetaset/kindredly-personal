@@ -16,6 +16,8 @@ import * as crypto from 'crypto';
 import {getKeyValueStore} from '@/base/runtime.factory';
 import {_createToken, removeSensitiveInfoFromUser} from '@/utils/auth_utils';
 import {UserRepo} from '@/db/user.repo';
+import {KeyEntryRepo} from '@/db/key_entry.repo';
+import {credentialTagFromDigest, passkeyKeyIdsForCredential} from 'tset-sharedlib/passkey-unlock-keys';
 import {decryptPassword} from '@/utils/crypto_util';
 
 const CHALLENGE_PREFIX = 'passkey_challenge:';
@@ -25,6 +27,7 @@ const CHALLENGE_TTL_SECONDS = 300; // 5 minutes
 class PasskeyService {
   private passkeyRepo = new PasskeyCredentialRepo();
   private userRepo = new UserRepo();
+  private keyEntryRepo = new KeyEntryRepo();
   private redis = getKeyValueStore();
 
   /**
@@ -91,8 +94,7 @@ class PasskeyService {
       }
     }
 
-    // Get RP ID from config or default to hostname
-    const rpId = config.passkeyRpId || this.extractRpId(config.serverHostname);
+    const rpId = this.rpId();
     const rpName = config.passkeyRpName || 'Kindredly';
 
     return {
@@ -142,14 +144,10 @@ class PasskeyService {
         throw new HttpException(400, 'Challenge mismatch');
       }
 
-      // Verify the origin matches our expected origin
-      const expectedOrigin = config.serverHostname;
-      if (!clientData.origin.startsWith(expectedOrigin.replace(/^https?:\/\//, ''))) {
-        // Allow for development environments
-        if (config.nodeEnv !== 'development') {
-          logger.warn(`Origin mismatch: expected ${expectedOrigin}, got ${clientData.origin}`);
-        }
-      }
+      // The relying-party hash lives in the attestation's authenticator data, which is CBOR and not
+      // parsed here. A passkey made for another site still can't sign in: every assertion's hash is
+      // checked in authenticatePasskey.
+      this.checkClientData(clientData, 'webauthn.create');
 
       // A credential with no public key can never have its assertions verified, so registering one
       // would create an account that cannot use the passkey it just set up.
@@ -238,13 +236,16 @@ class PasskeyService {
         throw new HttpException(403, 'Passkey challenge user mismatch');
       }
 
+      this.checkClientData(clientData, 'webauthn.get');
+      const authDataBuffer = Buffer.from(this.base64URLDecode(authenticatorData));
+      this.checkAuthenticatorData(authDataBuffer);
+
       // Verify the assertion signature against the public key captured at registration.
       //
       // Without this, holding a credentialId is enough to authenticate as its owner: the challenge
       // endpoint is unauthenticated and hands back the credentialIds for any username or email, so
       // a forged signature would have been accepted. The signature is the only part of a WebAuthn
       // assertion an attacker cannot produce.
-      const authDataBuffer = Buffer.from(this.base64URLDecode(authenticatorData));
       this.verifyAssertionSignature(credential, authDataBuffer, clientDataJSON, signature);
 
       // Parse authenticator data to get sign count
@@ -339,11 +340,105 @@ class PasskeyService {
     }
 
     await this.passkeyRepo.disableByCredentialId(credentialId);
+    await this.removeUnlockCopies(userId, credentialId);
     logger.info(`Passkey deleted for user ${userId}`);
     return true;
   }
 
   // Helper methods
+
+  /**
+   * A passkey's own unlock copies of the person's secret key go with it (UNL-6): their wrapping key
+   * is named after the passkey (tset-sharedlib/passkey-unlock-keys). A shared copy from before
+   * UNL-6 can't be traced to one passkey, so it stays.
+   */
+  private async removeUnlockCopies(userId: string, credentialId: string): Promise<void> {
+    const tag = credentialTagFromDigest(crypto.createHash('sha256').update(credentialId).digest());
+    const copyKeyIds = passkeyKeyIdsForCredential(userId, tag);
+    const entries = await this.keyEntryRepo.listForUser(userId);
+    for (const entry of entries) {
+      if (entry._id && !entry.deletedAt && copyKeyIds.includes(entry.unwrappingKeyId as string)) {
+        await this.keyEntryRepo.updateWithId(entry._id, {deletedAt: new Date()});
+      }
+    }
+  }
+
+  /** The relying party every ceremony is bound to: PASSKEY_RP_ID, else the server's hostname. */
+  private rpId(): string {
+    return config.passkeyRpId || this.extractRpId(config.serverHostname);
+  }
+
+  /**
+   * clientDataJSON must name the ceremony and come from a page allowed to use our relying party:
+   * https on the relying party's host or its www, our browser extension (passkeyExtensionOrigins),
+   * or an origin in PASSKEY_ALLOWED_ORIGINS; plain http only on localhost. Browsers let every subdomain use the relying party, but a subdomain may
+   * serve pages Kindredly does not write, so only these are trusted. Apple's native passkey API
+   * reports https://<rpId>, so it passes too.
+   */
+  private checkClientData(clientData: any, type: 'webauthn.create' | 'webauthn.get'): void {
+    if (clientData?.type !== type) {
+      throw new HttpException(400, 'Passkey response is for a different step');
+    }
+    if (!this.originAllowed(String(clientData?.origin || ''))) {
+      logger.warn(`Passkey origin refused: ${clientData?.origin} (relying party ${this.rpId()})`);
+      throw new HttpException(400, 'Passkey came from a site that may not use it');
+    }
+  }
+
+  private originAllowed(origin: string): boolean {
+    let url: URL;
+    try {
+      url = new URL(origin);
+    } catch {
+      return false;
+    }
+    const allowed = [...config.passkeyExtensionOrigins, ...config.passkeyAllowedOrigins];
+    if (allowed.some((entry) => this.sameOrigin(entry, url))) return true;
+    const rpId = this.rpId().toLowerCase();
+    const host = url.hostname.toLowerCase();
+    if (host !== rpId && host !== `www.${rpId}`) return false;
+    return url.protocol === 'https:' || (url.protocol === 'http:' && host === 'localhost');
+  }
+
+  private sameOrigin(allowed: string, url: URL): boolean {
+    try {
+      const key = this.originKey(new URL(allowed));
+      return !!key && key === this.originKey(url);
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * scheme://host[:port], lowercased. Node gives every non-web scheme (chrome-extension:,
+   * moz-extension:) the origin "null", which would make any two of them equal, so those are built
+   * from their parts. Null when there is no host to compare.
+   */
+  private originKey(url: URL): string | null {
+    if (url.origin !== 'null') return url.origin.toLowerCase();
+    return url.host ? `${url.protocol}//${url.host}`.toLowerCase() : null;
+  }
+
+  /**
+   * Authenticator data starts with SHA-256 of the relying party id (32 bytes), then a flags byte.
+   * The passkey must be ours, and the device must have checked the person (Face ID, fingerprint,
+   * PIN): a passkey opens encrypted data, so presence alone isn't enough.
+   */
+  private checkAuthenticatorData(authData: Buffer): void {
+    if (authData.length < 37) {
+      throw new HttpException(400, 'Passkey response is incomplete');
+    }
+    const expectedRpIdHash = crypto.createHash('sha256').update(this.rpId()).digest();
+    if (!crypto.timingSafeEqual(authData.subarray(0, 32), expectedRpIdHash)) {
+      throw new HttpException(401, 'This passkey belongs to a different site');
+    }
+    const flags = authData[32];
+    const userPresent = (flags & 0x01) !== 0;
+    const userVerified = (flags & 0x04) !== 0;
+    if (!userPresent || !userVerified) {
+      throw new HttpException(401, 'The device did not confirm it was you');
+    }
+  }
 
   /**
    * Verify a WebAuthn assertion signature.

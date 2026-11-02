@@ -2,6 +2,8 @@ import {
   CATALOG_REPORT_REASONS,
   CURATION_CHECK_GROUPS,
   CURATION_CHECKLISTS,
+  CURATION_CURATOR_ONLY_CHECKS,
+  CURATION_KEY_GROUPS,
   CURATION_REVIEW_FIELD,
   CURRENT_CURATION_CHECKLIST_VERSION,
   answersForChecklist,
@@ -13,11 +15,14 @@ import {
   checksFor,
   curationItemContext,
   currentFacetValue,
+  currentFlagValues,
+  flagOptionDescription,
   getCurationChecklist,
   isReviewOwnedCriteriaTag,
   mergeReviewFacets,
   renderCurationChecklistForPrompt,
   reviewOwnedCriteriaPrefixes,
+  shownToFamilies,
   suggestedDeclineReason,
   suggestedReviewAgainMonths,
   validateCurationAnswers,
@@ -101,10 +106,6 @@ describe('checklist v1 is pinned', () => {
 describe('checklist v2', () => {
   const v2 = getCurationChecklist(2)!;
 
-  it('is the current version', () => {
-    expect(CURRENT_CURATION_CHECKLIST_VERSION).toBe(2);
-  });
-
   it('drops the check that repeated Trustworthy source, and asks Mature content before Minimum age', () => {
     const v1Keys = v1.checks.map((check) => check.key).filter((key) => key !== 'critical_thinking');
     const expected = [...v1Keys];
@@ -133,6 +134,225 @@ describe('checklist v2', () => {
   });
 });
 
+describe('checklist v3', () => {
+  const v2 = getCurationChecklist(2)!;
+  const v3 = getCurationChecklist(3)!;
+  const byKey = (key: string) => v3.checks.find((check) => check.key === key)!;
+
+  it('was the current version until v4', () => {
+    expect(v3.version).toBe(3);
+  });
+
+  it('adds AI and homework and Privacy after Chat and posting, and removes nothing', () => {
+    const expected = [...v2.checks.map((check) => check.key)];
+    expected.splice(expected.indexOf('user_contact') + 1, 0, 'ai_and_homework', 'privacy');
+    expect(v3.checks.map((check) => check.key)).toEqual(expected);
+  });
+
+  it('keeps every answer shape and rule from v2', () => {
+    for (const check of v3.checks) {
+      const old = v2.checks.find((c) => c.key === check.key);
+      if (!old) continue;
+      const shape = (c: typeof check) => [c.group, c.answer, c.required, c.appliesTo, c.ai, c.declineReasonOnFail, c.publicScreenshots];
+      expect(shape(check)).toEqual(shape(old));
+    }
+  });
+
+  it('asks each new check as boxes that warn and never keep an item out', () => {
+    const fingerprint = ['ai_and_homework', 'privacy'].map((key) => {
+      const check = byKey(key);
+      const spec = check.answer;
+      return [
+        check.key,
+        check.group,
+        spec.kind,
+        spec.kind === 'flags' ? spec.options.join('|') : '',
+        check.required ? 'required' : 'optional',
+        check.appliesTo,
+        check.ai,
+        check.declineReasonOnFail || '',
+      ].join(' ; ');
+    });
+    expect(fingerprint).toEqual([
+      'ai_and_homework ; safety ; flags ; ai_chat|ai_friend|ai_offload ; optional ; link ; draft ; ',
+      'privacy ; safety ; flags ; priv_details|priv_adtracking|priv_nopolicy ; optional ; link ; draft ; ',
+    ]);
+    expect(answerStatus(byKey('privacy'), {value: ['priv_adtracking', 'priv_nopolicy']})).toBe('concern');
+    expect(answerStatus(byKey('ai_and_homework'), {value: []})).toBe('pass');
+  });
+
+  it('names each box for families, never by its key', () => {
+    expect(answerLabel(byKey('ai_and_homework'), {value: ['ai_chat', 'ai_offload']})).toBe(
+      'Chat with an AI, Does the thinking for them',
+    );
+    expect(answerLabel(byKey('privacy'), {value: ['priv_details']})).toBe('Asks a child for personal details');
+    expect(answerLabel(byKey('privacy'), {value: []})).toBe('None found');
+    expect(answerLabel(byKey('mature_content'), {value: ['flag_violence']})).toBe('Violence');
+    const text = renderCurationChecklistForPrompt(v3, LINK);
+    expect(text).toContain('"ai_friend" (AI friend or companion)');
+    expect(text).toContain('"priv_adtracking" (Tracks for advertising)');
+  });
+
+  it('renames Chat and strangers, and leaves personal details to Privacy', () => {
+    expect(byKey('user_contact').publicLabel).toBe('Chat and posting');
+    expect(byKey('user_contact').instructions).toMatch(/uploads/);
+    expect(byKey('signup').instructions).not.toMatch(/personal details/);
+    expect(byKey('signup').instructions).toMatch(/Privacy check/);
+  });
+
+  it('writes the marked boxes onto the item, and a "none found" tag when nothing was marked', () => {
+    const answers: CurationAnswers = {
+      privacy: {value: ['priv_adtracking']},
+      ai_and_homework: {value: []},
+    };
+    const merged = mergeReviewFacets(['ta_kids', 'priv_nopolicy', 'ai_chat'], v3, LINK, answers);
+    expect(merged.sort()).toEqual(['ai_none', 'priv_adtracking', 'ta_kids'].sort());
+  });
+
+  it('leaves the item alone for a box check nobody answered', () => {
+    expect(mergeReviewFacets(['priv_details'], v3, LINK, {privacy: {value: NOT_CHECKED}})).toEqual(['priv_details']);
+    expect(mergeReviewFacets(['ai_chat'], v3, LINK, {})).toEqual(['ai_chat']);
+  });
+
+  it('starts a review from the boxes the item already carries, and tells that from nobody having checked', () => {
+    expect(currentFlagValues(byKey('privacy'), ['ta_kids', 'priv_details'])).toEqual(['priv_details']);
+    expect(currentFlagValues(byKey('privacy'), ['priv_none'])).toEqual([]);
+    expect(currentFlagValues(byKey('privacy'), ['ta_kids'])).toBeNull();
+    expect(currentFlagValues(byKey('mature_content'), ['priv_details'])).toBeNull();
+  });
+
+  it('an open v2 review keeps its answers and starts the new checks unanswered', () => {
+    const moved = answersForChecklist({signup: {value: 'pass'}, user_contact: {value: 'concern'}}, v3);
+    expect(moved).toEqual({signup: {value: 'pass'}, user_contact: {value: 'concern'}});
+  });
+});
+
+describe('checklist v4', () => {
+  const v3 = getCurationChecklist(3)!;
+  const v4 = getCurationChecklist(4)!;
+  const byKey = (key: string) => v4.checks.find((check) => check.key === key)!;
+
+  it('is the current version', () => {
+    expect(CURRENT_CURATION_CHECKLIST_VERSION).toBe(4);
+  });
+
+  it("drops the curator's housekeeping and removes nothing else", () => {
+    const expected = v3.checks.map((check) => check.key).filter((key) => !CURATION_CURATOR_ONLY_CHECKS.includes(key));
+    expect(v4.checks.map((check) => check.key)).toEqual(expected);
+    expect(v4.checks.map((check) => check.key)).not.toContain('link_works');
+    expect(v4.checks.map((check) => check.key)).not.toContain('description_accurate');
+    expect(v4.checks.map((check) => check.key)).not.toContain('duplicate');
+  });
+
+  it('requires every key check', () => {
+    const key = v4.checks.filter((check) => CURATION_KEY_GROUPS.includes(check.group));
+    expect(key.map((check) => check.key)).toEqual([
+      'ads',
+      'design',
+      'attention_traps',
+      'mature_content',
+      'min_age',
+      'user_contact',
+      'ai_and_homework',
+      'privacy',
+    ]);
+    expect(key.every((check) => check.required)).toBe(true);
+  });
+
+  it('lists the key groups first', () => {
+    expect(CURATION_CHECK_GROUPS.map((group) => group.key)).toEqual(['distraction', 'safety', 'learning', 'basics']);
+  });
+
+  it('counts Aging as a concern, as Outdated is', () => {
+    const freshness = byKey('freshness');
+    expect(answerStatus(freshness, {value: 'fresh_active'})).toBe('pass');
+    expect(answerStatus(freshness, {value: 'fresh_aging'})).toBe('concern');
+    expect(answerStatus(freshness, {value: 'fresh_outdated'})).toBe('concern');
+    // An old review keeps what Aging meant when it was answered.
+    expect(answerStatus(v3.checks.find((check) => check.key === 'freshness')!, {value: 'fresh_aging'})).toBe('pass');
+  });
+
+  it('calls AI and homework "AI and answer tools", with the same boxes', () => {
+    expect(byKey('ai_and_homework').publicLabel).toBe('AI and answer tools');
+    expect(byKey('ai_and_homework').answer).toEqual(v3.checks.find((check) => check.key === 'ai_and_homework')!.answer);
+  });
+
+  it('keeps every other answer shape from v3', () => {
+    for (const check of v4.checks) {
+      const old = v3.checks.find((c) => c.key === check.key)!;
+      if (check.key === 'freshness') continue;
+      expect([check.group, check.answer, check.appliesTo, check.ai, check.declineReasonOnFail]).toEqual([
+        old.group,
+        old.answer,
+        old.appliesTo,
+        old.ai,
+        old.declineReasonOnFail,
+      ]);
+    }
+  });
+
+  it('an open v3 review drops its housekeeping answers and keeps the rest', () => {
+    const moved = answersForChecklist({link_works: {value: 'pass'}, duplicate: {value: 'pass'}, ads: {value: 'ads_l'}}, v4);
+    expect(moved).toEqual({ads: {value: 'ads_l'}});
+  });
+
+  it('finishes with the key checks answered and no housekeeping', () => {
+    const answers: CurationAnswers = {
+      edu_value: {value: 'eduval_educational'},
+      source: {value: 'pass'},
+      sensitive_topics: {value: 'pass'},
+      ads: {value: 'ads_no'},
+      design: {value: 'design_clean'},
+      attention_traps: {value: 'pass'},
+      mature_content: {value: []},
+      min_age: {value: 'minage_kids'},
+      user_contact: {value: 'pass'},
+      ai_and_homework: {value: []},
+      privacy: {value: []},
+    };
+    expect(validateCurationAnswers(v4, LINK, answers, finalizeCurate).errors).toEqual([]);
+    const {privacy: _privacy, ...withoutPrivacy} = answers;
+    expect(validateCurationAnswers(v4, LINK, withoutPrivacy, finalizeCurate).errors.map((e) => e.key)).toEqual(['privacy']);
+  });
+
+  it('explains the Privacy and AI boxes in the words families read', () => {
+    expect(flagOptionDescription('ai_offload')).toMatch(/finished answers/);
+    expect(flagOptionDescription('priv_adtracking')).toMatch(/Ad trackers/);
+    expect(flagOptionDescription('flag_violence')).toBeNull();
+  });
+});
+
+describe('what families read from a finished review', () => {
+  const v3 = getCurationChecklist(3)!;
+  const v4 = getCurationChecklist(4)!;
+  const check = (list: typeof v4, key: string) => list.checks.find((c) => c.key === key)!;
+
+  it("never shows the curator's housekeeping, on any version", () => {
+    expect(shownToFamilies(check(v3, 'link_works'), {value: 'pass', comment: 'Works.'})).toBe(false);
+    expect(shownToFamilies(check(v3, 'description_accurate'), {value: 'fail'})).toBe(false);
+    expect(shownToFamilies(check(v3, 'duplicate'), {value: 'concern'})).toBe(false);
+  });
+
+  it('shows every key check answer, a pass included', () => {
+    expect(shownToFamilies(check(v4, 'ads'), {value: 'ads_no'})).toBe(true);
+    expect(shownToFamilies(check(v4, 'privacy'), {value: []})).toBe(true);
+  });
+
+  it('shows another check only when it found something, or carries a note', () => {
+    expect(shownToFamilies(check(v4, 'sensitive_topics'), {value: 'pass'})).toBe(false);
+    expect(shownToFamilies(check(v4, 'sensitive_topics'), {value: 'concern'})).toBe(true);
+    expect(shownToFamilies(check(v4, 'signup'), {value: 'pass', comment: 'A free account saves progress.'})).toBe(true);
+    expect(shownToFamilies(check(v4, 'freshness'), {value: 'fresh_active'})).toBe(false);
+    expect(shownToFamilies(check(v4, 'freshness'), {value: 'fresh_aging'})).toBe(true);
+  });
+
+  it('shows nothing for a check nobody answered, unless the curator left a note', () => {
+    expect(shownToFamilies(check(v4, 'ads'), undefined)).toBe(false);
+    expect(shownToFamilies(check(v4, 'ads'), {value: NOT_CHECKED})).toBe(false);
+    expect(shownToFamilies(check(v4, 'ads'), {value: NOT_CHECKED, comment: 'The site needs a login to see.'})).toBe(true);
+  });
+});
+
 describe('every checklist version', () => {
   it.each(Object.values(CURATION_CHECKLISTS).map((list) => [list.version, list] as const))('v%s is well formed', (_version, list) => {
     const keys = list.checks.map((check) => check.key);
@@ -155,7 +375,11 @@ describe('every checklist version', () => {
           expect(spec.options).toContain(value);
         }
       }
-      if (spec.kind === 'flags') expect([...spec.options].sort()).toEqual(Object.keys(flagOptions).sort());
+      if (spec.kind === 'flags' && !spec.labels) expect([...spec.options].sort()).toEqual(Object.keys(flagOptions).sort());
+      if (spec.kind === 'flags' && spec.labels) {
+        expect(Object.keys(spec.labels).sort()).toEqual([...spec.options].sort());
+        for (const option of spec.options) expect(spec.labels[option].length).toBeGreaterThan(0);
+      }
     }
   });
 
@@ -275,11 +499,14 @@ describe('validateCurationAnswers', () => {
     expect(errors).toEqual([{key: 'ads', message: expect.stringContaining('cannot go in the catalog')}]);
   });
 
-  it('a concern must say what was found', () => {
-    const answers = {...passingLinkAnswers(), source: {value: 'concern'}};
-    expect(validateCurationAnswers(v1, LINK, answers, finalizeCurate).errors.map((e) => e.key)).toEqual(['source']);
-    answers.source = {value: 'concern', comment: 'No About page.'} as any;
-    expect(validateCurationAnswers(v1, LINK, answers, finalizeCurate).errors).toEqual([]);
+  it('a concern or a fail does not need a comment', () => {
+    const concern = {...passingLinkAnswers(), source: {value: 'concern'}};
+    expect(validateCurationAnswers(v1, LINK, concern, finalizeCurate).errors).toEqual([]);
+    const declined = validateCurationAnswers(v1, LINK, {link_works: {value: 'fail'}}, {
+      outcome: 'decline',
+      declineReason: 'broken',
+    });
+    expect(declined.errors).toEqual([]);
   });
 
   it('not adding it needs a reason families will read, and no required answers', () => {

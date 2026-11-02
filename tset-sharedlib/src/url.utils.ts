@@ -51,22 +51,38 @@ function hostnameOf(url: unknown): string | null {
   }
 }
 
+/**
+ * Social media sites (SMB-5, docs/plans/social-media-and-shared-links-plan.md). Each one's short
+ * links and the read-only copies of it that show the same feed count as it. Messaging apps
+ * (WhatsApp, Messenger, Telegram) are not social media here; Discord and Snapchat are (D10).
+ * `restrictions/socialMedia.ts` reads this list for the Block social media setting.
+ */
 export const SOCIAL_MEDIA_DOMAINS = [
   'facebook.com',
+  'fb.com',
+  'fb.watch',
+  'fb.me',
   'twitter.com',
   'x.com',
+  'xcancel.com',
+  'nitter.net',
   'bsky.app',
   'bsky.social',
   'instagram.com',
+  'instagr.am',
+  'imginn.com',
+  'picuki.com',
   'tiktok.com',
+  'urlebird.com',
   'snapchat.com',
   'reddit.com',
   'redd.it',
   'tumblr.com',
   'pinterest.com',
+  'pin.it',
   'linkedin.com',
-  'whatsapp.com',
   'threads.net',
+  'threads.com',
   'discord.com',
 ] as const;
 
@@ -268,8 +284,25 @@ function normalizeExplicitPatterns(values: unknown): string[] {
   return values.filter((p: unknown): p is string => typeof p === 'string' && p.trim().length > 0);
 }
 
+/**
+ * `PAGE_NOTE_SCHEMA_ID` (pageNote.utils.ts), kept here as a literal so this file does not import that
+ * one, which imports `cleanURL` from here. A test holds the two equal.
+ */
+export const PAGE_NOTE_SCHEMA_KEY = 'kindredly.pageNote.v1';
+
+/**
+ * A page note (PGN) points to its page only through its own schema and must never claim the page: a
+ * claimed pattern is what Library only, Always allowed and time limits match on. An edit that adds a
+ * url, pattern or link to one is ignored here as well as taken off when it is saved.
+ */
+function isPageNoteDetails(details: any): boolean {
+  const schemas = details?.info?.schemas;
+  return !!schemas && typeof schemas === 'object' && !!schemas[PAGE_NOTE_SCHEMA_KEY];
+}
+
 export function getItemDetailPatterns(details: any): string[] {
   if (!details || typeof details !== 'object') return [];
+  if (isPageNoteDetails(details)) return [];
 
   const patternSet = new Set<string>();
 
@@ -337,6 +370,7 @@ function addLinkPatterns(link: any, details: any, patternSet: Set<string>): void
  */
 export function getItemClaimedPatterns(details: any): string[] {
   if (!details || typeof details !== 'object') return [];
+  if (isPageNoteDetails(details)) return [];
 
   const patternSet = new Set<string>();
 

@@ -17,6 +17,7 @@
       storedMode = null;
     }
 
+    // 'system' (Match device) and nothing stored both follow the device.
     var normalizedTheme = normalizeThemeName(storedMode);
     if (normalizedTheme) return normalizedTheme;
 
@@ -96,6 +97,48 @@
     return true;
   }
 
+  /**
+   * The first frame of the extension new tab, the iPhone app and the website: the wallpaper Home
+   * last showed, painted on the start-up logo's layer (#knd-boot) instead of a plain colour while
+   * the app loads (HAT-642, HAT-685). `data-knd-boot` on <html> opts a page in:
+   * index_extension.html and kindredapp/index.html carry it, and the build adds it to the iPhone
+   * app's page. Recorded by src/app/bootWallpaper.ts; keep the two
+   * shapes in step. Only on Home, whose reveal waits for its own wallpaper (Search lets the layer
+   * go before its picture has decoded, so the wallpaper would blink out and back), and only under
+   * the theme it was recorded in. css/loadingapp.css lays the layer out.
+   */
+  var BOOT_TARGETS = ['extension', 'ios', 'web'];
+  var BOOT_WALLPAPER_KEY = 'knd:ui:appearance:bootWallpaper';
+  var WALLPAPER_PATHS = ['/', '/index.html'];
+  var BOOT_IMAGE_PATTERN = /^url\("(\/bgs\/[A-Za-z0-9_.-]+|data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+\/=]+)"\)$/;
+  // grad2 and grad3 unset the body colour, which reads back as rgba(0, 0, 0, 0): a layer that hides nothing.
+  var SEE_THROUGH_COLOR = /^rgba\((?:[^,]+,){3}\s*0(?:\.0*)?\s*\)$/;
+
+  function resolveBootWallpaper(themeName) {
+    if (BOOT_TARGETS.indexOf(document.documentElement.getAttribute('data-knd-boot')) < 0) return null;
+    var path = (window.location.hash || '').replace(/^#/, '').split('?')[0] || '/';
+    if (WALLPAPER_PATHS.indexOf(path) < 0) return null;
+
+    var record = null;
+    try {
+      record = JSON.parse(window.localStorage.getItem(BOOT_WALLPAPER_KEY) || 'null');
+    } catch (error) {
+      return null;
+    }
+
+    if (!record || record.v !== 1 || record.theme !== themeName) return null;
+    if (typeof record.color !== 'string' || !/^(#|rgb)/.test(record.color) || SEE_THROUGH_COLOR.test(record.color)) return null;
+    if (record.image != null && (typeof record.image !== 'string' || !BOOT_IMAGE_PATTERN.test(record.image))) return null;
+    return record;
+  }
+
+  function applyBootWallpaper(record) {
+    var root = document.documentElement;
+    root.style.setProperty('--knd-boot-wallpaper-color', record.color);
+    root.style.setProperty('--knd-boot-wallpaper-image', record.image || 'none');
+    root.classList.add('knd-boot-wallpaper');
+  }
+
   var themeName = window.__KND_BOOT_THEME__ || resolveThemeName();
   window.__KND_BOOT_THEME__ = themeName;
 
@@ -103,6 +146,35 @@
   window.__KND_BOOT_BIG_SIMPLE__ = bigSimple;
 
   applyDocumentTheme(themeName);
+
+  var bootWallpaper = resolveBootWallpaper(themeName);
+  if (bootWallpaper) applyBootWallpaper(bootWallpaper);
+
+  /**
+   * The block page's first frame (HAT-799): its shield, drawn on the start-up layer (#knd-boot) by
+   * css/loadingapp.css in the spot the page puts it, instead of a blank screen and, on a slow phone,
+   * the spinning logo. Only where the page shows that shield: Family Downtime and the "what now?"
+   * stage (`intervention=1`) have screens of their own. The icon is recorded on <html>, and
+   * views/access_request/Blocked.vue takes the drawing over only when it shows the same one.
+   */
+  function resolveBlockedBadge() {
+    var hash = (window.location.hash || '').replace(/^#/, '');
+    if (hash.split('?')[0] !== '/blocked') return null;
+    var params;
+    try {
+      params = new URLSearchParams(hash.split('?')[1] || '');
+    } catch (error) {
+      return null;
+    }
+    if (params.get('blockType') === 'downtime' || params.get('intervention') === '1') return null;
+    return params.get('blockType') === 'time' ? 'clock-history' : 'shield-fill';
+  }
+
+  var blockedBadge = resolveBlockedBadge();
+  if (blockedBadge) {
+    document.documentElement.classList.add('knd-boot-blocked');
+    document.documentElement.setAttribute('data-knd-boot-badge', blockedBadge);
+  }
 
   var bodyThemeApplied = applyBodyTheme(themeName);
   var bodyScaleApplied = applyBigSimple(bigSimple);

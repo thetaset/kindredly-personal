@@ -2,7 +2,7 @@ import type { MinAgeGroup } from '../content.types'
 
 /**
  * Shared age-band vocabulary for "which presets show by default" lists
- * (Essentials suggestions, collection templates, …).
+ * (collection templates, …).
  *
  * Lives in sharedlib because the collection-template seed references these
  * constants, and that seed is read by the catalog build script and the

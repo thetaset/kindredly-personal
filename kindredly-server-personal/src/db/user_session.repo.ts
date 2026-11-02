@@ -58,8 +58,17 @@ export class UserSessionRepo extends BaseRepo<UserSession> {
       .returning('_id');
   }
 
+  /**
+   * Every sign-in session of a user. NOT their Companions' device sessions (`cmp_<deviceId>`): a child
+   * may sign themselves out everywhere, and that silently disconnected the Companion on their own
+   * computer — the act `/companion/devices/remove` refuses a child (HAT-178). A device is taken off
+   * an account only by a parent removing it, which revokes it by client id.
+   */
   async revokeAllForUser(userId: string, reason: string, exceptSessionId?: string) {
-    let q = this.query().where({userId}).whereNull('revokedAt');
+    let q = this.query()
+      .where({userId})
+      .whereNull('revokedAt')
+      .where((w) => w.whereNull('clientId').orWhere('clientId', 'not like', 'cmp\\_%'));
     if (exceptSessionId) {
       q = q.whereNot('_id', exceptSessionId);
     }

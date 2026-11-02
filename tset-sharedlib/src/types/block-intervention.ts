@@ -99,6 +99,12 @@ const INTERVENTIONS: Record<ReasonCode, BlockIntervention> = {
     offerOnScreenAlternatives: false,
     offscreenIdeaKeys: TASK_IDEAS,
   },
+  'earn-access-pending': {
+    stance: 'finish-task',
+    message: 'There is something to finish first.',
+    offerOnScreenAlternatives: false,
+    offscreenIdeaKeys: TASK_IDEAS,
+  },
   // Not a task gate, despite the name. The usage evaluator sets this whenever a
   // usage row's requirements fail, and it outranks `time-exceeded` in the shared
   // precedence — so it is what an ordinary "no time left" block actually reports.

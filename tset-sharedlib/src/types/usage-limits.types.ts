@@ -4,6 +4,7 @@
 
 import type { ReasonCode, ActivityResultType, ActivityEventContext, InterventionMode } from './activity.types';
 import type { EduValue } from '../content.types';
+import type { EarnAccessOpenings, EarnAccessSettings } from './earn-access.types';
 
 export interface TimeRange {
   start: string;
@@ -13,7 +14,8 @@ export interface TimeRange {
 export interface LimitMatchCondition {
   // 'appId': device-app packages (android:<pkg>, ios:selection:<uuid>, or the
   // all-device-apps sentinel) enforced by the Companion satellite app.
-  type: 'eduValue' | 'intent' | 'sessionIntent' | 'urlPatterns' | 'itemIds' | 'attribute' | 'usageRequirement' | 'socialDesignation' | 'appId';
+  // 'game': games from the games list (restrictions/gamesList.ts) by id — their sites and their apps.
+  type: 'eduValue' | 'intent' | 'sessionIntent' | 'urlPatterns' | 'itemIds' | 'attribute' | 'usageRequirement' | 'socialDesignation' | 'appId' | 'game';
   values: string[];
   timeAmount?: number;
 }
@@ -92,6 +94,16 @@ export interface UsageSummaryData {
    * blocked, so no place may say "blocked", "blocking" or "unavailable until".
    */
   usageLimitsRemindOnly?: boolean;
+  /**
+   * Time today on Always allowed (HAT-152), interval-merged like `overallUsage`. Left out of every
+   * total above, so a page can say how much was not counted. Absent when there is none.
+   */
+  alwaysAllowedMs?: number;
+  /**
+   * Time today on phone apps that are not screen time (HAT-952, `deviceguard/notScreenTime.ts`),
+   * interval-merged. Left out of every total above, as Always allowed is. Absent when there is none.
+   */
+  notScreenTimeMs?: number;
 }
 
 /**
@@ -200,7 +212,15 @@ export interface CheckpointRelease {
   releasedBySelf?: boolean;
 }
 
+/**
+ * The most extra time a day each limit can be given (HAT-950), by limit id: minutes, or 'any'. A
+ * limit missing here takes up to its own daily limit; 0 takes none.
+ */
+export type ExtraTimeMax = Record<string, number | 'any'>;
+
 export interface AccessControlSettings {
+  /** See ExtraTimeMax. */
+  extraTimeMax?: ExtraTimeMax;
   disableRestrictions?: boolean;
   disableRestrictionsTimeStamp?: number;
   disableRestrictionsExpires?: number;
@@ -221,6 +241,10 @@ export interface AccessControlSettings {
   liveViewSettings?: LiveViewSettings;
   checkpointSettings?: CheckpointSettings;
   checkpointRelease?: CheckpointRelease;
+  /** Earn access rules (HAT-836). See restrictions/earnAccess.ts. */
+  earnAccessSettings?: EarnAccessSettings;
+  /** When each Earn access rule was last opened, by rule id. */
+  earnAccessOpenings?: EarnAccessOpenings;
 }
 
 export interface RemoteActionSettings {

@@ -1,4 +1,5 @@
 import jsonwebtoken, {sign} from 'jsonwebtoken';
+import {createHmac} from 'crypto';
 import {Request, Response} from 'express';
 
 import {config} from '@/config';
@@ -41,6 +42,28 @@ export function verifyWithRing(token: string, callback: (err: any, decoded?: any
 }
 
 const jwtverify = promisify((arg: string, callback) => verifyWithRing(arg, callback));
+
+/**
+ * Admin console tokens are signed with their own secret, made from the JWT secret and the admin
+ * password together (HAT-529, docs/guides/admin-lockdown.md). A leaked JWT secret alone can't
+ * mint one, and changing the admin password signs every admin session out: they sit outside the
+ * user_session registry, so that is the only way to revoke one.
+ */
+function adminTokenSecret(): string {
+  return createHmac('sha256', jwtAccessTokenSecret)
+    .update(`admin-console:${config.adminConsolePassword || ''}`)
+    .digest('hex');
+}
+
+/** An admin token lives two hours; the console refreshes it while in use, up to 12 hours from sign-in. */
+export const ADMIN_TOKEN_LIFETIME = '2h';
+export const ADMIN_SESSION_MAX_MS = 12 * 60 * 60 * 1000;
+
+/** True once a session is past 12 hours from its sign-in, or carries no sign-in time at all. */
+export function adminSessionTooOld(authInfo: {authAt?: number} | null | undefined, nowMs = Date.now()): boolean {
+  const authAt = Number(authInfo?.authAt);
+  return !Number.isFinite(authAt) || nowMs - authAt > ADMIN_SESSION_MAX_MS;
+}
 
 function headerValue(req: any, name: string): string | undefined {
   const value = req?.headers?.[name];
@@ -195,7 +218,13 @@ export const authenticateJWTWithToken = (req, res, next, token: string) => {
         // `checkSession` returns ok:false ONLY for a session explicitly marked
         // revoked — every other failure, including redis and the database being
         // down, fails open. So reaching here already means revoked.
-        return res.json({success: false, message: 'AuthSessionRevoked', status: 401});
+        //
+        // `AuthDeviceRemoved` is narrower still: a parent pressed Remove device, the one revocation
+        // only an admin can cause (`/companion/devices/remove`). A Companion that hears it stops
+        // protecting the computer, which is what the parent asked for (HAT-178). Every other
+        // revocation stays `AuthSessionRevoked`, which a Companion must never act on.
+        const message = sessionCheck.reason === 'device_removed' ? 'AuthDeviceRemoved' : 'AuthSessionRevoked';
+        return res.json({success: false, message, status: 401});
       }
 
       try {
@@ -278,14 +307,10 @@ export const adminAuthenticateJWT = (req, res, next) => {
   if (authHeader) {
     const token = authHeader.split(' ')[1];
 
-    verifyWithRing(token, (err, authInfo) => {
-      if (err) {
-        console.error(err);
-        recordAdminFailure('invalid_token');
-        return res.sendStatus(403);
-      } else if (!authInfo.isAdmin) {
-        console.error(err);
-        recordAdminFailure('non_admin_token');
+    jsonwebtoken.verify(token, adminTokenSecret(), {algorithms: ['HS256']}, (err, authInfo: any) => {
+      if (err || !authInfo?.isAdmin) {
+        // A token a user route would accept is privilege probing, not an expired admin session.
+        verifyWithRing(token, (userErr) => recordAdminFailure(userErr ? 'invalid_token' : 'non_admin_token'));
         return res.sendStatus(403);
       }
 
@@ -368,10 +393,16 @@ export function getUserAuthDetails(user: User) {
   };
 }
 
-export function getAdminAuthDetails() {
-  // Admin console tokens are outside the user_session registry (no userId), so
-  // expiry is their only invalidation mechanism — keep them short-lived.
-  const token = jsonwebtoken.sign({isAdmin: true, sessionId: uuidv4()}, jwtAccessTokenSecret, {expiresIn: '12h'});
+/**
+ * `authAt` is when the person signed in; a refresh carries it forward, so a session can be extended
+ * to 12 hours and no further.
+ */
+export function getAdminAuthDetails(authAt: number = Date.now()) {
+  // Admin console tokens are outside the user_session registry (no userId): expiry, and changing
+  // the admin password, are how they end. Keep them short-lived.
+  const token = jsonwebtoken.sign({isAdmin: true, sessionId: uuidv4(), authAt}, adminTokenSecret(), {
+    expiresIn: ADMIN_TOKEN_LIFETIME,
+  });
 
   return {
     success: true,
@@ -509,7 +540,65 @@ export const DEVICE_AGENT_ALLOWED_PATHS = new Set([
   // row by the token's user and the request's client id), so rules 1 and 2 above hold. The pushes
   // that token can receive are the child's, and Guard acts only on the silent "fetch your settings".
   '/user/client/updateDeviceToken',
+  // A Companion unlinked at the computer taking itself off the parent's list (CMP-70). The token
+  // alone grants nothing here: the route removes only with a parent's approval (see
+  // `createCompanionApproval`), which a parent's PIN at that computer issued minutes before, for
+  // that device and that child. The Companion carries the parent's grant; it never makes one, so
+  // rule 1 holds. It takes no id: the child and the device come from the token, so rule 2 holds.
+  '/companion/devices/removeSelf',
+  // "New app on Emma's computer" from the Companion itself (HAT-766, DCP-22): the browser read a
+  // computer's app list only at linking, so the notice never came. A notice, never a grant: it
+  // changes no setting, and the child is the token's, so rules 1 and 2 hold. Self-reported, as it
+  // always was; enforcement is the app policy, which blocks by name.
+  '/companion/apps/reportNew',
 ]);
+
+/** How long a parent's approval at the computer lasts: as long as the Companion keeps their PIN. */
+export const COMPANION_APPROVAL_TTL_SEC = 10 * 60;
+
+/** What a parent's approval says: this admin, at this device, for this child. */
+export type CompanionApproval = {adminUserId: string; childUserId: string; deviceId: string};
+
+/**
+ * The keys an approval is signed with: HMACs of the access-token secrets, never the secrets
+ * themselves. Anything signed with an access-token secret verifies as a sign-in in
+ * `authenticateJWTWithToken`, and an approval must never be one.
+ */
+function companionApprovalKeys(): string[] {
+  return jwtVerificationSecrets.map((secret) =>
+    createHmac('sha256', secret).update('kindredly-companion-approval:v1').digest('hex'),
+  );
+}
+
+/**
+ * A parent's approval, issued when they type their PIN at a Companion (`/auth/desktopCompanionAuthorize`)
+ * and carried by it to `/companion/devices/removeSelf` (CMP-70). Ten minutes, one device, one child.
+ */
+export function createCompanionApproval(approval: CompanionApproval): string {
+  return sign({typ: 'companion-approval', ...approval}, companionApprovalKeys()[0], {
+    algorithm: 'HS256',
+    expiresIn: COMPANION_APPROVAL_TTL_SEC,
+  });
+}
+
+/** The approval, or null when it is not one, was forged, or has run out. */
+export function verifyCompanionApproval(token: string): CompanionApproval | null {
+  if (!token) return null;
+  for (const key of companionApprovalKeys()) {
+    let decoded: any;
+    try {
+      decoded = jsonwebtoken.verify(token, key, {algorithms: ['HS256']});
+    } catch {
+      continue;
+    }
+    if (decoded?.typ !== 'companion-approval') return null;
+    const {adminUserId, childUserId, deviceId} = decoded;
+    if (typeof adminUserId !== 'string' || typeof childUserId !== 'string' || typeof deviceId !== 'string') return null;
+    if (!adminUserId || !childUserId || !deviceId) return null;
+    return {adminUserId, childUserId, deviceId};
+  }
+  return null;
+}
 
 /** Long-lived Companion (device-agent) token: `DEVICE_AGENT_ALLOWED_PATHS` only, session-revocable. */
 export function _createCompanionToken(user: User, deviceId: string): TokenData {

@@ -34,6 +34,9 @@ export function isDesktopPlatform(platform: string | undefined | null): boolean 
  * title counts too: the Companion resolves a running game back to its `steam:<appid>`
  * from the install path the library scan already knows.
  *
+ * Linux joined on 2026-09-30 (DCP-13): the same evaluator, fed from X11/Sway/Hyprland where the app in
+ * front can be seen, and from the running apps where it cannot (GNOME and KDE on Wayland).
+ *
  * iOS is still absent, and for a structural reason rather than an unfinished one: its
  * blocking runs off a device-local `FamilyActivitySelection` that never reaches the
  * server, so a parent's choices cannot reach an iPhone at all.
@@ -43,7 +46,7 @@ export function isDesktopPlatform(platform: string | undefined | null): boolean 
  * could act on one — let a parent block something, see "Saved", and get no
  * enforcement whatsoever. Do not widen it ahead of the device.
  */
-const ENFORCING_PLATFORMS: ReadonlySet<string> = new Set(['android', 'macos', 'steam']);
+const ENFORCING_PLATFORMS: ReadonlySet<string> = new Set(['android', 'macos', 'linux', 'steam']);
 
 export function canEnforceAppBlocking(platform: string | undefined | null): boolean {
   return ENFORCING_PLATFORMS.has(String(platform || 'android'));

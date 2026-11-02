@@ -1,0 +1,1 @@
+function h(e,o){const s=e.indexOf("#"),r=s>=0?e.slice(s):"",t=s>=0?e.slice(0,s):e,n=t.indexOf("?");if(n<0)return e;const i=t.slice(n+1).split("&").filter(c=>c&&c.split("=")[0]!==o);return t.slice(0,n)+(i.length?`?${i.join("&")}`:"")+r}export{h as w};

@@ -138,6 +138,61 @@ class PostService {
     return rawId != null ? String(rawId).trim() : '';
   }
 
+  // Within the family a post shares the one item, never a copy (HAT-984). It waits under Not in
+  // library, with Add to library on the post, for everyone except a child in library mode: their
+  // library is what lets them open it, so it goes straight in. An encrypted post's adults get view
+  // only, as before. Collections are left alone: sharing one is its own flow.
+  private async shareAttachedItemsWithFamily(
+    ctx: RequestContext,
+    attachedItems: any[],
+    recipients: Array<{_id: string; type?: UserType | null; options?: any}>,
+    encrypted: boolean,
+  ) {
+    const others = recipients.filter((user) => user._id !== ctx.currentUserId);
+    const grants = [
+      {
+        users: others.filter((user) => user.type !== UserType.restricted),
+        permission: encrypted ? PermissionType.viewer : PermissionType.editor,
+        notInLibrary: true,
+      },
+      {
+        users: others.filter((user) => this.isRestrictedLibraryOnlyUser(user)),
+        permission: PermissionType.viewer,
+        notInLibrary: false,
+      },
+      {
+        users: others.filter((user) => user.type === UserType.restricted && !this.isRestrictedLibraryOnlyUser(user)),
+        permission: PermissionType.viewer,
+        notInLibrary: true,
+      },
+    ].filter((grant) => grant.users.length > 0);
+    if (grants.length === 0) return;
+
+    const collectionItemIds = await this.getAttachedCollectionItemIds(attachedItems);
+    for (const attachment of attachedItems) {
+      if (attachment?.type !== 'libItem' || !attachment.itemId || collectionItemIds.has(attachment.itemId)) continue;
+
+      for (const grant of grants) {
+        try {
+          await this.permissionService.shareItemWithUsers(
+            ctx,
+            attachment.itemId,
+            grant.users.map((user) => user._id),
+            grant.permission,
+            true,
+            false,
+            grant.notInLibrary,
+            false,
+            true,
+          );
+        } catch (e) {
+          // Best-effort for an encrypted post: the post should still be created.
+          if (!encrypted) throw e;
+        }
+      }
+    }
+  }
+
   // Library-only ("whitelisting") restricted user — the only users whose post shares must come
   // from their library. Restricted users in filter-only mode share like anyone else.
   private isRestrictedLibraryOnlyUser(user: any): boolean {
@@ -311,8 +366,7 @@ class PostService {
 
     // Add to user feeds and create lookup(s) for attachment sharing.
     // Note: we intentionally treat cross-account (friend) recipients differently.
-    const attachmentSharedUserIds: string[] = [];
-    const sharedWithUserMap = new Map<string, {accountId?: string | null; type?: UserType | null}>();
+    const sharedWithUserMap = new Map<string, {accountId?: string | null; type?: UserType | null; options?: any}>();
 
     if (sharedWith) {
       // Batch the recipient lookups instead of one findById per user (N+1).
@@ -345,104 +399,16 @@ class PostService {
             console.log(err);
           }
 
-          if (user.accountId == ctx.accountId) {
-            if (userId != ctx.currentUserId) attachmentSharedUserIds.push(userId);
-          }
-
-          sharedWithUserMap.set(userId, {accountId: user.accountId, type: user.type});
+          sharedWithUserMap.set(userId, {accountId: user.accountId, type: user.type, options: user.options});
         }
       }
     }
 
-    const collectionItemIds = await this.getAttachedCollectionItemIds(attachedItems || []);
+    const sameAccountRecipients = recipientUserIds
+      .map((userId) => ({_id: userId, ...sharedWithUserMap.get(userId)}))
+      .filter((user) => !!user.accountId && user.accountId === ctx.accountId);
 
-    const sameAccountRestrictedRecipientUserIds = recipientUserIds.filter((userId) => {
-      const user = sharedWithUserMap.get(userId);
-      return !!user?.accountId && user.accountId === ctx.accountId && user.type === UserType.restricted;
-    });
-
-    const sameAccountNonRestrictedRecipientUserIds = recipientUserIds.filter((userId) => {
-      const user = sharedWithUserMap.get(userId);
-      return !!user?.accountId && user.accountId === ctx.accountId && user.type !== UserType.restricted;
-    });
-
-    if (attachedItems && !encrypted) {
-      for (const attachment of attachedItems || []) {
-        if (attachment.type === 'libItem' && !collectionItemIds.has(attachment.itemId)) {
-          await this.permissionService.shareItemWithUsers(
-            ctx,
-            attachment.itemId,
-            sameAccountNonRestrictedRecipientUserIds,
-            PermissionType.editor,
-            true,
-            false, //viewer if restricted
-            true,
-            false,
-            true,
-          );
-
-          if (sameAccountRestrictedRecipientUserIds.length > 0) {
-            await this.permissionService.shareItemWithUsers(
-              ctx,
-              attachment.itemId,
-              sameAccountRestrictedRecipientUserIds,
-              PermissionType.viewer,
-              true,
-              true,
-              false,
-              false,
-              true,
-            );
-          }
-        }
-      }
-    }
-
-    // For encrypted posts, also grant VIEW access to attached items for same-account recipients.
-    if (encrypted && sharedWith && sharedWith.length > 0) {
-      const recipientUserIds = sharedWith.filter((v) => v && v !== ctx.currentUserId);
-      if (recipientUserIds.length > 0) {
-        for (const attachment of attachedItems || []) {
-          if (attachment.type !== 'libItem' || !attachment.itemId || collectionItemIds.has(attachment.itemId)) continue;
-
-          const sameAccountRecipients = recipientUserIds.filter((uid) => {
-            const u = sharedWithUserMap.get(uid);
-            return !!u?.accountId && u.accountId === ctx.accountId && u.type !== UserType.restricted;
-          });
-
-          try {
-            if (sameAccountRecipients.length > 0) {
-              await this.permissionService.shareItemWithUsers(
-                ctx,
-                attachment.itemId,
-                sameAccountRecipients,
-                PermissionType.viewer,
-                true,
-                true,
-                true,
-                false,
-                true,
-              );
-            }
-            if (sameAccountRestrictedRecipientUserIds.length > 0) {
-              await this.permissionService.shareItemWithUsers(
-                ctx,
-                attachment.itemId,
-                sameAccountRestrictedRecipientUserIds,
-                PermissionType.viewer,
-                true,
-                true,
-                false,
-                false,
-                true,
-              );
-            }
-          } catch (_e) {
-            // Best-effort: post creation should still succeed.
-          }
-        }
-      }
-    }
+    await this.shareAttachedItemsWithFamily(ctx, attachedItems || [], sameAccountRecipients, encrypted);
 
     return postId;
   }
@@ -602,19 +568,12 @@ class PostService {
 
     //Add to user feeds and create list of users to share attachments with
     await this.posts.updateWithId(postId, {sharedWith: sharedWith});
-    const attachmentSharedUserIds = [];
-    const sameAccountRestrictedRecipientUserIds = [];
+    const sameAccountRecipients: Array<{_id: string; type?: UserType | null; options?: any}> = [];
     for (const userId of newlySharedWith) {
       const user = await this.users.findById(userId);
       if (user) {
         await this.userFeedService.add(ctx, userId, 'post', postId);
-        if (user.accountId == ctx.accountId) {
-          if (user.type === UserType.restricted) {
-            sameAccountRestrictedRecipientUserIds.push(userId);
-          } else {
-            attachmentSharedUserIds.push(userId);
-          }
-        }
+        if (user.accountId == ctx.accountId) sameAccountRecipients.push(user);
       }
     }
     for (const userId of noLongerSharedWith) {
@@ -624,37 +583,7 @@ class PostService {
       }
     }
 
-    const collectionItemIds = await this.getAttachedCollectionItemIds(attachedItems);
-
-    for (const attachment of attachedItems) {
-      if (attachment.type === 'libItem' && !collectionItemIds.has(attachment.itemId)) {
-        await this.permissionService.shareItemWithUsers(
-          ctx,
-          attachment.itemId,
-          attachmentSharedUserIds,
-          PermissionType.editor,
-          true,
-          false,
-          true,
-          false,
-          true,
-        );
-
-        if (sameAccountRestrictedRecipientUserIds.length > 0) {
-          await this.permissionService.shareItemWithUsers(
-            ctx,
-            attachment.itemId,
-            sameAccountRestrictedRecipientUserIds,
-            PermissionType.viewer,
-            true,
-            true,
-            false,
-            false,
-            true,
-          );
-        }
-      }
-    }
+    await this.shareAttachedItemsWithFamily(ctx, attachedItems, sameAccountRecipients, !!post.encrypted);
 
     return true;
   }

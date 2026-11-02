@@ -124,7 +124,10 @@ export class SessionService {
 
       const cached = await withTimeout(redis.get(cacheKey), REDIS_CHECK_TIMEOUT_MS);
       if (cached === 'ok') return {ok: true};
-      if (cached === 'revoked') return {ok: false, reason: 'revoked'};
+      // `revoked:<reason>`, so a removed device still hears why from the cache; `revoked` is the old form.
+      if (cached === 'revoked' || cached?.startsWith('revoked:')) {
+        return {ok: false, reason: cached.slice('revoked:'.length) || 'revoked'};
+      }
 
       const session = await this.sessionRepo.findById(sessionId);
 
@@ -142,8 +145,9 @@ export class SessionService {
       }
 
       if (session.revokedAt) {
-        await redis.set(cacheKey, 'revoked', 'EX', CACHE_TTL_SEC);
-        return {ok: false, reason: session.revokedReason || 'revoked'};
+        const reason = session.revokedReason || 'revoked';
+        await redis.set(cacheKey, `revoked:${reason}`, 'EX', CACHE_TTL_SEC);
+        return {ok: false, reason};
       }
 
       const lastSeen = session.lastSeenAt ? new Date(session.lastSeenAt).getTime() : 0;
@@ -161,7 +165,7 @@ export class SessionService {
 
   async revokeSession(sessionId: string, reason: string) {
     await this.sessionRepo.revoke(sessionId, reason);
-    await this.invalidateCache([sessionId]);
+    await this.invalidateCache([sessionId], reason);
   }
 
   /**
@@ -174,7 +178,7 @@ export class SessionService {
   async revokeForClient(userId: string, clientId: string, reason: string): Promise<number> {
     const revoked = await this.sessionRepo.revokeByClientId(userId, clientId, reason);
     const ids = (revoked || []).map((row: any) => (typeof row === 'string' ? row : row._id)).filter(Boolean);
-    await this.invalidateCache(ids);
+    await this.invalidateCache(ids, reason);
     return ids.length;
   }
 
@@ -182,7 +186,7 @@ export class SessionService {
   async revokeAllForUser(userId: string, reason: string, exceptSessionId?: string) {
     const revoked = await this.sessionRepo.revokeAllForUser(userId, reason, exceptSessionId);
     const ids = (revoked || []).map((row: any) => (typeof row === 'string' ? row : row._id));
-    await this.invalidateCache(ids);
+    await this.invalidateCache(ids, reason);
     return ids.length;
   }
 
@@ -219,13 +223,14 @@ export class SessionService {
     }
   }
 
-  private async invalidateCache(sessionIds: string[]) {
+  private async invalidateCache(sessionIds: string[], reason = 'revoked') {
     if (!sessionIds.length) return;
     try {
       const redis = getKeyValueStore();
       const pipeline = redis.pipeline();
       for (const id of sessionIds) {
-        pipeline.set(CACHE_PREFIX + id, 'revoked', 'EX', CACHE_TTL_SEC);
+        // With the reason: a removed device must hear "removed" from the cache too (HAT-178).
+        pipeline.set(CACHE_PREFIX + id, `revoked:${reason}`, 'EX', CACHE_TTL_SEC);
       }
       await pipeline.exec();
     } catch (e) {

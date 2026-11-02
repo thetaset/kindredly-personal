@@ -386,15 +386,18 @@ class ImportExportService {
         blockContext: this.clonePlainObject(record.blockContext),
         visibilityCode:
           typeof record.visibilityCode === 'number' ? record.visibilityCode : (existing?.visibilityCode ?? 2),
-        curated: typeof record.curated === 'boolean' ? record.curated : (existing?.curated ?? false),
-        curationStatus: record.curationStatus || existing?.curationStatus || null,
+        // Curation belongs to the server the row lands on, never to the package: a
+        // collection curated on a dev server arrives uncurated, and a re-import keeps
+        // whatever this server already decided.
+        curated: existing?.curated ?? false,
+        curationStatus: existing?.curationStatus || null,
         publishType: record.publishType || existing?.publishType || null,
         publishConfig: Object.keys(nextPublishConfig).length > 0 ? nextPublishConfig : null,
         excludeFromSearch:
           typeof record.excludeFromSearch === 'boolean'
             ? record.excludeFromSearch
             : (existing?.excludeFromSearch ?? false),
-        curatorComment: record.curatorComment || existing?.curatorComment || null,
+        curatorComment: existing?.curatorComment || null,
         availableAt: this.toDate(record.availableAt),
         data: nextData,
         meta: nextMeta,

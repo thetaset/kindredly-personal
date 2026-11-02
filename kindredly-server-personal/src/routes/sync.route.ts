@@ -7,6 +7,7 @@ import {authenticateJWT, errorHelper, getTargetUserId, removeNullFields} from '.
 import SyncService from '@/services/sync.service';
 import {SessionService} from '@/services/session.service';
 import SSEManager from '@/services/sse.manager';
+import McpRelayService from '@/services/mcp_relay.service';
 import {RequestContext} from '@/base/request_context';
 import {config} from '@/config';
 import {isRateLimitingEnabled} from '@/services/rate_limit_switch';
@@ -117,6 +118,14 @@ class SyncRoute implements Routes {
           // client hangs up during registration's Redis round-trips.
           const alive = await this.sseManager.registerConnection(clientId, userId, req, res);
           if (!alive) return;
+
+          // A device that takes Connected AI apps calls says so (HAT-616). Registered only in a
+          // family Kindredly granted it to; a failure here must never cost the stream.
+          if (req.query.relay === '1') {
+            McpRelayService.instance
+              .onStreamOpened(ctx.accountId, userId, clientId)
+              .catch(() => console.error('[mcpRelay] answerer registration failed'));
+          }
 
           // Send welcome message
           res.write(`data: ${JSON.stringify({message: 'Welcome to the SSE stream!'})}\n\n`);

@@ -1,0 +1,88 @@
+{
+  "id": "34-earn-access-weekly-opened-monday",
+  "behaviour": "A weekly Earn access rule holding Social media, opened on Monday, holds nothing on Wednesday of the same family week.",
+  "clock": {
+    "nowMs": 1789585200000,
+    "familyTimeZone": "America/Los_Angeles",
+    "deviceTimeZone": "America/Los_Angeles"
+  },
+  "settings": {
+    "usageLimitsData": {
+      "contentUsageLimits": [],
+      "temporaryRules": []
+    },
+    "ruleOverrideSettings": {
+      "ruleOverrides": []
+    },
+    "accessControlSettings": {
+      "earnAccessSettings": {
+        "version": 1,
+        "rules": [
+          {
+            "id": "reading-week",
+            "name": "Reading before social",
+            "enabled": true,
+            "holds": [
+              "social"
+            ],
+            "steps": [
+              {
+                "id": "s1",
+                "type": "minutes",
+                "eduValues": [
+                  "eduval_educational"
+                ],
+                "minutes": 60
+              }
+            ],
+            "approval": false,
+            "reset": "week"
+          }
+        ]
+      },
+      "earnAccessOpenings": {
+        "reading-week": {
+          "openedAtMs": 1789401600000,
+          "bySelf": true
+        }
+      }
+    },
+    "appPolicy": null,
+    "appPolicyStatus": "absent"
+  },
+  "installedApps": [
+    {
+      "pkg": "com.instagram.android",
+      "label": "Instagram",
+      "platform": "android"
+    },
+    {
+      "pkg": "com.roblox.client",
+      "label": "Roblox",
+      "platform": "android"
+    }
+  ],
+  "floor": [],
+  "usage": {
+    "appMsByPkg": {},
+    "webLogs": []
+  },
+  "usageSeed": {
+    "perRuleUsedMs": {}
+  },
+  "expectDevice": [
+    {
+      "pkg": "com.instagram.android",
+      "action": "allow",
+      "reason": null,
+      "ruleId": null
+    },
+    {
+      "pkg": "com.roblox.client",
+      "action": "allow",
+      "reason": null,
+      "ruleId": null
+    }
+  ],
+  "browserNotApplicable": "Device-only here: the browser's Earn access is tested in ActivityService.earnAccess.test.ts and earnAccess.test.ts in sharedlib."
+}

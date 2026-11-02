@@ -44,6 +44,8 @@ class SSEManager {
   private eventFilters = new Map<string, ReadonlySet<string>>();
   private serverId: string;
   private channelName = 'sse_broadcasts';
+  /** Told when a stream this process held is gone (the Connected AI apps relay drops its device). */
+  private removalListeners: Array<(clientId: string) => void> = [];
   private systemsInitialized = false;
 
   private constructor() {
@@ -166,7 +168,9 @@ class SSEManager {
   }
 
   private handleIncomingBroadcast(message: SSEMessage): void {
-    console.log('Received SSE broadcast:', message);
+    // Never log `message.data`: every task reads every broadcast, so a logged body is written once
+    // per task, and a payload a client decrypts must not reach the server's logs on the way.
+    console.log(`Received SSE broadcast '${message.event}'`);
     if (message.targetClientId) {
       // Specific client targeting
       const connection = this.localConnections.get(message.targetClientId);
@@ -176,7 +180,6 @@ class SSEManager {
     } else if (message.targetUserId) {
       // User-specific broadcast
       this.localConnections.forEach((res, clientId) => {
-        console.log('Checking clientId:', clientId, 'for userId:', message.targetUserId);
         if (clientId.startsWith(`${message.targetUserId}-`) && this.receives(clientId, message.event)) {
           console.log(`Sending event '${message.event}' to user ${message.targetUserId} on client ${clientId}`);
           this.sendSSEMessage(res, message.event, message.data, true, clientId);
@@ -190,6 +193,27 @@ class SSEManager {
         }
       });
     }
+  }
+
+  /** Whether this process holds a live stream for `clientId`. */
+  hasLocalConnection(clientId: string): boolean {
+    const res = this.localConnections.get(clientId);
+    return !!res && !res.destroyed && !res.writableEnded;
+  }
+
+  /**
+   * Writes one event to a stream this process holds, without going through the shared broadcast
+   * channel. False when this process holds no such stream. Used by the Connected AI apps relay,
+   * whose frames travel on their own channel so no other process parses them.
+   */
+  sendToLocal(clientId: string, event: string, data: unknown): boolean {
+    if (!this.hasLocalConnection(clientId) || !this.receives(clientId, event)) return false;
+    this.sendSSEMessage(this.localConnections.get(clientId)!, event, data, true, clientId);
+    return true;
+  }
+
+  onConnectionRemoved(listener: (clientId: string) => void): void {
+    this.removalListeners.push(listener);
   }
 
   /** Whether this connection may be sent `event`. See `eventFilters`. */
@@ -314,6 +338,13 @@ class SSEManager {
     // Remove locally
     this.localConnections.delete(clientId);
     this.eventFilters.delete(clientId);
+    for (const listener of this.removalListeners) {
+      try {
+        listener(clientId);
+      } catch (e) {
+        console.error('SSE removal listener failed:', (e as Error)?.message);
+      }
+    }
 
     // Get connection info to find userId
     const connectionData = await this.redis.get(`sse_connection:${clientId}`);

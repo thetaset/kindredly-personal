@@ -5,8 +5,12 @@ import type {
   FamilyDowntimeSettings,
   FamilyDowntimeView,
 } from "../restrictions/familyDowntime";
-import type { SiteStyleEntryV1 } from "../types/item.types";
+import type { AdditionalLink, ItemFeed, SiteStyleEntryV1 } from "../types/item.types";
+import type { FindWorkRequest, FindWorkResponse } from "../types/work.types";
+import type { PostMedia } from "../reddit-media.utils";
 import type { AiImageCredits } from "../ai-image-credits";
+import type { OwnAiProviderId, OwnAiStatusView } from "../own-ai";
+import type { FamilyHiddenReason } from "../publish.rules";
 import type {
   AccessRequestAddResponse,
   AccountInfoResponse,
@@ -31,6 +35,7 @@ import type {
   AISendMessageRequest,
   AISendMessageResponse,
   AISendMessageStreamRequest,
+  AITaskModelEntry,
   AISessionResponse,
   AITextRequest,
   AITextResponse,
@@ -91,6 +96,7 @@ import type {
   AdminFeedGenLoadFeedResponse,
   AdminPublishedPackageExportRequest,
   AdminPublishedPackageExportResponse,
+  AdminPublishedSettingsExportResponse,
   AdminPublishedChangeTypeRequest,
   AdminPublishedChangeTypeResponse,
   AdminPublishedDeleteRequest,
@@ -170,6 +176,7 @@ import type {
   GetPublishedViewRequest,
   RemoveItemFromUserLibraryRequest,
   LibraryCleanupCandidatesRequest,
+  LibraryCleanupCandidatesResponse,
   LibraryDuplicateCandidatesRequest,
   LibraryDuplicateCandidatesResponse,
   MergeLibraryDuplicatesRequest,
@@ -220,13 +227,18 @@ import type {
   RegisterRequest,
   RegisterResponse,
   RemoveLogEntryRequest,
+  RemoveLogEntriesRequest,
+  RemoveLogEntriesResponse,
   SaveCollectionItemDetailsRequest,
   SaveItemRequest,
   SaveItemResponse,
   SavePostAttachmentToLibraryRequest,
   SavePostAttachmentToLibraryResponse,
   SaveMetaTempRequest,
+  SearchHistoryRequest,
+  SearchHistoryResponse,
   SearchMainRequest,
+  SearchPlace,
   SignInRequest,
   AuthResponse,
   StandaloneAppBootstrapRequest,
@@ -313,6 +325,7 @@ import type {
   AdminCategoryCoverageResponse,
   CategorySetsResponse,
   PublishedCategoryCoverageResponse,
+  GalleryGroup,
   AdminAiConfigResponse,
   AdminAiConfigSaveRequest,
   AdminDashboardStatsResponse,
@@ -325,6 +338,28 @@ import type {
   EmbeddingCacheStatsRequest,
   EmbeddingCacheStatsResponse,
   CurationQueueEntry,
+  CuratorItemHistoryResponse,
+  CuratorAddLinksResponse,
+  CuratorApproveResponse,
+  CuratorListEntry,
+  CuratorManifestPreviewResponse,
+  CuratorManifestImportResponse,
+  CurationProposalQueueEntry,
+  CurationProposalApplyRequest,
+  CurationProposalApplyResponse,
+  AgentKeyView,
+  McpRelayStatus,
+  McpRelayConnectionView,
+  McpRelaySessionView,
+  McpRelayReplyRequest,
+  McpPermissionRequestView,
+  DeviceUnlockRequestView,
+  DeviceUnlockStatus,
+  McpPermissionStatus,
+  McpRelayOauthClientRegistration,
+  McpRelayOauthTokenResponse,
+  McpJsonRpcMessage,
+  McpJsonRpcResponse,
   CurationReviewAiDraft,
   CurationReviewCuratorView,
   CurationReviewForCuratorResponse,
@@ -340,16 +375,38 @@ import type {
   DiscoverServersResponse,
   CheckServerUrlRequest,
   CheckServerUrlResponse,
+  ItemAttachmentPiecesStartRequest,
+  FilePiecesStartResponse,
+  FilePiecesPutRequest,
+  FilePiecesPutResponse,
+  ItemAttachmentPiecesFinishRequest,
+  ItemAttachmentPiecesFinishResponse,
+  FilePiecesOpenRequest,
+  FilePiecesOpenResponse,
+  FilePiecesReadRequest,
+  FilePiecesReadResponse,
+  FilePiecesCloseRequest,
 } from "./api-types";
 
 import type { AccountType } from "../types/user.types";
+import type { ReasonCode } from "../types/activity.types";
 import type { StoredFamilyPolicyRule } from "../types/family-policy.types";
-import type { DeviceGuardStatus, DeviceAppInventory, DeviceAppPolicy, CompanionDeviceView, CompanionProbeResult, CompanionOpenTarget, DesktopBridgeStatus, CompiledDeviceRuleSet, DeviceSettingsCurrentRequest, DeviceSettingsCurrentResponse } from "../types/device-guard.types";
+import type { DeviceGuardStatus, DeviceAppInventory, DeviceAppPolicy, CompanionDeviceView, DeviceAdminCodeView, CompanionProbeResult, CompanionOpenTarget, CompanionAppDecision, DesktopBridgeStatus, CompiledDeviceRuleSet, DeviceSettingsCurrentRequest, DeviceSettingsCurrentResponse } from "../types/device-guard.types";
 import type { LessonGenRequest, LessonGenResponse, LessonGradeRequest, LessonGradeResponse } from "../lesson.utils";
+import type { McpRelaySealedEnvelope, McpRelayPairingRedeemed, McpUploadClaim, McpUploadStatus, McpUploadView } from "./mcp-relay.types";
+import type {
+  TrackImproveRequest,
+  TrackImproveResponse,
+  TrackSyllabusRequest,
+  TrackSyllabusResponse,
+  TrackWriteItemRequest,
+  TrackWriteItemResponse,
+} from "../track-generation";
 
 import type { KeyEntry } from "../shared.types";
 
 import UserFile from "../schemas/public/UserFile";
+import type PublishedRelation from "../schemas/public/PublishedRelation";
 import type {
   ActivityLogEntry,
   AuthInfo,
@@ -384,6 +441,7 @@ import type {
   ReactionInfo,
   ResourceFetchInfoResponse,
   ServerVersionInfo,
+  PersonalUpdateInfo,
   StreamResult,
   SubscriptionInfo,
   SubscriptionRefType,
@@ -403,10 +461,11 @@ import type { EventDefinition, EventOccurrenceView } from "../types/event.types"
 import type {SiteOverridesEnvelope} from '../content.types';
 import type {EduValue} from '../shared.types';
 import type {ArticleAnalyzeRequest, ArticleAnalyzeResponse} from '../types/articleTrust.types';
-import type {DailyRewardStates, RewardSettings} from '../types/reward.types';
 import type {CheckpointRelease, CheckpointTaskGateStatus} from '../types/usage-limits.types';
+import type {EarnAccessOpening, EarnAccessRule, EarnAccessStatus} from '../types/earn-access.types';
+import type { PageNoteReadResult, PageNoteReminder, PageNoteSaveRequest, PageNoteSaveResult, PageNoteSummary, PageNotesForUrl } from '../pageNote.utils';
 import type {TaskCompletionStatus} from '../types/task.types';
-import type {ArtifactDeleteRequest, ArtifactDeleteResponse, ArtifactGetRequest, ArtifactGetResponse, ArtifactListRequest, ArtifactListResponse, ArtifactSyncPendingRequest, ArtifactSyncPendingResponse, ArtifactUpsertRequest, ArtifactUpsertResponse, GetClassificationEvalProgramStatusRequest, GetClassificationEvalProgramStatusResponse, GetGroupedEntriesSinceRequest, GetGroupedEntriesSinceResponse, PlatformAlertReceiverView, GetSessionSummarySnapshotRequest, GetSessionSummarySnapshotResponse, GetTopicAttentionRequest, GetTopicAttentionResponse, GetUsageInsightsReportRequest, GetUsageInsightsReportResponse, GetUsageSessionsSinceRequest, GetUsageSessionsSinceResponse, InvalidateActivityMonitorsRequest, InvalidateActivityMonitorsResponse, LearnedClassifierArtifact, ReportClassificationIssueRequest, ReportClassificationIssueResponse, SaveUserActivityLogResponse, UploadClassificationDatasetSamplesRequest, UploadClassificationDatasetSamplesResponse, UploadImageClassificationSamplesRequest, UploadImageClassificationSamplesResponse, UsageLogCollapseMode, UserActivityLogListResponse} from './api-types';
+import type {ArtifactDeleteRequest, ArtifactDeleteResponse, ContinueListRequest, ContinueListResponse, ContinueRecordRequest, ContinueRecordResponse, ContinueRemoveRequest, ContinueRemoveResponse, ProjectCreateRequest, ProjectListRequest, ProjectListResponse, ProjectRenameRequest, ProjectResponse, ProjectSetNoteRequest, ArtifactGetRequest, ArtifactGetResponse, ArtifactListRequest, ArtifactListResponse, ArtifactSyncPendingRequest, ArtifactSyncPendingResponse, ArtifactUpsertRequest, ArtifactUpsertResponse, GetClassificationEvalProgramStatusRequest, GetClassificationEvalProgramStatusResponse, GetGroupedEntriesSinceRequest, GetGroupedEntriesSinceResponse, PlatformAlertReceiverView, GetSessionSummarySnapshotRequest, GetSessionSummarySnapshotResponse, GetTopicAttentionRequest, GetTopicAttentionResponse, GetUsageInsightsReportRequest, GetUsageInsightsReportResponse, GetUsageSessionsSinceRequest, GetUsageSessionsSinceResponse, InvalidateActivityMonitorsRequest, InvalidateActivityMonitorsResponse, LearnedClassifierArtifact, ReportClassificationIssueRequest, ReportClassificationIssueResponse, SaveUserActivityLogResponse, UploadClassificationDatasetSamplesRequest, UploadClassificationDatasetSamplesResponse, UploadImageClassificationSamplesRequest, UploadImageClassificationSamplesResponse, UsageLogCollapseMode, UserActivityLogListResponse} from './api-types';
 
 /** Queue widths as the classifier currently has them, with the build's defaults alongside. */
 export type ImageClassifyQueueWidths = {
@@ -617,24 +676,6 @@ export interface ApiRouteMap {
     response: { nowMs: number; occurrences: EventOccurrenceView[] };
   };
 
-  // Rewards
-  "/reward/state/get": {
-    request: { userId?: string | null };
-    response: {
-      rewardSettings: RewardSettings;
-      dailyState: DailyRewardStates;
-      triggerProgress: Record<string, { progressMinutes?: number; completedTaskIds?: string[] }>;
-    };
-  };
-  "/reward/claim": {
-    request: { userId?: string | null; rewardRuleId: string };
-    response: { success: boolean; error?: string };
-  };
-  "/reward/grant/manual": {
-    request: { userId?: string | null; rewardRuleId: string };
-    response: { success: boolean; error?: string };
-  };
-
   "/user/showcase/get": {
     request: { tempAuthToken?: TokenData };
     response: {
@@ -736,6 +777,16 @@ export interface ApiRouteMap {
       collections: Array<{ _id: string; name: string }>;
     };
   };
+  // Turn a note into a task, or a task into a note, keeping the same item (collections, sharing
+  // and history stay). Client background route only; the "Convert to…" rows in an item's More.
+  "/task_items/convertFromNote": {
+    request: { itemId: string };
+    response: { task: TaskDefinition };
+  };
+  "/task_items/convertToNote": {
+    request: { itemId: string };
+    response: { itemId: string };
+  };
 
   // Task completion via RefState (user-owned)
   "/task_completion/upsert": {
@@ -792,6 +843,25 @@ export interface ApiRouteMap {
     request: { lessonItemId: string; ownerId?: string; quizStepKeys: string[] };
     response: { success: boolean };
   };
+  /** A child finished a part of a built-in lesson pack: tells the family's guardians (HAT-577). */
+  "/lesson_progress/partDone": { request: {}; response: { notified: boolean } };
+
+  // A reader's answer to a learning track item's check, via RefState (user-owned). Never scored.
+  "/track_progress/getCheck": {
+    request: { refType: 'item' | 'published'; refId: string; ownerId?: string; checkKey: string };
+    response: { answer: any | null };
+  };
+  "/track_progress/saveCheck": {
+    request: {
+      refType: 'item' | 'published';
+      refId: string;
+      ownerId?: string;
+      checkKey: string;
+      answer: string[] | boolean;
+      correct: boolean;
+    };
+    response: { answer: any };
+  };
 
   // Background route: proxies to the server's /article/analyze, or short-circuits to
   // { status: 'offline' } in local mode.
@@ -829,6 +899,20 @@ export interface ApiRouteMap {
     request: LessonGradeRequest;
     response: LessonGradeResponse;
   };
+  // Learning tracks made with Kindredly AI (TRK-14…16): Plus only, metered, nothing saved on the
+  // server. The page saves what the maker keeps.
+  "/usertask/track/syllabus": {
+    request: TrackSyllabusRequest;
+    response: TrackSyllabusResponse;
+  };
+  "/usertask/track/writeItem": {
+    request: TrackWriteItemRequest;
+    response: TrackWriteItemResponse;
+  };
+  "/usertask/track/improve": {
+    request: TrackImproveRequest;
+    response: TrackImproveResponse;
+  };
   "/access_request/add": {
     request: { key: string; type?: string; details?: any; message?: string };
     response: AccessRequestAddResponse;
@@ -857,7 +941,9 @@ export interface ApiRouteMap {
   };
   "/access_request/remove": { request: { id: string }; response: void };
   "/access_request/reviewStatus": {
-    request: {};
+    // `userId`: an admin asking about one child (AI Usage lists each child's checks left). The
+    // server resolves it with `getTargetUserId` and refuses anyone but that child or an admin.
+    request: { userId?: string };
     response: { enabled: boolean; remainingThisWeek: number | null };
   };
   "/account/content/getTermDict": {
@@ -1086,6 +1172,25 @@ export interface ApiRouteMap {
     request: ArtifactSyncPendingRequest;
     response: ArtifactSyncPendingResponse;
   };
+
+  // Continue: what a person has started, with where they were (client background, CNT-1)
+  "/continue/record": {
+    request: ContinueRecordRequest;
+    response: ContinueRecordResponse;
+  };
+  "/continue/list": {
+    request: ContinueListRequest;
+    response: ContinueListResponse;
+  };
+  "/continue/remove": {
+    request: ContinueRemoveRequest;
+    response: ContinueRemoveResponse;
+  };
+  // Projects: a `project:` tag's display name and note (client background, AIM-13)
+  "/project/list": { request: ProjectListRequest; response: ProjectListResponse };
+  "/project/create": { request: ProjectCreateRequest; response: ProjectResponse };
+  "/project/rename": { request: ProjectRenameRequest; response: ProjectResponse };
+  "/project/setNote": { request: ProjectSetNoteRequest; response: ProjectResponse };
   "/account/stats": {
     request: {};
     response: { userCount: number; itemCount: number; collectionCount: number };
@@ -1140,6 +1245,10 @@ export interface ApiRouteMap {
   "/activity/removeLogEntry": {
     request: RemoveLogEntryRequest;
     response: void;
+  };
+  "/activity/removeLogEntries": {
+    request: RemoveLogEntriesRequest;
+    response: RemoveLogEntriesResponse;
   };
   "/activity/reportClassificationIssue": {
     request: ReportClassificationIssueRequest;
@@ -1198,12 +1307,18 @@ export interface ApiRouteMap {
     request: { accountId: string; accountType: AccountType };
     response: void;
   };
+  /** Delete a family and every member (HAT-710). `confirmation` must be "DELETE". */
+  "/admin/account/delete": {
+    request: { accountId: string; confirmation: string };
+    response: { deleted: boolean; members: number };
+  };
   "/admin/account/info": {
     request: { accountId: string };
     response: {
       id: string;
       name: string;
       accountType: AccountType;
+      deleted?: boolean;
       users: UserView[];
     };
   };
@@ -1256,6 +1371,16 @@ export interface ApiRouteMap {
   "/admin/user/stats": {
     request: {};
     response: { total: number; active7: number; active30: number; new30: number; disabled: number };
+  };
+  /** Clients seen in each window, per app, platform and version; `seen` lines up with `windowsDays` (HAT-802). */
+  "/admin/clients/seen": {
+    request: {};
+    response: {
+      windowsDays: number[];
+      rows: Array<{ appId: string | null; appType: string | null; appVersion: string | null; seen: number[] }>;
+      totals: number[];
+      countedAt: string;
+    };
   };
   "/admin/dataRetention/run": {
     request: {};
@@ -1921,12 +2046,16 @@ export interface ApiRouteMap {
     request: { dbId?: string };
     response: {
       galleryDBData: Array<{ _id: string; groupIds: string[] }>;
-      galleryGroupDBData: Array<{ _id: string; name: string; itemIds: string[]; query?: string }>;
+      galleryGroupDBData: GalleryGroup[];
     };
   };
   "/admin/getItems": {
     request: { itemIds: string[] };
-    response: { items: Published[] };
+    /**
+     * `hidden`: why families don't see an id (absent = they do). `unlisted`: rows `items` leaves out
+     * (unpublished, not out yet), so they keep a name. Older servers send neither.
+     */
+    response: { items: Published[]; hidden?: Record<string, FamilyHiddenReason>; unlisted?: Published[] };
   };
   "/admin/item/list": {
     request: { filterBy?: any; pageInfo?: any };
@@ -1996,6 +2125,25 @@ export interface ApiRouteMap {
       published?: boolean;
     };
     response: { item: Published; heldForReview: boolean };
+  };
+  // Kindredly's own tracks (TRK-22): the family routes' calls, on Kindredly's account.
+  "/admin/track/syllabus": {
+    request: TrackSyllabusRequest;
+    response: TrackSyllabusResponse;
+  };
+  "/admin/track/writeItem": {
+    request: TrackWriteItemRequest;
+    response: TrackWriteItemResponse;
+  };
+  // Improve on Kindredly's own feeds (TRK-21): run on Kindredly's account; a rewrite changes the
+  // published item only when an admin keeps it.
+  "/admin/track/improve": {
+    request: TrackImproveRequest;
+    response: TrackImproveResponse;
+  };
+  "/admin/published/keepTrackItem": {
+    request: { itemId: string; title: string; item: unknown; expectedBody: string };
+    response: { item: Published };
   };
   "/admin/published/updateContentFields": {
     request: {
@@ -2102,9 +2250,34 @@ export interface ApiRouteMap {
     request: { filterBy?: any; pageInfo?: any };
     response: { records: Published[]; count: number | null };
   };
+  /** Every `published_relation` row, unfiltered, in `_id` order after `afterId`. Used by scripts/syncPublished.mjs. */
+  "/admin/published/relations/list": {
+    request: { afterId?: string | null; limit?: number };
+    response: { rows: PublishedRelation[]; total: number };
+  };
+  "/admin/published/settings/export": { request: void; response: AdminPublishedSettingsExportResponse };
   "/admin/signin": {
-    request: { username: string; password: string };
+    /** `code`: the authenticator code or a recovery code, once one is set up (HAT-529). */
+    request: { username: string; password: string; code?: string };
     response: { token: string; user: UserView };
+  };
+  "/admin/secondFactor/status": {
+    request: {};
+    response: { enabled: boolean; enabledAt: string | null; recoveryCodesLeft: number };
+  };
+  /** A new key, pending until a code from it is confirmed. */
+  "/admin/secondFactor/start": {
+    request: {};
+    response: { key: string; otpauthUri: string };
+  };
+  /** Turns the code on; the recovery codes are returned once. */
+  "/admin/secondFactor/confirm": {
+    request: { code: string };
+    response: { recoveryCodes: string[] };
+  };
+  "/admin/secondFactor/disable": {
+    request: { code: string };
+    response: { ok: true };
   };
   "/admin/diagnostics/list": {
     request: {};
@@ -2175,6 +2348,8 @@ export interface ApiRouteMap {
     }>;
   };
   "/ai/deleteSession": { request: { sessionId: string }; response: void };
+  /** Background only: holds a chat-attached file on this device and returns a token for `addfile`. */
+  "/ai/stageFile": { request: { fileData: string; fileType?: string; filename?: string }; response: { fileToken: string } };
   "/ai/getCurrentSessionId": { request: {}; response: string | null };
   "/ai/getSessionById": {
     request: { id: string };
@@ -2249,6 +2424,14 @@ export interface ApiRouteMap {
   "/ai/textRequest": { request: AITextRequest; response: AITextResponse };
   /** The collection builder's copy/paste JSON format spec, admin-editable server-side. */
   "/ai/collectionAuthoringPrompt": { request: {}; response: { formatSpec: string } };
+  /**
+   * A child's newest Kinbot message, checked before it goes to the family's own AI (HAT-966). A
+   * `reply` is what Kinbot says instead of calling the model.
+   */
+  "/ai/childMessageCheck": {
+    request: { text: string };
+    response: { verdict: 'ok' | 'selfHarm' | 'sexual'; reply?: string };
+  };
   // Client-only (extension/native) direct-provider bgroutes. No server handler.
   "/ai/provider/listOllamaModels": {
     request: { endpoint: string };
@@ -2283,23 +2466,82 @@ export interface ApiRouteMap {
     request: {};
     response: {
       supported: boolean;
-      provider: "server" | "ollama" | "browser" | "browser-ff";
+      provider: "server" | "ollama" | "browser" | "browser-ff" | "own";
       endpoint: string;
       model: string;
       thinking: boolean;
       /** Firefox's on-device model id. Chrome's built-in model has no name to choose. */
       browserModelId: string;
+      /**
+       * The family's own AI account (HAT-966), as "OpenAI · model", or null when none is connected or
+       * this device cannot open it. `ownAiStatus` says which.
+       */
+      ownAiLabel: string | null;
+      ownAiStatus: "none" | "locked" | "connected";
     };
   };
   "/ai/provider/setConfig": {
     request: {
-      provider?: "server" | "ollama" | "browser" | "browser-ff";
+      provider?: "server" | "ollama" | "browser" | "browser-ff" | "own";
       endpoint?: string;
       model?: string;
       thinking?: boolean;
       browserModelId?: string;
     };
     response: { success: boolean; message?: string };
+  };
+  // The family's own AI account (HAT-966). Client-only bgroutes: the key is encrypted with the
+  // family's account key and never reaches Kindredly's server. Writes are admin only.
+  "/ai/ownAi/status": { request: {}; response: OwnAiStatusView };
+  "/ai/ownAi/listModels": {
+    request: { provider: OwnAiProviderId; baseUrl?: string; apiKey?: string };
+    response: { ok: true; models: { id: string; label: string }[] } | { ok: false; error: string };
+  };
+  "/ai/ownAi/test": {
+    request: { provider: OwnAiProviderId; baseUrl?: string; apiKey?: string; model: string };
+    response: { ok: true } | { ok: false; error: string };
+  };
+  /** Tests the connection with one short request, then saves it for the family. */
+  "/ai/ownAi/save": {
+    request: { provider: OwnAiProviderId; baseUrl?: string; apiKey?: string; model: string };
+    response: { success: boolean; message?: string; status?: OwnAiStatusView };
+  };
+  "/ai/ownAi/remove": { request: {}; response: { success: boolean; message?: string } };
+  /** Sign in with OpenRouter: trade its code for a key (PKCE). */
+  "/ai/ownAi/openRouterExchange": {
+    request: { code: string; codeVerifier: string };
+    response: { ok: true; key: string } | { ok: false; error: string };
+  };
+  /** Summarise a conversation's earlier turns now, so it keeps fitting its model (HAT-074). */
+  "/ai/compactSession": {
+    request: { sessionId: string };
+    response: { success: boolean; message?: string };
+  };
+  /**
+   * Words hidden from AI (HAT-254): this person's names and phrases that are swapped for placeholders
+   * before anything reaches a model. Stored end-to-end encrypted in their own ref_state row.
+   */
+  "/ai/hiddenWords/get": {
+    request: {};
+    response: { words: string[] };
+  };
+  /** Replace the list; returns it as saved (trimmed, de-duplicated, capped). */
+  "/ai/hiddenWords/set": {
+    request: { words: string[] };
+    response: { success: boolean; words?: string[]; message?: string };
+  };
+  /**
+   * The model and reasoning level each AI task runs with on this device, and the models it could
+   * use, each with how well it suits the task and why (HAT-071).
+   */
+  "/ai/taskModels/list": {
+    request: {};
+    response: { tasks: AITaskModelEntry[] };
+  };
+  /** Save a task's model (null = the default) and/or reasoning level (null = the task's own). */
+  "/ai/taskModels/set": {
+    request: { taskId: string; engineId?: string | null; reasoningEffort?: "none" | "low" | "medium" | "high" | null };
+    response: { success: boolean; message?: string; tasks?: AITaskModelEntry[] };
   };
   /**
    * Can the Chrome/Edge built-in model run here? Answered from the background, where inference
@@ -2332,6 +2574,12 @@ export interface ApiRouteMap {
     request: { password: string; userId?: string };
     response: { valid: boolean };
   };
+  // The signed-in person's own PIN, hashed on the device. The iPhone app asks for it when it
+  // opens on a parent (HAT-403).
+  "/auth/checkPin": {
+    request: { pin: string };
+    response: { valid: boolean };
+  };
   "/auth/client/info": { request: any; response: void };
   "/auth/completeEmailVerification": {
     request: { verificationCode: string; confirm: boolean };
@@ -2342,8 +2590,12 @@ export interface ApiRouteMap {
     response: { tokenData: TokenData };
   };
   "/auth/mintCompanionToken": {
-    /** `targetUserId`: an admin linking a device for a child they administer (desktop Companion). */
-    request: { deviceId: string; deviceName?: string; targetUserId?: string };
+    /**
+     * `targetUserId`: an admin linking a device for a child they administer (desktop Companion).
+     * `tempAuthToken`: a parent's approval from `/auth/permissionOverride`, entered on a child's
+     * phone; a child's session cannot link without it (HAT-930).
+     */
+    request: { deviceId: string; deviceName?: string; targetUserId?: string; tempAuthToken?: TokenData };
     response: { token: string; deviceId: string };
   };
   "/auth/createUser": { request: CreateUserRequest; response: UserView };
@@ -2444,6 +2696,16 @@ export interface ApiRouteMap {
   };
   "/auth/signin": { request: SignInRequest; response: AuthResponse };
   "/auth/signinlocal": { request: Record<string, any>; response: AuthResponse };
+  // Device-only family checks on this device (client bg routes only; HAT-403, UX-085).
+  "/auth/localFamilyStatus": { request: {}; response: { exists: boolean; hasPin: boolean } };
+  "/auth/eraseLocalFamily": { request: {}; response: { erased: boolean } };
+  // The iPhone app's PIN checks: its lock on a parent, and a parent's approval of a child's
+  // download (client bg routes only; HAT-403).
+  "/auth/verifyOwnPinpass": { request: { pinpass?: string }; response: { valid: boolean } };
+  "/auth/verifyParentPinpass": { request: { pinpass?: string }; response: { valid: boolean } };
+  // Switch User asks a parent for their full password, not a PIN, when a child's device has never
+  // had them signed in (client bg route only; HAT-670).
+  "/auth/switchNeedsFullPassword": { request: { userId: string }; response: { needed: boolean } };
   "/auth/getRestrictedUser": { request: {}; response: UserView };
   "/auth/signout": { request: {}; response: void };
   // Extension → hosted-webapp transparent sign-in handoff (client bg routes only; never hit the server).
@@ -2475,7 +2737,7 @@ export interface ApiRouteMap {
     response: AuthResponse;
   };
   "/auth/updatePassword": {
-    request: { password: string; passwordCopy: string; userId?: string };
+    request: { password: string; passwordCopy?: string | null; userId?: string; currentPassword?: string; forceSkipCheck?: boolean; keyFollows?: boolean };
     response: void;
   };
   "/auth/updatePIN": {
@@ -2534,6 +2796,16 @@ export interface ApiRouteMap {
     request: { target: CompanionOpenTarget };
     response: { ok: boolean; error?: string };
   };
+  /** On the child device: would Kindredly Guard block this Android package right now? */
+  "/companion/app/decision": {
+    request: { pkg: string };
+    response: CompanionAppDecision;
+  };
+  /** On the child device: open this Android package's launcher activity. */
+  "/companion/app/open": {
+    request: { pkg: string };
+    response: { ok: boolean; error?: string };
+  };
   "/companion/rules/push": {
     request: { forceRefresh?: boolean };
     response: { ok: boolean; rulesCount?: number; unchanged?: boolean; error?: string };
@@ -2552,6 +2824,14 @@ export interface ApiRouteMap {
     response: { devices: CompanionDeviceView[]; latestSettingsVersion?: number | null };
   };
   /**
+   * The admin code for each of a child's devices (CMP-5, CMP-62), for the parent's Admin code page.
+   * Background only: the device keys are unwrapped there and never leave it.
+   */
+  "/companion/devices/adminCodes": {
+    request: { childUserId: string };
+    response: { devices: DeviceAdminCodeView[] };
+  };
+  /**
    * The parent's app protections for one child. `policy: null` means never
    * configured, which the UI shows differently from "configured to block nothing".
    */
@@ -2564,6 +2844,27 @@ export interface ApiRouteMap {
     response: { ok: boolean };
   };
   /**
+   * Background route (HAT-902): App controls edits applied to the policy as stored when they run,
+   * as the App controls page's switches apply theirs: app types on or off, then one app at a time.
+   * Kinbot's Apply card sends it, so a switch the parent flipped meanwhile is kept.
+   */
+  "/companion/policy/edit": {
+    request: {
+      childUserId?: string;
+      categories?: Record<string, boolean>;
+      apps?: { pkg: string; policyKey: string; categoryId: string; decision: 'allow' | 'block' }[];
+    };
+    response: { ok: boolean };
+  };
+  /**
+   * Background route (SMB-16): the social sites a person's library opens, as Block social media
+   * Exceptions entries, read from this device's index of that library.
+   */
+  "/socialMedia/librarySites": {
+    request: { userId?: string | null };
+    response: { entries: string[] };
+  };
+  /**
    * SERVER route (unlike the rest of /companion/*): confirms a parent authorized
    * turning uninstall protection off. Requires a live permission-override token,
    * which the server verifies — the child is signed in on this phone, so the
@@ -2573,6 +2874,17 @@ export interface ApiRouteMap {
     request: { deviceId?: string };
     response: { authorized: boolean; adminUserId?: string; at?: number; reason?: string };
   };
+  /**
+   * Server route: the extension asks for its removal-alert link when someone signs in
+   * (HAT-129). `link` is null unless the signed-in user is a child. The extension
+   * hands it to `runtime.setUninstallURL`, pointed at `/extension/removed`.
+   */
+  "/extension/removalAlert/register": {
+    request: {};
+    response: { link: { u: string; c: string; s: string } | null };
+  };
+  /** Opened by the browser as the extension is removed; tells the family's admins. Returns an HTML page. */
+  "/extension/removed": { request: { u?: string; c?: string; s?: string }; response: void };
   /**
    * Server route: the child's own device reports newly installed apps so the
    * account's parents get a notification.
@@ -2620,6 +2932,23 @@ export interface ApiRouteMap {
     response: { version: number };
   };
   /**
+   * Ask this user's devices to upload what they have recorded, now.
+   *
+   * A device buffers its app sessions and posts them on a fifteen-minute cycle, which is the
+   * shortest period WorkManager will schedule. A guardian who opens Usage or History ten seconds
+   * after their child put the phone down is reading a report that is correct and stale, and the
+   * feature reads as broken. This is the nudge that closes that gap: it carries no data either
+   * way, only "send what you have".
+   *
+   * `sent` is how many device tokens it reached, which is NOT how many will answer — a phone that
+   * is off, offline or has no Guard on it is counted and will never reply. The caller must not
+   * report it as devices heard from.
+   */
+  "/companion/devices/requestUpload": {
+    request: { userId?: string };
+    response: { sent: number };
+  };
+  /**
    * SERVER route, device-agent token only, GET (DCP-8): an SSE stream for the desktop Companion that
    * carries only the content-free `deviceSettingsChanged`, answered with a fetch of
    * `/companion/settings/current`. Returns an event stream, not JSON.
@@ -2641,6 +2970,15 @@ export interface ApiRouteMap {
     request: { childUserId: string; deviceId: string };
     response: { ok: boolean; revokedSessions: number; deletedRows: number };
   };
+  /**
+   * A Companion unlinked at the computer, taking itself off the parent's list (CMP-70). Device
+   * token only; `approval` is what `/auth/desktopCompanionAuthorize` issued for a parent's PIN at
+   * that computer. The child and device come from the token. Same removal as the route above.
+   */
+  "/companion/devices/removeSelf": {
+    request: { approval: string };
+    response: { ok: boolean; revokedSessions: number; deletedRows: number };
+  };
   /** Client bg route: authorize with the server, then tell Guard to stand down. */
   "/companion/protection/disable": {
     request: {};
@@ -2659,6 +2997,14 @@ export interface ApiRouteMap {
   "/collection/suggest": {
     request: { query?: string; url?: string };
     response: ItemInfoView[];
+  };
+  /** Client bg route: collections strong enough for the popup to offer unasked. */
+  "/collection/suggestConfident": {
+    request: { query?: string; url?: string };
+    response: Array<
+      | { collection: ItemInfoView; collectionId: string; reason: "site"; host: string; count: number }
+      | { collection: ItemInfoView; collectionId: string; reason: "name" }
+    >;
   };
   "/collection/recent": {
     request: { userId?: string; limit?: number };
@@ -2698,7 +3044,8 @@ export interface ApiRouteMap {
     response: void;
   };
   "/collection/items": {
-    request: { collectionId: string; typeFilter?: string; userId?: string };
+    /** localOnly: this device's copy with viewer permissions, never sent to the server (HAT-747). */
+    request: { collectionId: string; typeFilter?: string; userId?: string; localOnly?: boolean };
     response: ItemInfoView[];
   };
   "/collection/structure": {
@@ -2734,6 +3081,14 @@ export interface ApiRouteMap {
   "/content/clearPipelineResults": {
     request: { userId?: string };
     response: void;
+  };
+  "/content/getBlockPageReason": {
+    request: { srcType?: string; srcId?: string; ts?: number; url?: string | null };
+    /**
+     * `earnAccessRuleId`: the Earn access rule behind an `earn-access-pending` block (HAT-836).
+     * `usageRuleId`: the time limit behind a time block (HAT-972).
+     */
+    response: { reasonCode: ReasonCode | null; earnAccessRuleId?: string | null; usageRuleId?: string | null };
   };
   "/content/getLoggedBlockingEntry": {
     request: { url: string; srcType?: string; srcId?: string; ts?: number };
@@ -2871,7 +3226,7 @@ export interface ApiRouteMap {
       image: string;
       runtimes?: Array<'tfjs-nsfw' | 'onnx-nsfw' | 'native-nsfw'>;
       iterations?: number;
-      nativePayloadModes?: Array<'original-base64' | 'js-resized-jpeg-base64' | 'original-base64-trace'>;
+      nativePayloadModes?: Array<'js-pixels-png-base64' | 'original-base64' | 'js-resized-jpeg-base64' | 'original-base64-trace'>;
       nativeDecodeStrategies?: Array<'bitmap-resize' | 'bitmap-draw' | 'image-decoder'>;
       nativeResizeQualities?: Array<'high' | 'medium' | 'low'>;
       nativeJpegQualities?: number[];
@@ -2880,7 +3235,7 @@ export interface ApiRouteMap {
     response: {
       iterations: number;
       selectedRuntimes: Array<'tfjs-nsfw' | 'onnx-nsfw' | 'native-nsfw'>;
-      selectedNativePayloadModes?: Array<'original-base64' | 'js-resized-jpeg-base64' | 'original-base64-trace'>;
+      selectedNativePayloadModes?: Array<'js-pixels-png-base64' | 'original-base64' | 'js-resized-jpeg-base64' | 'original-base64-trace'>;
       selectedNativeDecodeStrategies?: Array<'bitmap-resize' | 'bitmap-draw' | 'image-decoder'>;
       selectedNativeResizeQualities?: Array<'high' | 'medium' | 'low'>;
       selectedNativeJpegQualities?: number[];
@@ -3017,6 +3372,14 @@ export interface ApiRouteMap {
     request: FamilyPolicyRuleDeleteRequest;
     response: FamilyPolicyRuleDeleteResponse;
   };
+  /**
+   * Kinbot's "unblock survev.io" (HAT-627 #8): removes this person's own Blocked-page rules for one
+   * site. Throws when there are none; a block shared with others stays, and `sharedBlock` says so.
+   */
+  "/content/familyPolicyRules/unblockSite": {
+    request: { site: string; userId: string };
+    response: { removed: number; sharedBlock: boolean };
+  };
   /** A guardian's own check of an item under curation review. Encrypted; the server never reads it. */
   "/content/familyCurationChecks/list": {
     request: {};
@@ -3039,6 +3402,20 @@ export interface ApiRouteMap {
       ok?: boolean;
       success?: boolean;
     } | any;
+  };
+  /** Correct the classification of several logged visits at once (background route, HAT-271). */
+  "/content/fixClassificationForVisits": {
+    request: {
+      eduValue: EduValue;
+      targetUserId?: string | null;
+      note?: string;
+      visits: Array<{ url: string; startTime: number; endTime?: number | null; pipelineResultId?: string | null }>;
+    };
+    response: {
+      success: boolean;
+      error?: string;
+      result?: { updatedActivityLogEntries: number; rewroteRemoteActivityRows: number; unsavedRows: number };
+    };
   };
   "/content/fixPipelineClassification": {
     request: {
@@ -3131,6 +3508,28 @@ export interface ApiRouteMap {
   /** @deprecated Use /data/contentInfo with options.includeMetadata instead. Kept for backward compatibility. */
   "/data/meta": { request: { url: string }; response: ItemMeta };
   /** @deprecated Use /data/contentInfo with options.includeResourceInfo instead. Kept for backward compatibility. */
+  /**
+   * Read full page (HAT-619): the device loads the page in a real browser engine (a background tab
+   * in the extension, a sheet in the iPhone app), reads it once its scripts ran, and closes it.
+   * Background only; the address never reaches the server.
+   */
+  "/data/readFullPage": {
+    request: { url: string };
+    response: {
+      status: "read" | "blocked" | "unsupported" | "failed";
+      meta?: ItemMeta | null;
+      reason?: string | null;
+    };
+  };
+  /**
+   * A shared post's own picture, pictures or video, so it can be saved instead of the link
+   * (HAT-635). Read on the device from the post's feed; null when it holds none or the site did
+   * not answer. Background only.
+   */
+  "/data/postMedia": {
+    request: { url: string };
+    response: { media: PostMedia | null };
+  };
   "/data/resourceInfo": {
     request: { url: string };
     response: ResourceFetchInfoResponse;
@@ -3138,6 +3537,21 @@ export interface ApiRouteMap {
   "/data/podcastFeedLookup": {
     request: PodcastFeedLookupRequest;
     response: PodcastFeedLookupResponse;
+  };
+  /** Where a short link (`vm.tiktok.com/…`, `t.co/…`) leads, for an item being saved (SMB-4). `url` is null when it could not be followed. */
+  "/data/resolveShortLink": {
+    request: { url: string };
+    response: { url: string | null };
+  };
+  /** A call an app makes to a checked outside service, such as weather (HAT-629). `notSetUp` when this server has no key for it in production; the host then makes the call the old way. */
+  "/data/appService": {
+    request: { url: string };
+    response: { notSetUp: true } | { status: number; contentType: string; body: string };
+  };
+  /** A book, film, TV series, album or song by name, for Kinbot's addWork (HAT-794): its own page, picture, summary, and where to read, watch or listen. */
+  "/data/findWork": {
+    request: FindWorkRequest;
+    response: FindWorkResponse;
   };
 
   "/data/raw": {
@@ -3188,8 +3602,15 @@ export interface ApiRouteMap {
     response: { success: boolean };
   };
   "/libraryHealth/applyRecommendation": {
-    request: { recommendationId: string; options?: any };
-    response: { success: boolean; message?: string };
+    request: { recommendationId: string; recommendation?: any };
+    response: {
+      success: boolean;
+      message?: string;
+      changed?: number;
+      failed?: Array<{ id: string; name: string; error: string }>;
+      collectionId?: string;
+      collectionName?: string;
+    };
   };
   "/libraryHealth/getSmartCollections": {
     request: {};
@@ -3427,6 +3848,14 @@ export interface ApiRouteMap {
     request: {};
     response: { recoveryKey: string; keyId: string; createdAt: string };
   };
+  "/encryption/keyCopy/remove": {
+    request: { userId?: string };
+    response: { removed: boolean };
+  };
+  "/encryption/replaceRecoveryKey": {
+    request: { userId?: string };
+    response: { keyString: string; keyId: string; createdAt: string };
+  };
   "/encryption/listKeys": { request: { userId?: string }; response: any[] };
   "/encryption/listKeysWithStatus": {
     request: { userId?: string };
@@ -3557,6 +3986,26 @@ export interface ApiRouteMap {
     request: { code: string };
     response: { email?: string; accountName?: string; valid: boolean };
   };
+  /** Sign-up asks whether a family invite is waiting for this email (HAT-537). Google and Apple get
+   * the invite itself; an email sign-up only learns one exists, and it is emailed again. */
+  "/invite/findForSignup": {
+    request: { loginType: string; loginPayload?: Record<string, any> | null; email?: string | null };
+    response: { invited: boolean; code?: string; inviterName?: string; inviterEmail?: string; emailed?: boolean };
+  };
+  /** Whether the caller's own family is empty enough to delete for this invite (HAT-539). */
+  "/invite/joinInsteadCheck": {
+    request: { code: string };
+    response: {
+      canJoinInstead: boolean;
+      reason: "same-family" | "not-admin" | "other-people" | "paid-plan" | "has-data" | null;
+      otherPeople: number;
+    };
+  };
+  /** Deletes the caller's own family, when it is still empty, so they can sign up through the invite. */
+  "/invite/joinInstead": {
+    request: { code: string };
+    response: { code: string };
+  };
   "/item/addToCollections": {
     request: {
       itemId: string;
@@ -3569,6 +4018,15 @@ export interface ApiRouteMap {
   "/item/archiveUpdate": {
     request: { itemId: string; value: boolean };
     response: void;
+  };
+  /**
+   * Archive or unarchive up to 500 items at once (Library Health → Cleanup). Archive is on the
+   * item, so it leaves everyone's library: when archiving, an item other people have is left as
+   * it was and listed in `sharedIds` unless `includeShared` is set.
+   */
+  "/item/archiveMany": {
+    request: { itemIds: string[]; value: boolean; includeShared?: boolean };
+    response: { changedIds: string[]; sharedIds: string[]; failedIds: string[] };
   };
   "/item/attachment/add": {
     request: {
@@ -3637,6 +4095,8 @@ export interface ApiRouteMap {
       ids: string[];
       includeUserPermissions?: boolean;
       includeFeedback?: boolean;
+      /** Only what this device holds; ids it lacks are left out instead of fetched. */
+      localOnly?: boolean;
     };
     response: ItemInfoView[];
   };
@@ -3670,6 +4130,16 @@ export interface ApiRouteMap {
     request: GetArchivedItemsRequest;
     response: ItemInfoView[];
   };
+  /** Archive search (HAT-884): the ids of every archived item in this person's library. */
+  "/library/archivedIds": {
+    request: { userId?: string };
+    response: { itemIds: string[] };
+  };
+  /** Archived items by id, at most 500 at once, with the permission checks a sync page has. */
+  "/library/archivedByIds": {
+    request: { userId?: string; itemIds: string[] };
+    response: ItemInfoView[];
+  };
   "/library/hidden": {
     request: GetHiddenItemsRequest;
     response: ItemInfoView[];
@@ -3681,6 +4151,14 @@ export interface ApiRouteMap {
   "/item/listSharedWithUser": {
     request: ListSharedWithUserRequest;
     response: ItemInfoView[];
+  };
+  "/item/notInLibrary/list": {
+    request: { userId?: string; limit?: number; countOnly?: boolean };
+    response: { items: ItemInfoView[]; total: number };
+  };
+  "/item/notInLibrary/remove": {
+    request: { itemIds: string[] };
+    response: { removed: string[]; refused: string[] };
   };
   "/item/listRecentAccessibleByUser": {
     request: ListRecentAccessibleByUserRequest;
@@ -3706,6 +4184,10 @@ export interface ApiRouteMap {
   "/item/meta/refreshWithIds": {
     request: { itemIds?: string[]; force?: boolean; updateSubType?: boolean };
     response: MetadataResponse;
+  };
+  "/item/meta/saveRefreshed": {
+    request: { itemId: string; meta: ItemMeta };
+    response: boolean;
   };
   "/item/parents/bychildid": {
     request: { itemId: string; userId?: string; includePath?: boolean };
@@ -3738,7 +4220,7 @@ export interface ApiRouteMap {
   "/item/query": { request: ItemQueryRequest; response: ItemQueryResponse };
   "/item/cleanupCandidates": {
     request: LibraryCleanupCandidatesRequest;
-    response: ItemInfoView[];
+    response: LibraryCleanupCandidatesResponse;
   };
   "/item/duplicates/candidates": {
     request: LibraryDuplicateCandidatesRequest;
@@ -3832,6 +4314,57 @@ export interface ApiRouteMap {
     request: { url: string; itemId?: string; targetUserId?: string };
     response: ItemInfoViewWithSearchFields[];
   };
+  "/item/savedState/byURL": {
+    request: { url: string };
+    /**
+     * `notes`: the person's own page notes about the page, for the notes dot (PGN-8). `openNotes`:
+     * the phone's Save page asked to open notes on this page (PGN-7), once; `openNoteId` the note.
+     */
+    response: { saved: boolean; itemId: string | null; notes: number; openNotes?: boolean; openNoteId?: string | null };
+  };
+  /**
+   * The signed-in person's own notes about a page (Page notes, PGN-2). Background route: notes are
+   * encrypted, and the page-to-note lookup lives on the device.
+   */
+  "/pageNotes/forUrl": {
+    request: { url: string };
+    response: PageNotesForUrl;
+  };
+  /** Start a page note, or save the text of one. The note never claims the page (background route). */
+  "/pageNotes/save": {
+    request: PageNoteSaveRequest;
+    response: PageNoteSaveResult;
+  };
+  /**
+   * The person's notes this page can be added to (HAT-926, Add to a note): their own, newest
+   * first, not already about the page, and without links. Background route.
+   */
+  "/pageNotes/choices": {
+    request: { url: string };
+    response: { notes: PageNoteSummary[] };
+  };
+  /** A page note's whole text, for the iPhone's notes sheet (PGN-6). Background route. */
+  "/pageNotes/read": {
+    request: { itemId: string };
+    response: PageNoteReadResult;
+  };
+  /**
+   * The phone's Save page asks for notes on its page (PGN-7): the browser opens them when it is
+   * back on that page, through `/item/savedState/byURL`'s `openNotes`, and then says `opened`,
+   * which uses the request up. Background route.
+   */
+  "/pageNotes/openOnPage": {
+    request: { url: string; itemId?: string | null; opened?: boolean };
+    response: { ok: boolean };
+  };
+  /**
+   * The signed-in person's reminder that covers this page, if any (PGN-9). Background route: the
+   * page script asks it with the channel the page names.
+   */
+  "/pageNotes/reminderFor": {
+    request: { url: string; channelIds?: string[] };
+    response: { reminder: PageNoteReminder | null };
+  };
   "/item/addToUserLibrary": {
     request: AddItemToUserLibraryRequest;
     response: void;
@@ -3845,11 +4378,21 @@ export interface ApiRouteMap {
     response: void;
   };
   "/item/update": { request: UpdateItemRequest; response: void };
+  "/item/notifyAddedToCollections": {
+    request: {
+      itemId: string;
+      /** Only collections the item is already in are notified; the rest are ignored. */
+      collectionIds: string[];
+    };
+    response: void;
+  };
   "/item/updateParents": {
     request: {
       itemId: string;
       collectionIds: string[];
       removeMissingCollections?: boolean;
+      /** Tell the other people on those collections. Off unless the adder says so. */
+      notifyOthers?: boolean;
     };
     response: void;
   };
@@ -4038,12 +4581,67 @@ export interface ApiRouteMap {
     response: PublishedInfoView;
   };
   "/published/getGalleryGroupAndItems": {
-    request: { groupId: string; dbId?: string };
-    response: { group: { id: string; name: string }; items: any[] };
+    // `limit` caps a collection group's items (default 12).
+    request: { groupId: string; dbId?: string; limit?: number };
+    response: { group: GalleryGroup; items: any[]; moreAvailable?: boolean };
   };
   "/published/curationQueue": {
     request: {};
     response: CurationQueueEntry[];
+  };
+  // Curator workspace (docs/trackers/curator-workspace-tracker.md): curators, not admins, on /curate.
+  "/published/curate/history": {
+    request: { itemId: string };
+    response: CuratorItemHistoryResponse;
+  };
+  "/published/curate/archive": {
+    request: { itemId: string };
+    response: { archivedAt: string };
+  };
+  "/published/curate/restore": {
+    request: { itemId: string };
+    response: void;
+  };
+  /** Only an archived item can be deleted (founder, 2026-10-30). */
+  "/published/curate/delete": {
+    request: { itemId: string };
+    response: void;
+  };
+  "/published/curate/setBlocked": {
+    request: { itemId: string; blocked: boolean; message?: string | null };
+    response: void;
+  };
+  "/published/curate/changeType": {
+    request: { itemId: string; type: string; subType?: string | null };
+    response: void;
+  };
+  "/published/curate/addLinks": {
+    request: { urls: string[] };
+    response: CuratorAddLinksResponse;
+  };
+  "/published/curate/approve": {
+    request: { itemIds: string[] };
+    response: CuratorApproveResponse;
+  };
+  /** 'waiting': Kindredly's own items added and not yet published; 'archived': what curators archived. */
+  "/published/curate/list": {
+    request: { which: 'waiting' | 'archived' };
+    response: CuratorListEntry[];
+  };
+  /** Body, feeds and other addresses; a family's body stays theirs. Name, picture and topics go through `/published/info/update`. */
+  "/published/curate/updateContent": {
+    request: { itemId: string; textContent?: string; feeds?: ItemFeed[]; additionalLinks?: AdditionalLink[] };
+    response: void;
+  };
+  /** A content-loader manifest, read without writing anything (CWS-6). */
+  "/published/curate/manifestPreview": {
+    request: { manifestText: string };
+    response: CuratorManifestPreviewResponse;
+  };
+  /** Adds the previewed rows unpublished, waiting in the queue; never publishes and never changes a family's item. */
+  "/published/curate/manifestImport": {
+    request: { manifestText: string; manifestHash: string };
+    response: CuratorManifestImportResponse;
   };
   // Curation review (docs/specs/curation-review.md). `listForItem` is public; the rest are curators only.
   "/curationReview/listForItem": {
@@ -4072,6 +4670,317 @@ export interface ApiRouteMap {
     request: { reviewId: string; imageData: string };
     response: { filename: string };
   };
+  /** Pending changes an AI proposed, one per item, oldest first. Curators only. */
+  "/curationProposal/queue": {
+    request: {};
+    response: CurationProposalQueueEntry[];
+  };
+  "/curationProposal/apply": {
+    request: CurationProposalApplyRequest;
+    response: CurationProposalApplyResponse;
+  };
+  "/curationProposal/remove": {
+    request: { proposalId: string };
+    response: { ok: true };
+  };
+  "/curationProposal/reject": {
+    request: { proposalId: string; note?: string | null };
+    response: { ok: true };
+  };
+  /**
+   * The curation MCP endpoint (docs/guides/curation-agent-mcp.md): one JSON-RPC message or a batch,
+   * stateless. Takes an agent key (`kag_…`), never a JWT. A batch of only notifications gets 202.
+   */
+  "/agent/mcp/curation": {
+    request: McpJsonRpcMessage | McpJsonRpcMessage[];
+    response: McpJsonRpcResponse | McpJsonRpcResponse[];
+  };
+  /**
+   * Connected AI apps (HAT-616, docs/proposals/connected-ai-apps.md). The settings page reads this;
+   * the relay checks the same conditions on every call.
+   */
+  "/mcpRelay/status": {
+    request: {};
+    response: McpRelayStatus;
+  };
+  /** The family switch. An adult only; turning it on needs Kindredly's grant and Family AI On. */
+  "/mcpRelay/setEnabled": {
+    request: { enabled: boolean };
+    response: McpRelayStatus;
+  };
+  "/mcpRelay/connections/list": {
+    request: {};
+    response: McpRelayConnectionView[];
+  };
+  /** A URL connection for an AI app that takes a bearer token. The token is returned once. */
+  "/mcpRelay/connections/create": {
+    request: { clientName: string };
+    response: { connection: McpRelayConnectionView; token: string };
+  };
+  "/mcpRelay/connections/remove": {
+    request: { connectionId: string };
+    response: { removed: boolean };
+  };
+  /**
+   * One Kindredly answers an AI app at a time (HAT-814). The AI apps answering on the Kindredly
+   * making this request, or asking for Agree; the bar at the top of Kindredly reads it.
+   */
+  "/mcpRelay/session/state": {
+    /** front: Kindredly was just opened or brought to the front here, so it is the one used last. */
+    request: { front?: boolean };
+    response: McpRelaySessionView[];
+  };
+  /** Agree: the Kindredly making this request becomes the only one that answers the AI app. */
+  "/mcpRelay/session/agree": {
+    request: { connectionId: string };
+    response: { agreed: boolean };
+  };
+  "/mcpRelay/session/deny": {
+    request: { connectionId: string };
+    response: { denied: boolean };
+  };
+  /** Disconnect: the AI app's next call asks again. */
+  "/mcpRelay/session/end": {
+    request: { connectionId: string };
+    response: { ended: boolean };
+  };
+  /** The answering device hands back one call's result. */
+  "/mcpRelay/reply": {
+    request: McpRelayReplyRequest;
+    response: { accepted: boolean };
+  };
+  /**
+   * The relay's MCP endpoint for a URL connection: one JSON-RPC message or a batch, stateless.
+   * Takes the connection's token (`kmr_…`), never a JWT. Answers nothing itself: every tool list and
+   * tool call goes to one of the adult's open devices.
+   */
+  "/mcpRelay/mcp": {
+    request: McpJsonRpcMessage | McpJsonRpcMessage[];
+    response: McpJsonRpcResponse | McpJsonRpcResponse[];
+  };
+  /**
+   * An AI app asking an adult's permission (HAT-690). The device answering the AI app creates the
+   * request with what is asked encrypted; any of the adult's devices lists and decides it; the asking
+   * call reads its status and takes the approval once.
+   */
+  "/mcpPermission/create": {
+    request: { blob: string; argsHash: string };
+    response: { _id: string };
+  };
+  "/mcpPermission/list": {
+    request: {};
+    response: McpPermissionRequestView[];
+  };
+  "/mcpPermission/decide": {
+    request: { requestId: string; approved: boolean };
+    response: { decided: boolean };
+  };
+  "/mcpPermission/status": {
+    request: { requestId: string };
+    response: { status: McpPermissionStatus };
+  };
+  "/mcpPermission/take": {
+    request: { argsHash: string };
+    response: { approved: boolean };
+  };
+  /**
+   * A file an AI app sends by link (HAT-964). The device answering the AI app makes the link, with
+   * what the file is for encrypted; the AI app's code sends the bytes to `/mcpRelay/upload?t=…`
+   * (no JWT: the link is the credential), or the person opens it and picks the file on the
+   * `/connect/upload` page. A Kindredly of the adult takes a sent file once, files it, and finishes.
+   */
+  "/mcpUpload/create": {
+    request: { blob: string };
+    response: { _id: string; url: string; expiresAt: string };
+  };
+  /** The page the person opened the link on. Null for a link that is wrong, expired or not theirs. */
+  "/mcpUpload/open": {
+    request: { token: string };
+    response: McpUploadView | null;
+  };
+  "/mcpUpload/list": {
+    request: {};
+    response: McpUploadView[];
+  };
+  "/mcpUpload/claim": {
+    request: { uploadId: string };
+    response: McpUploadClaim | null;
+  };
+  "/mcpUpload/finish": {
+    request: { uploadId: string; added: boolean };
+    response: { finished: boolean };
+  };
+  /** The upload link itself: the bytes as the body, `t` the link's token. Not called by a client. */
+  "/mcpRelay/upload": {
+    request: { t: string };
+    response: { status: McpUploadStatus; message: string };
+  };
+  "/deviceUnlock/create": {
+    request: { publicKey: string; deviceLabel?: string };
+    response: { _id: string; pickupToken: string; expiresAt: string };
+  };
+  "/deviceUnlock/list": {
+    request: {};
+    response: DeviceUnlockRequestView[];
+  };
+  "/deviceUnlock/approve": {
+    request: { requestId: string; wrappedKey: string };
+    response: { approved: boolean };
+  };
+  "/deviceUnlock/deny": {
+    request: { requestId: string };
+    response: { denied: boolean };
+  };
+  "/deviceUnlock/take": {
+    request: { requestId: string; pickupToken: string };
+    response: { status: DeviceUnlockStatus; wrappedKey?: string };
+  };
+  "/deviceUnlock/cancel": {
+    request: { requestId: string; pickupToken: string };
+    response: { cancelled: boolean };
+  };
+  "/deviceApproval/start": {
+    request: {};
+    response: { requestId: string; publicKey: string; words: string[]; expiresAt: string };
+  };
+  "/deviceApproval/scanned": {
+    request: { requestId: string; publicKey: string };
+    response: { deviceLabel: string; createdAt: string };
+  };
+  "/deviceApproval/check": {
+    request: { requestId: string };
+    response: { status: 'waiting' | 'opened' | 'denied' | 'expired' | 'failed' };
+  };
+  "/deviceApproval/cancel": {
+    request: {};
+    response: { cancelled: boolean };
+  };
+  "/deviceApproval/list": {
+    request: {};
+    response: Array<{ _id: string; deviceLabel: string; createdAt: string; words: string[] }>;
+  };
+  "/deviceApproval/approve": {
+    request: { requestId: string };
+    response: { approved: boolean };
+  };
+  "/deviceApproval/deny": {
+    request: { requestId: string };
+    response: { denied: boolean };
+  };
+  /**
+   * End-to-end encrypted connection (MCP-16): a device starts pairing with its public key and gets
+   * the first half of the pairing code; the second half (the pair secret) never reaches the server.
+   */
+  "/mcpRelay/pairing/start": {
+    request: { extPub: string };
+    response: { connectionId: string; redeemToken: string };
+  };
+  /** Called by the program an AI app runs, with the first half of the pairing code. No sign-in. */
+  "/mcpRelay/pairing/redeem": {
+    request: { redeemToken: string; shimPub: string; clientName?: string };
+    response: McpRelayPairingRedeemed;
+  };
+  /** The pairing device waits for the program's public key here. */
+  "/mcpRelay/pairing/status": {
+    request: { connectionId: string };
+    response: { shimPub: string | null };
+  };
+  /** The device stores the channel key encrypted with the adult's own secret key. */
+  "/mcpRelay/pairing/finish": {
+    request: { connectionId: string; wrappedKey: string };
+    response: { finished: boolean };
+  };
+  /** Any of the adult's devices reads the encrypted channel key, to open a sealed call. */
+  "/mcpRelay/connections/key": {
+    request: { connectionId: string };
+    response: { wrappedKey: string | null };
+  };
+  /**
+   * Background only (never the server): start pairing on this device. Returns the whole pairing code
+   * to show, `<redeemToken>.<pairSecret>`; the pair secret never leaves the device otherwise.
+   */
+  "/mcpRelayDevice/pairStart": {
+    request: {};
+    response: { connectionId: string; code: string };
+  };
+  /** Background only: finish pairing once the program has used the code. Ask again until done. */
+  "/mcpRelayDevice/pairFinish": {
+    request: { connectionId: string };
+    response: { done: false } | { done: true; code: string };
+  };
+  /** The program's sealed call. Takes its token (`kmr_…`); the server cannot open the envelope. */
+  "/mcpRelay/call": {
+    request: { envelope: McpRelaySealedEnvelope };
+    response: { envelope?: McpRelaySealedEnvelope; error?: string };
+  };
+  /** OAuth sign-in for an AI app (MCP-20): the consent page reads the request it is answering. */
+  "/mcpRelay/oauth/request": {
+    request: { requestId: string };
+    /** `refusal` is why the signed-in person cannot allow it, or null when they can. */
+    response: { clientName: string; redirectHost: string; refusal: string | null };
+  };
+  /** Allow or deny. Allow creates the connection; the browser then goes to `redirectUrl`. */
+  "/mcpRelay/oauth/decide": {
+    request: { requestId: string; allow: boolean };
+    response: { redirectUrl: string };
+  };
+  /** Dynamic Client Registration (RFC 7591), called by the AI app. Public clients only. */
+  "/mcpRelay/oauth/register": {
+    request: { redirect_uris: string[]; client_name?: string; token_endpoint_auth_method?: "none" };
+    response: McpRelayOauthClientRegistration;
+  };
+  /** The token endpoint (RFC 6749), called by the AI app, form-encoded. Authorization code + PKCE, or refresh. */
+  "/mcpRelay/oauth/token": {
+    request: {
+      grant_type: "authorization_code" | "refresh_token";
+      code?: string;
+      code_verifier?: string;
+      redirect_uri?: string;
+      client_id?: string;
+      refresh_token?: string;
+    };
+    response: McpRelayOauthTokenResponse;
+  };
+  /** A browser navigation (GET) from the AI app; redirects to the consent page in the app. */
+  "/mcpRelay/oauth/authorize": {
+    request: {
+      response_type: "code";
+      client_id: string;
+      redirect_uri: string;
+      code_challenge: string;
+      code_challenge_method: "S256";
+      state?: string;
+    };
+    response: void;
+  };
+  /** OAuth discovery (GET): RFC 9728 protected-resource metadata for `/mcpRelay/mcp`. */
+  "/mcpRelay/.well-known/oauth-protected-resource": {
+    request: {};
+    response: Record<string, unknown>;
+  };
+  /** OAuth discovery (GET): RFC 8414 authorization-server metadata. */
+  "/mcpRelay/.well-known/oauth-authorization-server": {
+    request: {};
+    response: Record<string, unknown>;
+  };
+  /** The same document, where OpenID Connect discovery looks (GET). */
+  "/mcpRelay/.well-known/openid-configuration": {
+    request: {};
+    response: Record<string, unknown>;
+  };
+  "/admin/agentKeys/list": {
+    request: {};
+    response: AgentKeyView[];
+  };
+  /** Returns the key once; only its hash is stored. */
+  "/admin/agentKeys/create": {
+    request: { label: string };
+    response: { key: string; agentKey: AgentKeyView };
+  };
+  "/admin/agentKeys/revoke": {
+    request: { keyId: string };
+    response: AgentKeyView;
+  };
   "/curationReview/requestAiDraft": {
     /** At most once every ten minutes per review. */
     request: { reviewId: string };
@@ -4089,9 +4998,10 @@ export interface ApiRouteMap {
     request: { limit?: number };
     response: { rows: PublishedMapFeedRow[] };
   };
+  // Despite the name, the groups themselves, in the gallery's order.
   "/published/listGroupIdsForGallery": {
     request: { galleryId: string; dbId?: string };
-    response: string[];
+    response: GalleryGroup[];
   };
   "/published/listChildren": {
     request: { itemId: string };
@@ -4153,6 +5063,8 @@ export interface ApiRouteMap {
        * For non-UserFile images (e.g. a URL), you can pass through an existing image filename.
        */
       bannerImageFilename?: string | null;
+      /** A learning track's outline (`kindredly.track.v1`), kept as the published copy's `data.track`. */
+      track?: unknown;
     };
     response: { publishId: string };
   };
@@ -4273,12 +5185,16 @@ export interface ApiRouteMap {
   };
   "/search/main": { request: SearchMainRequest; response: ItemInfoView[] };
   "/search/autocomplete": {
-    request: { query: string; userId?: string };
+    request: { query: string; userId?: string; place?: SearchPlace };
     response: any[];
   };
   "/search/browser-address-autocomplete": {
     request: { query: string; limit?: number };
     response: any[];
+  };
+  "/search/history": {
+    request: SearchHistoryRequest;
+    response: SearchHistoryResponse;
   };
   "/search/embedded": { request: any; response: any };
   "/search/status": { request: {}; response: { indexRebuilding: boolean } };
@@ -4515,11 +5431,14 @@ export interface ApiRouteMap {
       data?: any;
       encInfo?: EncInfo;
     };
-    response: SubscriptionInfo;
+    // The new subscription's id, or the existing one's when the person already follows it.
+    response: string;
   };
+  // `expectedUpdatedAt` is the `updatedAt` the caller read. When the row has been written since,
+  // nothing is saved and the answer is `conflict: true` with the row's current `updatedAt`.
   "/subscription/edit": {
-    request: { subscriptionId: string; data: any; encInfo: EncInfo };
-    response: void;
+    request: { subscriptionId: string; data: any; encInfo: EncInfo; expectedUpdatedAt?: string | null };
+    response: { updated: boolean; conflict?: boolean; updatedAt?: string | null };
   };
   "/subscription/listForRef": {
     request: { refId: string; refType: string };
@@ -4661,6 +5580,7 @@ export interface ApiRouteMap {
     response: { underAccountLimit?: boolean; allowInviteCode?: boolean | null };
   };
   "/system/version": { request: {}; response: ServerVersionInfo };
+  "/system/updateCheck": { request: {}; response: PersonalUpdateInfo };
   "/test/client/dbtest": { request: any; response: any };
   "/test/client/debugInfo": { request: {}; response: any };
   "/test/client/run": {
@@ -4967,6 +5887,12 @@ export interface ApiRouteMap {
     response: Notification[];
   };
   "/user/notification/markAllAsRead": { request: {}; response: void };
+  /**
+   * Server route, a child's own device: they finished a part of a built-in lesson pack (HAT-577).
+   * Carries nothing: lesson progress is end-to-end encrypted, and the notice names the child and the
+   * pack, never the part. Capped per child per day.
+   */
+  "/user/notification/lessonPartDone": { request: {}; response: { notified: boolean } };
   "/user/notification/markRead": { request: { ids: string[] }; response: void };
   "/user/notification/markUnread": {
     request: { ids: string[] };
@@ -4996,6 +5922,69 @@ export interface ApiRouteMap {
   "/user/checkpoint/clear": {
     request: {};
     response: { release: CheckpointRelease };
+  };
+  /**
+   * A guardian approves a child's Daily Check-in for today (background route; Kinbot's Approve
+   * check-in, HAT-627). Not approved when the check-in is not holding them now.
+   */
+  "/user/checkpoint/approve": {
+    request: { userId: string };
+    response: { approved: boolean; reason?: string; release?: CheckpointRelease };
+  };
+  /**
+   * Open one of your OWN Earn access rules once its steps are done (HAT-836). Like
+   * /user/checkpoint/clear, the one Earn access write a restricted user may make: it acts only on
+   * the caller, writes only that rule's opening, and refuses a rule that waits for a guardian. The
+   * steps are checked on the device before this is sent (the server cannot read encrypted tasks).
+   */
+  "/user/earnAccess/open": {
+    /**
+     * `userId`: a guardian opening a child's rule; left out, your own. `confirmed`: sent by the I've
+     * done it tap (HAT-912), the only thing that counts a rule's confirm step as done; checked on the
+     * device, ignored by the server.
+     */
+    request: { ruleId: string; userId?: string; tempAuthToken?: TokenData; confirmed?: true };
+    response: { opening: EarnAccessOpening };
+  };
+  /**
+   * A guardian opens a child's Earn access rule for this period (background route). Not approved when
+   * the rule is off or already open.
+   */
+  "/user/earnAccess/approve": {
+    /** `tempAuthToken`: a guardian's PIN at the child's device. */
+    request: { userId: string; ruleId: string; tempAuthToken?: TokenData };
+    response: { approved: boolean; reason?: string; opening?: EarnAccessOpening };
+  };
+  /**
+   * How far each Earn access rule's steps are (background route only: tasks and lessons are
+   * encrypted, so only a device can check them). Read-only; opening is /user/earnAccess/open.
+   */
+  "/earnAccess/status": {
+    request: { userId?: string | null; forceRefresh?: boolean };
+    response: EarnAccessStatus;
+  };
+  /**
+   * Throws unless the person signed in may open this rule now. Called by /user/earnAccess/open.
+   * `confirmed`: the I've done it tap, which counts the rule's confirm step as done (HAT-912).
+   */
+  "/earnAccess/assertOpen": {
+    request: { ruleId: string; confirmed?: true };
+    response: { allowed: true };
+  };
+  /**
+   * Change one person's Earn access rules by id, against their rules as stored now (background
+   * route). `put` adds or replaces, `update` only replaces a rule still there, `add` only adds one
+   * that is not. Read fresh at the moment of writing, so a page or a Kinbot card opened minutes ago
+   * changes only its own rules. An adult's own rule is stored without approval.
+   */
+  "/earnAccess/rules/put": {
+    request: { userId?: string | null; put?: EarnAccessRule[]; update?: EarnAccessRule[]; add?: EarnAccessRule[] };
+    response: { rules: EarnAccessRule[] };
+  };
+  /** Remove one Earn access rule by id, against the rules as stored now (background route). */
+  "/earnAccess/rules/remove": {
+    request: { userId?: string | null; ruleId: string };
+    response: { rules: EarnAccessRule[] };
   };
   "/user/settings/copy": {
     request: CopyUserSettingsRequest;
@@ -5083,6 +6072,37 @@ export interface ApiRouteMap {
         totalMs: number;
       };
     } | null;
+  };
+  // Files in pieces (IFX-14): background only, never sent to the server as such.
+  "/item/attachment/pieces/start": {
+    request: ItemAttachmentPiecesStartRequest;
+    response: FilePiecesStartResponse;
+  };
+  "/item/attachment/pieces/finish": {
+    request: ItemAttachmentPiecesFinishRequest;
+    response: ItemAttachmentPiecesFinishResponse;
+  };
+  "/userfile/pieces/put": {
+    request: FilePiecesPutRequest;
+    response: FilePiecesPutResponse;
+  };
+  "/userfile/pieces/open": {
+    request: FilePiecesOpenRequest;
+    response: FilePiecesOpenResponse;
+  };
+  "/userfile/pieces/read": {
+    request: FilePiecesReadRequest;
+    response: FilePiecesReadResponse;
+  };
+  "/userfile/pieces/close": {
+    request: FilePiecesCloseRequest;
+    response: {};
+  };
+  // App Builder: this account's seal on a build saved with an app (background only; see
+  // tset-client/src/crypto/AppBuildSeal.ts). The digests are SHA-256 of the build's JS and CSS.
+  "/appbuild/seal": {
+    request: { format: string; runtime: number; hash: string; jsDigest: string; cssDigest: string; libs: string[] };
+    response: { seal: string | null };
   };
   "/userfile/getMetaById": {
     request: { fileId: string; previewId?: string };
@@ -5457,6 +6477,7 @@ export const authOptionalRoutes: Array<keyof ApiRouteMap> = [
   // Invite checking (before user has account)
   "/invite/checkCode",
   "/invite/getInfo",
+  "/invite/findForSignup",
 
   // Published/public content (viewable without login)
   "/published/get",

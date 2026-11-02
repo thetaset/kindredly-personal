@@ -55,6 +55,8 @@
     var ns = String(namespace || 'app')
     var key = String(opts.key || 'state')
     var shared = opts.shared === true
+    // Server-backed data is the person's own unless the app asks for the family's one copy.
+    var where = shared && opts.scope === 'account' ? { namespace: ns, scope: 'account' } : { namespace: ns }
     var base = isPlainObject(defaults) ? defaults : {}
 
     var listeners = []
@@ -127,7 +129,7 @@
       pendingSave = Promise.resolve(pendingSave)
         .catch(function () {})
         .then(function () {
-          return target.set(key, snapshot, { namespace: ns })
+          return target.set(key, snapshot, where)
         })
         .then(function () {
           store.error = null
@@ -156,7 +158,7 @@
       }
       return Promise.resolve()
         .then(function () {
-          return target.get(key, { namespace: ns })
+          return target.get(key, where)
         })
         .then(function (stored) {
           // The host returns the value directly, or wrapped — accept both rather than guessing.

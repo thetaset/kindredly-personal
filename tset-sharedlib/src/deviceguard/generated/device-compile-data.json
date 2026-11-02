@@ -34,12 +34,27 @@
     "ai.character.app": "social",
     "ai.elementlabs.lmstudio": "productivity",
     "air.com.hypah.io.slither": "games",
+    "anydesk": "remote",
+    "app.zen_browser.zen": "browsers",
     "au.com.shiftyjelly.pocketcasts": "music",
+    "audacity": "creative",
     "barrier": "remote",
+    "battle.net": "games",
     "bbc.mobile.news.ww": "news",
+    "blender": "creative",
+    "brave": "browsers",
+    "brave-browser": "browsers",
+    "calculatorapp": "utilities",
     "ch.protonvpn.mac": "vpn",
+    "chrome": "browsers",
+    "chromium": "browsers",
+    "chromium-browser": "browsers",
+    "chromium_chromium": "browsers",
     "cm.aptoide.pt": "stores",
+    "cmd": "utilities",
     "co.brainly": "learning",
+    "code": "productivity",
+    "code_code": "productivity",
     "com.1password.1password": "utilities",
     "com.Meltytech.Shotcut": "creative",
     "com.Slack": "communication",
@@ -63,6 +78,7 @@
     "com.android.vending": "stores",
     "com.anthropic.claude": "productivity",
     "com.anthropic.claudefordesktop": "productivity",
+    "com.anydesk.Anydesk": "remote",
     "com.anydesk.anydeskandroid": "remote",
     "com.apkpure.aegon": "stores",
     "com.apple.ActivityMonitor": "utilities",
@@ -132,6 +148,7 @@
     "com.desmos.calculator": "learning",
     "com.diffusionbee.diffusionbee": "creative",
     "com.discord": "social",
+    "com.discordapp.Discord": "social",
     "com.disney.disneyplus": "video",
     "com.dropbox.android": "productivity",
     "com.dts.freefireth": "games",
@@ -161,6 +178,9 @@
     "com.garageband.android": "creative",
     "com.getepic.Epic": "learning",
     "com.github.CopilotForXcode": "productivity",
+    "com.github.IsmaelMartinez.teams_for_linux": "communication",
+    "com.github.eneshecan.WhatsAppForLinux": "communication",
+    "com.github.tchx84.Flatseal": "stores",
     "com.github.yeriomin.yalpstore": "stores",
     "com.gog.galaxy": "games",
     "com.goodreads": "news",
@@ -203,6 +223,7 @@
     "com.greenlight.financial.mobile": "shopping",
     "com.groupme.android": "communication",
     "com.halfbrick.fruitninjafree": "games",
+    "com.heroicgameslauncher.hgl": "games",
     "com.heytap.browser": "browsers",
     "com.heytap.market": "stores",
     "com.hnc.Discord": "social",
@@ -231,6 +252,7 @@
     "com.memrise.android.memrisecompanion": "learning",
     "com.mi.globalbrowser": "browsers",
     "com.microblink.photomath": "learning",
+    "com.microsoft.Edge": "browsers",
     "com.microsoft.Excel": "productivity",
     "com.microsoft.Powerpoint": "productivity",
     "com.microsoft.VSCode": "productivity",
@@ -248,6 +270,7 @@
     "com.microsoft.teams2": "communication",
     "com.miniclip.eightballpool": "games",
     "com.mobile.legends": "games",
+    "com.mojang.Minecraft": "games",
     "com.mojang.minecraftlauncher": "games",
     "com.mojang.minecraftpe": "games",
     "com.myfitnesspal.android": "utilities",
@@ -261,8 +284,10 @@
     "com.notion.id": "productivity",
     "com.nuebling.mac-mouse-fix": "utilities",
     "com.nytimes.android": "news",
+    "com.obsproject.Studio": "creative",
     "com.obsproject.obs-studio": "creative",
     "com.openai.chatgpt": "productivity",
+    "com.opera.Opera": "browsers",
     "com.opera.browser": "browsers",
     "com.opera.browser.beta": "browsers",
     "com.opera.gx": "browsers",
@@ -296,6 +321,7 @@
     "com.roblox.clientstudio": "games",
     "com.robtopx.geometryjump": "games",
     "com.rovio.baba": "games",
+    "com.rustdesk.RustDesk": "remote",
     "com.samsung.android.dialer": "communication",
     "com.samsung.android.messaging": "communication",
     "com.scopely.monopolygo": "games",
@@ -307,16 +333,20 @@
     "com.sec.android.app.sbrowser.beta": "browsers",
     "com.shazam.android": "music",
     "com.skype.raider": "communication",
+    "com.slack.Slack": "communication",
     "com.snapchat.android": "social",
     "com.sololearn": "learning",
     "com.soundcloud.android": "music",
+    "com.spotify.Client": "music",
     "com.spotify.client": "music",
     "com.spotify.lite": "music",
     "com.spotify.music": "music",
     "com.spotify.tv.android": "utilities",
     "com.squareup.cash": "shopping",
+    "com.ss.android.ugc.trill": "social",
     "com.steam.mobile": "games",
     "com.strava": "utilities",
+    "com.stremio.Stremio": "video",
     "com.supercell.brawlstars": "games",
     "com.supercell.clashofclans": "games",
     "com.supercell.clashroyale": "games",
@@ -338,10 +368,13 @@
     "com.uc.browser.en": "browsers",
     "com.udemy.android": "learning",
     "com.uptodown.android": "stores",
+    "com.usebottles.bottles": "games",
+    "com.valvesoftware.Steam": "games",
     "com.valvesoftware.android.steam.community": "games",
     "com.valvesoftware.steam": "games",
     "com.venmo": "shopping",
     "com.viber.voip": "communication",
+    "com.visualstudio.code": "productivity",
     "com.vivaldi.Vivaldi": "browsers",
     "com.vivaldi.browser": "browsers",
     "com.vsco.cam": "creative",
@@ -359,29 +392,112 @@
     "com.yandex.browser": "browsers",
     "com.yubo.yubo": "social",
     "com.zhiliaoapp.musically": "social",
+    "com.zhiliaoapp.musically.go": "social",
     "com.zzkko": "shopping",
     "company.thebrowser.Browser": "browsers",
     "deezer.android.app": "music",
+    "dev.vencord.Vesktop": "social",
+    "discord": "social",
+    "discord_discord": "social",
+    "element-desktop": "communication",
+    "epicgameslauncher": "stores",
+    "excel": "productivity",
+    "firefox": "browsers",
+    "firefox-esr": "browsers",
+    "firefox_firefox": "browsers",
     "flipboard.app": "news",
+    "fortniteclient-win64-shipping": "games",
     "free.vpn.unblock.proxy.turbovpn": "vpn",
+    "freetube": "video",
+    "gimp": "creative",
+    "gnome-software": "stores",
+    "gnome-system-monitor": "utilities",
+    "gnome-terminal": "utilities",
+    "google-chrome": "browsers",
+    "google-chrome-beta": "browsers",
+    "google-chrome-unstable": "browsers",
+    "heroic": "games",
+    "iexplore": "browsers",
+    "im.riot.Riot": "communication",
+    "inkscape": "creative",
+    "io.elementary.appcenter": "stores",
+    "io.freetubeapp.FreeTube": "video",
+    "io.github.flattool.Warehouse": "stores",
     "io.github.forkmaintainers.iceraven": "browsers",
+    "io.gitlab.librewolf-community": "browsers",
+    "io.itch.itch": "games",
+    "io.mpv.Mpv": "video",
+    "io.snapcraft.Store": "stores",
+    "itch": "games",
+    "krita": "creative",
+    "leagueclient": "games",
+    "libreoffice-calc": "productivity",
+    "libreoffice-impress": "productivity",
+    "libreoffice-startcenter": "productivity",
+    "libreoffice-writer": "productivity",
+    "librewolf": "browsers",
+    "lutris": "games",
     "mark.via.gp": "browsers",
+    "microsoft-edge": "browsers",
+    "microsoft-edge-beta": "browsers",
+    "minecraft": "games",
+    "minecraft-launcher": "games",
+    "minecraft.windows": "games",
+    "minecraftlauncher": "games",
+    "mintinstall": "stores",
+    "mpv": "video",
+    "ms-teams": "communication",
+    "msedge": "browsers",
+    "mspaint": "creative",
+    "mstsc": "remote",
     "net.battle.app": "games",
+    "net.davidotek.pupgui2": "games",
+    "net.lutris.Lutris": "games",
     "net.onecook.browser": "browsers",
     "net.openvpn.connect.app": "vpn",
     "net.tsukumijima.real-esrgan-gui": "creative",
     "net.whatsapp.WhatsApp": "communication",
+    "notepad": "utilities",
     "notion.id": "productivity",
+    "obs64": "creative",
+    "olk": "productivity",
+    "one.ablaze.floorp": "browsers",
+    "onenote": "productivity",
+    "opera": "browsers",
+    "opera_gx": "browsers",
     "org.adblockplus.browser": "browsers",
+    "org.audacityteam.Audacity": "creative",
+    "org.blender.Blender": "creative",
     "org.blenderfoundation.blender": "creative",
+    "org.chromium.Chromium": "browsers",
     "org.deskflow.deskflow": "remote",
     "org.edx.mobile": "learning",
     "org.fdroid.fdroid": "stores",
+    "org.gimp.GIMP": "creative",
     "org.gimp.gimp": "creative",
+    "org.gnome.Calculator": "utilities",
+    "org.gnome.Console": "utilities",
+    "org.gnome.Epiphany": "browsers",
+    "org.gnome.Ptyxis": "utilities",
+    "org.gnome.Software": "stores",
+    "org.gnome.SystemMonitor": "utilities",
+    "org.gnome.Terminal": "utilities",
+    "org.gnome.TextEditor": "utilities",
     "org.inkscape.Inkscape": "creative",
+    "org.kde.discover": "stores",
+    "org.kde.falkon": "browsers",
+    "org.kde.haruna": "video",
+    "org.kde.kate": "utilities",
+    "org.kde.kdenlive": "creative",
+    "org.kde.konsole": "utilities",
+    "org.kde.krita": "creative",
+    "org.kde.plasma-systemmonitor": "utilities",
     "org.khanacademy.android": "learning",
     "org.krita": "creative",
     "org.libation.macos": "news",
+    "org.libreoffice.LibreOffice": "productivity",
+    "org.libretro.RetroArch": "games",
+    "org.mozilla.Thunderbird": "communication",
     "org.mozilla.firefox": "browsers",
     "org.mozilla.firefox_beta": "browsers",
     "org.mozilla.firefoxdeveloperedition": "browsers",
@@ -389,24 +505,78 @@
     "org.mozilla.klar": "browsers",
     "org.mozilla.nightly": "browsers",
     "org.pgadmin.pgadmin4": "productivity",
+    "org.prismlauncher.PrismLauncher": "games",
+    "org.remmina.Remmina": "remote",
     "org.scratchjr.android": "learning",
+    "org.signal.Signal": "communication",
+    "org.telegram.desktop": "communication",
     "org.telegram.messenger": "communication",
     "org.thoughtcrime.securesms": "communication",
     "org.torproject.android": "vpn",
     "org.torproject.torbrowser": "browsers",
+    "org.torproject.torbrowser-launcher": "browsers",
     "org.upscayl.Upscayl": "creative",
+    "org.videolan.VLC": "video",
     "org.videolan.vlc": "video",
+    "org.vinegarhq.Sober": "games",
     "org.whispersystems.signal-desktop": "communication",
     "org.wikipedia": "learning",
+    "outlook": "productivity",
+    "powerpnt": "productivity",
+    "powershell": "utilities",
+    "pwsh": "utilities",
+    "regedit": "utilities",
+    "retroarch": "games",
+    "riotclientservices": "games",
+    "robloxplayerbeta": "games",
+    "robloxstudiobeta": "creative",
     "ru.keepcoder.Telegram": "communication",
     "ru.vk.store": "stores",
+    "rustdesk": "remote",
     "sh.whisper": "social",
+    "signal": "communication",
+    "signal-desktop": "communication",
+    "slack": "communication",
+    "slack_slack": "communication",
+    "snap-store_snap-store": "stores",
+    "snap-store_ubuntu-software": "stores",
+    "snap-store_ubuntu-software-local-file": "stores",
+    "software-properties-gtk": "stores",
+    "software-properties-qt": "stores",
+    "spotify": "music",
+    "spotify_spotify": "music",
+    "steam": "games",
+    "steam_steam": "games",
     "stirling.pdf.dev": "productivity",
+    "synaptic": "stores",
+    "taskmgr": "utilities",
+    "teams-for-linux": "communication",
+    "teamviewer": "remote",
+    "telegram": "communication",
+    "telegram-desktop": "communication",
+    "telegram-desktop_telegram-desktop": "communication",
+    "thunderbird": "communication",
+    "torbrowser": "browsers",
     "tv.plex.desktop": "video",
     "tv.twitch.android.app": "video",
+    "us.zoom.Zoom": "communication",
     "us.zoom.videomeetings": "communication",
     "us.zoom.xos": "communication",
-    "wp.wattpad": "news"
+    "vesktop": "social",
+    "vivaldi": "browsers",
+    "vivaldi-stable": "browsers",
+    "vlc": "video",
+    "vlc_vlc": "video",
+    "whatsapp": "communication",
+    "whatsapp.root": "communication",
+    "windowsterminal": "utilities",
+    "winstore.app": "stores",
+    "winword": "productivity",
+    "wp.wattpad": "news",
+    "xboxpcapp": "games",
+    "xfce4-terminal": "utilities",
+    "xyz.blueskyweb.app": "social",
+    "zoom": "communication"
   },
   "safetyFloorAndroid": [
     "com.thetaset.companion",
@@ -426,6 +596,41 @@
     "com.apple.SecurityAgent",
     "com.kindredly.app"
   ],
+  "notScreenTimeAndroid": [
+    "com.google.android.deskclock",
+    "com.android.deskclock",
+    "com.sec.android.app.clockpackage",
+    "com.oneplus.deskclock",
+    "com.coloros.alarmclock",
+    "com.google.android.dialer",
+    "com.android.dialer",
+    "com.samsung.android.dialer",
+    "com.samsung.android.incallui",
+    "com.android.incallui",
+    "com.android.server.telecom",
+    "android",
+    "com.android.systemui",
+    "com.android.settings",
+    "com.google.android.permissioncontroller",
+    "com.android.permissioncontroller",
+    "com.google.android.packageinstaller",
+    "com.android.packageinstaller",
+    "com.google.android.inputmethod.latin",
+    "com.samsung.android.honeyboard",
+    "com.sec.android.inputmethod",
+    "com.touchtype.swiftkey",
+    "com.google.android.calculator",
+    "com.android.calculator2",
+    "com.sec.android.app.popupcalculator",
+    "com.oneplus.calculator",
+    "com.miui.calculator",
+    "com.google.android.GoogleCamera",
+    "com.android.camera",
+    "com.android.camera2",
+    "com.sec.android.app.camera",
+    "com.oneplus.camera",
+    "com.oplus.camera"
+  ],
   "defaultSafetyAllowlist": [
     "com.thetaset.companion",
     "com.thetaset.kindred"
@@ -437,5 +642,233 @@
     "windows",
     "linux",
     "steam"
+  ],
+  "gameApps": {
+    "roblox": [
+      "android:com.roblox.client",
+      "macos:com.roblox.RobloxPlayer",
+      "windows:robloxplayerbeta",
+      "linux:org.vinegarhq.Sober"
+    ],
+    "minecraft": [
+      "android:com.mojang.minecraftpe",
+      "macos:com.mojang.minecraftlauncher",
+      "windows:minecraft.windows",
+      "windows:minecraftlauncher",
+      "windows:minecraft",
+      "linux:minecraft-launcher",
+      "linux:com.mojang.Minecraft",
+      "linux:org.prismlauncher.PrismLauncher"
+    ],
+    "fortnite": [
+      "android:com.epicgames.fortnite",
+      "windows:fortniteclient-win64-shipping"
+    ],
+    "among-us": [
+      "android:com.innersloth.spacemafia",
+      "steam:945360"
+    ],
+    "brawl-stars": [
+      "android:com.supercell.brawlstars"
+    ],
+    "clash-of-clans": [
+      "android:com.supercell.clashofclans"
+    ],
+    "clash-royale": [
+      "android:com.supercell.clashroyale"
+    ],
+    "candy-crush": [
+      "android:com.king.candycrushsaga",
+      "android:com.king.candycrushsodafarm"
+    ],
+    "subway-surfers": [
+      "android:com.kiloo.subwaysurf"
+    ],
+    "call-of-duty-mobile": [
+      "android:com.activision.callofduty.shooter"
+    ],
+    "free-fire": [
+      "android:com.dts.freefireth"
+    ],
+    "pubg": [
+      "android:com.tencent.ig",
+      "steam:578080"
+    ],
+    "8-ball-pool": [
+      "android:com.miniclip.eightballpool"
+    ],
+    "homescapes": [
+      "android:com.playrix.homescapes"
+    ],
+    "gardenscapes": [
+      "android:com.playrix.gardenscapes"
+    ],
+    "pokemon-go": [
+      "android:com.nianticlabs.pokemongo"
+    ],
+    "fruit-ninja": [
+      "android:com.halfbrick.fruitninjafree"
+    ],
+    "my-talking-tom-friends": [
+      "android:com.outfit7.mytalkingtomfriends"
+    ],
+    "ea-sports-fc-mobile": [
+      "android:com.ea.gp.fifamobile"
+    ],
+    "monopoly-go": [
+      "android:com.scopely.monopolygo"
+    ],
+    "geometry-dash": [
+      "android:com.robtopx.geometryjump",
+      "steam:322170"
+    ],
+    "mobile-legends": [
+      "android:com.mobile.legends"
+    ],
+    "league-of-legends": [
+      "android:com.riotgames.league.wildrift",
+      "windows:leagueclient"
+    ],
+    "angry-birds-2": [
+      "android:com.rovio.baba"
+    ],
+    "mario-kart-tour": [
+      "android:com.nintendo.zaka"
+    ],
+    "chess-com": [
+      "android:com.chess"
+    ],
+    "terraria": [
+      "steam:105600"
+    ],
+    "stardew-valley": [
+      "steam:413150"
+    ],
+    "rocket-league": [
+      "steam:252950"
+    ],
+    "fall-guys": [
+      "steam:1097150"
+    ],
+    "counter-strike-2": [
+      "steam:730"
+    ],
+    "dota-2": [
+      "steam:570"
+    ],
+    "team-fortress-2": [
+      "steam:440"
+    ],
+    "apex-legends": [
+      "steam:1172470"
+    ],
+    "valheim": [
+      "steam:892970"
+    ],
+    "lethal-company": [
+      "steam:1966720"
+    ],
+    "gta-v": [
+      "steam:271590"
+    ],
+    "portal-2": [
+      "steam:620"
+    ],
+    "garrys-mod": [
+      "steam:4000"
+    ],
+    "overwatch-2": [
+      "steam:2357570"
+    ],
+    "palworld": [
+      "steam:1623730"
+    ],
+    "hollow-knight": [
+      "steam:367520"
+    ],
+    "undertale": [
+      "steam:391540"
+    ],
+    "phasmophobia": [
+      "steam:739630"
+    ],
+    "brawlhalla": [
+      "steam:291550"
+    ],
+    "warframe": [
+      "steam:230410"
+    ],
+    "the-sims-4": [
+      "steam:1222670"
+    ],
+    "subnautica": [
+      "steam:264710"
+    ],
+    "sea-of-thieves": [
+      "steam:1172620"
+    ],
+    "marvel-rivals": [
+      "steam:2767030"
+    ],
+    "baldurs-gate-3": [
+      "steam:1086940"
+    ],
+    "survev": [],
+    "slither-io": [
+      "android:air.com.hypah.io.slither"
+    ],
+    "krunker": [],
+    "shell-shockers": [],
+    "agar-io": [],
+    "bloxd-io": [],
+    "1v1-lol": [],
+    "smash-karts": [],
+    "skribbl-io": [],
+    "geoguessr": [],
+    "animal-jam": [],
+    "prodigy": []
+  },
+  "earnAccessHolds": [
+    {
+      "hold": "entertainment",
+      "condition": {
+        "type": "eduValue",
+        "values": [
+          "eduval_fun"
+        ]
+      }
+    },
+    {
+      "hold": "junk",
+      "condition": {
+        "type": "eduValue",
+        "values": [
+          "eduval_junk"
+        ]
+      }
+    },
+    {
+      "hold": "games",
+      "condition": {
+        "type": "attribute",
+        "values": [
+          "game"
+        ]
+      }
+    },
+    {
+      "hold": "social",
+      "condition": {
+        "type": "socialDesignation",
+        "values": [
+          "social"
+        ]
+      }
+    }
+  ],
+  "earnAccessCountableEduValues": [
+    "eduval_educational",
+    "eduval_task",
+    "eduval_edutainment"
   ]
 }

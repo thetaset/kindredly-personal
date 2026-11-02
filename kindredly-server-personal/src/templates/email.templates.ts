@@ -1,4 +1,5 @@
 import {config} from '@/config';
+import {escapeHtml} from '@/utils/text_utils';
 import fs from 'fs';
 import path from 'path';
 
@@ -120,9 +121,12 @@ export const friendRequestTemplate = {
     return `Friend Request from ${displayedInviterName} on Kindredly`;
   },
 
-  content(displayedInviterName: any, message: any, accountUser: any): string {
+  content(inviterName: any, inviteMessage: any, accountUser: any): string {
+    // The sender writes their name and the message; this is HTML.
+    const displayedInviterName = escapeHtml(inviterName);
+    const message = inviteMessage ? escapeHtml(inviteMessage) : '';
     return `
-      Greetings! ${displayedInviterName} sent you a friend request from on kindredly.ai, but it doesn't look like you have an account yet.              
+      Greetings! ${displayedInviterName} sent you a friend request from on kindredly.ai, but it doesn't look like you have an account yet.
       <a href="${config.serverHostname}/kindredapp/#/register">Click here to join</a>.
       <br/>
       <br/>
@@ -139,7 +143,7 @@ export const friendRequestTemplate = {
       <br/>
       <br/>
       <br/>
-      ${displayedInviterName}'s email is ${accountUser.email}. 
+      ${displayedInviterName}'s email is ${escapeHtml(accountUser.email)}.
    
       `;
   },

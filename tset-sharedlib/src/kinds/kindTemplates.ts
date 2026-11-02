@@ -40,17 +40,18 @@ export type KindTemplateEmphasis = 'standard' | 'bold'
 /**
  * Renderer layout: 'cards' = detail rows at rest; 'symbols' = icon/image tile
  * grid, tap a tile to expand its contents; 'gallery' = every member as a picture
- * grid, no slots involved. Unknown values fall back to 'cards' on old clients
- * (MV3-safe enum-of-shipped-renderers pattern).
+ * grid, no slots involved; 'cart' = products grouped by what they are and where
+ * they are sold, with prices where a page gave one. Unknown values fall back to
+ * 'cards' on old clients (MV3-safe enum-of-shipped-renderers pattern).
  */
-export type KindTemplateLayout = 'cards' | 'symbols' | 'gallery'
+export type KindTemplateLayout = 'cards' | 'symbols' | 'gallery' | 'cart'
 
 /**
  * Layouts whose whole job is to render the collection's members, so an empty
  * `slots` array is the correct shape rather than a malformed one. Keep this in
  * sync with the layouts that ignore slots entirely.
  */
-const SLOTLESS_LAYOUTS = new Set<string>(['gallery'])
+const SLOTLESS_LAYOUTS = new Set<string>(['gallery', 'cart'])
 
 export type KindTemplate = {
   id: string
@@ -77,6 +78,10 @@ const HEALTH_SLOTS: KindTemplateSlot[] = [
   { kindId: 'health.pharmacy', importance: 'optional' },
   { kindId: 'health.provider.physicalTherapist', importance: 'optional' },
 ]
+
+/** The cart view, and the chooser card that creates a collection using it. */
+export const CART_KIND_TEMPLATE_ID = 'kindtpl.cart.v1'
+export const CART_COLLECTION_TEMPLATE_ID = 'home.shoppingcart.v1'
 
 export const KIND_TEMPLATES: KindTemplate[] = [
   {
@@ -133,6 +138,17 @@ export const KIND_TEMPLATES: KindTemplate[] = [
       { kindId: 'school.calendar', importance: 'optional' },
       { kindId: 'school.lunchMenu', importance: 'optional' },
     ],
+  },
+  {
+    id: 'kindtpl.cart.v1',
+    name: 'Shopping cart',
+    group: 'Home & Family',
+    description: 'Products from any store, with the price each page showed when it was added.',
+    accent: 'teal',
+    layout: 'cart',
+    // Slotless, like the gallery: a cart holds whatever products you add, so
+    // there is nothing to prompt for. See SLOTLESS_LAYOUTS.
+    slots: [],
   },
   {
     id: 'kindtpl.gallery.v1',

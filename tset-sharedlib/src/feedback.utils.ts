@@ -22,6 +22,13 @@ export interface FeedbackUpdate {
 }
 
 /**
+ * The one value `reaction` stores. Like, haha and frown were removed (HAT-473): any value a
+ * client sends, including an older app that still offers them, is saved as a heart, and any
+ * non-null `reaction` already stored is read as one.
+ */
+export const HEART_REACTION = 'heart';
+
+/**
  * Valid feedback attribute names that can be updated
  */
 export const FEEDBACK_ATTRIBUTES = [
@@ -97,8 +104,10 @@ export function computeFeedbackUpdate(
   }
 
   // Direct value attributes
-  if (['reaction', 'isHidden'].includes(attrName)) {
-    (feedback as any)[attrName] = value;
+  if (attrName === 'reaction') {
+    feedback.reaction = value ? HEART_REACTION : null;
+  } else if (attrName === 'isHidden') {
+    feedback.isHidden = value;
   }
 
   // Snooze handling - clears neverRemind when set

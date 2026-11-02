@@ -1,12 +1,14 @@
 import {HttpException} from '@/exceptions/HttpException';
 import {UserChangeLogRepo} from '@/db/user_changelog.repo';
 import type {DeviceGrant} from 'tset-sharedlib/restrictions/deviceGrants';
+import {holdOverridesToExtraTimeMax} from 'tset-sharedlib/restrictions/extraTimeMax';
 import {buildDeviceGrants} from '@/services/deviceGrantBuilder';
 import {config} from '@/config';
 import {AccountRepo} from '@/db/account.repo';
 import {ItemFeedbackRepo} from '@/db/item_feedback.repo';
 import {ReviewRepo} from '@/db/review.repo';
 import {UserRepo} from '@/db/user.repo';
+import {SubscriptionRepo} from '@/db/subscription.repo';
 import {UserActivityRepo} from '@/db/user_activity.repo';
 import {UserPermRepo} from '@/db/user_perm.repo';
 import {UserPrefRepo} from '@/db/user_pref.repo';
@@ -31,8 +33,34 @@ import type {CopyUserSettingsRequest, CopyUserSettingsResponse, UserSettingsCopy
 import {isUnderAge} from 'tset-sharedlib/date.utils';
 import {effectiveHistoryRetentionDays} from 'tset-sharedlib/plan-policy';
 import {buildCheckpointRelease, resolveCheckpointMode} from 'tset-sharedlib/restrictions/checkpoint';
+import {checkpointSettingsOf} from 'tset-sharedlib/restrictions/checkinRule';
+import {
+  buildEarnAccessOpening,
+  earnAccessRuleHolding,
+  earnAccessRuleIsComplete,
+  earnAccessRuleSelfOpenable,
+  keepEarnAccessPartsOldWritersDrop,
+  normalizeEarnAccessSettings,
+  pruneEarnAccessOpenings,
+} from 'tset-sharedlib/restrictions/earnAccess';
+import {familyClock} from 'tset-sharedlib/deviceguard/familyClock';
+import type {EarnAccessOpening} from 'tset-sharedlib/types/earn-access.types';
+import {isAllowListEmpty, normalizeAllowList} from 'tset-sharedlib/restrictions/alwaysAllowed';
+import {normalizePageNoteReminders} from 'tset-sharedlib/pageNote.utils';
+import {normalizeSocialMediaSettings} from 'tset-sharedlib/restrictions/socialMedia';
+import {
+  USER_OPTION_OBJECT_KEYS,
+  USER_OPTION_SWITCH_KEYS,
+  undeclaredUserOptionKeys,
+} from 'tset-sharedlib/restrictions/userOptionKeys';
+import {
+  applyAccessControlSettingsPatch,
+  isAccessControlSettingsPatch,
+} from 'tset-sharedlib/restrictions/accessControlSettingsPatch';
+import {normalizeAppGrants} from 'tset-sharedlib/restrictions/appGrants';
 import type {AccessControlSettings, CheckpointRelease} from 'tset-sharedlib/types';
 import {isAppCapabilityId} from 'tset-sharedlib/types/item.types';
+import {isAppSiteGrantKey} from 'tset-sharedlib/app-outside-services';
 import type UserPublic from 'tset-sharedlib/schemas/public/UserPublic';
 import {
   buildContentFilteringCopySnapshot,
@@ -49,7 +77,7 @@ import UserFileService from './user_file.service';
 import VerificationService from './verification.service';
 import {container} from '@/inversify.config';
 import SSEManager from './sse.manager';
-import {deviceSettingsChanged, notifyDeviceSettingsChanged} from './device_settings.service';
+import {deviceSettingsChanged, isValidTimeZone, notifyDeviceSettingsChanged} from './device_settings.service';
 import {nextDeviceSettingsVersionSql} from '@/db/device_settings_version.repo';
 
 const publicAttributes = ['username', 'fullName', 'enabled', 'about', 'profileImage'];
@@ -65,6 +93,8 @@ const OFFICIAL_PUBLISHER_CREATED_AT = new Date('2023-01-01T00:00:00.000Z');
 /** Bounds on the app device-capability grant map — see _sanitizeAppCapabilityGrants. */
 const MAX_APP_CAPABILITY_GRANT_APPS = 200;
 const MAX_APP_CAPABILITY_REF_ID_LENGTH = 200;
+/** Device capabilities plus the sites a guardian approved for one app (HAT-629). */
+const MAX_APP_CAPABILITY_GRANTS_PER_APP = 50;
 const MAX_EMAIL_ALLOWED_SENDERS = 500;
 const MAX_EMAIL_ADDRESS_LENGTH = 254;
 /** A Blocked message is a sentence or two on a block screen, not a letter. */
@@ -72,6 +102,7 @@ const BLOCKED_MESSAGE_MAX = 500;
 
 class UserService {
   private userRepo = new UserRepo();
+  private subscriptionRepo = new SubscriptionRepo();
   private changeLogRepo = new UserChangeLogRepo();
   private usersPublic = new UserPublicRepo();
   private userShowcaseRepo = new UserShowcaseRepo();
@@ -373,6 +404,11 @@ class UserService {
   }
   async updateUserPublicProfile(ctx: RequestContext, data: UpdatePublicProfileRequest) {
     const user = await ctx.getCurrentUser();
+    // A public profile can be read without signing in, so a child never has one. The app shows
+    // Public profile to admins only; this is the server half (EUP-16).
+    if (user?.type == UserType.restricted) {
+      throw new HttpException(403, 'Children do not have a public profile');
+    }
     let publicId = user.publicId;
     if (!publicId) {
       publicId = uuidv4();
@@ -600,7 +636,8 @@ class UserService {
 
     const options = (user.options || {}) as any;
     const accessControlSettings = (options.accessControlSettings || {}) as AccessControlSettings;
-    const checkpointSettings = accessControlSettings.checkpointSettings;
+    // Stored as an Earn access rule since HAT-913; the old field for data saved before it.
+    const checkpointSettings = checkpointSettingsOf(accessControlSettings);
 
     if (checkpointSettings?.enabled !== true) {
       throw new Error('No daily check-in is set up');
@@ -624,6 +661,100 @@ class UserService {
     });
 
     return {release};
+  }
+
+  /**
+   * Open an Earn access rule for this period (HAT-836): your own once its steps are done, or, for a
+   * guardian, a child's (from the block page in person, an access request, or the rule's page).
+   *
+   * Your own: narrow for the same reasons as `clearOwnCheckpoint`. It refuses a rule that waits for a
+   * guardian. The steps (tasks, minutes) are checked on the device before this is sent; tasks are
+   * encrypted, so the server cannot check them. A child's: only an admin of their family, which a
+   * guardian's PIN at the child's device also is (`tempAuthToken`).
+   *
+   * The row is read under a lock and only `earnAccessOpenings` is written, inside the stored options,
+   * so two openings at once both land and a guardian's change to another setting saved a moment ago
+   * stays. A rule already open writes nothing and wakes no device: a repeated tap is not a change.
+   * An opening reaches the Companions, so it raises the device settings version in the same statement
+   * and nudges the devices, as `setUserOptions` does.
+   */
+  // ROUTE-METHOD
+  async openEarnAccess(
+    ctx: RequestContext,
+    input: {ruleId?: unknown; userId?: unknown},
+  ): Promise<{opening: EarnAccessOpening}> {
+    const actorId = ctx.getCurrentUserId();
+    if (!actorId) {
+      throw new Error('You must be signed in');
+    }
+    const ruleId = input?.ruleId;
+    if (typeof ruleId !== 'string' || !ruleId) {
+      throw new HttpException(400, 'ruleId is required');
+    }
+    const requested = typeof input?.userId === 'string' ? input.userId.trim() : '';
+    const targetId = requested || actorId;
+    const forChild = targetId !== actorId;
+    if (forChild) await ctx.verifyAdminOverUser(targetId, 'Only a guardian can open this');
+
+    const nowMs = Date.now();
+    let opening: EarnAccessOpening;
+    let changed = false;
+    const trx = await this.userRepo.createTransaction();
+    try {
+      const row = (await trx('user')
+        .where({_id: targetId})
+        .forUpdate()
+        .first('_id', 'accountId', 'options', 'deleted')) as
+        | {_id: string; accountId?: string; options: any; deleted?: boolean}
+        | undefined;
+      if (!row || row.deleted) {
+        throw new HttpException(404, 'User not found');
+      }
+      const access = (row.options?.accessControlSettings || {}) as AccessControlSettings;
+      const settings = normalizeEarnAccessSettings(access.earnAccessSettings);
+      const rule = settings.rules.find((r) => r.id === ruleId);
+      if (!rule || !rule.enabled || !earnAccessRuleIsComplete(rule)) {
+        throw new HttpException(404, 'No such rule is on');
+      }
+      if (!forChild && !earnAccessRuleSelfOpenable(rule)) {
+        throw new HttpException(403, 'Only an adult can open this');
+      }
+
+      const account = row.accountId ? await trx('account').where({_id: row.accountId}).first('options') : undefined;
+      const timeZone = isValidTimeZone(account?.options?.familyTimeZone) ? account.options.familyTimeZone : null;
+      const stored = (access.earnAccessOpenings || {}) as Record<string, EarnAccessOpening>;
+      if (!earnAccessRuleHolding(rule, stored, familyClock(nowMs, timeZone)) && stored[rule.id]) {
+        opening = stored[rule.id];
+      } else {
+        opening = buildEarnAccessOpening(nowMs, actorId, !forChild);
+        const openings = {...pruneEarnAccessOpenings(settings, stored), [rule.id]: opening};
+        await trx('user')
+          .where({_id: targetId})
+          .update({
+            options: trx.raw(
+              `(jsonb_set(coalesce(options::jsonb, '{}'::jsonb), '{accessControlSettings}',
+                coalesce(options::jsonb -> 'accessControlSettings', '{}'::jsonb) || jsonb_build_object('earnAccessOpenings', ?::jsonb)))::json`,
+              [JSON.stringify(openings)],
+            ) as any,
+            deviceSettingsVersion: nextDeviceSettingsVersionSql(trx),
+          });
+        changed = true;
+      }
+      await trx.commit();
+    } catch (error) {
+      await trx.rollback();
+      throw error;
+    }
+
+    if (changed) {
+      this.broadcastUserSettingsRefresh(targetId, {
+        refreshCurrentUser: true,
+        refreshUserPrefs: false,
+        source: 'options-update',
+      });
+      notifyDeviceSettingsChanged([targetId]);
+    }
+    return {opening};
   }
 
   /**
@@ -869,6 +1000,22 @@ class UserService {
     return null;
   }
 
+  private readonly reportedUndeclaredOptionKeys = new Set<string>();
+
+  /**
+   * A key no list in userOptionKeys.ts declares is not stored. Say so once per key, so a setting
+   * that forgot to declare itself is noticed instead of vanishing (HAT-327, REG-5).
+   */
+  private _reportUndeclaredOptionKeys(options: unknown) {
+    for (const key of undeclaredUserOptionKeys(options)) {
+      if (this.reportedUndeclaredOptionKeys.has(key)) continue;
+      this.reportedUndeclaredOptionKeys.add(key);
+      console.warn(
+        `[user options] not stored: "${key}" is not declared in tset-sharedlib/src/restrictions/userOptionKeys.ts`,
+      );
+    }
+  }
+
   private _mergeUserOptions(
     targetUser: Pick<User, 'options' | 'type' | 'dob'>,
     options: any,
@@ -882,6 +1029,8 @@ class UserService {
       aiChatEnabled: false,
       assistantReviewEnabled: false,
       appEditorEnabled: false,
+      commandBarEnabled: false,
+      historySearchEnabled: false,
       explorePublishedEnabled: false,
       emailEnabled: false,
       speechModeEnabled: false,
@@ -889,6 +1038,7 @@ class UserService {
       communityContentEnabled: false,
       companionDevicesEnabled: false,
       remoteChildActionsEnabled: false,
+      shoppingCartEnabled: false,
       accessControlSettings: null,
       usageLimitsData: null,
       ruleOverrideSettings: null,
@@ -897,66 +1047,80 @@ class UserService {
     const updatedOptions = {...prevOptions} as Record<string, unknown>;
 
     if (options && typeof options === 'object') {
-      if ('whitelistingEnabled' in options) {
-        updatedOptions.whitelistingEnabled = !!options.whitelistingEnabled;
+      // The keys and why each is an option, not a pref: tset-sharedlib/src/restrictions/userOptionKeys.ts.
+      for (const key of USER_OPTION_SWITCH_KEYS) {
+        if (key in options) updatedOptions[key] = !!options[key];
       }
-      if ('codeInjectionEnabled' in options) {
-        updatedOptions.codeInjectionEnabled = !!options.codeInjectionEnabled;
+      for (const key of USER_OPTION_OBJECT_KEYS) {
+        if (key in options) updatedOptions[key] = options[key];
       }
-      if ('contentFilteringEnabled' in options) {
-        updatedOptions.contentFilteringEnabled = !!options.contentFilteringEnabled;
+      // REG-7: a patch changes only its fields, on this server's latest copy. The whole object sent
+      // beside it is for a server that predates patches, so it gives way here.
+      if (isAccessControlSettingsPatch(options.accessControlSettingsPatch)) {
+        updatedOptions.accessControlSettings = applyAccessControlSettingsPatch(
+          prevOptions.accessControlSettings as Record<string, unknown> | null,
+          options.accessControlSettingsPatch,
+        );
       }
-      if ('logActivity' in options) {
-        updatedOptions.logActivity = !!options.logActivity;
+      // HAT-912: an app from before rule instructions drops them, and the I've done it step, from every
+      // rule it saves. Its save is marked below version 2; keep both from the stored copy.
+      const nextAccess = updatedOptions.accessControlSettings as Record<string, unknown> | null | undefined;
+      if (
+        nextAccess &&
+        typeof nextAccess === 'object' &&
+        nextAccess !== prevOptions.accessControlSettings &&
+        'earnAccessSettings' in nextAccess
+      ) {
+        const prevAccess = (prevOptions.accessControlSettings || {}) as Record<string, unknown>;
+        const earnAccessSettings = keepEarnAccessPartsOldWritersDrop(
+          prevAccess.earnAccessSettings,
+          nextAccess.earnAccessSettings,
+        );
+        if (earnAccessSettings !== nextAccess.earnAccessSettings) {
+          updatedOptions.accessControlSettings = {...nextAccess, earnAccessSettings};
+        }
       }
-      if ('containLinksInternally' in options) {
-        updatedOptions.containLinksInternally = !!options.containLinksInternally;
+      // HAT-950 rule B: no save gives a limit more extra time a day than its ceiling, whichever
+      // app or assistant wrote it.
+      const nextOverrides = (updatedOptions.ruleOverrideSettings as any)?.ruleOverrides;
+      if ('ruleOverrideSettings' in options && Array.isArray(nextOverrides)) {
+        const held = holdOverridesToExtraTimeMax({
+          overrides: nextOverrides,
+          rules: (updatedOptions.usageLimitsData as any)?.contentUsageLimits || [],
+          extraTimeMax: (updatedOptions.accessControlSettings as any)?.extraTimeMax || null,
+        });
+        updatedOptions.ruleOverrideSettings = {...(updatedOptions.ruleOverrideSettings as object), ruleOverrides: held};
       }
-      if ('aiChatEnabled' in options) {
-        updatedOptions.aiChatEnabled = !!options.aiChatEnabled;
+      this._reportUndeclaredOptionKeys(options);
+      // Always allowed (HAT-152): its own key so no limits save can overwrite it. Stored normalized;
+      // an empty list is removed rather than kept, so it never looks like a setting.
+      if ('alwaysAllowed' in options) {
+        const alwaysAllowed = normalizeAllowList(options.alwaysAllowed);
+        if (isAllowListEmpty(alwaysAllowed)) delete updatedOptions.alwaysAllowed;
+        else updatedOptions.alwaysAllowed = alwaysAllowed;
       }
-      if ('assistantReviewEnabled' in options) {
-        updatedOptions.assistantReviewEnabled = !!options.assistantReviewEnabled;
+      // Page notes reminders (PGN-9): its own key, stored cleaned; an empty list is removed.
+      if ('pageNoteReminders' in options) {
+        const reminders = normalizePageNoteReminders(options.pageNoteReminders);
+        if (reminders.length) updatedOptions.pageNoteReminders = reminders;
+        else delete updatedOptions.pageNoteReminders;
       }
-      if ('appEditorEnabled' in options) {
-        updatedOptions.appEditorEnabled = !!options.appEditorEnabled;
-      }
-      if ('explorePublishedEnabled' in options) {
-        updatedOptions.explorePublishedEnabled = !!options.explorePublishedEnabled;
-      }
-      // The optional features that used to be one family-wide switch on the account. They are
-      // per person now, and they are options rather than userPrefs for the reason every
-      // permission here is: a restricted user can write their own prefs, so a child could
-      // otherwise grant themselves an inbox, a microphone, or the community catalog.
-      if ('emailEnabled' in options) {
-        updatedOptions.emailEnabled = !!options.emailEnabled;
-      }
-      if ('speechModeEnabled' in options) {
-        updatedOptions.speechModeEnabled = !!options.speechModeEnabled;
-      }
-      if ('wakeWordEnabled' in options) {
-        updatedOptions.wakeWordEnabled = !!options.wakeWordEnabled;
-      }
-      if ('communityContentEnabled' in options) {
-        updatedOptions.communityContentEnabled = !!options.communityContentEnabled;
-      }
-      if ('companionDevicesEnabled' in options) {
-        updatedOptions.companionDevicesEnabled = !!options.companionDevicesEnabled;
-      }
-      if ('remoteChildActionsEnabled' in options) {
-        updatedOptions.remoteChildActionsEnabled = !!options.remoteChildActionsEnabled;
-      }
-      if ('accessControlSettings' in options) {
-        updatedOptions.accessControlSettings = options.accessControlSettings;
-      }
-      if ('usageLimitsData' in options) {
-        updatedOptions.usageLimitsData = options.usageLimitsData;
-      }
-      if ('ruleOverrideSettings' in options) {
-        updatedOptions.ruleOverrideSettings = options.ruleOverrideSettings;
+      // Block social media (SMB-6): its own key for the same reason. Anything unreadable, or null,
+      // removes it, and the older rules decide again.
+      if ('socialMedia' in options) {
+        const socialMedia = normalizeSocialMediaSettings(options.socialMedia);
+        if (socialMedia) updatedOptions.socialMedia = socialMedia;
+        else delete updatedOptions.socialMedia;
       }
       if ('appCapabilityGrants' in options) {
         updatedOptions.appCapabilityGrants = this._sanitizeAppCapabilityGrants(options.appCapabilityGrants);
+      }
+      // A guardian's yes to one blocked app from a request (HAT-178): checked, ended ones dropped, and
+      // removed when none are left so it never looks like a setting.
+      if ('appGrants' in options) {
+        const appGrants = normalizeAppGrants(options.appGrants, Date.now());
+        if (appGrants.length) updatedOptions.appGrants = appGrants;
+        else delete updatedOptions.appGrants;
       }
       if ('emailAllowedSenders' in options) {
         updatedOptions.emailAllowedSenders = this._sanitizeEmailAllowedSenders(options.emailAllowedSenders);
@@ -1007,7 +1171,10 @@ class UserService {
 
       const caps: Record<string, unknown> = {};
       for (const [capability, grant] of Object.entries(capMap as Record<string, unknown>)) {
-        if (!isAppCapabilityId(capability)) continue;
+        if (Object.keys(caps).length >= MAX_APP_CAPABILITY_GRANTS_PER_APP) break;
+        // A site a guardian approved (`net.fetch.<host>`) is kept as well; dropping it here would
+        // make every approval vanish on save while the request still closed as approved.
+        if (!isAppCapabilityId(capability) && !isAppSiteGrantKey(capability)) continue;
         if (!grant || typeof grant !== 'object' || Array.isArray(grant)) continue;
 
         const {grantedBy, grantedAt, expiresAtMs} = grant as Record<string, unknown>;
@@ -1087,6 +1254,7 @@ class UserService {
     await this.userActivityRepo.deleteWhere({userId: user._id});
     await this.permissionsRepo.deleteWhere({userId: user._id});
     await this.reviewsRepo.deleteWhere({userId: user._id});
+    await this.removeSubscriptionsOfUser(user._id);
     await this.usersPublic.deleteWhere({_id: user.publicId});
     await this.userRepo.deleteWhere({_id: user._id});
 
@@ -1396,7 +1564,22 @@ class UserService {
       deleted: true,
     });
 
+    // A deleted member's subscriptions follow nothing anyone will read, and kept they would still
+    // count towards a published collection's subscribers.
+    await this.removeSubscriptionsOfUser(userIdToDelete);
+
     return true;
+  }
+
+  /** Remove all of one person's subscriptions and recount the published collections they followed. */
+  private async removeSubscriptionsOfUser(userId: string) {
+    try {
+      const removed = await this.subscriptionRepo.deleteAllForUser(userId);
+      const publishedIds = removed.filter((sub) => sub.refType === 'pub_col').map((sub) => sub.refId);
+      await this.subscriptionRepo.recountPublishedSubscribers(publishedIds);
+    } catch (e) {
+      console.error('Could not remove the subscriptions of a deleted user', e);
+    }
   }
 
   async disableUser(ctx: RequestContext, userIdToDisable) {

@@ -35,6 +35,7 @@ export function cloudOnlyRoutes(): Routes[] {
   const AuthForProviders = require('./_internal/auth_for_providers.route').default; // personal-optional: guarded
   const ContactRoute = require('./_internal/contact.route').default; // personal-optional: guarded
   const CurationReviewRoute = require('./_internal/curation_review.route').default; // personal-optional: guarded
+  const CurationProposalRoute = require('./_internal/curation_proposal.route').default; // personal-optional: guarded
   const FollowingRoute = require('./_internal/following.route').default; // personal-optional: guarded
   const FriendRoute = require('./_internal/friend.route').default; // personal-optional: guarded
   const InternalMiscRoute = require('./_internal/internal.misc.route').default; // personal-optional: guarded
@@ -57,6 +58,7 @@ export function cloudOnlyRoutes(): Routes[] {
     new AuthForProviders(),
     new ContactRoute(),
     new CurationReviewRoute(),
+    new CurationProposalRoute(),
     new FollowingRoute(),
     new FriendRoute(),
     new InternalMiscRoute(),

@@ -40,6 +40,9 @@ export type ReasonCode =
   // current period. Distinct from time reasons: waiting out the clock does not
   // clear it, only a parent does.
   | 'checkpoint-pending'
+  // An Earn access rule (HAT-836) holds this kind of content until its steps are done. Like the
+  // check-in, waiting does not clear it; doing the steps, or a guardian, does.
+  | 'earn-access-pending'
   | 'out-of-time-range'
   | 'no-matching-rule';
 
@@ -47,7 +50,7 @@ export type ActivityResultType = 'block' | 'replace' | 'notify' | null;
 export type InterventionMode = 'block' | 'warn' | 'reminder' | 'track-only';
 
 export interface ActivityDecisionTrace {
-  decisionSource: 'usage-limit' | 'pipeline' | 'library' | 'sentry' | 'system' | 'checkpoint';
+  decisionSource: 'usage-limit' | 'pipeline' | 'library' | 'sentry' | 'system' | 'checkpoint' | 'earn-access';
   interventionMode: InterventionMode;
   reasonCode?: ReasonCode | null;
   selectedUsageRuleId?: string | null;
@@ -158,6 +161,12 @@ export interface ActivityContentInfo {
   intent?: IntentTag;
   /** Optional event-level topic signals (usually inferred, not manually set). */
   topics?: TopicTag[];
+  /**
+   * A few phrases from the page itself (at most 6, 160 characters in all), so "Search your history"
+   * can find a page by more than its title and address. Present only while that person has the
+   * feature on (`user.options.historySearchEnabled`); read by nothing else.
+   */
+  keywords?: string[];
   /** Optional rolled session-level intent (can differ from page-level intent). */
   sessionIntent?: IntentTag;
   /** Confidence score for sessionIntent from 0..1. */
@@ -170,6 +179,11 @@ export interface ActivityContentInfo {
   srcInfo?: ContentInfoSrc;
   flags?: string[];
   social?: SocialDesignation;
+  /**
+   * A phone or computer app session's app type (`games`, `social`…), joined on when the logs are
+   * read for a limit or a report (`deviceAppAttribution`). Never stored on the log (HAT-634).
+   */
+  appCategoryId?: string;
   primaryContent?: PrimaryContentInfo;
   pageStructureSignals?: PageStructureSignals;
   /** How the user navigated to this content (search vs feed vs direct/link). */
@@ -209,6 +223,10 @@ export interface AccessRequestDetails {
    * a phone weeks after writing it.
    */
   checkpointNote?: string;
+  /** For type 'earnAccess' (HAT-836): the rule asked about, so Approve opens that rule and no other. */
+  earnAccessRuleId?: string;
+  /** Its name as it read when the child asked. */
+  earnAccessRuleName?: string;
   /**
    * For type 'item' (a child asking for a library item): the item and its name. The
    * approval panel links to the item and names it, and the server names it in the

@@ -21,6 +21,13 @@ import {
 } from '../src/kinds/appCategories';
 import { DEFAULT_SAFETY_ALLOWLIST } from '../src/deviceguard/deviceRuleCompiler';
 import { DEVICE_PLATFORMS } from '../src/restrictions/deviceAppIds';
+import { NOT_SCREEN_TIME_ANDROID } from '../src/deviceguard/notScreenTime';
+import { GAMES_LIST } from '../src/restrictions/gamesList';
+import {
+  EARN_ACCESS_COUNTABLE_EDU_VALUES,
+  EARN_ACCESS_HOLDS,
+  earnAccessHoldCondition,
+} from '../src/restrictions/earnAccess';
 
 const OUT = path.resolve(__dirname, '../src/deviceguard/generated/device-compile-data.json');
 
@@ -32,8 +39,17 @@ function build() {
     appCategorySeed: Object.fromEntries(Object.entries(APP_CATEGORY_SEED).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))),
     safetyFloorAndroid: [...DEVICE_SAFETY_FLOOR_STATIC],
     safetyFloorMacos: [...DEVICE_SAFETY_FLOOR_MACOS],
+    // Phone apps whose time counts toward no limit (HAT-952).
+    notScreenTimeAndroid: [...NOT_SCREEN_TIME_ANDROID],
     defaultSafetyAllowlist: [...DEFAULT_SAFETY_ALLOWLIST],
     devicePlatforms: [...DEVICE_PLATFORMS],
+    // A limit on one game names it by id (HAT-634); its apps on every platform, from the games list.
+    gameApps: Object.fromEntries(GAMES_LIST.map((game) => [game.id, [...game.apps]])),
+    // Earn access (HAT-836): what each hold matches, in the order rules list them, and the Usage
+    // types a minutes step may count (a step counting none is dropped, as `normalizeEarnAccessRule`
+    // drops it). A list, not an object: Guard's JSON reader does not keep key order.
+    earnAccessHolds: EARN_ACCESS_HOLDS.map((hold) => ({ hold, condition: earnAccessHoldCondition(hold) })),
+    earnAccessCountableEduValues: [...EARN_ACCESS_COUNTABLE_EDU_VALUES],
   };
 }
 

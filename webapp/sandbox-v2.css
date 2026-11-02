@@ -1,0 +1,107 @@
+/*
+ * Runtime 2 sandbox base (sandbox-v2.html).
+ *
+ * Only the theme tokens and the bare page. Every app's own CSS — Tailwind's preflight, its classes,
+ * the kit's — is built by the host and arrives with the run (src/appbuilder/buildApp.ts), where
+ * src/appbuilder/runtime/appTheme.ts names these tokens the way shadcn/ui names its colours.
+ *
+ * These are the fallbacks. AppIFrame sends the host's own Kindredly theme colours over them, so an
+ * app follows the family's theme; the fallbacks are what an app looks like anywhere else (the eval
+ * harness, an attachment preview).
+ */
+
+:root,
+:root[data-knd-theme="light"],
+:root[data-knd-theme="pastel"],
+:root[data-knd-theme="primary"] {
+  --knd-bg: #f9f9f9;
+  --knd-surface: #ffffff;
+  --knd-surface-2: #f4f4f5;
+  --knd-hover: #efeff1;
+  --knd-text: #18181b;
+  --knd-muted: #63636b;
+  --knd-border: #e4e4e7;
+  --knd-input-border: #d9d9de;
+  --knd-accent: #2771b7;
+  --knd-accent-text: #ffffff;
+  --knd-good: #15803d;
+  --knd-warn: #b45309;
+  --knd-bad: #dc2626;
+}
+
+:root[data-knd-theme="dark"],
+:root[data-knd-theme="neon"] {
+  --knd-bg: #121212;
+  --knd-surface: #1c1c1f;
+  --knd-surface-2: #27272a;
+  --knd-hover: #2c2c30;
+  --knd-text: #f4f4f5;
+  --knd-muted: #a1a1aa;
+  --knd-border: rgba(255, 255, 255, 0.1);
+  --knd-input-border: rgba(255, 255, 255, 0.16);
+  --knd-accent: #4f9be0;
+  --knd-accent-text: #0b1220;
+  --knd-good: #4ade80;
+  --knd-warn: #fbbf24;
+  --knd-bad: #f87171;
+}
+
+:root {
+  --knd-radius: 0.75rem;
+}
+
+html,
+body {
+  margin: 0;
+  background-color: var(--knd-bg);
+  color: var(--knd-text);
+  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+
+/* What window.onerror appends when an app throws (sandbox-runtime.js). */
+.error {
+  margin: 12px 16px;
+  padding: 10px 12px;
+  border: 1px solid var(--knd-bad);
+  border-radius: 8px;
+  color: var(--knd-bad);
+  background: color-mix(in srgb, var(--knd-bad) 8%, transparent);
+  font: 13px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace;
+  white-space: pre-wrap;
+}
+
+/* ===== game surface (built by knd.game) — the same as sandbox-ui.css, which runtime 2 does not load.
+   Colors are literal on purpose: these controls sit ON a game canvas, whose background is app
+   content rather than a theme token. */
+.knd-game { position: relative; margin: 0 auto; touch-action: none; }
+.knd-game canvas { display: block; width: 100%; height: 100%; }
+.knd-game-overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 12px;
+}
+.knd-game-overlay > * { pointer-events: auto; }
+
+/* A round on-screen control for a touch game. */
+.knd-pad {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 56px;
+  height: 56px;
+  padding: 0;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  background: rgba(0, 0, 0, 0.38);
+  color: #fff;
+  font-size: 22px;
+  line-height: 1;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}

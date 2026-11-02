@@ -121,3 +121,43 @@ export function verifyUnlockPin(
 
   return false
 }
+
+// ---------------------------------------------------------------------------
+// Per-computer admin code (CMP-5)
+//
+// The clock-only code above is the same on every install, and its source ships in the extension,
+// so anyone who reads it can compute today's code for every family. A linked computer already
+// holds its own secret: the device key the extension mints at link time (`rawKeyB64` in the
+// Companion's provisioning record), which the family's clients can unwrap through the normal key
+// chain. The code for that computer is an HMAC of the 15-minute window under that key, cut to five
+// digits the way authenticator apps cut theirs (RFC 4226 dynamic truncation).
+//
+// No HMAC here: the Companion's main process uses Node's crypto, the Kindredly app uses WebCrypto.
+// Both sign `deviceUnlockMessage(window)` and hand the digest to `deviceUnlockCodeFromDigest`.
+// ---------------------------------------------------------------------------
+
+/** What each side signs for a window. Versioned so the derivation can change without ambiguity. */
+export function deviceUnlockMessage(window: number) {
+  return `kindredly-admin-code:v1:${Math.trunc(window)}`
+}
+
+/** Five digits from an HMAC-SHA256 digest, by RFC 4226 dynamic truncation. */
+export function deviceUnlockCodeFromDigest(digest: Uint8Array) {
+  if (!digest || digest.length < 20) throw new Error('digest too short')
+  const offset = digest[digest.length - 1] & 0x0f
+  const binary =
+    ((digest[offset] & 0x7f) << 24) |
+    ((digest[offset + 1] & 0xff) << 16) |
+    ((digest[offset + 2] & 0xff) << 8) |
+    (digest[offset + 3] & 0xff)
+  return String(binary % 10 ** COMPANION_UNLOCK_PIN_DIGITS).padStart(COMPANION_UNLOCK_PIN_DIGITS, '0')
+}
+
+/** The windows a code may come from, oldest first: the current one and its neighbours. */
+export function deviceUnlockWindows(now: number = Date.now(), skewWindows: number = COMPANION_UNLOCK_PIN_SKEW_WINDOWS) {
+  const current = unlockPinWindow(now)
+  const tolerance = Math.max(0, Math.trunc(skewWindows))
+  const windows: number[] = []
+  for (let offset = -tolerance; offset <= tolerance; offset += 1) windows.push(current + offset)
+  return windows
+}

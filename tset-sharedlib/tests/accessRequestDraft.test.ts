@@ -7,6 +7,7 @@ import {
   buildAccessRequestDraft,
   checkpointRequestKey,
   nextLocalMidnightMs,
+  PAUSE_REQUEST_KEY,
   timeRequestKey,
 } from '../src/restrictions/accessRequestDraft';
 
@@ -87,10 +88,36 @@ describe('checkpoint requests', () => {
   });
 });
 
+describe('pause requests (HAT-766)', () => {
+  it('files one key per child, whatever key was passed, and lapses with the day', () => {
+    const out = buildAccessRequestDraft({ type: 'pause', key: 'anything', details: { srcTitle: 'helix' }, nowMs: NOW });
+    expect(out.ok && out.draft.key).toBe(PAUSE_REQUEST_KEY);
+    expect(out.ok && out.draft.details).toEqual({ srcTitle: 'helix', expiresAtTs: nextLocalMidnightMs(NOW), requestedAtTs: NOW });
+  });
+});
+
 describe('unknown types', () => {
   it('passes the callers key straight through', () => {
     // action / publishedItem / appCapability build their own keys upstream.
     const out = buildAccessRequestDraft({ type: 'appCapability', key: 'ACTION:location', nowMs: NOW });
     expect(out.ok && out.draft).toEqual({ key: 'ACTION:location', type: 'appCapability', details: {} });
+  });
+});
+
+describe('earnAccess drafts (HAT-836)', () => {
+  const { buildAccessRequestDraft, earnAccessRequestKey } = require('../src/restrictions/accessRequestDraft');
+  const now = new Date(2026, 9, 29, 15, 0).getTime();
+
+  it('keys one ask a day per rule, and lapses at midnight', () => {
+    const built = buildAccessRequestDraft({ type: 'earnAccess', details: { earnAccessRuleId: 'r1', earnAccessRuleName: 'Chores' }, nowMs: now });
+    expect(built.ok).toBe(true);
+    expect(built.draft.key).toBe('EARN_ACCESS_r1_2026-10-29');
+    expect(built.draft.key).toBe(earnAccessRequestKey('r1', now));
+    expect(built.draft.details.expiresAtTs).toBe(new Date(2026, 9, 30).getTime());
+    expect(built.draft.details.earnAccessRuleName).toBe('Chores');
+  });
+
+  it('refuses an ask that names no rule', () => {
+    expect(buildAccessRequestDraft({ type: 'earnAccess', details: {}, nowMs: now }).ok).toBe(false);
   });
 });

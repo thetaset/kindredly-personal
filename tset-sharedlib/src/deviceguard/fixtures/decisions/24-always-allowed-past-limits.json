@@ -1,0 +1,111 @@
+{
+  "id": "24-always-allowed-past-limits",
+  "behaviour": "An Always allowed app opens after the overall budget is spent and its time is not counted toward any budget, so another app with little time of its own stays open. An app block still closes an Always allowed app.",
+  "clock": {
+    "nowMs": 1789448400000,
+    "familyTimeZone": "America/Los_Angeles",
+    "deviceTimeZone": "America/Los_Angeles"
+  },
+  "settings": {
+    "usageLimitsData": {
+      "contentUsageLimits": [
+        {
+          "id": "r-all-apps",
+          "name": "All apps",
+          "type": "advanced",
+          "conditions": [
+            {
+              "type": "appId",
+              "values": [
+                "all-device-apps"
+              ]
+            }
+          ],
+          "timeLimits": [
+            {
+              "hours": 1,
+              "daysOfWeek": [
+                0,
+                1,
+                2,
+                3,
+                4,
+                5,
+                6
+              ]
+            }
+          ]
+        }
+      ],
+      "temporaryRules": []
+    },
+    "ruleOverrideSettings": {
+      "ruleOverrides": []
+    },
+    "accessControlSettings": {},
+    "appPolicy": {
+      "version": 1,
+      "blockedCategories": [
+        "browsers"
+      ],
+      "entries": {},
+      "updatedAt": 1
+    },
+    "appPolicyStatus": "readable",
+    "alwaysAllowAppIds": [
+      "com.google.android.calendar",
+      "com.android.chrome"
+    ]
+  },
+  "installedApps": [
+    {
+      "pkg": "com.roblox.client",
+      "label": "Roblox",
+      "platform": "android"
+    },
+    {
+      "pkg": "com.google.android.calendar",
+      "label": "Calendar",
+      "platform": "android"
+    },
+    {
+      "pkg": "com.android.chrome",
+      "label": "Chrome",
+      "platform": "android"
+    }
+  ],
+  "floor": [
+    "com.android.settings"
+  ],
+  "usage": {
+    "appMsByPkg": {
+      "com.google.android.calendar": 10800000,
+      "com.roblox.client": 1800000
+    },
+    "webLogs": []
+  },
+  "usageSeed": {
+    "perRuleUsedMs": {}
+  },
+  "expectDevice": [
+    {
+      "pkg": "com.google.android.calendar",
+      "action": "allow",
+      "reason": null,
+      "ruleId": null
+    },
+    {
+      "pkg": "com.roblox.client",
+      "action": "allow",
+      "reason": null,
+      "ruleId": null
+    },
+    {
+      "pkg": "com.android.chrome",
+      "action": "block",
+      "reason": "app-blocked",
+      "ruleId": null
+    }
+  ],
+  "browserNotApplicable": "Device-only here: the browser's Always allowed is tested in ActivityService.alwaysAllowed.test.ts and SentryProcessor.earlyUrlBlock.test.ts."
+}

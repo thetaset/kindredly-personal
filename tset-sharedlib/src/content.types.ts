@@ -1,6 +1,7 @@
 
 import { ItemResourceType } from './constants';
 import { getItemRequirementsForType, hasFeedOfKind, type ItemRequirement } from './item.requirements';
+import { isMediaItemSubType, recognizeMediaMetadataUrl } from './media-metadata.utils';
 
 // import { entityNameList, tagNameList, tagOptionsMap } from "tset-sharedlib/constants";
 // 
@@ -21,6 +22,12 @@ export type DesignTag = 'dtag_kidfriendly';
 export type AudienceRole = 'aud_educator' | 'aud_parent';
 // Freshness — the external resource's own maintenance/activity (like a dormant repo), not our review cadence.
 export type Freshness = 'fresh_active' | 'fresh_aging' | 'fresh_outdated' | 'fresh_unknown';
+// Privacy (multi-select) — what the site takes from a child. `priv_none` means someone checked and
+// found none of the others, which is different from nobody having checked.
+export type Privacy = 'priv_none' | 'priv_details' | 'priv_adtracking' | 'priv_nopolicy';
+// AI and homework (multi-select). `ai_offload` is cognitive offloading: it hands over finished
+// answers instead of the child working them out. `ai_none` means someone checked and found none.
+export type AiFeature = 'ai_none' | 'ai_chat' | 'ai_friend' | 'ai_offload';
 
 // A server-fed "domain -> classification" corrective rule. Distributed to clients as a
 // cached, versioned list and merged into the deterministic site-classification layer to
@@ -91,7 +98,7 @@ export type IntentTag =
   | 'intent_doomscroll';
 
 export type UseCriterias = Array<
-  EduValue | MinAgeGroup | TargetAudience | Cost | Ads | CostDetails | ContentType | TopicTag | IntentTag | DesignLevel | DesignTag | AudienceRole | Freshness
+  EduValue | MinAgeGroup | TargetAudience | Cost | Ads | CostDetails | ContentType | TopicTag | IntentTag | DesignLevel | DesignTag | AudienceRole | Freshness | Privacy | AiFeature
 >;
 
 export interface UseCriteriaData {
@@ -108,6 +115,8 @@ export interface UseCriteriaData {
   designTags: DesignTag[];
   audienceRoles: AudienceRole[];
   freshness?: Freshness;
+  privacy: Privacy[];
+  aiFeatures: AiFeature[];
 }
 
 /***********Item Types */
@@ -166,6 +175,21 @@ export const typeNameList = [
   { key: 'art_work', name: 'Art Work', icon: 'brush', parent: "thing" ,hide: true},
   { key: 'article', name: 'Article', icon: 'file-earmark-text', parent: "thing" ,hide: true},
   { key: 'artist', name: 'Artist', icon: 'person-lines-fill', parent: "thing" ,hide: true},
+  { key: 'audio', name: 'Audio', icon: 'soundwave', parent: "thing" ,hide: true},
+  {
+    key: 'audiobook',
+    name: 'Audiobook',
+    icon: 'headphones',
+    parent: "thing" ,
+    hide: true,
+    schema: [
+      { name: 'authors', type: 'multi_string', label: 'Author(s)', placeholder: 'Add an author', uiGroup: 'primary' },
+      { name: 'narrators', type: 'multi_string', label: 'Narrator(s)', placeholder: 'Add a narrator', uiGroup: 'primary' },
+      { name: 'publishedDate', type: 'date', label: 'Published date', uiGroup: 'details' },
+      { name: 'language', type: 'string', label: 'Language', placeholder: 'Language (optional)', uiGroup: 'details' },
+      { name: 'series', type: 'string', label: 'Series', placeholder: 'Series (optional)', uiGroup: 'details' },
+    ],
+  },
   { 
     key: 'book',
     name: 'Book',
@@ -219,7 +243,31 @@ export const typeNameList = [
   { key: 'other', name: 'Other', icon: 'circle-fill', parent: "thing" ,hide: false},
   { key: 'person', name: 'Person', icon: 'person-lines-fill', parent: "thing" ,hide: true},
   { key: 'plant', name: 'Plant', icon: 'tree', parent: "thing" ,hide: true},
-  { key: 'product', name: 'Product', icon: 'cart', parent: "thing" ,hide: true},
+  {
+    key: 'product',
+    name: 'Product',
+    icon: 'cart',
+    parent: "thing",
+    hide: true,
+    // Filled from the page the person is on, never from a server fetch (product-metadata.utils.ts).
+    // Every field is optional: most stores publish no price we can read, and a product with no
+    // price is still a product.
+    schema: [
+      { name: 'price', type: 'number', label: 'Price', placeholder: 'Price (optional)', uiGroup: 'primary' },
+      { name: 'currency', type: 'string', label: 'Currency', placeholder: 'USD', uiGroup: 'primary' },
+      // A price with no capture time is worthless a week later, so the two travel together.
+      { name: 'priceSeenAt', type: 'date', label: 'Price seen', uiGroup: 'primary' },
+      // Free text on purpose: what kind of thing this is ("headphones"), not an item type and not
+      // a taxonomy. It is what a cart groups on.
+      { name: 'productType', type: 'string', label: 'Kind of product', placeholder: 'Headphones, tumbler, building set', uiGroup: 'primary' },
+      { name: 'store', type: 'string', label: 'Store', placeholder: 'Where it is sold', uiGroup: 'details' },
+      { name: 'availability', type: 'string', label: 'Availability', uiGroup: 'details' },
+      // Written by code and never shown: the store's own id for the product, and past prices.
+      { name: 'identifier', type: 'string', label: 'Identifier', uiGroup: 'hidden' },
+      { name: 'priceHistory', type: 'array', label: 'Price history', uiGroup: 'hidden' },
+    ],
+  },
+  { key: 'podcast_episode', name: 'Podcast episode', icon: 'mic', parent: "thing" ,hide: true},
   { key: 'project', name: 'Project', icon: 'folder', parent: "thing" ,hide: true},
   { key: 'task', name: 'Task', icon: 'check2-square', parent: "thing" ,hide: true},
   { key: 'song', name: 'Song', icon: 'music-note-beamed', parent: "thing" ,hide: true},
@@ -522,6 +570,21 @@ const itemTypeSelectorDescriptors: Partial<Record<ItemTypeSecondary, ItemTypeSel
     description: 'A music item centered on listening or musical identity.',
     extraDetails: 'Best for artists, albums, tracks, and music-focused references.',
   },
+  audio: {
+    description: 'A sound file: a recording, a talk, a lecture.',
+    extraDetails: 'Plays in the audio player and keeps your place.',
+    keywords: 'audio sound recording mp3 m4a listen',
+  },
+  podcast_episode: {
+    description: 'One podcast episode, saved as a file.',
+    extraDetails: 'Plays in the audio player and keeps your place.',
+    keywords: 'podcast episode show listen mp3 download',
+  },
+  audiobook: {
+    description: 'A book read aloud: an audio file, or a link to one.',
+    extraDetails: 'Plays in the audio player and keeps your place.',
+    keywords: 'audio book listen narrated m4b audible',
+  },
   song: {
     description: 'A single song or track.',
     extraDetails: 'Best for one specific piece of music rather than a broader artist or catalog.',
@@ -730,6 +793,43 @@ export function shouldAutoDeriveSubType(input: {
   return isSystemDerivedSubType(normalizedCurrentSubType);
 }
 
+/**
+ * How an item's page is laid out (HAT-949): the type decides, and a picture only fills the shape.
+ *
+ * - `cover`: things you listen to or read through. A square cover beside the title (the picture
+ *   cropped to fill it, or the type's icon on the title's colour), the main button (Play, Read)
+ *   and your place, then the item's documents as a list. The file the main button plays or reads
+ *   is never shown a second time.
+ * - `hero`: things you watch or look at. The media across the top.
+ * - `contents`: File(s). The files as a gallery, or as a contents list when they are documents.
+ * - `page`: everything else. The picture placed by its shape (HAT-663).
+ *
+ * `hero` and `contents` are what those types already got; `cover` is the new shape. Moving a type
+ * to another shape is a change to this list.
+ */
+export type ItemPageShape = 'cover' | 'hero' | 'contents' | 'page';
+
+const ITEM_PAGE_SHAPES: Readonly<Partial<Record<ItemTypeSecondary, ItemPageShape>>> = {
+  audio: 'cover',
+  audiobook: 'cover',
+  podcast_episode: 'cover',
+  book: 'cover',
+  ebook: 'cover',
+  podcast: 'cover',
+  music: 'cover',
+  song: 'cover',
+  image: 'hero',
+  video: 'hero',
+  yt_video: 'hero',
+  map: 'hero',
+  file_group: 'contents',
+};
+
+export function getItemPageShape(type: string | null | undefined, subType: string | null | undefined): ItemPageShape {
+  const normalized = normalizeSubTypeForType(type, subType) ?? subType ?? '';
+  return ITEM_PAGE_SHAPES[normalized as ItemTypeSecondary] || ITEM_PAGE_SHAPES[type as ItemTypeSecondary] || 'page';
+}
+
 export function getItemExperienceContract(
   type: string,
   subType: string,
@@ -840,6 +940,25 @@ export function getItemExperienceContract(
         capabilityFlags: ['supportsFeedDiscovery', 'supportsStructuredMetadata', 'supportsMediaProviders'],
         pickerSummary: 'Podcast that can be played through a choice of media providers.',
       };
+    case 'audiobook':
+      return {
+        ...baseContract,
+        experienceKind: 'audio',
+        semanticKinds: ['audiobook', 'book', 'audio'],
+        defaultViewMode: 'audio',
+        capabilityFlags: ['supportsStructuredMetadata', 'supportsMediaProviders'],
+        pickerSummary: 'Audiobook that plays in the audio player and keeps your place.',
+      };
+    case 'podcast_episode':
+      return {
+        ...baseContract,
+        experienceKind: 'audio',
+        semanticKinds: ['podcast', 'audio'],
+        defaultViewMode: 'audio',
+        capabilityFlags: ['supportsStructuredMetadata'],
+        pickerSummary: 'Podcast episode that plays in the audio player and keeps your place.',
+      };
+    case 'audio':
     case 'music':
     case 'song':
       return {
@@ -1076,11 +1195,30 @@ export const PAGE_TYPE_SUB_TYPES: Readonly<Record<string, ItemTypeSecondary>> = 
   SITE_ROOT: 'website',
 };
 
+type MetaForSubType = {
+  url?: string | null;
+  tsExtractedInfo?: { pageType?: string | null };
+  tsManifest?: { mediaMetadata?: { subType?: unknown } | null } | null;
+};
+
 /**
  * Derive item subType from metadata's tsExtractedInfo.pageType
  * Used at persistence time to set correct subType based on resource detection
  */
-export function getSubTypeFromMeta(meta: { tsExtractedInfo?: { pageType?: string | null } } | null | undefined): ItemTypeSecondary | null {
+export function getSubTypeFromMeta(
+  meta: MetaForSubType | null | undefined,
+  url?: string | null,
+): ItemTypeSecondary | null {
+  // The media resolver names the item type outright (Audible → book, Netflix → film).
+  const mediaSubType = meta?.tsManifest?.mediaMetadata?.subType;
+  if (isMediaItemSubType(mediaSubType)) return mediaSubType;
+
+  // Without the server's answer (local-only mode, or it failed) the URL alone still
+  // tells an Audible book from a website. Pure parsing on the device, no network.
+  const itemUrl = url || meta?.url;
+  const urlSubType = itemUrl ? recognizeMediaMetadataUrl(itemUrl)?.subType : undefined;
+  if (urlSubType) return urlSubType;
+
   const pageType = meta?.tsExtractedInfo?.pageType;
   if (!pageType) return null;
 
@@ -1105,11 +1243,29 @@ export function getSubTypeFromFeeds(
   return hasFeedOfKind(info?.feeds, 'audio') ? 'podcast' : null;
 }
 
+/**
+ * A website, from the address alone: a link to a site's home page ("https://example.com/").
+ * The same rule the server's page reader records as SITE_ROOT (`isRootWebsiteURL`), so a link
+ * saved without a page read is a website too (HAT-918). Quiet on an address that does not
+ * parse, since this runs for every row drawn.
+ */
+export function getSubTypeFromAddress(url: string | null | undefined): ItemTypeSecondary | null {
+  if (typeof url !== 'string' || !url) return null;
+  try {
+    const { protocol, pathname } = new URL(url);
+    if (protocol !== 'http:' && protocol !== 'https:') return null;
+    return pathname === '/' || !pathname ? 'website' : null;
+  } catch {
+    return null;
+  }
+}
+
 /** The parts of an item's details needed to work out what it really is. */
 export type EffectiveTypeInput = {
   type?: string | null;
   subType?: string | null;
-  meta?: { tsExtractedInfo?: { pageType?: string | null } } | null;
+  url?: string | null;
+  meta?: MetaForSubType | null;
   info?: { feeds?: Array<{ feedURL?: string | null; mediaKind?: string | null }> | null } | null;
 };
 
@@ -1126,14 +1282,24 @@ export type EffectiveTypeInput = {
  * only when the subType slot was free. There is deliberately no backfill —
  * personal items are encrypted, so the server cannot rewrite them. This stays a
  * permanent legacy read shim rather than something to delete later.
+ *
+ * Last of all, a link to a site's home page is a website from its address (HAT-918), worked
+ * out here on the device rather than written onto items. `fromAddress: false` is for the
+ * published catalog: its Kind filter is SQL over the stored subType and page type, and a card
+ * must not name a kind that filter does not find.
  */
 export function resolveDisplaySubType(
   details: EffectiveTypeInput | null | undefined,
+  opts: { fromAddress?: boolean } = {},
 ): ItemTypeSecondary | null {
   let subType = (details?.subType ?? null) as ItemTypeSecondary | null;
 
-  if (details?.type === 'link' && !subType) {
-    subType = getSubTypeFromMeta(details?.meta) ?? getSubTypeFromFeeds(details?.info);
+  if (details?.type === 'link' && (!subType || isSystemDerivedSubType(subType))) {
+    subType =
+      getSubTypeFromMeta(details?.meta, details?.url) ??
+      subType ??
+      getSubTypeFromFeeds(details?.info) ??
+      (opts.fromAddress === false ? null : getSubTypeFromAddress(details?.url));
   }
 
   // A feed no longer changes an item's type. Legacy items persisted as
@@ -1178,8 +1344,11 @@ export function deriveSaveTimeSubType(
  * {@link getEffectiveItemType} with the display-time derivations applied — the answer to
  * "what is this item really?" for counting and filtering, not just rendering.
  */
-export function resolveEffectiveItemType(details: EffectiveTypeInput | null | undefined): string {
-  return getEffectiveItemType(details?.type, resolveDisplaySubType(details));
+export function resolveEffectiveItemType(
+  details: EffectiveTypeInput | null | undefined,
+  opts: { fromAddress?: boolean } = {},
+): string {
+  return getEffectiveItemType(details?.type, resolveDisplaySubType(details, opts));
 }
 
 export function getItemTypeDetails(type: string, subType: string, openWithSettings: Record<string, string> = {}): {
@@ -1262,6 +1431,8 @@ export const tagTypes = {
   designTags: { prefix: 'dtag', name: 'Design flags' },
   audienceRoles: { prefix: 'aud', name: 'Made for' },
   freshness: { prefix: 'fresh', name: 'Freshness' },
+  privacy: { prefix: 'priv', name: 'Privacy' },
+  aiFeatures: { prefix: 'ai', name: 'AI and homework' },
   // warning: { prefix: 'wa', name: "Warning Flags" },
 };
 
@@ -1297,6 +1468,8 @@ export interface UseCriteriaDataWithDetails {
   designTags: TagOptionDetail<DesignTag>[];
   audienceRoles: TagOptionDetail<AudienceRole>[];
   freshness?: TagOptionDetail<Freshness>;
+  privacy: TagOptionDetail<Privacy>[];
+  aiFeatures: TagOptionDetail<AiFeature>[];
 }
 
 export type ContentTypeIngredient = {
@@ -1332,18 +1505,38 @@ export const normalizeEduValueAlias = (value?: string | null): EduValue | undefi
 };
 
 /**
+ * Usage types the classifier gives an item from its type alone (HAT-544). The page
+ * classifier never sees a note — a note has no address to classify — so without this
+ * every note counted as Unassigned. A note is the writer's own work: Task-Related.
+ *
+ * A default, like the built-in site rules: a Category picked by hand on the item still
+ * wins. Only for the item itself — never pass a note's type when a web page matched the
+ * note through one of its links, or a link in a note would make that page Task-Related.
+ * Time on a note page is Task-Related already, through the built-in Kindredly site rule.
+ */
+const ITEM_TYPE_USAGE_RULES: ReadonlyMap<string, EduValue> = new Map<string, EduValue>([
+  ['note', 'eduval_task'],
+]);
+
+export const getItemTypeEduValue = (itemType: string | null | undefined): EduValue | undefined =>
+  itemType ? ITEM_TYPE_USAGE_RULES.get(itemType) : undefined;
+
+/**
  * The single educational value an item counts as, for the "browse by usage" grid and the
  * matching query filter.
  *
  * `useCriteria` is a flat bag of editorial tags, so this picks the first real `eduval_*`
- * entry (normalizing legacy aliases) and falls back to 'eduval_unknown' when there is
- * none — the same "unassigned is a bucket you can select" rule SearchScan already applies.
+ * entry (normalizing legacy aliases). With none, the item's type decides when a rule
+ * covers it (`getItemTypeEduValue`: every note is Task-Related), and otherwise it falls
+ * back to 'eduval_unknown' — the same "unassigned is a bucket you can select" rule
+ * SearchScan already applies.
  *
  * Counting and filtering MUST both go through this. A grid whose tile counts disagree with
  * what clicking the tile returns is worse than no grid.
  */
 export const resolveItemEduValue = (
   useCriteria: ReadonlyArray<string> | null | undefined,
+  itemType?: string | null,
 ): EduValue => {
   if (Array.isArray(useCriteria)) {
     for (const tag of useCriteria) {
@@ -1352,7 +1545,7 @@ export const resolveItemEduValue = (
     }
   }
 
-  return 'eduval_unknown';
+  return getItemTypeEduValue(itemType) || 'eduval_unknown';
 };
 
 export const withEduValueCompatibilityAliases = (values: ReadonlyArray<string>): EduValue[] => {
@@ -1478,7 +1671,7 @@ export const eduValueNutritionLabels: Record<EduValue, ContentTypeNutritionLabel
   },
 
   eduval_junk: {
-    title: 'Junk Content',
+    title: 'Junk',
     tagline: 'Junk, high pull.',
     description:
       'Content that is misleading, clickbait, rage-bait, or designed to be compulsive. Not “evil”, but easy to overconsume and often leaves users feeling worse.',
@@ -1496,9 +1689,9 @@ export const eduValueNutritionLabels: Record<EduValue, ContentTypeNutritionLabel
 };
 
 // Content groupings that are governed by usage limits but are NOT eduValues
-// (social is a designation, video sites are a delivery format). They get their
-// own nutrition labels so the usage-limits UI can explain them.
-export type ExtraContentTypeKey = 'social' | 'video';
+// (social is a designation, video a format, games a kind of site or app). Each counts on top of
+// a page's category. They get their own nutrition labels so the usage-limits UI can explain them.
+export type ExtraContentTypeKey = 'social' | 'video' | 'games';
 
 export const extraContentTypeNutritionLabels: Record<ExtraContentTypeKey, ContentTypeNutritionLabel> = {
   social: {
@@ -1520,10 +1713,10 @@ export const extraContentTypeNutritionLabels: Record<ExtraContentTypeKey, Conten
     examples: ['Instagram', 'TikTok', 'Snapchat', 'X / Twitter', 'Facebook'],
   },
   video: {
-    title: 'Video Sites',
+    title: 'Video',
     tagline: 'Streaming video — quality varies wildly.',
     description:
-      'General-purpose video platforms that mix genuinely great learning content with entertainment and junk. Because the same site hosts all of it, autoplay and recommendations can quickly pull a focused session into an endless watch-next spiral.',
+      'Any video playing, on any site. Video platforms mix genuinely great learning content with entertainment and junk. Because the same site hosts all of it, autoplay and recommendations can quickly pull a focused session into an endless watch-next spiral.',
     ingredients: [
       { name: 'Autoplay & “up next”', note: 'One video becomes ten.' },
       { name: 'Recommendation rabbit holes', note: 'The algorithm steers what comes next.' },
@@ -1531,11 +1724,29 @@ export const extraContentTypeNutritionLabels: Record<ExtraContentTypeKey, Conten
       { name: 'Ads & sponsorships', note: 'Common, and not always obvious to kids.' },
     ],
     dailyDietGuidance: [
-      'Set a video-sites time limit so a quick clip doesn’t become an afternoon.',
+      'Set a Video limit so a quick clip doesn’t become an afternoon.',
       'Prefer library-approved channels or specific videos over open browsing for young kids.',
       'Turn the “what did you watch?” check-in into a habit.',
     ],
     examples: ['YouTube'],
+  },
+  games: {
+    title: 'Games',
+    tagline: 'From learning games to ones with no end.',
+    description:
+      'Game sites, and game apps on phones and computers. Some games teach and build skills; others are built around rewards and streaks that make stopping hard. A game also counts toward its own category, so a learning game counts toward Educational or Edutainment as well.',
+    ingredients: [
+      { name: 'Rewards & streaks', note: 'Daily bonuses pull them back.' },
+      { name: 'No natural end', note: 'Levels, matches and seasons keep going.' },
+      { name: 'Mixed value', note: 'Learning games and pure play side by side.' },
+      { name: 'In-game purchases', note: 'Common, and not always obvious to kids.' },
+    ],
+    dailyDietGuidance: [
+      'Set a Games limit so learning games and play share one daily amount.',
+      'Prefer games with a clear end over ones built on streaks.',
+      'Play together sometimes — it shows you what the game asks of them.',
+    ],
+    examples: ['Minecraft', 'Roblox', 'Prodigy Math'],
   },
 };
 
@@ -1567,7 +1778,7 @@ let defaultIcon = null;// 'activity'
 export const eduTagList: TagOptionDetail<EduValue>[] = [
 
     {
-      key: 'eduval_unknown', name: 'Unassigned (auto)', selectedName: 'Unknown', description: 'Not assigned or unknown.'
+      key: 'eduval_unknown', name: 'Unknown', selectedName: 'Unknown', description: 'Not assigned or unknown.'
       , extraDetails: 'Unassigned or unknown value',
       hideFromSearch: true,
       color: colorLookup['gray'], icon: defaultIcon || 'question-circle'
@@ -1602,7 +1813,7 @@ export const eduTagList: TagOptionDetail<EduValue>[] = [
     },
     {
       key: 'eduval_junk',
-      name: 'Junk Content',
+      name: 'Junk',
       selectedName: 'Junk',
       description: 'Potentially unhealthy or low-value',
       extraDetails: 'Content considered addictive, misleading, clickbait, or lacking substantive value. Acceptable occasionally, but best consumed in moderation.',
@@ -1749,6 +1960,31 @@ export const freshnessTagList: TagOptionDetail<Freshness>[] = [
   { key: 'fresh_unknown', name: 'Unassigned (auto)', selectedName: 'Unknown', description: 'Not assigned or unknown.', hideFromSearch: true, icon: 'clock-history', color: colorLookup['gray'] },
 ];
 
+/**
+ * Freshness is worth a family's attention only when a source is going stale. "Actively updated" is
+ * what a family expects, so the item page and item cards show Aging and Outdated and nothing else.
+ */
+export function isStaleFreshness(tag: string | null | undefined): boolean {
+  return tag === 'fresh_aging' || tag === 'fresh_outdated';
+}
+
+// Privacy — what a site takes from a child. A curation review writes these, and the AI tagger may
+// suggest them. `priv_none` is "someone checked and found none", which an unreviewed item never has.
+export const privacyTagList: TagOptionDetail<Privacy>[] = [
+  { key: 'priv_none', name: 'No privacy concerns found', selectedName: 'No privacy concerns', description: 'Checked: it asks a child for nothing, and does not track for advertising.', icon: 'shield-check', color: '#16a34a' },
+  { key: 'priv_details', name: 'Asks a child for personal details', selectedName: 'Asks for personal details', description: 'A name, email, phone number, photo or voice, address or location, on a form or in a chatbot.', icon: 'person-lines-fill', color: '#f88e42' },
+  { key: 'priv_adtracking', name: 'Tracks for advertising', selectedName: 'Tracks for ads', description: 'Ad trackers on the page, or ads chosen from what someone does.', icon: 'eye', color: '#f88e42' },
+  { key: 'priv_nopolicy', name: 'No privacy policy', selectedName: 'No privacy policy', description: 'It asks for details or tracks, and says nothing about what it does with them.', icon: 'file-earmark-x', color: '#dc2626' },
+];
+
+// AI and homework. `ai_offload` is cognitive offloading, written in the words a parent reads.
+export const aiFeatureTagList: TagOptionDetail<AiFeature>[] = [
+  { key: 'ai_none', name: 'No AI features found', selectedName: 'No AI features', description: 'Checked: no AI chat, no AI companion, and it does not hand over finished answers.', icon: 'shield-check', color: '#16a34a' },
+  { key: 'ai_chat', name: 'Chat with an AI', selectedName: 'AI chat', description: 'A chatbot a child can type anything to.', icon: 'chat-dots', color: '#2065c0' },
+  { key: 'ai_friend', name: 'AI friend or companion', selectedName: 'AI friend', description: 'An AI that acts as a friend, companion or confidant.', icon: 'robot', color: '#dc2626' },
+  { key: 'ai_offload', name: 'Does the thinking for them', selectedName: 'Does the thinking', description: 'It hands over finished answers, writing or solutions in place of the child working them out.', icon: 'magic', color: '#f88e42' },
+];
+
 export interface UseCriteriaDataOptions {
   eduValue?: EduValue[];
   minAgeGroup?: MinAgeGroup[];
@@ -1763,6 +1999,8 @@ export interface UseCriteriaDataOptions {
   designTags?: DesignTag[];
   audienceRoles?: AudienceRole[];
   freshness?: Freshness[];
+  privacy?: Privacy[];
+  aiFeatures?: AiFeature[];
 }
 export const tagOptionsMap: UseCriteriaDataOptions = {
   eduValue: eduTagList.map((tag) => tag.key) as EduValue[],
@@ -1778,6 +2016,8 @@ export const tagOptionsMap: UseCriteriaDataOptions = {
   designTags: designAttrTagList.map((tag) => tag.key) as DesignTag[],
   audienceRoles: audienceRoleTagList.map((tag) => tag.key) as AudienceRole[],
   freshness: freshnessTagList.map((tag) => tag.key) as Freshness[],
+  privacy: privacyTagList.map((tag) => tag.key) as Privacy[],
+  aiFeatures: aiFeatureTagList.map((tag) => tag.key) as AiFeature[],
 };
 
 export const tagOptionsWithDetailsMap = {
@@ -1794,6 +2034,8 @@ export const tagOptionsWithDetailsMap = {
   designTags: designAttrTagList,
   audienceRoles: audienceRoleTagList,
   freshness: freshnessTagList,
+  privacy: privacyTagList,
+  aiFeatures: aiFeatureTagList,
 };
 
 
@@ -1854,6 +2096,8 @@ export function getUseCriteriaObjWithKeys(tags: Array<string>) {
     designTags: [] as Array<DesignTag>,
     audienceRoles: [] as Array<AudienceRole>,
     freshness: undefined as Freshness | undefined,
+    privacy: [] as Array<Privacy>,
+    aiFeatures: [] as Array<AiFeature>,
 
   } satisfies UseCriteriaData;
   try {
@@ -1887,6 +2131,10 @@ export function getUseCriteriaObjWithKeys(tags: Array<string>) {
         result.audienceRoles.push(tagVal as AudienceRole);
       } else if (tagKey.startsWith('fresh_')) {
         result.freshness = tagVal as Freshness;
+      } else if (tagKey.startsWith('priv_')) {
+        result.privacy.push(tagVal as Privacy);
+      } else if (tagKey.startsWith('ai_')) {
+        result.aiFeatures.push(tagVal as AiFeature);
       }
     }
   } catch (e) {
@@ -1943,6 +2191,8 @@ export function getUseCriteriaObjWithInfo(tags: Array<string>) {
     designTags: [] as Array<TagOptionDetail<DesignTag>>,
     audienceRoles: [] as Array<TagOptionDetail<AudienceRole>>,
     freshness: undefined as TagOptionDetail<Freshness> | undefined,
+    privacy: [] as Array<TagOptionDetail<Privacy>>,
+    aiFeatures: [] as Array<TagOptionDetail<AiFeature>>,
 
   } satisfies UseCriteriaDataWithDetails;
   try {
@@ -1980,6 +2230,10 @@ export function getUseCriteriaObjWithInfo(tags: Array<string>) {
         result.audienceRoles.push(tagVal as TagOptionDetail<AudienceRole>);
       } else if (tagKey.startsWith('fresh_')) {
         result.freshness = tagVal as TagOptionDetail<Freshness>;
+      } else if (tagKey.startsWith('priv_')) {
+        result.privacy.push(tagVal as TagOptionDetail<Privacy>);
+      } else if (tagKey.startsWith('ai_')) {
+        result.aiFeatures.push(tagVal as TagOptionDetail<AiFeature>);
       }
     }
   } catch (e) {

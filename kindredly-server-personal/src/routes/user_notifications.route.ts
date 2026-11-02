@@ -38,6 +38,18 @@ class UserNotificationsRoute implements Routes {
     );
 
     // SCH-OK
+    // A child's own device: they finished a part of a built-in lesson pack (HAT-577). The
+    // service decides who is told and what it says; the request carries nothing.
+    this.router.post(
+      '/user/notification/lessonPartDone',
+      authenticateJWT,
+      errorHelper(async (req: ApiReq<'/user/notification/lessonPartDone'>, res) => {
+        const results = await this.notificationService.addLessonPartDoneNotification(RequestContext.instance(req));
+        res.json({success: true, results});
+      }),
+    );
+
+    // SCH-OK
     this.router.post(
       '/user/notification/list',
       authenticateJWT,

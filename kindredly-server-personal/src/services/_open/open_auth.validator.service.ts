@@ -7,7 +7,7 @@ import {checkPassword} from '@/utils/auth_utils';
 import {checkEmail, checkUserName} from '@/utils/user.utils';
 
 import AuthValidatorService from '../_interfaces/auth_validator.service';
-import {hashString, secureCompareSecrets} from '@/utils/crypto_util';
+import {storedSecretMatches} from '@/utils/stored_password';
 import {UserRepo} from '@/db/user.repo';
 import User from 'tset-sharedlib/schemas/public/User';
 
@@ -45,8 +45,7 @@ class OpenAuthValidatorService implements AuthValidatorService {
         throw new HttpException(409, `Login failed`);
       }
 
-      const hashedPassword = hashString(userData.password);
-      const isPasswordMatching: boolean = secureCompareSecrets(hashedPassword, user.password);
+      const isPasswordMatching: boolean = await storedSecretMatches(user.password, userData.password);
       if (!isPasswordMatching) throw new HttpException(409, 'Password is not matching');
       else {
         verified = true;

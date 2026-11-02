@@ -47,6 +47,7 @@ import {
 } from 'tset-sharedlib/restrictions/assistantReview';
 import {isLikelyChallengeTitle} from 'tset-sharedlib/extraction.pure.utils';
 import {isAiReclassifyReasonCode, isAiReviewableReasonCode} from 'tset-sharedlib/types/reason-code.utils';
+import {classifySocialMediaUrl} from 'tset-sharedlib/restrictions/socialMedia';
 import {buildPatternsForUrlScope, resolveAssistantScope} from 'tset-sharedlib/url.utils';
 import type {AssistantGrantScope} from 'tset-sharedlib/url.utils';
 import type {
@@ -102,8 +103,9 @@ const MODEL_TIMEOUT_MS = 20_000;
 
 /**
  * What one review is held at against the family's AI limits while it runs: its input cap of
- * roughly 20k tokens and 8k output on gpt-5.4-mini, the dearest model a Plus admin default is
- * likely to be, comes to about $0.05. Recorded spend replaces the hold when the review finishes.
+ * roughly 20k tokens and 8k output comes to about $0.006 on gpt-6-luna and $0.12 on gpt-6-sol, so
+ * $0.05 covers every Luna review and a short Sol one. Recorded spend replaces the hold when the
+ * review finishes.
  */
 const ACCESS_REVIEW_WORST_CASE_MICRO_USD = 50_000;
 
@@ -345,6 +347,14 @@ class AccessRequestReviewService {
         return {enabled: false, guidelines: ''};
       }
 
+      // Library mode only (founder, 2026-10-04, HAT-199). Outside it, Content Filtering blocks and
+      // time requests go to the parent: the grant stays saved, and works again when Library mode
+      // is back on. Web filtering shows the switch only under Library mode, so a review running
+      // with Library mode off would be one the parent could no longer see there.
+      if ((targetUser as any)?.options?.whitelistingEnabled !== true) {
+        return {enabled: false, guidelines: ''};
+      }
+
       const config = normalizeAssistantReviewConfig((account as any)?.options?.assistantReview);
       const guidelines = resolveAssistantGuidelines(config, targetUserId);
 
@@ -397,6 +407,11 @@ class AccessRequestReviewService {
   eligibilityFor(subject: AssistantReviewSubject): 'grant' | 'reclassify' | null {
     const requestType = subject.requestType || 'url';
     const reasonCode = subject.details?.reasonCode ?? null;
+
+    // Social media is never the assistant's to answer, whatever the reason code (SMB-12): a post it
+    // approved would be a guardian's item, which opens past Block social media.
+    const subjectUrl = subject.url || subject.details?.url;
+    if (subjectUrl && classifySocialMediaUrl(subjectUrl)) return null;
 
     if (requestType === 'url') {
       return isAiReviewableReasonCode(reasonCode) ? 'grant' : null;
@@ -816,7 +831,7 @@ class AccessRequestReviewService {
       if ((error as {code?: unknown} | null)?.code === 'AI_BUDGET_EXCEEDED') {
         return defer('budget', "Not checked: the family's AI limit is used up for now.", {}, remaining);
       }
-      return defer('error', 'The assistant could not check this one.', {}, remaining);
+      return defer('error', 'AI request review could not check this one.', {}, remaining);
     }
 
     let inputs: PageInputs;
@@ -824,7 +839,7 @@ class AccessRequestReviewService {
       inputs = await this.gatherInputs(subject);
     } catch (error) {
       console.warn('[assistant-review] failed to gather page inputs', error);
-      return defer('error', 'The assistant could not read this page.', {}, remaining);
+      return defer('error', 'AI request review could not read this page.', {}, remaining);
     }
 
     if (inputs.unsafeCacheHit) {
@@ -864,7 +879,7 @@ class AccessRequestReviewService {
     if (!verdict) {
       // No cooldown here: the assistant did not form a view, so the next ask
       // deserves a real look rather than inheriting a non-answer.
-      return defer('error', 'The assistant could not check this one.', {inputs, model}, remaining);
+      return defer('error', 'AI request review could not check this one.', {inputs, model}, remaining);
     }
 
     // The two jobs do not swap. A site request cannot come back as a category
@@ -1041,7 +1056,7 @@ class AccessRequestReviewService {
         userIds: [targetUserId],
         enabled: true,
         source: 'assistant_review',
-        note: 'Set by the assistant when this page was asked about.',
+        note: 'Set by AI request review when this page was asked about.',
         createdAt: now,
         updatedAt: now,
       },

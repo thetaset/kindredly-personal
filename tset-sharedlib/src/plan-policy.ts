@@ -107,7 +107,9 @@ export const sharedPlanPolicies: Record<SharedPlanKey, SharedPlanPolicy> = {
       // the life of the account. Raising the upload limit without the storage limit only
       // moves where the wall is.
       maxVisibleStorageBytes: 2 * GB,
-      maxUploadBytes: 100 * MB,
+      // Files over 16 MB go up and come back in encrypted 2 MB pieces (IFX-14), so the size of
+      // one file is a plan choice, not a memory limit (HAT-937).
+      maxUploadBytes: 500 * MB,
       warnAtPercent: 70,
       urgentWarnAtPercent: 85,
       blockAtPercent: 100,
@@ -150,7 +152,7 @@ export const sharedPlanPolicies: Record<SharedPlanKey, SharedPlanPolicy> = {
     },
     files: {
       maxVisibleStorageBytes: 10 * GB,
-      maxUploadBytes: 200 * MB,
+      maxUploadBytes: 2 * GB,
       warnAtPercent: 70,
       urgentWarnAtPercent: 85,
       blockAtPercent: 100,

@@ -28,6 +28,7 @@ import {
 import {AccountOptions} from 'tset-sharedlib/schemas/public/Account';
 import type {SystemOptions} from 'tset-sharedlib/schemas/public/Account';
 import {FAMILY_AI_SETTINGS_OFFERED} from 'tset-sharedlib/family-ai';
+import {isOwnAiStored} from 'tset-sharedlib/own-ai';
 import {isValidTimeZone, notifyDeviceSettingsChanged} from './device_settings.service';
 import {bumpDeviceSettingsVersion} from '@/db/device_settings_version.repo';
 import {
@@ -44,6 +45,7 @@ import {
   type FamilyDowntimeSettings,
 } from 'tset-sharedlib/restrictions/familyDowntime';
 import SSEManager from './sse.manager';
+import {FamilyDowntimeNoticeService} from './family_downtime_notice.service';
 
 function resolveDisplayAccount(account: Account | null) {
   if (!account) return account;
@@ -53,6 +55,20 @@ function resolveDisplayAccount(account: Account | null) {
     ...buildAccountPlanUpdate(account.accountType),
   };
 }
+
+type JoinInsteadCheck = {
+  canJoinInstead: boolean;
+  reason: 'same-family' | 'not-admin' | 'other-people' | 'paid-plan' | 'has-data' | null;
+  otherPeople: number;
+};
+
+const JOIN_INSTEAD_REFUSALS: Record<NonNullable<JoinInsteadCheck['reason']>, string> = {
+  'same-family': "You're already in this family.",
+  'not-admin': 'Only the adult who manages this family can do this.',
+  'other-people': 'Your family has other people in it, so it cannot be deleted from an invite link.',
+  'paid-plan': 'Your family has a paid plan. Cancel it in Settings before joining another family.',
+  'has-data': 'Your account has things saved in it, so it cannot be deleted from an invite link.',
+};
 
 @injectable()
 class AccountService {
@@ -142,6 +158,65 @@ class AccountService {
     return {inviteCode: verification._id};
   }
 
+  /**
+   * Whether the signed-in person can swap their own family for an invite in one step: only when
+   * nothing would be lost (HAT-539). Anything else gets steps instead -- back up, then Delete
+   * account, then open the invite again -- so a family with a library is never deleted from an
+   * invite link. The invite page and `leaveOwnFamilyForInvite` both read this one answer.
+   *
+   * Empty means: this adult alone, no library items, no collections beyond the system ones every
+   * account gets, and no paid plan.
+   */
+  // ROUTE-METHOD
+  async checkLeaveOwnFamilyForInvite(ctx: RequestContext, code: string): Promise<JoinInsteadCheck> {
+    // Throws on a code that is not a family invite, or has expired.
+    const invite = await this.verificationService.getFamilyInviteInfo(code);
+    if (invite.accountId == ctx.accountId) {
+      return {canJoinInstead: false, reason: 'same-family', otherPeople: 0};
+    }
+    if (!(await ctx.isAdmin())) {
+      return {canJoinInstead: false, reason: 'not-admin', otherPeople: 0};
+    }
+
+    const living = (await this.users.listByAccountId(ctx.accountId)).filter((u) => !u.deleted);
+    const otherPeople = living.filter((u) => u._id != ctx.currentUserId).length;
+    if (otherPeople > 0) {
+      return {canJoinInstead: false, reason: 'other-people', otherPeople};
+    }
+
+    const account = await this._getAccountById(ctx.accountId);
+    if (account?.accountType == AccountType.plus || account?.accountType == AccountType.superplus) {
+      return {canJoinInstead: false, reason: 'paid-plan', otherPeople};
+    }
+
+    const itemCount = await this.itemService._getLibraryItemCount(ctx.accountId);
+    const madeCollections = await this.itemService._getMadeCollectionCount(ctx.accountId);
+    if (itemCount > 0 || madeCollections > 0) {
+      return {canJoinInstead: false, reason: 'has-data', otherPeople};
+    }
+    return {canJoinInstead: true, reason: null, otherPeople};
+  }
+
+  /**
+   * Someone invited to a family who signed up without the invite link has a family of their own,
+   * and an account cannot move between families (doc 31: `/user/migrate` returns 501). When that
+   * family is still empty, this deletes it -- the same steps as Delete account -- so they can sign
+   * up again through the invite (HAT-537, HAT-539). Nothing is moved, so nothing is left wrapped
+   * under the old family's key.
+   */
+  // ROUTE-METHOD
+  async leaveOwnFamilyForInvite(ctx: RequestContext, code: string) {
+    const check = await this.checkLeaveOwnFamilyForInvite(ctx, code);
+    if (!check.canJoinInstead) {
+      throw new Error(JOIN_INSTEAD_REFUSALS[check.reason ?? 'has-data']);
+    }
+
+    await this.userService.markUserDeleted(ctx.currentUserId);
+    // Last, as in Delete account: a throw above must not leave a deleted account with a live user.
+    await this.accounts.updateWithId(ctx.accountId, {deleted: true});
+    return {code};
+  }
+
   // ROUTE-METHOD
   async getAccountStats(ctx: RequestContext) {
     const accountId = ctx.accountId;
@@ -190,11 +265,20 @@ class AccountService {
     // Family Downtime has its own routes, each a locked patch. A whole-object write here from a
     // client's cached account would silently undo another admin's End now or one-off.
     delete patch.familyDowntime;
+    // Connected AI apps has its own route (`/mcpRelay/setEnabled`); a cached whole object must
+    // never turn it on or off (HAT-616).
+    delete patch.mcpRelayEnabled;
 
     // The family AI setting (PLN-3): only a choice offered today. Settings only waits for PLN-11,
     // and a value this server does not offer must not be stored for a client to read.
     if ('aiSetting' in patch && !(FAMILY_AI_SETTINGS_OFFERED as readonly unknown[]).includes(patch.aiSetting)) {
       throw new Error('Unknown AI setting');
+    }
+
+    // The family's own AI account (HAT-966): ciphertext only. A plain key sent by mistake, or any
+    // other shape, must never be stored where every member's device reads it.
+    if ('ownAi' in patch && patch.ownAi !== null && !isOwnAiStored(patch.ownAi)) {
+      throw new Error('Unknown own AI connection');
     }
 
     /**
@@ -219,6 +303,9 @@ class AccountService {
     // Left out on purpose: `updateWithId` then keeps the downtime stored at the moment of the write.
     const {familyDowntime: _readEarlier, ...currentOptions} = account.options || {};
     const merged = {...currentOptions, ...patch};
+    // Family AI going to anything but On turns Connected AI apps off, so turning AI back on never
+    // brings outside AI apps back without an adult choosing it again.
+    if ('aiSetting' in patch && patch.aiSetting !== 'on') merged.mcpRelayEnabled = false;
     if (!timeZoneChanged) {
       await this.accounts.updateWithId(ctx.accountId, {options: merged});
       return true;
@@ -464,6 +551,11 @@ class AccountService {
         console.warn('[family-downtime] SSE refresh failed', e?.message || e);
       });
     }
+    // The admins' phone notice (HAT-380): Start now, End now and turning it off reach it now, not
+    // at the job's next minute.
+    FamilyDowntimeNoticeService.instance.sync(ctx.accountId).catch((e) => {
+      console.warn('[family-downtime] phone notice failed', e?.message || e);
+    });
 
     return {familyDowntime: stored};
   }
@@ -485,6 +577,7 @@ class AccountService {
   // ROUTE-METHOD
   async addFamilyDowntimeOneOff(ctx: RequestContext, startAt: number, endAt: number) {
     return this._writeFamilyDowntime(ctx, (current, {nowMs}) => {
+      if (!current.enabled) throw new Error('Family Downtime is off. An admin turns it on under Family & Account.');
       const problem = oneOffProblem(startAt, endAt, nowMs);
       if (problem) throw new Error(problem);
       if (current.oneOffs.length >= FAMILY_DOWNTIME_ONE_OFF_MAX) {

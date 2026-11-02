@@ -1,0 +1,1 @@
+const e={menu:{noMatches:"No matching settings"},menuHeader:{openMenu:"Open menu",menu:"Menu",back:"Back"},switcher:{mySettings:"My Settings",familyAccount:"Family & Account"},picture:{showLarger:"Show a larger picture of {label}",done:"Done"},pageHeader:{openMenu:"Open menu",menu:"Menu",search:"Search",sections:"Sections",back:"Back"}};export{e as s};

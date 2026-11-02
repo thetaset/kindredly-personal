@@ -374,6 +374,16 @@ export class RequestContext {
     return user && user.type == UserType.admin;
   }
 
+  /**
+   * An admin of the family that owns the thing — never "any admin". `isAdmin()` is true for
+   * every family admin in every family, so on its own it must not grant access to an item or
+   * collection: that let one family's admin read another family's collections by id (CLN-75).
+   */
+  async isAdminInAccount(accountId: string | null | undefined) {
+    if (!accountId || !this.accountId || accountId !== this.accountId) return false;
+    return !!(await this.isAdmin());
+  }
+
   async getUserById(userId: string) {
     if (!(userId in this.userCache)) {
       this.userCache[userId] = await this.users.findById(userId);

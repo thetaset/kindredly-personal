@@ -40,6 +40,39 @@ const NAMED_BEHAVIOURS = [
   'safety-floor',
   'reminder-mode',
   'track-only-mode',
+  // "Pause all restrictions" reaching the phone. Until these, both device compilers read only "Pause
+  // just usage limits", so a child who asked a parent from the block screen and was granted a pause
+  // stayed blocked on their phone while the browser opened up.
+  'restrictions-pause-active',
+  'restrictions-pause-expired',
+  'restrictions-pause-keeps-downtime',
+  'block-all-cancels-pause',
+  // Always allowed (HAT-152): past a spent budget without spending it, an app block still wins, and
+  // open during Family Downtime.
+  'always-allowed-past-limits',
+  'always-allowed-during-downtime',
+  // A guardian's yes to one app from a request (HAT-178), until it ends.
+  'app-grant-active',
+  'app-grant-expired',
+  // Games (HAT-634): the Games limit covers the Games app type; a limit on one game covers its apps.
+  'games-limit',
+  'one-game-limit',
+  // Earn access (HAT-836): a holding rule closes the apps its holds cover until it opens, for its
+  // period (a day, a family week); Always allowed stays open, and only "Pause all restrictions" lifts it.
+  'earn-access-holds-games',
+  'earn-access-opened-today',
+  'earn-access-opened-yesterday',
+  'earn-access-always-allowed',
+  'earn-access-weekly-opened-monday',
+  'earn-access-usage-pause-keeps-hold',
+  // On a ruleset compiled the day before, with nothing to recompile from (EA-15): a daily rule holds
+  // again after the family's midnight, and a school-days rule opens on Saturday.
+  'earn-access-held-again-without-recompile',
+  'earn-access-off-day-without-recompile',
+  // A rule opened only by I've done it (HAT-912): no device can check the step, so it holds until
+  // an opening, exactly as a rule with a task step does.
+  'earn-access-confirm-holds',
+  'earn-access-confirm-opened-today',
 ];
 
 const DEVICE_ACTIONS = new Set(['allow', 'warn', 'block']);
@@ -50,6 +83,7 @@ const DEVICE_REASONS = new Set([
   'always-blocked',
   'app-blocked',
   'family-downtime',
+  'earn-access',
 ]);
 
 function loadSources(): any[] {
@@ -76,6 +110,24 @@ const PLATFORMS = ['android', 'macos'] as const;
  * would have written.
  */
 function settingsForPlatform(settings: any, platform: (typeof PLATFORMS)[number]) {
+  // Always allowed app ids are stored `<platform>:<id>`; sources write the bare id, and each platform
+  // gets its own prefix, which its evaluator strips (HAT-152).
+  if (Array.isArray(settings.alwaysAllowAppIds)) {
+    settings = {
+      ...settings,
+      alwaysAllowAppIds: settings.alwaysAllowAppIds.map((id: string) => (id.includes(':') ? id : `${platform}:${id}`)),
+    };
+  }
+  // A guardian's grants name apps the same way (HAT-178).
+  if (Array.isArray(settings.appGrants)) {
+    settings = {
+      ...settings,
+      appGrants: settings.appGrants.map((g: {appId: string; until: number}) => ({
+        ...g,
+        appId: g.appId.includes(':') ? g.appId : `${platform}:${g.appId}`,
+      })),
+    };
+  }
   if (platform === 'android' || !settings.appPolicy) return settings;
   const entries: Record<string, unknown> = {};
   for (const [key, entry] of Object.entries(settings.appPolicy.entries || {})) {
@@ -92,6 +144,15 @@ function compileZone(c: any): string {
   return c.clock.familyTimeZone ?? c.clock.deviceTimeZone;
 }
 
+/**
+ * When the device decides. A case compiles at `clock.nowMs`; one with `clock.decideAtMs` decides then,
+ * on the ruleset compiled earlier, as a device with no settings of its own to recompile from does
+ * (EA-15). Guard's native compile still compiles at `clock.nowMs`.
+ */
+function decideAtMs(c: any): number {
+  return typeof c.clock.decideAtMs === 'number' ? c.clock.decideAtMs : c.clock.nowMs;
+}
+
 function compileAll(sources: any[]) {
   return {
     generatedBy: 'tset-sharedlib/tests/deviceDecisionFixtures.test.ts — regenerate, never edit by hand',
@@ -100,8 +161,9 @@ function compileAll(sources: any[]) {
         id: c.id,
         platform,
         behaviour: c.behaviour,
-        nowMs: c.clock.nowMs,
-        dateKey: dateKeyInTimeZone(c.clock.nowMs, compileZone(c)),
+        // When the device decides: later than the compile for a case about a ruleset gone stale.
+        nowMs: decideAtMs(c),
+        dateKey: dateKeyInTimeZone(decideAtMs(c), compileZone(c)),
         floor: c.floor,
         usageByPkgMs: c.usage.appMsByPkg,
         ruleSet: compileDeviceSettings({
@@ -114,7 +176,9 @@ function compileAll(sources: any[]) {
           })),
           usageSeed: c.usageSeed,
         }),
-        expect: c.expectDevice,
+        // A case about one real app (a game from the games list, HAT-634) names it by each platform's
+        // own id, so it may give a platform its own expectations.
+        expect: c.expectDeviceByPlatform?.[platform] ?? c.expectDevice,
       })),
     ),
   };
@@ -139,10 +203,11 @@ describe('shared decision fixtures (DCP-6)', () => {
   it.each(sources.map((c) => [c.id, c]))('%s is well formed', (_id, c) => {
     expect(typeof c.behaviour).toBe('string');
     expect(c.expectDevice.length).toBeGreaterThan(0);
-    for (const e of c.expectDevice) {
+    for (const e of [c.expectDevice, ...Object.values(c.expectDeviceByPlatform ?? {})].flat() as any[]) {
       expect(DEVICE_ACTIONS.has(e.action)).toBe(true);
       expect(DEVICE_REASONS.has(e.reason)).toBe(true);
     }
+    for (const platform of Object.keys(c.expectDeviceByPlatform ?? {})) expect(PLATFORMS).toContain(platform);
     // Every case says what the browser should decide, or why the browser has no equivalent.
     expect(Boolean(c.expectBrowser) !== Boolean(c.browserNotApplicable)).toBe(true);
   });

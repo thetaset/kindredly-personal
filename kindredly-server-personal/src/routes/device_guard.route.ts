@@ -11,11 +11,18 @@ import {UserType} from 'tset-sharedlib/shared.types';
 import {AuditLogService} from '@/services/audit_log.service';
 import {RefStateService} from '@/services/ref_state.service';
 import {SessionService} from '@/services/session.service';
-import {DeviceSettingsService, deviceSettingsVersionOf} from '@/services/device_settings.service';
+import {
+  DeviceSettingsService,
+  deviceSettingsVersionOf,
+  notifyDeviceSettingsChanged,
+} from '@/services/device_settings.service';
 import SSEManager from '@/services/sse.manager';
 import {config} from '@/config';
 import {isRateLimitingEnabled} from '@/services/rate_limit_switch';
 import {describeNewApps} from '@/services/companionTamperPolicy';
+import {escapeHtml} from '@/utils/text_utils';
+import {selfRemovalApprover} from '@/services/companionSelfRemoval';
+import {RefStateRepo} from '@/db/ref_state.repo';
 
 const SETTINGS_EVENTS_HEADERS = {
   'Content-Type': 'text/event-stream',
@@ -49,6 +56,7 @@ class DeviceGuardRoute implements Routes {
 
   private notificationService = container.resolve(NotificationService);
   private refStateService = new RefStateService();
+  private refStates = new RefStateRepo();
   private deviceSettingsService = new DeviceSettingsService();
   private sseManager = SSEManager.getInstance();
 
@@ -92,7 +100,10 @@ class DeviceGuardRoute implements Routes {
           ctx.accountId,
           {
             title: 'Uninstall protection turned off',
-            message: `${admin.displayedName || admin.username || 'A parent'} turned off uninstall protection on ${childName}'s phone.`,
+            // HTML in the notice and the email: both names are set by the people they name.
+            message: escapeHtml(
+              `${admin.displayedName || admin.username || 'A parent'} turned off uninstall protection on ${childName}'s phone.`,
+            ),
             shortMessage: `Uninstall protection was turned off on ${childName}'s phone.`,
             refInfo: {resourceType: 'companionDevice', resourceId: deviceId, requestType: 'protectionRemoved'},
           },
@@ -190,6 +201,71 @@ class DeviceGuardRoute implements Routes {
           console.error('audit_log: failed to log device.remove', e);
         }
 
+        // Tell the child's devices to ask now. The removed one is answered `AuthDeviceRemoved` and
+        // stops protecting within seconds rather than at its next ten-minute check-in (HAT-178);
+        // the others find nothing changed.
+        if (revokedSessions > 0) notifyDeviceSettingsChanged([childUserId]);
+
+        res.json({success: true, results: {ok: true, revokedSessions, deletedRows}});
+      }),
+    );
+
+    /**
+     * A Companion unlinked at the computer, taking itself off the parent's list (CMP-70).
+     *
+     * The device's own token, plus a parent's approval from their PIN at that computer — see
+     * `selfRemovalApprover` for why the token alone removes nothing. Then the same removal as
+     * `/companion/devices/remove`, in the same order: the device's sessions first, then its rows.
+     * The rows go through the repo, not RefStateService, whose delete refuses a restricted caller
+     * for `provisioning`; the approval checked above is the admin that rule asks for.
+     */
+    this.router.post(
+      '/companion/devices/removeSelf',
+      authenticateJWT,
+      errorHelper(async (req: ApiReq<'/companion/devices/removeSelf'>, res) => {
+        const ctx = RequestContext.instance(req);
+        const childUserId = ctx.getSessionUserId();
+        const deviceId = ctx.getTokenDeviceId();
+        const verdict = await selfRemovalApprover({
+          approval: String(req.body?.approval || ''),
+          tokenUserId: childUserId,
+          tokenDeviceId: deviceId,
+          loadUser: (userId) => ctx.getUserById(userId),
+        });
+        if ('message' in verdict) return res.json({success: false, message: verdict.message, status: verdict.status});
+        // Checked by the approver already; repeated so the types below need no assertion.
+        if (!childUserId || !deviceId)
+          return res.json({success: false, message: 'This device is not provisioned.', status: 401});
+
+        const revokedSessions = await SessionService.instance.revokeForClient(
+          childUserId,
+          `cmp_${deviceId}`,
+          'device_removed',
+        );
+        let deletedRows = 0;
+        for (const stateKey of ['provisioning', 'status', 'appInventory', 'tamperIncident']) {
+          deletedRows += await this.refStates.deleteOne({
+            refType: 'device-guard',
+            refId: 'companion',
+            ownerType: 'user',
+            ownerId: childUserId,
+            stateKey,
+            stateSubKey: deviceId,
+          });
+        }
+
+        try {
+          await AuditLogService.instance.log(ctx, {
+            action: 'device.remove',
+            entityType: 'user',
+            entityId: childUserId,
+            relatedIds: {targetUserId: childUserId, deviceId, approvedBy: verdict.adminUserId},
+          });
+        } catch (e) {
+          console.error('audit_log: failed to log device.remove (self)', e);
+        }
+        if (revokedSessions > 0) notifyDeviceSettingsChanged([childUserId]);
+
         res.json({success: true, results: {ok: true, revokedSessions, deletedRows}});
       }),
     );
@@ -229,13 +305,16 @@ class DeviceGuardRoute implements Routes {
         const total = pkgs.length;
         const listed = shown.join(', ');
         const extra = total > shown.length ? ` and ${total - shown.length} more` : '';
+        const copy = describeNewApps({total, listed: `${listed}${extra}`, childName, platform: req.body?.platform});
         await this.notificationService.addAccountNotification(
           ctx,
           NotificationType.DEVICE_APP_REVIEW,
           childUserId,
           ctx.accountId,
           {
-            ...describeNewApps({total, listed: `${listed}${extra}`, childName, platform: req.body?.platform}),
+            ...copy,
+            // HTML in the notice: the app names come from the child's device, the name from the child.
+            message: escapeHtml(copy.message),
             refInfo: {
               resourceType: 'companionDevice',
               resourceId: childUserId || '',
@@ -315,6 +394,31 @@ class DeviceGuardRoute implements Routes {
       }),
     );
 
+    /**
+     * Ask this user's devices to upload their buffered sessions now (the 15-minute cycle is
+     * WorkManager's floor). Guardian, or the user about their own devices — the same authority
+     * check as the version route beside it, because this exposes nothing the caller could not
+     * already read; it only changes WHEN they read it.
+     *
+     * Best effort by construction: `sent` counts tokens pushed to, and a phone that is off or has
+     * no Guard on it is counted and will never answer. The caller polls for fresher data rather
+     * than waiting on a promise this cannot make.
+     */
+    this.router.post(
+      '/companion/devices/requestUpload',
+      authenticateJWT,
+      errorHelper(async (req: ApiReq<'/companion/devices/requestUpload'>, res) => {
+        const ctx = RequestContext.instance(req);
+        const userId = String(req.body?.userId || ctx.getCurrentUserId() || '');
+        if (!userId) return res.json({success: false, message: 'userId is required'});
+        await ctx.verifySelfOrAdminOverUser(userId);
+        // The class already holds one (`notificationService` above). `container.resolve` builds a
+        // fresh instance every call, so resolving again here was a second service per request.
+        const {sent} = await this.notificationService.sendSilentDeviceUploadRequest(userId);
+        res.json({success: true, results: {sent}});
+      }),
+    );
+
     this.router.post(
       '/companion/settings/current',
       authenticateJWT,
@@ -328,7 +432,7 @@ class DeviceGuardRoute implements Routes {
 
         const raw = req.body?.knownVersion;
         const knownVersion = typeof raw === 'number' && Number.isFinite(raw) ? raw : undefined;
-        const results = await this.deviceSettingsService.currentForUser(userId, knownVersion);
+        const results = await this.deviceSettingsService.currentForUser(userId, knownVersion, Date.now(), deviceId);
         res.json({success: true, results});
       }),
     );

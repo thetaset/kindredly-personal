@@ -66,6 +66,7 @@ class SubscriptionRoute implements Routes {
           req.body.subscriptionId,
           req.body.data,
           req.body.encInfo,
+          req.body.expectedUpdatedAt,
         );
         const result = {
           success: true,
@@ -84,6 +85,7 @@ class SubscriptionRoute implements Routes {
           RequestContext.instance(req),
           getTargetUserId(req),
           req.body.refId,
+          req.body.refType,
         );
         const result = {
           success: true,

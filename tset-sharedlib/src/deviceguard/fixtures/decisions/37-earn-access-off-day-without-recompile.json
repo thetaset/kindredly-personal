@@ -1,0 +1,98 @@
+{
+  "id": "37-earn-access-off-day-without-recompile",
+  "behaviour": "A school-days rule holding on Friday opens on Saturday on a device still using Friday's ruleset, with no settings of its own to recompile from (EA-15).",
+  "clock": {
+    "nowMs": 1789758000000,
+    "decideAtMs": 1789837200000,
+    "familyTimeZone": "America/Los_Angeles",
+    "deviceTimeZone": "America/Los_Angeles"
+  },
+  "settings": {
+    "usageLimitsData": {
+      "contentUsageLimits": [],
+      "temporaryRules": []
+    },
+    "ruleOverrideSettings": {
+      "ruleOverrides": []
+    },
+    "accessControlSettings": {
+      "earnAccessSettings": {
+        "version": 1,
+        "rules": [
+          {
+            "id": "chores-first",
+            "name": "Chores before games",
+            "enabled": true,
+            "holds": [
+              "games"
+            ],
+            "steps": [
+              {
+                "id": "s1",
+                "type": "task",
+                "taskId": "task-dishes"
+              }
+            ],
+            "approval": false,
+            "reset": "day",
+            "daysOfWeek": [
+              1,
+              2,
+              3,
+              4,
+              5
+            ]
+          }
+        ]
+      }
+    },
+    "appPolicy": null,
+    "appPolicyStatus": "absent"
+  },
+  "installedApps": [
+    {
+      "pkg": "com.roblox.client",
+      "label": "Roblox",
+      "platform": "android"
+    },
+    {
+      "pkg": "com.mojang.minecraftpe",
+      "label": "Minecraft",
+      "platform": "android"
+    },
+    {
+      "pkg": "com.duolingo",
+      "label": "Duolingo",
+      "platform": "android"
+    }
+  ],
+  "floor": [],
+  "usage": {
+    "appMsByPkg": {},
+    "webLogs": []
+  },
+  "usageSeed": {
+    "perRuleUsedMs": {}
+  },
+  "expectDevice": [
+    {
+      "pkg": "com.roblox.client",
+      "action": "allow",
+      "reason": null,
+      "ruleId": null
+    },
+    {
+      "pkg": "com.mojang.minecraftpe",
+      "action": "allow",
+      "reason": null,
+      "ruleId": null
+    },
+    {
+      "pkg": "com.duolingo",
+      "action": "allow",
+      "reason": null,
+      "ruleId": null
+    }
+  ],
+  "browserNotApplicable": "Device-only here: the browser recomputes holding on every check, so it has no ruleset to go stale. Its Earn access is tested in ActivityService.earnAccess.test.ts and earnAccess.test.ts in sharedlib."
+}

@@ -37,6 +37,13 @@ export const GAP_FINAL_ALERT_MS = 48 * HOUR;
 export const MAX_NOTIFICATIONS_PER_INCIDENT = 2;
 /** Local hour at which batched gap alerts are delivered. */
 export const DIGEST_HOUR_LOCAL = 9;
+/**
+ * A computer's Companion closed this many times within `QUIT_STREAK_WINDOW_MS` is someone trying to
+ * stop it, and a guardian hears about it. Once is a crash, a dead display or a curious click: it
+ * restarts itself in seconds, so it is recorded on the device card and nobody is told (HAT-447).
+ */
+export const QUIT_STREAK_COUNT = 3;
+export const QUIT_STREAK_WINDOW_MS = HOUR;
 
 export type TamperIncident = {
   /** When the device was last known healthy. */
@@ -52,11 +59,16 @@ export type TamperIncident = {
    * reporting that same event until a newer one replaces it.
    */
   reportedEventAt?: number;
+  /**
+   * When the Companion was closed (`companionQuit`) within the last `QUIT_STREAK_WINDOW_MS`, not yet
+   * told to anyone. Cleared by the alert a streak sends. Carried into every later incident.
+   */
+  recentQuitAt?: number[];
 };
 
 export type DeviceSnapshot = {
   deviceId: string;
-  /** Parent-visible device name, for the message. */
+  /** The device's own name: a computer's host name. Phones report none. */
   deviceLabel?: string;
   /** From the status row. Absent means Android, as every Guard build before the field. */
   platform?: string;
@@ -70,11 +82,14 @@ export type DeviceSnapshot = {
 export type TamperDecision =
   | {action: 'none'; incident?: TamperIncident}
   | {action: 'open'; incident: TamperIncident}
+  /** Save the incident and tell nobody: a single close of a computer's Companion (HAT-447). */
+  | {action: 'record'; incident: TamperIncident}
   | {action: 'notify'; incident: TamperIncident; urgency: 'immediate' | 'digest'; reason: TamperReason}
   | {action: 'resolve'; incident: TamperIncident; notifyRecovery: boolean};
 
 export type TamperReason =
   | {kind: 'event'; eventKind: DeviceTamperKind}
+  | {kind: 'quitStreak'; count: number}
   | {kind: 'gap'; sinceMs: number; final: boolean};
 
 /**
@@ -96,24 +111,38 @@ export function evaluateDevice(
   const open = incident && !incident.resolvedAt ? incident : null;
   // Every new incident keeps the newest event already reported, whatever kind the incident is.
   const alreadyReported = reportedEventAt(incident);
-  const carried = alreadyReported === undefined ? {} : {reportedEventAt: alreadyReported};
+  const recentQuitAt = incident?.recentQuitAt ?? [];
+  const carried = {
+    ...(alreadyReported === undefined ? {} : {reportedEventAt: alreadyReported}),
+    ...(recentQuitAt.length ? {recentQuitAt} : {}),
+  };
 
   // An explicit tamper event beats everything: the device was still alive when it
   // reported, so this is unambiguous and worth an immediate push.
   if (isNewEvent(snapshot, incident)) {
-    const next: TamperIncident = {
-      openedAt: snapshot.tamperLastEventAt!,
-      kind: 'event',
-      lastEventKind: snapshot.tamperLastEventKind,
-      lastNotifiedAt: now,
-      notifyCount: (open?.notifyCount ?? 0) + 1,
-      reportedEventAt: snapshot.tamperLastEventAt!,
-    };
+    const at = snapshot.tamperLastEventAt!;
+    const kind = snapshot.tamperLastEventKind;
+    const event = {openedAt: at, kind: 'event' as const, lastEventKind: kind, reportedEventAt: at};
+    const notified = {lastNotifiedAt: now, notifyCount: (open?.notifyCount ?? 0) + 1};
+    // Closed, and back by itself. Only a streak of them is a sign someone is trying (HAT-447).
+    if (kind === 'companionQuit') {
+      const streak = [...recentQuitAt.filter((quitAt) => quitAt > at - QUIT_STREAK_WINDOW_MS && quitAt < at), at];
+      if (streak.length < QUIT_STREAK_COUNT) {
+        return {action: 'record', incident: {...event, notifyCount: open?.notifyCount ?? 0, recentQuitAt: streak}};
+      }
+      // The alert spends the streak: the next one takes three more.
+      return {
+        action: 'notify',
+        incident: {...event, ...notified},
+        urgency: 'immediate',
+        reason: {kind: 'quitStreak', count: streak.length},
+      };
+    }
     return {
       action: 'notify',
-      incident: next,
+      incident: {...event, ...notified, ...(recentQuitAt.length ? {recentQuitAt} : {})},
       urgency: 'immediate',
-      reason: {kind: 'event', eventKind: snapshot.tamperLastEventKind ?? 'adminDisabled'},
+      reason: {kind: 'event', eventKind: kind ?? 'adminDisabled'},
     };
   }
 
@@ -128,11 +157,16 @@ export function evaluateDevice(
       incident: {...open, resolvedAt: now},
       // "Reporting again" only answers a gap alert. After an event alert the device never stopped
       // reporting, so telling the parent it is "back online" is untrue.
-      notifyRecovery: open.kind === 'gap' && open.notifyCount > 0,
+      notifyRecovery: open.kind === 'gap' && open.notifyCount > 0 && !isDesktopPlatform(snapshot.platform),
     };
   }
 
   if (gap == null) return {action: 'none', incident: incident ?? undefined};
+
+  // A computer that has not checked in is switched off — for a night, or a month in a cupboard. A
+  // computer is not tampered with by turning it off, and only what its running Companion reports
+  // alerts a guardian (founder, 2026-10-14, HAT-447). A phone stays on, so its silence still counts.
+  if (isDesktopPlatform(snapshot.platform)) return {action: 'none', incident: incident ?? undefined};
 
   // Silent incident: recorded so the clock starts, but the parent hears nothing
   // yet. Most of these close themselves overnight.
@@ -214,31 +248,62 @@ export function accountIsDark(snapshots: DeviceSnapshot[], now: number): boolean
 }
 
 /**
- * The app and the kind of device, for copy sent about either. A computer runs the Companion, a phone
- * runs Guard (DCP-17).
+ * The app and the kind of device, for copy sent about either (DCP-17). Phones and computers both run
+ * Kindredly Companion since the phone app's rename from Kindredly Guard (HAT-086).
  */
 function deviceWords(platform: string | undefined): {app: string; short: string; kind: string} {
-  return isDesktopPlatform(platform)
-    ? {app: 'Kindredly Companion', short: 'the Companion', kind: 'computer'}
-    : {app: 'Kindredly Guard', short: 'Guard', kind: 'phone'};
+  return {app: 'Kindredly Companion', short: 'Companion', kind: isDesktopPlatform(platform) ? 'computer' : 'phone'};
 }
 
-/** Parent-facing copy. Kept here so the wording is unit-testable alongside the thresholds. */
-export function describeReason(
-  reason: TamperReason,
-  deviceLabel: string,
-  platform?: string,
-): {title: string; body: string} {
+/**
+ * Whose device an alert is about, as a guardian says it: "Emma's computer (sunic)", "Emma's phone".
+ * The device's own name follows when it has one — a computer reports its host name, a phone none —
+ * so two of Emma's computers can be told apart. Never the device id: "Device lnx-dbf4" is what every
+ * alert said, because this read a field no device sends (HAT-195).
+ */
+export function whoseDevice(input: {
+  childName?: string | null;
+  deviceLabel?: string | null;
+  platform?: string;
+}): string {
+  const {kind} = deviceWords(input.platform);
+  const name = String(input.childName || '').trim();
+  const label = String(input.deviceLabel || '').trim();
+  const owner = name ? `${name}'s ${kind}` : `a ${kind}`;
+  return label && label.toLowerCase() !== kind ? `${owner} (${label})` : owner;
+}
+
+/** A title starts with the device, which may be "a computer". */
+function startOfTitle(text: string): string {
+  return text.charAt(0).toUpperCase() + text.slice(1);
+}
+
+/**
+ * Parent-facing copy. Kept here so the wording is unit-testable alongside the thresholds.
+ * `device` is `whoseDevice`'s answer.
+ *
+ * Every body names the device as well as the title. The push shows the body under a fixed
+ * "Device Protection Alert" title, so a body that said "this computer" told a guardian with two
+ * children nothing about whose it was (HAT-447).
+ */
+export function describeReason(reason: TamperReason, device: string, platform?: string): {title: string; body: string} {
+  if (reason.kind === 'quitStreak') {
+    return {
+      title: `Kindredly keeps being closed on ${device}`,
+      body: `Kindredly was closed ${reason.count} times within an hour on ${device}. It restarted itself each time and is protecting again.`,
+    };
+  }
   if (reason.kind === 'event') {
-    const body = EVENT_COPY[reason.eventKind] ?? 'Something changed in the protection settings.';
-    return {title: `Protection changed on ${deviceLabel}`, body};
+    const copy = EVENT_COPY[reason.eventKind];
+    const body = copy ? copy(device) : `Something changed in the protection settings on ${device}.`;
+    return {title: `Protection changed on ${device}`, body};
   }
   const hours = Math.floor(reason.sinceMs / HOUR);
   const since = hours >= 48 ? `${Math.floor(hours / 24)} days` : `${hours} hours`;
   const words = deviceWords(platform);
   return {
-    title: reason.final ? `${deviceLabel} still hasn't checked in` : `${deviceLabel} hasn't checked in`,
-    body: `${words.app} hasn't reported for ${since}. The ${words.kind} may be off, or ${words.short} may have been removed.`,
+    title: startOfTitle(reason.final ? `${device} still hasn't checked in` : `${device} hasn't checked in`),
+    body: `${words.app} on ${device} hasn't reported for ${since}. The ${words.kind} may be off, or ${words.short} may have been removed.`,
   };
 }
 
@@ -254,33 +319,44 @@ export function describeNewApps(input: {total: number; listed: string; childName
   const {kind} = deviceWords(typeof input.platform === 'string' ? input.platform : undefined);
   const {total, childName} = input;
   return {
-    title: total === 1 ? `New app on a ${kind}` : `${total} new apps on a ${kind}`,
+    title: total === 1 ? `New app on ${childName}'s ${kind}` : `${total} new apps on ${childName}'s ${kind}`,
     message: `${input.listed} appeared on ${childName}'s ${kind}. Review what's allowed.`,
     shortMessage: `${total} new app${total === 1 ? '' : 's'} on ${childName}'s ${kind}.`,
   };
 }
 
 /** Sent when a device that had gone quiet reports again. */
-export function describeRecovery(deviceLabel: string, platform?: string): {title: string; body: string} {
+export function describeRecovery(device: string, platform?: string): {title: string; body: string} {
   const words = deviceWords(platform);
-  return {title: `${deviceLabel} is reporting again`, body: `${words.app} is back online on this ${words.kind}.`};
+  return {
+    title: startOfTitle(`${device} is reporting again`),
+    body: `${words.app} is back online on ${device}.`,
+  };
 }
 
-const EVENT_COPY: Record<DeviceTamperKind, string> = {
-  adminDisableRequested: 'Someone started turning off uninstall protection.',
-  adminDisabled: 'Uninstall protection was turned off. Guard can now be removed.',
-  screenGuardDisabled: 'The screen guard was switched off in accessibility settings.',
-  uninstallScreen: 'Someone opened the screen used to remove apps.',
+const EVENT_COPY: Record<DeviceTamperKind, (device: string) => string> = {
+  adminDisableRequested: (device) => `Someone started turning off uninstall protection on ${device}.`,
+  adminDisabled: (device) =>
+    `Uninstall protection was turned off on ${device}. Kindredly Companion can now be removed.`,
+  screenGuardDisabled: (device) => `The screen guard was switched off in accessibility settings on ${device}.`,
+  uninstallScreen: (device) => `Someone opened the screen used to remove apps on ${device}.`,
   // Android's setting name alone told a guardian nothing (founder, 2026-09-14): the effect, then where to fix it.
-  usageAccessRevoked:
-    "Kindredly Guard was turned off in the phone's Usage access settings, so app time isn't being recorded.",
-  mainAppMissing: 'The Kindredly app was removed from the phone.',
+  usageAccessRevoked: (device) =>
+    `Kindredly Companion was turned off in Usage access settings on ${device}, so app time isn't being recorded.`,
+  mainAppMissing: (device) => `The Kindredly app was removed from ${device}.`,
   // Desktop. Says what happened AND that it is already fixed, because the alert would otherwise
   // read as "your child's computer is unprotected right now", which it is not.
-  companionQuit: 'Kindredly was closed on this computer. It restarted itself and is protecting again.',
+  companionQuit: (device) => `Kindredly was closed on ${device}. It restarted itself and is protecting again.`,
   // Desktop. Not phrased as an alarm: the overwhelmingly likely reader is the parent who did it,
   // standing at the computer, fixing a rule that was wrong. It still has to be SENT, because from
   // this side a paused Companion and a tampered-with one are indistinguishable — and a parent who
   // did not do this has just learned their PIN is out.
-  escapeHatch: 'A parent PIN paused limits on this computer for 15 minutes. They come back on their own.',
+  escapeHatch: (device) => `The admin code paused limits on ${device} for 15 minutes. They come back on their own.`,
+  // Linux. Someone tried to stop Kindredly coming back; it still does, and that is said too (CMP-48).
+  companionTampered: (device) => `Someone tried to stop Kindredly from restarting on ${device}. It's still running.`,
+  // Linux. What was done, and that it is undone (CMP-69).
+  linkRemoved: (device) =>
+    `Kindredly's link to your family was deleted on ${device}. It put the link back and is protecting again.`,
+  stayDownForged: (device) =>
+    `Kindredly was kept closed on ${device} for up to 30 minutes without the admin code. It's running again.`,
 };

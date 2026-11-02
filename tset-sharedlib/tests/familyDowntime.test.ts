@@ -129,15 +129,22 @@ describe('resolveFamilyDowntime', () => {
     expect(springForward[0].endMs - springForward[0].startMs).toBe(9 * HOUR);
   });
 
-  it('applies a one-off that spans a weekend, whether or not the schedule is on', () => {
+  it('applies a one-off that spans a weekend', () => {
     const weekend = settings({
+      oneOffs: [{ id: 'trip', startAt: laSept(19, 18), endAt: laSept(20, 9), createdBy: 'alex' }],
+    });
+    expect(resolveFamilyDowntime(weekend, laSept(19, 23), LA)).toMatchObject({ active: true, endsAtMs: laSept(20, 9) });
+  });
+
+  // HAT-127: off until an admin turns it on, and off means nothing applies — one-offs included.
+  it('applies nothing while Family Downtime is off', () => {
+    const off = settings({
       enabled: false,
       schedules: weeknights.schedules,
       oneOffs: [{ id: 'trip', startAt: laSept(19, 18), endAt: laSept(20, 9), createdBy: 'alex' }],
     });
-    expect(resolveFamilyDowntime(weekend, laSept(19, 23), LA)).toMatchObject({ active: true, endsAtMs: laSept(20, 9) });
-    // The recurring schedule is switched off, so Monday night is not downtime.
-    expect(resolveFamilyDowntime(weekend, laSept(21, 22), LA).active).toBe(false);
+    expect(resolveFamilyDowntime(off, laSept(19, 23), LA).active).toBe(false);
+    expect(resolveFamilyDowntime(off, laSept(21, 22), LA).active).toBe(false);
   });
 
   it('merges a one-off that overlaps or touches a recurring window into one downtime', () => {
@@ -256,7 +263,6 @@ describe('Dismiss for me', () => {
   // Removing the one-off that was running ends the dismissed downtime just as End now does.
   it('ends with the downtime it was made in when a write cuts that downtime short', () => {
     const tonight = settings({
-      enabled: false,
       oneOffs: [{ id: 'now', startAt: laSept(14, 21), endAt: laSept(15, 7), createdBy: 'sam' }],
     });
     const dismissed = dismissFamilyDowntimeForUser(tonight, laSept(14, 22), LA, 'alex');

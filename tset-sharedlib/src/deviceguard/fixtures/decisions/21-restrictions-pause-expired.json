@@ -1,0 +1,103 @@
+{
+  "id": "21-restrictions-pause-expired",
+  "behaviour": "Once \"Pause all restrictions\" has expired, the app blocks and time limits under it apply again, with no new settings from anyone.",
+  "clock": {
+    "nowMs": 1789491600000,
+    "familyTimeZone": "America/Los_Angeles",
+    "deviceTimeZone": "America/Los_Angeles"
+  },
+  "settings": {
+    "usageLimitsData": {
+      "contentUsageLimits": [
+        {
+          "id": "r-fun",
+          "name": "Fun",
+          "type": "advanced",
+          "conditions": [
+            {
+              "type": "eduValue",
+              "values": [
+                "eduval_fun"
+              ]
+            }
+          ],
+          "timeLimits": [
+            {
+              "hours": 1,
+              "daysOfWeek": [
+                0,
+                1,
+                2,
+                3,
+                4,
+                5,
+                6
+              ]
+            }
+          ]
+        }
+      ],
+      "temporaryRules": []
+    },
+    "ruleOverrideSettings": {
+      "ruleOverrides": []
+    },
+    "accessControlSettings": {
+      "disableRestrictions": true,
+      "disableRestrictionsTimeStamp": 1789490400000,
+      "disableRestrictionsExpires": 1789491540000
+    },
+    "appPolicy": {
+      "version": 1,
+      "blockedCategories": [
+        "browsers"
+      ],
+      "entries": {},
+      "updatedAt": 1
+    },
+    "appPolicyStatus": "readable"
+  },
+  "installedApps": [
+    {
+      "pkg": "com.roblox.client",
+      "label": "Roblox",
+      "platform": "android"
+    },
+    {
+      "pkg": "com.android.chrome",
+      "label": "Chrome",
+      "platform": "android"
+    }
+  ],
+  "floor": [],
+  "usage": {
+    "appMsByPkg": {
+      "com.roblox.client": 7200000
+    },
+    "webLogs": [
+      {
+        "url": "https://example.com/eduval_fun/70",
+        "eduValue": "eduval_fun",
+        "minutes": 70
+      }
+    ]
+  },
+  "usageSeed": {
+    "perRuleUsedMs": {}
+  },
+  "expectDevice": [
+    {
+      "pkg": "com.roblox.client",
+      "action": "block",
+      "reason": "budget-exhausted",
+      "ruleId": "r-fun"
+    },
+    {
+      "pkg": "com.android.chrome",
+      "action": "block",
+      "reason": "app-blocked",
+      "ruleId": null
+    }
+  ],
+  "browserNotApplicable": "Device-only here: the browser lifts a pause where it enforces, through getRestrictionEffectiveStatus in the client's restrictionState.ts, tested in restrictionState.test.ts. This case pins the phone to the same reading."
+}

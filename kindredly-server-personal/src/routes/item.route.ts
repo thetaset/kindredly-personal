@@ -359,6 +359,21 @@ class ItemRoute implements Routes {
       }),
     );
 
+    this.router.post(
+      '/item/archiveMany',
+      authenticateJWT,
+      errorHelper(async (req: ApiReq<'/item/archiveMany'>, res) => {
+        const ctx = RequestContext.instance(req);
+        const results = await this.itemService.archiveItems(
+          ctx,
+          req.body.itemIds,
+          !!req.body.value,
+          !!req.body.includeShared,
+        );
+        res.json({success: true, results});
+      }),
+    );
+
     // SCH-OK
     this.router.post(
       '/item/update',
@@ -387,6 +402,21 @@ class ItemRoute implements Routes {
       }),
     );
 
+    // Tell the people on a collection about an item already in it. The popup saves the moment
+    // a collection is picked, so this is how a "Let them know" ticked afterwards still lands.
+    this.router.post(
+      '/item/notifyAddedToCollections',
+      authenticateJWT,
+      errorHelper(async (req: ApiReq<'/item/notifyAddedToCollections'>, res) => {
+        await this.itemService.notifyAddedToCollections(
+          RequestContext.instance(req),
+          req.body.itemId,
+          req.body.collectionIds,
+        );
+        res.json({success: true});
+      }),
+    );
+
     // SCH-TOCHECK
     // TODO: Should check permissions new collections
     this.router.post(
@@ -398,6 +428,9 @@ class ItemRoute implements Routes {
           req.body.itemId,
           req.body.collectionIds,
           req.body.removeMissingCollections,
+          // The adder decides whether the other people on the collection hear about it
+          // (founder decision, 2026-09-19). Silent unless asked.
+          !req.body.notifyOthers,
         );
 
         // NOTE: change log is updated inside function
@@ -525,11 +558,25 @@ class ItemRoute implements Routes {
       '/item/addToCollections',
       authenticateJWT,
       errorHelper(async (req: ApiReq<'/item/addToCollections'>, res) => {
+        const ctx = RequestContext.instance(req);
+        const {itemId, collectionIds = [], removeCollectionIds = []} = req.body;
         const results = await this.itemRelationService.updateItemToCollectionMembership(
-          RequestContext.instance(req),
-          req.body.itemId,
-          req.body.collectionIds,
-          req.body.removeCollectionIds,
+          ctx,
+          itemId,
+          collectionIds,
+          removeCollectionIds,
+        );
+        // Everyone on a collection the item joined or left, as updateItemParents records for
+        // /item/save, plus the item's own people. Without a row an item filed into someone
+        // else's collection never reached them: their sync is driven by these rows (HAT-106).
+        const collectionUserIds = await this.permissionService._listUserIdsOfAllUserWithDirectPermissionsToItems(ctx, [
+          ...collectionIds,
+          ...removeCollectionIds,
+        ]);
+        const itemUserIds = await this.permissionService._listUserIdsWithPermissionsToItem(ctx, itemId, true);
+        await this.changeLogService.logItemChangeForUserIds(
+          Array.from(new Set([...collectionUserIds, ...itemUserIds])),
+          [itemId],
         );
         const result = {
           success: true,
@@ -678,6 +725,30 @@ class ItemRoute implements Routes {
       }),
     );
 
+    // Archive search (HAT-884): the ids of every archived item, then their rows by id, so a
+    // device keeps an archive index and fetches only what it does not have.
+    this.router.post(
+      '/library/archivedIds',
+      authenticateJWT,
+      errorHelper(async (req: ApiReq<'/library/archivedIds'>, res) => {
+        const itemIds = await this.itemlistService.listArchivedIds(RequestContext.instance(req), getTargetUserId(req));
+        res.json({success: true, results: {itemIds}});
+      }),
+    );
+
+    this.router.post(
+      '/library/archivedByIds',
+      authenticateJWT,
+      errorHelper(async (req: ApiReq<'/library/archivedByIds'>, res) => {
+        const results = await this.itemlistService.listArchivedByIds(
+          RequestContext.instance(req),
+          getTargetUserId(req),
+          req.body.itemIds,
+        );
+        res.json({success: true, results});
+      }),
+    );
+
     // RESTORED: /item/listWithFeedback route
     this.router.post(
       '/item/listWithFeedback',
@@ -706,12 +777,35 @@ class ItemRoute implements Routes {
           RequestContext.instance(req),
           getTargetUserId(req),
           req.body.sharedByUserId,
+          {sinceMs: req.body.sinceMs, limit: req.body.limit, fromFriends: req.body.fromFriends === true},
         );
         const result = {
           success: true,
           results: results,
         };
         res.json(result);
+      }),
+    );
+
+    // Not in library (HAT-984): what this person can open but has not got in their library.
+    this.router.post(
+      '/item/notInLibrary/list',
+      authenticateJWT,
+      errorHelper(async (req: ApiReq<'/item/notInLibrary/list'>, res) => {
+        const result = await this.itemlistService.listNotInLibrary(RequestContext.instance(req), getTargetUserId(req), {
+          limit: req.body.limit,
+          countOnly: req.body.countOnly === true,
+        });
+        res.json({success: true, results: result});
+      }),
+    );
+
+    this.router.post(
+      '/item/notInLibrary/remove',
+      authenticateJWT,
+      errorHelper(async (req: ApiReq<'/item/notInLibrary/remove'>, res) => {
+        const result = await this.itemService.removeFromNotInLibrary(RequestContext.instance(req), req.body.itemIds);
+        res.json({success: true, results: result});
       }),
     );
 
@@ -793,21 +887,22 @@ class ItemRoute implements Routes {
       errorHelper(async (req: ApiReq<'/collection/removeFromUserLibrary'>, res) => {
         const ctx = RequestContext.instance(req);
 
-        await this.itemService.removeUserCollections(
+        const outcome = await this.itemService.removeUserCollections(
           ctx,
           getTargetUserId(req),
           req.body.collectionIds,
           req.body.fullRemove,
         );
 
-        if (req.body.collectionIds)
-          for (const colId of req.body.collectionIds) {
-            await this.changeLogService.logItemChange(ctx, colId);
-          }
+        // Only ids actually written; a refused removal is reported in `results.refused`
+        // instead of a bare success. Same reasoning as /collection/addToUserLibrary.
+        for (const colId of outcome.added) {
+          await this.changeLogService.logItemChange(ctx, colId);
+        }
 
         const result = {
           success: true,
-          results: {},
+          results: outcome,
         };
         res.json(result);
       }),
@@ -1004,16 +1099,17 @@ class ItemRoute implements Routes {
       authenticateJWT,
       errorHelper(async (req: ApiReq<'/item/removeFromUserLibrary'>, res) => {
         const ctx = RequestContext.instance(req);
-        await this.itemService.removeUserItemsFromLibrary(ctx, getTargetUserId(req), req.body.itemIds);
+        const outcome = await this.itemService.removeUserItemsFromLibrary(ctx, getTargetUserId(req), req.body.itemIds);
 
-        if (req.body.itemIds)
-          for (const itemId of req.body.itemIds) {
-            await this.changeLogService.logItemChange(ctx, itemId);
-          }
+        // Only ids actually written; a refused removal is reported in `results.refused`
+        // instead of a bare success. Same reasoning as /item/addToUserLibrary.
+        for (const itemId of outcome.added) {
+          await this.changeLogService.logItemChange(ctx, itemId);
+        }
 
         const result = {
           success: true,
-          results: {},
+          results: outcome,
         };
         res.json(result);
       }),

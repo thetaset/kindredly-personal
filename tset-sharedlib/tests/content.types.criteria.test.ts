@@ -8,6 +8,8 @@ import {
   designTagList,
   audienceRoleTagList,
   freshnessTagList,
+  privacyTagList,
+  aiFeatureTagList,
 } from '../src/content.types';
 
 describe('criteria tag metadata + short names', () => {
@@ -31,11 +33,20 @@ describe('criteria tag metadata + short names', () => {
     expect(getCriteriaTagShortName('not_a_tag')).toBeUndefined();
   });
 
-  test('design / audience / freshness tags carry color + icon for chip rendering', () => {
-    for (const tag of [...designTagList, ...audienceRoleTagList, ...freshnessTagList]) {
+  test('design / audience / freshness / privacy / AI tags carry color + icon for chip rendering', () => {
+    for (const tag of [...designTagList, ...audienceRoleTagList, ...freshnessTagList, ...privacyTagList, ...aiFeatureTagList]) {
       expect(tag.color).toBeTruthy();
       expect(tag.icon).toBeTruthy();
     }
+  });
+
+  test('privacy and AI tags land on their own axes, and an item carries several at once', () => {
+    const parsed = getUseCriteriaObjWithKeys(['ta_kids', 'priv_details', 'priv_adtracking', 'ai_none']);
+    expect(parsed.privacy).toEqual(['priv_details', 'priv_adtracking']);
+    expect(parsed.aiFeatures).toEqual(['ai_none']);
+    expect(parsed.targetAudiences).toEqual(['ta_kids']);
+    expect(getCriteriaTagShortName('priv_adtracking')).toBe('Tracks for ads');
+    expect(getCriteriaTagShortName('ai_offload')).toBe('Does the thinking');
   });
 
   test('new facet tags resolve via getCriteriaTagDetail', () => {

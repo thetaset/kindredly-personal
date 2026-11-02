@@ -7,6 +7,8 @@ import type { ItemTypePrimary, ItemTypeSecondary, TagOptionDetail } from '../con
 import type Item from '../schemas/public/Item';
 import { ActivityContentInfo, MatchResult } from './activity.types';
 import type { RecognizedPageInfo } from '../page-recognition.utils';
+import type { PostMedia } from '../reddit-media.utils';
+import type { ProductMetadata } from '../product-metadata.utils';
 import type { DateString, Modify } from './common.types';
 import type { EncInfo } from './encryption.types';
 import type { FilePreview } from './file.types';
@@ -83,22 +85,43 @@ export interface ItemMetaExtracted {
     | 'published'
     | 'published_curated'
     | 'oembed'
+    | 'provider_api'
+    | 'provider_url'
+    | 'book_catalog'
     | 'live_dom'
+    | 'full_page'
+    | 'device_fetch'
+    | 'shared_title'
     | 'pdf_landing_page'
     | 'pdf_embedded'
     | 'file_name'
     | 'file_headers';
+  /**
+   * The name was made from the address (`getNameFromAddress`): the page gave only its site's name,
+   * or none. Any read's own title wins over it (HAT-619).
+   */
+  nameFromAddress?: boolean;
   redditScore?: number;
   redditComments?: number;
   redditSubreddit?: string;
   redditAuthor?: string;
   redditCreated?: number;
+  /** A post's own picture, pictures or video, found by the read that named it (HAT-635). */
+  postMedia?: PostMedia;
 
   /**
    * Optional richer page recognition output (provider + resourceType + ids).
    * This is additive and should not change existing behavior unless callers opt in.
    */
   recognized?: RecognizedPageInfo;
+
+  /**
+   * What the page said about the product on it — price, currency, store, what kind of thing it is.
+   * Absent on every page that is not a store's product page, and partly filled on most that are,
+   * because most stores publish no price we can read. Read on the device only; see
+   * `product-metadata.utils.ts`.
+   */
+  product?: ProductMetadata;
 }
 
 export interface ExtractedFeedLink {
@@ -301,6 +324,12 @@ export function initialImportProcessingState(
 
 export const PLAYBACK_SCHEMA_ID = 'kindredly.playback.v1';
 
+/**
+ * An item's sound: links to files kept online, not uploaded (HAT-977), and the order its parts
+ * play in, files and links together (HAT-978).
+ */
+export const AUDIO_PARTS_SCHEMA_ID = 'kindredly.audioParts.v1';
+
 export const MEDIA_REF_SCHEMA_ID = 'kindredly.mediaRef.v1';
 
 export const EBOOK_READER_SCHEMA_ID = 'kindredly.ebookReader.v1';
@@ -329,6 +358,28 @@ export interface PlaybackSchemaV1 {
   sourceUrl?: string;
   artworkUrl?: string;
   title?: string;
+}
+
+/** One sound file kept online. `url` is what the player fetches; `sourceUrl` is the link as given. */
+export interface AudioLinkV1 {
+  id: string;
+  url: string;
+  sourceUrl?: string;
+  name?: string;
+  fileType?: string;
+}
+
+/**
+ * One place in the play order: one of the item's attachments, or one of the links above. An
+ * `attachmentId`, so a Kindredly item file maps it to the new attachment on import.
+ */
+export type AudioPartOrderEntry = { attachmentId: string } | { linkId: string };
+
+export interface AudioPartsSchemaV1 {
+  schemaVersion: 1;
+  links: AudioLinkV1[];
+  /** The parts in play order. Parts not listed play after, by name. */
+  order?: AudioPartOrderEntry[];
 }
 
 export interface EbookReaderSchemaV1 {
@@ -777,6 +828,63 @@ export function setPlaybackSchemaOnInfo(
       [PLAYBACK_SCHEMA_ID]: schema,
     },
   };
+}
+
+/** Set the item's audio links and part order; with neither, the schema is removed. */
+export function setAudioPartsSchemaOnInfo(
+  info: ItemDetailsInfo | null | undefined,
+  parts: { links: AudioLinkV1[]; order: AudioPartOrderEntry[] },
+): ItemDetailsInfo {
+  const schemas =
+    info?.schemas && typeof info.schemas === 'object' && !Array.isArray(info.schemas)
+      ? { ...info.schemas }
+      : {};
+  if (parts.links.length || parts.order.length) {
+    schemas[AUDIO_PARTS_SCHEMA_ID] = { schemaVersion: 1, links: parts.links, order: parts.order } satisfies AudioPartsSchemaV1;
+  } else {
+    delete schemas[AUDIO_PARTS_SCHEMA_ID];
+  }
+  return { ...(info || {}), schemas };
+}
+
+type AudioPartsSource = {
+  info?: ItemDetailsInfo | null;
+  details?: { info?: ItemDetailsInfo | null } | null;
+} | null | undefined;
+
+function rawAudioParts(source: AudioPartsSource): Partial<AudioPartsSchemaV1> | null {
+  const raw = (source?.info?.schemas?.[AUDIO_PARTS_SCHEMA_ID] ||
+    source?.details?.info?.schemas?.[AUDIO_PARTS_SCHEMA_ID]) as Partial<AudioPartsSchemaV1> | undefined;
+  return raw && raw.schemaVersion === 1 ? raw : null;
+}
+
+/** The item's audio links, in the order they were added; links that are not https are left out. */
+export function getAudioLinksV1(source: AudioPartsSource): AudioLinkV1[] {
+  const raw = rawAudioParts(source);
+  if (!raw || !Array.isArray(raw.links)) return [];
+  return raw.links.flatMap((link) => {
+    const url = typeof link?.url === 'string' ? link.url.trim() : '';
+    const id = typeof link?.id === 'string' ? link.id : '';
+    if (!id || !/^https:\/\//i.test(url)) return [];
+    return [{
+      id,
+      url,
+      ...(typeof link.sourceUrl === 'string' && link.sourceUrl ? { sourceUrl: link.sourceUrl } : {}),
+      ...(typeof link.name === 'string' && link.name.trim() ? { name: link.name.trim() } : {}),
+      ...(typeof link.fileType === 'string' && link.fileType ? { fileType: link.fileType } : {}),
+    }];
+  });
+}
+
+/** The order the item's parts play in (HAT-978); empty when never set. */
+export function getAudioPartOrderV1(source: AudioPartsSource): AudioPartOrderEntry[] {
+  const raw = rawAudioParts(source);
+  if (!Array.isArray(raw?.order)) return [];
+  return raw!.order.flatMap((entry: any): AudioPartOrderEntry[] => {
+    if (typeof entry?.attachmentId === 'string' && entry.attachmentId) return [{ attachmentId: entry.attachmentId }];
+    if (typeof entry?.linkId === 'string' && entry.linkId) return [{ linkId: entry.linkId }];
+    return [];
+  });
 }
 
 export function setParentSourceSchemaOnInfo(
@@ -1281,6 +1389,10 @@ export interface KindredlyAppBuildV1 {
   // source scan cannot see through a bundle that aliases `kindredly.location`, and letting the
   // scan win would strip the declaration and break the app with E_CAPABILITY_NOT_DECLARED.
   importedCapabilities?: AppCapabilityId[] | null;
+  // Which sandbox the app runs in: 1 — the original (Pico, Alpine, Kaboom; plain JS building HTML),
+  // 2 — React + Tailwind + the @kindredly/ui kit. Absent means 1, so every app saved before runtime 2
+  // existed keeps running exactly as it did.
+  runtime?: 1 | 2 | null;
 }
 
 function normalizeImportSource(raw: unknown): KindredlyAppImportSource | null {
@@ -1325,6 +1437,7 @@ export function getKindredlyAppBuild(source: {
     scaffoldVersion: typeof schema.scaffoldVersion === 'number' ? schema.scaffoldVersion : undefined,
     ...(importedFrom ? { importedFrom } : {}),
     ...(importedCapabilities && importedCapabilities.length ? { importedCapabilities } : {}),
+    ...(schema.runtime === 2 ? { runtime: 2 as const } : schema.runtime === 1 ? { runtime: 1 as const } : {}),
   };
 }
 
@@ -1432,6 +1545,8 @@ export interface ItemInfoViewWithSearchFields extends ItemInfoView {
   permissionUserId?: string;
   parentList?: { name: string; _id: string; imageFilename?: string }[];
   matchType?: 'similar' | 'exact' | 'linked'
+  /** For a 'linked' match: the item's link or URL pattern that covered the URL. */
+  matchedPattern?: string
 }
 
 export interface ItemSysInfo {

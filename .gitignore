@@ -79,3 +79,8 @@ dist
 
 tmp/*
 tmp/
+
+# The download files go to a GitHub Release, not git: they are over GitHub's 100 MB file limit.
+# build_docker_personal.sh fetches them (scripts/publish_personal_repo.sh in the internal repo).
+kindredly-server-personal/data/downloads/*.xpi
+kindredly-server-personal/data/downloads/*.part

@@ -1,4 +1,6 @@
 import type { UserSettingsCopySourceSnapshot } from '../api';
+import { normalizeAllowList } from './alwaysAllowed';
+import { normalizeSocialMediaSettings } from './socialMedia';
 
 export const USER_SETTINGS_COPY_FILTERING_PREF_KEYS = [
   'filters.strictnessPresetId',
@@ -17,6 +19,10 @@ export const USER_SETTINGS_COPY_WEBSITE_PREF_KEYS = [
   'redditHideSearch',
   'redditHideComments',
   'redditHideOtherDistractions',
+  'tiktokPlayOnce',
+  'instagramPlayOnce',
+  'youtubeShortsPlayOnce',
+  'googleAILimit',
 ] as const;
 
 type ResolvedContentFilters = {
@@ -27,6 +33,7 @@ type ResolvedContentFilters = {
   blockPagesWithManyInappropriateImages: boolean;
   imageAggressionLevel: 'strict' | 'moderate' | 'relaxed' | 'off';
   disableSexyBlocking: boolean;
+  monitorVideos: boolean;
   blockShortFormVideo: boolean;
   blockSocialMedia: boolean;
   blockInappropriateTopics: boolean;
@@ -38,7 +45,7 @@ type ResolvedContentFilters = {
   disableAllExplicitImageScanning: boolean;
 };
 
-type StrictnessPresetId = 'strict' | 'moderate' | 'relaxed' | 'custom';
+type StrictnessPresetId = 'strict' | 'moderate' | 'relaxed' | 'light' | 'custom';
 type NamedStrictnessPresetId = Exclude<StrictnessPresetId, 'custom'>;
 
 const STRICTNESS_PRESET_FILTER_PATCHES: Record<NamedStrictnessPresetId, Partial<ResolvedContentFilters>> = {
@@ -47,18 +54,30 @@ const STRICTNESS_PRESET_FILTER_PATCHES: Record<NamedStrictnessPresetId, Partial<
     blockStrongSexualTerms: true,
     blockStrongProfanityTerms: true,
     censorBadWords: true,
+    blockInappropriateTopics: true,
   },
   moderate: {
     languageRestrictionLevel: 'moderate',
     blockStrongSexualTerms: true,
     blockStrongProfanityTerms: true,
     censorBadWords: true,
+    blockInappropriateTopics: true,
   },
   relaxed: {
     languageRestrictionLevel: 'lenient',
     blockStrongSexualTerms: true,
     blockStrongProfanityTerms: true,
     censorBadWords: true,
+    blockInappropriateTopics: true,
+  },
+  // HAT-111, same as the client's: censors profanity, blocks only sexual content.
+  light: {
+    languageRestrictionLevel: 'lenient',
+    blockAdult: true,
+    blockStrongSexualTerms: true,
+    blockStrongProfanityTerms: false,
+    censorBadWords: true,
+    blockInappropriateTopics: false,
   },
 };
 
@@ -67,6 +86,7 @@ const STRICTNESS_INDEPENDENT_FILTER_KEYS: Array<keyof ResolvedContentFilters> = 
   'blockPagesWithManyInappropriateImages',
   'imageAggressionLevel',
   'disableSexyBlocking',
+  'monitorVideos',
 ];
 
 const DEFAULT_FILTERS: ResolvedContentFilters = {
@@ -77,6 +97,7 @@ const DEFAULT_FILTERS: ResolvedContentFilters = {
   blockPagesWithManyInappropriateImages: true,
   imageAggressionLevel: 'moderate',
   disableSexyBlocking: false,
+  monitorVideos: false,
   blockShortFormVideo: false,
   blockSocialMedia: false,
   blockInappropriateTopics: true,
@@ -99,7 +120,7 @@ function cloneValue<T>(value: T): T {
 }
 
 function isNamedStrictnessPresetId(value: unknown): value is NamedStrictnessPresetId {
-  return value === 'strict' || value === 'moderate' || value === 'relaxed';
+  return value === 'strict' || value === 'moderate' || value === 'relaxed' || value === 'light';
 }
 
 function pickStrictnessIndependentFilters(
@@ -213,6 +234,7 @@ function resolveContentFilters(
     ),
     imageAggressionLevel: normalizeImageAggressionLevel(filters.imageAggressionLevel, defaults.imageAggressionLevel),
     disableSexyBlocking: toBoolean(filters.disableSexyBlocking, defaults.disableSexyBlocking),
+    monitorVideos: toBoolean(filters.monitorVideos, defaults.monitorVideos),
     blockShortFormVideo: false,
     blockSocialMedia: false,
     blockInappropriateTopics: toBoolean(filters.blockInappropriateTopics, defaults.blockInappropriateTopics),
@@ -355,7 +377,7 @@ export function buildContentFilteringCopySnapshot(
       assistantReviewEnabled: sourceOptions?.assistantReviewEnabled === true,
     },
     preferenceUpdates: {
-      'filters.strictnessPresetId': strictnessPresetId === 'strict' || strictnessPresetId === 'moderate' || strictnessPresetId === 'relaxed'
+      'filters.strictnessPresetId': isNamedStrictnessPresetId(strictnessPresetId)
         ? strictnessPresetId
         : 'custom',
       'filters.contentFilters': normalizedFilters,
@@ -377,6 +399,12 @@ export function buildUsageLimitsCopySnapshot(
     optionsPatch: {
       usageLimitsData,
       accessControlSettings,
+      // Always allowed goes with the limits it lifts (HAT-152). A library item on it opens only for
+      // someone whose library has that item.
+      alwaysAllowed: normalizeAllowList(sourceOptions?.alwaysAllowed),
+      // Block social media goes with the Social media limit it writes (SMB-6): copying one without
+      // the other leaves a 0-minute limit that a setting saying "off" cannot explain. Null removes it.
+      socialMedia: normalizeSocialMediaSettings(sourceOptions?.socialMedia),
     },
     preferenceUpdates: {},
   };
@@ -421,6 +449,17 @@ export function buildWebsiteSettingsCopySnapshot(
     sourceUserType,
     sourcePrefs.redditHideOtherDistractions as boolean | null | undefined,
   );
+  // One video, then stop (SMB-20): on for a child unless a guardian turned it off.
+  const tiktokPlayOnce = resolveRestrictedSiteToggle(sourceUserType, sourcePrefs.tiktokPlayOnce as boolean | null | undefined);
+  const instagramPlayOnce = resolveRestrictedSiteToggle(sourceUserType, sourcePrefs.instagramPlayOnce as boolean | null | undefined);
+  const youtubeShortsPlayOnce = resolveRestrictedSiteToggle(
+    sourceUserType,
+    sourcePrefs.youtubeShortsPlayOnce as boolean | null | undefined,
+  );
+  // Unset unless a parent chose a level, for every user type.
+  const googleAILimit = sourcePrefs.googleAILimit === 'noChat' || sourcePrefs.googleAILimit === 'hideAll'
+    ? sourcePrefs.googleAILimit
+    : null;
 
   return {
     optionsPatch: {},
@@ -434,6 +473,10 @@ export function buildWebsiteSettingsCopySnapshot(
       redditHideSearch,
       redditHideComments,
       redditHideOtherDistractions,
+      tiktokPlayOnce,
+      instagramPlayOnce,
+      youtubeShortsPlayOnce,
+      googleAILimit,
     },
   };
 }

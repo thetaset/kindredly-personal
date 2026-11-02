@@ -1,0 +1,107 @@
+{
+  "id": "25-always-allowed-during-downtime",
+  "behaviour": "An Always allowed app stays open during Family Downtime, beside the family's own downtime list; every other app is closed.",
+  "clock": {
+    "nowMs": 1789448400000,
+    "familyTimeZone": "America/Los_Angeles",
+    "deviceTimeZone": "America/Los_Angeles"
+  },
+  "settings": {
+    "usageLimitsData": {
+      "contentUsageLimits": [
+        {
+          "id": "r-all-apps",
+          "name": "All apps",
+          "type": "advanced",
+          "conditions": [
+            {
+              "type": "appId",
+              "values": [
+                "all-device-apps"
+              ]
+            }
+          ],
+          "timeLimits": [
+            {
+              "hours": 1,
+              "daysOfWeek": [
+                0,
+                1,
+                2,
+                3,
+                4,
+                5,
+                6
+              ]
+            }
+          ]
+        }
+      ],
+      "temporaryRules": []
+    },
+    "ruleOverrideSettings": {
+      "ruleOverrides": []
+    },
+    "accessControlSettings": {},
+    "appPolicy": null,
+    "appPolicyStatus": "readable",
+    "familyDowntime": {
+      "intervals": [
+        {
+          "startMs": 1789444800000,
+          "endMs": 1789480800000
+        }
+      ],
+      "horizonEndMs": 1791867600000,
+      "allowAppIds": [
+        "com.audible.application"
+      ],
+      "note": "Screens are resting."
+    },
+    "alwaysAllowAppIds": [
+      "com.google.android.calendar"
+    ]
+  },
+  "installedApps": [
+    {
+      "pkg": "com.roblox.client",
+      "label": "Roblox",
+      "platform": "android"
+    },
+    {
+      "pkg": "com.google.android.calendar",
+      "label": "Calendar",
+      "platform": "android"
+    },
+    {
+      "pkg": "com.android.chrome",
+      "label": "Chrome",
+      "platform": "android"
+    }
+  ],
+  "floor": [
+    "com.android.settings"
+  ],
+  "usage": {
+    "appMsByPkg": {},
+    "webLogs": []
+  },
+  "usageSeed": {
+    "perRuleUsedMs": {}
+  },
+  "expectDevice": [
+    {
+      "pkg": "com.google.android.calendar",
+      "action": "allow",
+      "reason": null,
+      "ruleId": null
+    },
+    {
+      "pkg": "com.roblox.client",
+      "action": "block",
+      "reason": "family-downtime",
+      "ruleId": null
+    }
+  ],
+  "browserNotApplicable": "Device-only here: the browser's Always allowed during downtime is tested in ActivityService.alwaysAllowed.test.ts."
+}

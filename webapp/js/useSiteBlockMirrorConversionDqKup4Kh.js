@@ -1,0 +1,1 @@
+import{a as o,bG as s}from"./appLifecycle.storeCIRbKlhW.js";import{useSiteBlocks as i}from"./useSiteBlocksxnS01LBC.js";import{o as n}from"./vue-runtimetcX7J1Xt.js";function f(r){const t=i(r);n(()=>{var e;((e=o.currentUser)==null?void 0:e.type)!=="admin"||!r.value||s(!1).then(()=>{if((o.users||[]).length)return t.convertMirrors()}).catch(()=>{})})}export{f as u};

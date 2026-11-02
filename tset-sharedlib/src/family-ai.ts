@@ -11,8 +11,8 @@
  *   placeholders. Reserved for PLN-11: not offered, and refused on save, until that row lands.
  * - `on`: AI tools may use Kindredly.ai within the plan's AI limits, or a private provider.
  *
- * The per-person switches (`user.options.aiChatEnabled`, `assistantReviewEnabled`) still apply,
- * but only below this: a person with AI Chat on in a family set to Off has no AI.
+ * The per-person switches (`user.options.aiToolsEnabled`, `aiChatEnabled`, `assistantReviewEnabled`)
+ * still apply, but only below this: a person with Kinbot on in a family set to Off has no AI.
  *
  * One rule, read by the server when it admits a hosted request and by every AI entry point in the
  * app, so what a parent chose is what decides.
@@ -28,10 +28,63 @@ export const FAMILY_AI_DEFAULT: FamilyAiSetting = 'off';
 
 /**
  * The 428 `errorType` when the family setting refuses a Kindredly.ai request: set to Off, or to
- * Private AI only. 428 for the same reason as `AI_ASSISTANT_OFF`: nothing about the sign-in is
- * wrong, and installed clients treat an auth status as a reason to sign out.
+ * Private AI only. 428 because nothing about the sign-in is wrong, and installed clients treat an
+ * auth status as a reason to sign out.
  */
 export const AI_OFF_FOR_FAMILY = 'AI_OFF_FOR_FAMILY';
+
+/**
+ * The 428 `errorType` when the family allows AI but this person's switches do not: neither AI tools
+ * nor Kinbot is on for them, or AI tools is off and they asked for an image.
+ */
+export const AI_OFF_FOR_PERSON = 'AI_OFF_FOR_PERSON';
+
+/**
+ * A person's two AI switches, below the family setting (founder, 2026-09-18). Both are in
+ * `user.options`, which only an admin writes, so a child cannot turn either on for themselves.
+ *
+ * - `aiToolsEnabled`, **AI tools**: scanning a page, image generation, suggestions, lessons. An
+ *   adult's are on unless turned off; a child's (`type: 'restricted'`) are off until a parent turns
+ *   them on — nothing stored means off for a child.
+ * - `aiChatEnabled`, **Kinbot**, the chat assistant. Off until a parent turns it on for that person,
+ *   even when the family has AI on.
+ */
+export type PersonAi =
+  | {
+      type?: unknown;
+      options?: { aiToolsEnabled?: unknown; aiChatEnabled?: unknown; aiWebSearchEnabled?: unknown } | null;
+    }
+  | null
+  | undefined;
+
+export function personAllowsAiTools(person: PersonAi): boolean {
+  const stored = person?.options?.aiToolsEnabled;
+  return person?.type === 'restricted' ? stored === true : stored !== false;
+}
+
+export function personAllowsKinbot(person: PersonAi): boolean {
+  return person?.options?.aiChatEnabled === true;
+}
+
+/**
+ * `aiWebSearchEnabled`, **Web search** (HAT-288): Kinbot may search the web to answer. Part of
+ * Kinbot, so never without it, and off for everyone until an admin turns it on for that person —
+ * a search sends the question to the AI provider's web search. Only a Plus family searches
+ * (`planAllowsWebSearch`). The chat route reads this, not anything the app sends, so a child cannot
+ * turn it on by editing a request.
+ */
+export function personAllowsWebSearch(person: PersonAi): boolean {
+  return personAllowsKinbot(person) && person?.options?.aiWebSearchEnabled === true;
+}
+
+/**
+ * The person may use some AI. What the server checks: Kinbot and the AI tools reach Kindredly.ai
+ * through the same routes, so a hosted request cannot be told apart by route — the app hides each
+ * one behind its own switch, and the server refuses a person who has neither.
+ */
+export function personAllowsAnyAi(person: PersonAi): boolean {
+  return personAllowsAiTools(person) || personAllowsKinbot(person);
+}
 
 /**
  * The family's setting, from its account options. Anything missing, unknown or not offered yet

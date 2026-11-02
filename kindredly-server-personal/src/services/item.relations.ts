@@ -22,40 +22,46 @@ class ItemRelationService {
     const colItems = await this._getParentRelationsForItem(itemId);
 
     let colIds = colItems.map((v) => v.collectionId);
-    if (!(await ctx.isAdmin())) {
-      const permissions = await this.permissionService._getUserDirectPermissionLookupExcludingOwner(targetUserId);
-      const uniqueIds = Array.from(new Set(colIds)).filter((v) => typeof v === 'string' && v.length > 0);
-      const parentCols = uniqueIds.length > 0 ? await this.items.findWhereIdIn(uniqueIds) : [];
-      const colById = Object.fromEntries((parentCols || []).map((c) => [c._id, c]));
+    // An admin sees every parent collection in their own family. A shared item can also sit in
+    // another family's collections, and those follow the same rules as for anyone (CLN-75).
+    const isAdmin = await ctx.isAdmin();
+    const permissions = await this.permissionService._getUserDirectPermissionLookupExcludingOwner(targetUserId);
+    const uniqueIds = Array.from(new Set(colIds)).filter((v) => typeof v === 'string' && v.length > 0);
+    const parentCols = uniqueIds.length > 0 ? await this.items.findWhereIdIn(uniqueIds) : [];
+    const colById = Object.fromEntries((parentCols || []).map((c) => [c._id, c]));
 
-      const allowed = new Set<string>();
-      for (const pid of uniqueIds) {
-        // Direct permission always wins.
-        if (pid in permissions && PermissionTypeList.includes(permissions[pid].permission)) {
-          allowed.add(pid);
-          continue;
-        }
-
-        const col = colById[pid] as any;
-        if (!col) continue;
-
-        // Visibility-derived access (shared/network) makes the collection discoverable.
-        if (col.accountId === ctx.accountId && (col.visibility === 'shared' || col.visibility === 'network')) {
-          allowed.add(pid);
-          continue;
-        }
-
-        if (col.visibility === 'network') {
-          const ownerUserId = col.userId;
-          if (ownerUserId && (await ctx.isInNetwork(ownerUserId))) {
-            allowed.add(pid);
-            continue;
-          }
-        }
+    const allowed = new Set<string>();
+    for (const pid of uniqueIds) {
+      // Direct permission always wins.
+      if (pid in permissions && PermissionTypeList.includes(permissions[pid].permission)) {
+        allowed.add(pid);
+        continue;
       }
 
-      colIds = colIds.filter((pid) => allowed.has(pid));
+      const col = colById[pid] as any;
+      if (!col) continue;
+
+      if (isAdmin && col.accountId === ctx.accountId) {
+        allowed.add(pid);
+        continue;
+      }
+
+      // Visibility-derived access (shared/network) makes the collection discoverable.
+      if (col.accountId === ctx.accountId && (col.visibility === 'shared' || col.visibility === 'network')) {
+        allowed.add(pid);
+        continue;
+      }
+
+      if (col.visibility === 'network') {
+        const ownerUserId = col.userId;
+        if (ownerUserId && (await ctx.isInNetwork(ownerUserId))) {
+          allowed.add(pid);
+          continue;
+        }
+      }
     }
+
+    colIds = colIds.filter((pid) => allowed.has(pid));
 
     return colIds;
   }
@@ -67,14 +73,9 @@ class ItemRelationService {
   public async _getItemParentRelationsForUser(ctx: RequestContext, targetUserId: string, itemId: string) {
     const colItems = await this._getParentRelationsForItem(itemId);
 
-    if (await ctx.isAdmin()) {
-      return colItems.map((v) => ({
-        _id: v._id,
-        collectionId: v.collectionId,
-        order: v.order,
-        createdAt: v.createdAt,
-      }));
-    }
+    // An admin sees every parent collection in their own family; another family's follow the
+    // same rules as for anyone (CLN-75).
+    const isAdmin = await ctx.isAdmin();
 
     const permissions = await this.permissionService._getUserDirectPermissionLookupExcludingOwner(targetUserId);
 
@@ -96,6 +97,11 @@ class ItemRelationService {
 
       const col = colById[cid] as any;
       if (!col) continue;
+
+      if (isAdmin && col.accountId === ctx.accountId) {
+        results.push({_id: v._id, collectionId: cid, order: v.order, createdAt: v.createdAt});
+        continue;
+      }
 
       if (col.accountId === ctx.accountId && (col.visibility === 'shared' || col.visibility === 'network')) {
         results.push({_id: v._id, collectionId: cid, order: v.order, createdAt: v.createdAt});
@@ -223,7 +229,7 @@ class ItemRelationService {
 
     const canEditCollection = await this.permissionService._hasEditPermissionDirectOrAsAdmin(ctx, collectionId);
 
-    if (!canEditCollection) throw new Error("user doesn't have edit permission to this collection: " + collection.name);
+    if (!canEditCollection) throw new Error("This collection isn't shared with you to edit.");
 
     const item = await ctx.getItemById(itemId);
 

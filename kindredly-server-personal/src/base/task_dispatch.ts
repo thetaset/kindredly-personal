@@ -73,6 +73,16 @@ export const taskHandlers: Record<TaskRunnerJobTypes, TaskHandler> = {
     return await RealmBackupService.instance.runScheduledBackup();
   },
 
+  [TaskRunnerJobTypes.runFamilyDowntimeNotices]: async () => {
+    const {FamilyDowntimeNoticeService} = require('../services/family_downtime_notice.service');
+    return await FamilyDowntimeNoticeService.instance.run();
+  },
+
+  [TaskRunnerJobTypes.runActivityReports]: async () => {
+    const {ActivityReportService} = require('../services/activity_report.service');
+    return await ActivityReportService.instance.run();
+  },
+
   [TaskRunnerJobTypes.runCompanionTamperWatch]: async () => {
     const {CompanionTamperWatchService} = require('../services/companion_tamper_watch.service');
     return await CompanionTamperWatchService.instance.run();
@@ -118,6 +128,12 @@ export const taskHandlers: Record<TaskRunnerJobTypes, TaskHandler> = {
     // personal-optional: guarded, never reached on a self-hosted server
     const CurationReviewService = require('../services/_internal/curation_review.service').default;
     return await new CurationReviewService().runDue();
+  },
+
+  [TaskRunnerJobTypes.runCatalogMonitor]: async () => {
+    // personal-optional: guarded, never reached on a self-hosted server
+    const {CatalogMonitorService} = require('../services/_internal/catalog_monitor.service');
+    return await new CatalogMonitorService().runDue();
   },
 };
 

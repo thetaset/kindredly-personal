@@ -49,6 +49,12 @@ export const userPrefDefaults = {
         email: true,
         push: true,
       },
+      // Kinbot gave a child its self-harm help reply (EUP-12). On by default on both channels:
+      // a parent should not have to find this setting before it can reach them.
+      CHILD_SAFETY_ALERT: {
+        email: true,
+        push: true,
+      },
       // New apps on a child's phone. Push on, email off: it is worth a glance when
       // it happens and worthless a day later, and routine enough that mailing every
       // batch would train parents to filter the whole sender.
@@ -72,6 +78,32 @@ export const userPrefDefaults = {
       CURATION_REVIEW_RESULT: {
         email: false,
         push: true,
+      },
+      // A child finished a part of Digital citizenship (HAT-577). Push off until a guardian
+      // turns it on: a child can finish several parts in one sitting, and the in-app notice is
+      // written either way. Never emailed.
+      LESSON_PART_DONE: {
+        email: false,
+        push: false,
+      },
+      // Family Downtime started, on an admin's phone (HAT-380). Push only: an email
+      // would still be in the inbox long after downtime ended.
+      FAMILY_DOWNTIME: {
+        email: false,
+        push: true,
+      },
+      // A connected AI app asking an adult's permission (HAT-690). Push only: the request lasts ten
+      // minutes, and the AI app is waiting on it.
+      AI_APP_PERMISSION: {
+        email: false,
+        push: true,
+      },
+      // Each child's activity, now and then (HAT-655). `frequency` is 'weekly' (Sunday evening),
+      // 'daily' (every evening) or 'off'; off sends nothing at all, not even the in-app notice.
+      ACTIVITY_REPORT: {
+        email: false,
+        push: true,
+        frequency: 'weekly',
       },
       DEFAULT: {
         email: true,

@@ -1,0 +1,1 @@
+function r(n,c=40){const t=(n||"").replace(/\s+/g," ").trim();if(t.length<=c)return t;const e=t.slice(0,c),s=e.lastIndexOf(" ");return`${(s>0?e.slice(0,s):e).replace(/[\s.,;:!?\-–—]+$/,"")}…`}export{r as t};

@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <!--
+    The sealed page an HTML file runs in (HAT-921). Framed with sandbox="allow-scripts" and no
+    allow-same-origin, so it has an opaque origin: no account, no app storage, no app.
+
+    This policy is the most any file gets: scripts, stylesheets and fonts from the three library
+    hosts only, no fetch, no form, no frame. The app writes a narrower policy into the file itself
+    for someone with filtering on (src/app/htmlFile/htmlFilePage.ts); both apply, so a file can
+    never get more than this. No 'self' anywhere: WebKit matches 'self' against the opaque origin
+    and refuses it, which is why the script below is inline.
+  -->
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline' 'unsafe-eval' https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://unpkg.com; style-src 'unsafe-inline' https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://unpkg.com; font-src data: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://unpkg.com; img-src data: blob: https:; media-src data: blob: https:; connect-src 'none'; form-action 'none'; frame-src 'none'; worker-src 'none'; object-src 'none'; base-uri 'none'">
+  <title>HTML file</title>
+</head>
+<body>
+  <script>
+    (function () {
+      var shown = false;
+      addEventListener('message', function (event) {
+        if (shown || event.source !== window.parent) return;
+        var data = event.data;
+        if (!data || data.type !== 'knd-html-file-show' || typeof data.html !== 'string') return;
+        shown = true;
+        // Replaces this document with the file. The policy above stays in force.
+        document.open();
+        document.write(data.html);
+        document.close();
+      });
+      window.parent.postMessage({ type: 'knd-html-file-viewer-ready' }, '*');
+    })();
+  </script>
+</body>
+</html>

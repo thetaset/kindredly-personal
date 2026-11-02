@@ -83,7 +83,12 @@ export interface ScreenTimeGuideline {
   sleep: GuidanceClaim<{ minHours: number; maxHours: number }>
   physicalActivity: GuidanceClaim<{ minutesPerDay: number | null; perWeekMinutes?: number; kind: 'any' | 'mvpa' }>
   socialMedia: GuidanceClaim<SocialMediaGuidance>
-  bedtime: GuidanceClaim<{ bufferMinutes: number; deviceOutOfBedroom: boolean; lateNightCutoffHour: number }>
+  /**
+   * The verdict from `age` to the end of the band, when the social-media verdict changes
+   * partway through it. Read both through `socialMediaGuidanceForAge`, never `socialMedia` alone.
+   */
+  socialMediaFromAge?: { age: number; claim: GuidanceClaim<SocialMediaGuidance> }
+  bedtime:GuidanceClaim<{ bufferMinutes: number; deviceOutOfBedroom: boolean; lateNightCutoffHour: number }>
   contentQuality: GuidanceClaim<string[]>
   /** What the guidance recommends that Kindredly cannot see. */
   offScreen: GuidanceClaim<string[]>
@@ -159,6 +164,23 @@ export function guidanceRefUrl(id: GuidanceSourceId): string {
 
 const BEDTIME_NOTE =
   'The late-night hour is a derived convention — each band\u2019s sleep need plus a one-hour wind-down against a 7 a.m. wake — not a finding from a study.'
+
+/**
+ * The minimum age for social media that the laws are converging on.
+ *
+ * 13 was the platforms' own floor, set by US privacy law (COPPA), not by any finding about
+ * development. The line the laws now draw is 16: Australia enforces it (S52), the UK has
+ * announced it for 2027 (S54) and the European Parliament has called for it across the EU
+ * (S53). Those are policy facts, cited as such — the evidence for waiting is the Surgeon
+ * General's advisory (S9), which is why it is cited first. The teen band spans 13–17, so the
+ * verdict changes inside it (`socialMediaFromAge`) rather than re-banding every other claim.
+ */
+export const SOCIAL_MEDIA_MIN_AGE = 16
+
+const UNDER_16_SOCIAL_MEDIA_NOTE =
+  '16 is becoming the standard minimum age: Australia enforces it, the UK follows in 2027, and the European Parliament has called for it across the EU.'
+
+const UNDER_16_SOCIAL_MEDIA_SOURCES: GuidanceSourceId[] = ['S9', 'S52', 'S53', 'S54']
 
 export const SCREEN_TIME_GUIDELINES: Record<GuidanceAgeBand, ScreenTimeGuideline> = {
   under2: {
@@ -291,9 +313,9 @@ export const SCREEN_TIME_GUIDELINES: Record<GuidanceAgeBand, ScreenTimeGuideline
     },
     socialMedia: {
       value: 'not-recommended',
-      sourceIds: ['S9', 'S10'],
+      sourceIds: UNDER_16_SOCIAL_MEDIA_SOURCES,
       confidence: 'consistent',
-      note: '13 is the platforms\u2019 own legal floor, not a developmental finding; the sensitive window starts around 11.',
+      note: UNDER_16_SOCIAL_MEDIA_NOTE,
     },
     bedtime: {
       value: { bufferMinutes: 60, deviceOutOfBedroom: true, lateNightCutoffHour: 21 },
@@ -343,11 +365,21 @@ export const SCREEN_TIME_GUIDELINES: Record<GuidanceAgeBand, ScreenTimeGuideline
       sourceIds: ['S5'],
       confidence: 'established',
     },
+    // 13–15. From 16 the laws that set a minimum age let a teen in; see SOCIAL_MEDIA_MIN_AGE.
     socialMedia: {
-      value: 'monitored',
-      sourceIds: ['S9', 'S10', 'S25'],
-      confidence: 'consistent',
-      note: 'Adult monitoring through the early teens (~14), when the sensitivity window closes; after that a family decision. Heavy use (>3 h/day) doubles depression/anxiety symptom risk at 12–15.',
+      value: 'not-recommended',
+      sourceIds: UNDER_16_SOCIAL_MEDIA_SOURCES,
+      confidence: 'consensus',
+      note: UNDER_16_SOCIAL_MEDIA_NOTE,
+    },
+    socialMediaFromAge: {
+      age: SOCIAL_MEDIA_MIN_AGE,
+      claim: {
+        value: 'family-decision',
+        sourceIds: ['S52', 'S54', 'S3'],
+        confidence: 'consensus',
+        note: 'Old enough under the laws that set 16. Notifications, autoplay and endless scroll are still built to maximise time spent.',
+      },
     },
     bedtime: {
       value: { bufferMinutes: 60, deviceOutOfBedroom: true, lateNightCutoffHour: 22 },
@@ -456,6 +488,14 @@ export function guidanceBandAges(band: GuidanceAgeBand): [number, number] {
 export function guidelineForAge(age: number | null): ScreenTimeGuideline | null {
   const band = guidanceBandForAge(age)
   return band ? SCREEN_TIME_GUIDELINES[band] : null
+}
+
+/** The social-media verdict for an age, or null for an unknown age. */
+export function socialMediaGuidanceForAge(age: number | null): GuidanceClaim<SocialMediaGuidance> | null {
+  const guideline = guidelineForAge(age)
+  if (!guideline || age === null) return null
+  const later = guideline.socialMediaFromAge
+  return later && age >= later.age ? later.claim : guideline.socialMedia
 }
 
 export function allGuidanceBands(): GuidanceAgeBand[] {

@@ -15,7 +15,7 @@ export type GuidanceSourceId =
   | 'S21' | 'S22' | 'S23' | 'S24' | 'S25' | 'S26' | 'S27' | 'S28' | 'S29' | 'S30'
   | 'S31' | 'S32' | 'S33' | 'S34' | 'S35' | 'S36' | 'S37' | 'S38' | 'S39' | 'S40'
   | 'S41' | 'S42' | 'S43' | 'S44' | 'S45' | 'S46' | 'S47' | 'S48' | 'S49' | 'S50'
-  | 'S51' | 'S52'
+  | 'S51' | 'S52' | 'S53' | 'S54'
 
 /** `policy` is a law or regulation cited as a fact about the world, never as evidence. */
 export type GuidanceSourceKind = 'guideline' | 'advisory' | 'meta-analysis' | 'study' | 'review' | 'survey' | 'policy'
@@ -700,7 +700,7 @@ export const GUIDANCE_SOURCES: Record<GuidanceSourceId, GuidanceSource> = {
     kind: 'review',
     supports: [
       '"Screen time" has no standard definition and is measured mostly by non-standardised self-report; findings are mixed and longitudinal evidence for causal or long-term effects is lacking',
-      'Recommends studying what screens are used for rather than how long — why time is sorted by usage type here',
+      'Recommends studying what screens are used for rather than how long — why time is sorted by category here',
     ],
   },
   S51: {
@@ -729,6 +729,32 @@ export const GUIDANCE_SOURCES: Record<GuidanceSourceId, GuidanceSource> = {
     supports: [
       'Platforms must take reasonable steps to keep Australians under 16 from holding social media accounts; in force from 10 December 2025 — the first country-scale minimum-age law',
       'Cited as a policy fact, not as evidence: no evaluation of its effects exists yet',
+    ],
+  },
+  S53: {
+    id: 'S53',
+    citeKey: 'Europarl 2025',
+    org: 'European Parliament',
+    title: 'Children should be at least 16 to access social media, say MEPs',
+    year: 2025,
+    url: 'https://www.europarl.europa.eu/news/en/press-room/20251120IPR31496/children-should-be-at-least-16-to-access-social-media-say-meps',
+    kind: 'policy',
+    supports: [
+      'Resolution of 26 November 2025 (483 to 92, 86 abstentions) calling for an EU-wide minimum age of 16 for social media, video-sharing platforms and AI companions; 13–15 only with a parent’s consent',
+      'Non-legislative: the Parliament’s position, not a law. Cited as a policy fact, not as evidence',
+    ],
+  },
+  S54: {
+    id: 'S54',
+    citeKey: 'UK 2026',
+    org: 'UK Department for Science, Innovation and Technology',
+    title: 'Social media to be banned for under-16s in landmark government move to give kids their childhood back',
+    year: 2026,
+    url: 'https://www.gov.uk/government/news/social-media-to-be-banned-for-under-16s-in-landmark-government-move-to-givekids-their-childhood-back',
+    kind: 'policy',
+    supports: [
+      'Announced 15 June 2026: a ban on social media for under-16s, expected in force from spring 2027; harmful features such as livestreaming and contact with strangers restricted by default for 16- and 17-year-olds',
+      'Cited as a policy fact, not as evidence',
     ],
   },
 }

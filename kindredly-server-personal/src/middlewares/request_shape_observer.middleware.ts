@@ -168,6 +168,9 @@ export const requestShapeObserverMiddleware = (req: any, res: any, next: any) =>
 
     const routePath = toRouteMapPath(req.path);
     if (!routePath) return next();
+    // Connected AI apps: a path like `/params/arguments/<name>` would name what an AI app asked
+    // for, and nothing about a relayed call is logged (HAT-616).
+    if (routePath.startsWith('/mcpRelay/')) return next();
 
     const validator = getValidator(routePath);
     if (!validator) return next();

@@ -4,10 +4,12 @@ import NotificationService from '@/services/notification.service';
 import {container} from '@/inversify.config';
 import {RequestContext} from '@/base/request_context';
 import {NotificationType, RequestTypes} from '@/typing/enum_strings';
+import {escapeHtml} from '@/utils/text_utils';
 import {
   accountIsDark,
   describeReason,
   describeRecovery,
+  whoseDevice,
   evaluateDevice,
   type DeviceSnapshot,
   type TamperIncident,
@@ -194,10 +196,14 @@ export class CompanionTamperWatchService {
         await this.saveIncident(ownerId, snapshot.deviceId, decision.incident);
         return 'opened';
 
+      case 'record':
+        await this.saveIncident(ownerId, snapshot.deviceId, decision.incident);
+        return 'none';
+
       case 'resolve':
         await this.saveIncident(ownerId, snapshot.deviceId, decision.incident);
         if (decision.notifyRecovery) {
-          await this.notifyParents(ownerId, snapshot, describeRecovery(deviceLabel(snapshot), snapshot.platform));
+          await this.notifyParents(ownerId, snapshot, (device) => describeRecovery(device, snapshot.platform));
         }
         return 'resolved';
 
@@ -210,10 +216,8 @@ export class CompanionTamperWatchService {
           return 'none';
         }
         await this.saveIncident(ownerId, snapshot.deviceId, decision.incident);
-        await this.notifyParents(
-          ownerId,
-          snapshot,
-          describeReason(decision.reason, deviceLabel(snapshot), snapshot.platform),
+        await this.notifyParents(ownerId, snapshot, (device) =>
+          describeReason(decision.reason, device, snapshot.platform),
         );
         return 'notified';
       }
@@ -236,7 +240,8 @@ export class CompanionTamperWatchService {
     if (!eventAt) return false;
     const snapshot: DeviceSnapshot = {
       deviceId: status.deviceId ?? '',
-      deviceLabel: status.deviceName,
+      // `deviceLabel` is what the Companion sends; this read `deviceName`, which nothing sends.
+      deviceLabel: status.deviceLabel || status.deviceName || undefined,
       platform: status.platform,
       provisioned: status.provisioned === true,
       lastSeenAt: now,
@@ -251,16 +256,19 @@ export class CompanionTamperWatchService {
     return this.withDeviceLock(`${ownerId}:${snapshot.deviceId}`, async () => {
       const incident = await this.loadIncident(ownerId, snapshot.deviceId);
       const decision = evaluateDevice(snapshot, incident, now);
+      // A single close is counted toward a streak, and nobody is told (HAT-447).
+      if (decision.action === 'record') {
+        await this.saveIncident(ownerId, snapshot.deviceId, decision.incident);
+        return false;
+      }
       if (decision.action !== 'notify' || decision.urgency !== 'immediate') return false;
 
       // Saved BEFORE notifying: if delivery throws, the event stays recorded and the
       // next heartbeat won't re-alert. Losing one alert to a transient push failure is
       // better than re-alerting on every check-in for the rest of the day.
       await this.saveIncident(ownerId, snapshot.deviceId, decision.incident);
-      await this.notifyParents(
-        ownerId,
-        snapshot,
-        describeReason(decision.reason, deviceLabel(snapshot), snapshot.platform),
+      await this.notifyParents(ownerId, snapshot, (device) =>
+        describeReason(decision.reason, device, snapshot.platform),
       );
       return true;
     });
@@ -317,10 +325,18 @@ export class CompanionTamperWatchService {
   private async notifyParents(
     childUserId: string,
     snapshot: DeviceSnapshot,
-    copy: {title: string; body: string},
+    describe: (device: string) => {title: string; body: string},
   ): Promise<void> {
     const child = await this.userRepo.findById(childUserId);
     if (!child?.accountId) return;
+    // Whose device it is, by the child's name: the device is linked to them (HAT-195).
+    const copy = describe(
+      whoseDevice({
+        childName: child.displayedName || child.username,
+        deviceLabel: snapshot.deviceLabel,
+        platform: snapshot.platform,
+      }),
+    );
     const ctx = new RequestContext({
       currentUserId: childUserId,
       accountId: child.accountId,
@@ -335,7 +351,8 @@ export class CompanionTamperWatchService {
       child.accountId,
       {
         title: copy.title,
-        message: copy.body,
+        // HTML in the notice and the email; it names the child and the device, which they can set.
+        message: escapeHtml(copy.body),
         shortMessage: copy.body,
         refInfo: {resourceType: 'companionDevice', resourceId: snapshot.deviceId, requestType: 'tamper'},
       },
@@ -357,15 +374,11 @@ function toSnapshot(row: {stateSubKey: string; data: any; updatedAt: Date}): Dev
   const status = row.data ?? {};
   return {
     deviceId: row.stateSubKey || status.deviceId || '',
-    deviceLabel: status.deviceName || undefined,
+    deviceLabel: status.deviceLabel || status.deviceName || undefined,
     platform: status.platform || undefined,
     provisioned: status.provisioned === true,
     lastSeenAt: row.updatedAt ? new Date(row.updatedAt).getTime() : null,
     tamperLastEventAt: status.tamper?.lastEventAt,
     tamperLastEventKind: status.tamper?.lastEventKind,
   };
-}
-
-function deviceLabel(snapshot: DeviceSnapshot): string {
-  return snapshot.deviceLabel || `Device ${snapshot.deviceId.slice(0, 8)}`;
 }

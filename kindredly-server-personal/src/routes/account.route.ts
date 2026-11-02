@@ -5,6 +5,8 @@ import {ApiReq} from '@/types/api-types';
 import {authenticateJWT, errorHelper, removeSensitiveInfoFromUser} from '../utils/auth_utils';
 
 import AccountService from '@/services/account.service';
+import AuthService from '@/services/auth.service';
+import {CreateUserDto} from '@dtos/users.dto';
 
 import UserService from '@/services/user.service';
 
@@ -19,6 +21,7 @@ class AccountRoute implements Routes {
   private userService = new UserService();
 
   private accountService = container.resolve(AccountService);
+  private authService = container.resolve(AuthService);
   private verificationService = new VerificationService();
 
   constructor() {
@@ -57,8 +60,42 @@ class AccountRoute implements Routes {
     this.router.post(
       '/invite/getInfo',
       errorHelper(async (req: ApiReq<'/invite/getInfo'>, res) => {
-        console.log('invite:', req.body);
         const result = await this.verificationService.getFamilyInviteInfo(req.body.code);
+        res.json({success: true, results: result});
+      }),
+    );
+
+    // Before an account exists: sign-up asks whether an invite is waiting for this email (HAT-537).
+    this.router.post(
+      '/invite/findForSignup',
+      errorHelper(async (req: ApiReq<'/invite/findForSignup'>, res) => {
+        const result = await this.authService.findFamilyInviteForSignup({
+          loginType: req.body.loginType,
+          loginPayload: req.body.loginPayload,
+          email: req.body.email,
+        } as CreateUserDto);
+        res.json({success: true, results: result});
+      }),
+    );
+
+    // What the invite page offers someone already signed in: delete-and-join only for an empty account.
+    this.router.post(
+      '/invite/joinInsteadCheck',
+      authenticateJWT,
+      errorHelper(async (req: ApiReq<'/invite/joinInsteadCheck'>, res) => {
+        const result = await this.accountService.checkLeaveOwnFamilyForInvite(
+          RequestContext.instance(req),
+          req.body.code,
+        );
+        res.json({success: true, results: result});
+      }),
+    );
+
+    this.router.post(
+      '/invite/joinInstead',
+      authenticateJWT,
+      errorHelper(async (req: ApiReq<'/invite/joinInstead'>, res) => {
+        const result = await this.accountService.leaveOwnFamilyForInvite(RequestContext.instance(req), req.body.code);
         res.json({success: true, results: result});
       }),
     );
@@ -69,7 +106,6 @@ class AccountRoute implements Routes {
       authenticateJWT,
 
       errorHelper(async (req: ApiReq<'/invite/create'>, res) => {
-        console.log('invite:', req.body);
         const result = await this.accountService.createAccountInvite(RequestContext.instance(req), req.body.inviteData);
         res.json({success: true, results: result});
       }),

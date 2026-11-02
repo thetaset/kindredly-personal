@@ -873,9 +873,9 @@ class ActivityService {
 
         if (!rowChanged) continue;
 
+        // Keeps the row's updatedAt: a fix is not the child's activity (HAT-668).
         await this.userActivityLogRepo.updateWithId(row._id, {
           ...(row as any),
-          updatedAt: new Date(),
           data: {
             ...(row as any).data,
             log: logList,
@@ -948,14 +948,18 @@ class ActivityService {
     }
 
     const clientId = ctx.getClientId();
+    // A guardian rewriting a child's row (a history delete, a classification fix) changes its
+    // entries only. The row keeps the device it came from and the time of its last activity, which
+    // the activity report reads as when the child was active (HAT-668).
+    const rewrittenByAnother = !!existing && resolvedTargetUserId !== ctx.currentUserId;
 
     const info = {
       _id,
       userId: resolvedTargetUserId,
       monitorId: monitorId,
-      clientId: clientId,
+      clientId: rewrittenByAnother ? ((existing as any).clientId ?? clientId) : clientId,
       createdAt: new Date(createdAt),
-      updatedAt: new Date(updatedAt),
+      updatedAt: rewrittenByAnother ? ((existing as any).updatedAt ?? new Date(updatedAt)) : new Date(updatedAt),
       type: type,
       data,
       encInfo,
@@ -1008,7 +1012,9 @@ class ActivityService {
 
   // ROUTE-METHOD
   async removeActivityEntry_deprecating(ctx: RequestContext, targetUserId: string, id) {
-    await ctx.isAdmin();
+    // Was a bare `await ctx.isAdmin()` whose answer nobody read: any signed-in person could delete
+    // a row for any userId they named.
+    await ctx.verifySelfOrAdmin(targetUserId);
     return await this.userActivity_deprecating.deleteWhere({_id: id, userId: targetUserId});
   }
 

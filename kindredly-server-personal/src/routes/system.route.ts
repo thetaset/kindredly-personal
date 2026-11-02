@@ -7,6 +7,7 @@ import {config} from '@/config';
 import SysSetupService from '@/services/_interfaces/syssetup.service';
 import {inject, injectable} from 'inversify';
 import {TYPES} from '@/types';
+import {personalUpdateCheck} from '@/services/personal_update';
 const indexRequest = (req: Request, res: Response, next: NextFunction): void => {
   try {
     res.sendStatus(200);
@@ -46,6 +47,15 @@ class SystemRoute implements Routes {
     });
 
     this.router.all('/system/version', versionReq);
+
+    // HAT-917: is a newer Kindredly Personal published? Signed-in only (not in the public list);
+    // the app asks for an admin on a Personal box.
+    this.router.all(
+      '/system/updateCheck',
+      errorHelper(async (_req: ApiReq<'/system/updateCheck'>, res) => {
+        res.status(200).json({success: true, results: await personalUpdateCheck()});
+      }),
+    );
 
     this.router.get('/', indexRequest);
 

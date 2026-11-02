@@ -49,6 +49,15 @@ export const RECURRING_JOBS: readonly RecurringJob[] = [
     profiles: ['cloud'],
   },
   {
+    // The catalog monitor (docs/trackers/catalog-monitor-tracker.md). `_internal` only, like the two
+    // above: a box has no catalog. Hourly, reading the few items due each time, so every site sees
+    // its one read a day spread out; the service does nothing unless CATALOG_MONITOR_ENABLED=true.
+    job: TaskRunnerJobTypes.runCatalogMonitor,
+    everyMs: HOUR,
+    immediately: false,
+    profiles: ['cloud'],
+  },
+  {
     job: TaskRunnerJobTypes.runDataRetention,
     everyMs: 24 * HOUR,
     immediately: false,
@@ -82,6 +91,27 @@ export const RECURRING_JOBS: readonly RecurringJob[] = [
     // every alert by the difference.
     job: TaskRunnerJobTypes.runSecurityDigest,
     everyMs: HOUR,
+    immediately: false,
+    profiles: ['cloud', 'lite'],
+  },
+  {
+    // The activity report (HAT-655): each admin's weekly (Sunday) or daily report, sent from 7 PM in
+    // the family's timezone. Every 15 minutes, so it goes out by 7:15 PM. Before the downtime job:
+    // that one is due at every tick, so a job after it would never run on a box. This one costs the
+    // downtime job one tick in fifteen, so a downtime notice is at most a minute later then.
+    job: TaskRunnerJobTypes.runActivityReports,
+    everyMs: 15 * MINUTE,
+    immediately: false,
+    profiles: ['cloud', 'lite'],
+  },
+  {
+    // Family Downtime on a parent's phone (HAT-380): a notification when it starts, removed when it
+    // ends. Every minute, because that is how late a notice may be. Under 60 s so it is due at every
+    // one-minute tick on a box, where a tick that fires a few ms early would otherwise skip a minute.
+    // Last in the table: on a box one job runs per tick, it is due at every tick, and the others are
+    // rarely due. A job placed after it would never run on a box.
+    job: TaskRunnerJobTypes.runFamilyDowntimeNotices,
+    everyMs: 55 * 1000,
     immediately: false,
     profiles: ['cloud', 'lite'],
   },

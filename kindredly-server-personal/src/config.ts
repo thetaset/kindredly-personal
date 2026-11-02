@@ -242,11 +242,36 @@ const config = {
     .split(',')
     .map((s) => s.trim())
     .filter(Boolean),
+  // The Ed25519 key the server signs a computer's pause with, for the Companion's root guard (HAT-766):
+  // a 32-byte seed in base64. Unset, it is derived from jwtAccessTokenSecret
+  // (`companion_signing.ts`), so a server needs no new secret; set it before rotating that secret, to
+  // the value `companionSigningSeedBase64()` prints, or every linked computer's guard keeps the old key.
+  companionSigningKey: process.env.COMPANION_SIGNING_KEY || '',
   passwordStorageEncryptionKey: process.env.PASSWORD_STORAGE_ENCRYPTION_KEY || '0987654321098765432100',
   passwordSalt: process.env.PASSWORD_SALT || 'TESTSALT',
   // Passkey/WebAuthn configuration
   passkeyRpId: process.env.PASSKEY_RP_ID, // Defaults to hostname if not set
   passkeyRpName: process.env.PASSKEY_RP_NAME || 'Kindredly',
+  // Pages besides https://<rp id> and https://www.<rp id> that may use a passkey, comma-separated
+  // origins such as https://app.example.com or an Edge extension's chrome-extension://<id>. Any
+  // other subdomain is refused: it may serve pages Kindredly does not write (UNL-5).
+  passkeyAllowedOrigins: (process.env.PASSKEY_ALLOWED_ORIGINS || '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean),
+  // Our browser extension (UNL-12). Since Chrome 122 and Firefox 150 an extension may use the relying
+  // party's passkeys, and the browser reports the extension's own address as the origin. Another
+  // extension has another address, so only ours get through.
+  passkeyExtensionOrigins: [
+    // The Chrome Web Store copy (tset-electron deviceLockdown WEB_STORE_CHROME_EXTENSION_ID).
+    'chrome-extension://lenaenoceakaebaeipiplfkjcmfegjpl',
+    // The ID the `key` in tset-client/src/manifest_chrome.json derives to, loaded unpacked.
+    'chrome-extension://kekfgmohihmjcmalpkpmpaeiehcmkgbj',
+    // Firefox, add-on id admin@thetaset.com: SHA-256 of the id, each hex digit written a–p. The same
+    // for every install, unlike its moz-extension://<uuid> pages (MDN, "Use the Web Authn API in
+    // web extensions").
+    'moz-extension://eijbjebndclgmbnbkepknjadfkeeenmaobanlfbjdajpdpcfadbfbgidlbdofhmh',
+  ],
   // Whether a passkey stored WITHOUT a public key may still sign in.
   //
   // Assertion signatures are always verified now — that is what closed the takeover where any
@@ -254,11 +279,11 @@ const config = {
   // against: ones registered on a browser without `getPublicKey()` (pre-Safari 16.4, pre-Firefox
   // 119), which stored an empty key.
   //
-  // Defaults to ALLOW so that shipping the fix cannot lock anyone out of an account we have not
-  // counted yet. Run the "Passkeys that cannot be verified" check in the admin console
-  // (/manage/diagnostics); once it reports zero, set PASSKEY_ALLOW_UNVERIFIABLE=false to close the
-  // last path that accepts an unverified assertion.
-  passkeyAllowUnverifiableCredentials: process.env.PASSKEY_ALLOW_UNVERIFIABLE !== 'false',
+  // Defaults to REFUSE (UNL-5): the client has sent a public key since passkeys first shipped
+  // (2025-12-06), so a keyless one could only come from a 2023-era browser, and that person still
+  // has their password. The "Passkeys that cannot be verified" check in the admin console
+  // (/manage/diagnostics) counts them; PASSKEY_ALLOW_UNVERIFIABLE=true lets them through again.
+  passkeyAllowUnverifiableCredentials: process.env.PASSKEY_ALLOW_UNVERIFIABLE === 'true',
   nodeEnv: environment,
   /**
    * Which runtime profile this process is. `cloud` is production and every
@@ -303,6 +328,39 @@ const config = {
     secretKey: process.env.AI_CONFIG_SECRET_KEY || 'sk-1234',
     // Hosted AI limits are per plan, in Admin AI Tools (ai_config.store.ts DEFAULT_LIMITS). The
     // AI_MONTHLY_TOKEN_LIMIT env var they replaced is no longer read.
+  },
+  // The catalog monitor (docs/trackers/catalog-monitor-tracker.md): reads every public catalog
+  // item's page once a day. OFF unless CATALOG_MONITOR_ENABLED=true. Turn it on once
+  // CATALOG_MONITOR_FETCH_FUNCTION names the Lambda (MON-6): without it the reads leave from this
+  // server's own address, so a site that blocked the monitor would also block families' link
+  // previews and feeds from here.
+  catalogMonitor: {
+    enabled: process.env.CATALOG_MONITOR_ENABLED === 'true',
+    // The Lambda the reads go through (aws-stack/catalog-monitor-fetch); empty reads directly.
+    fetchFunction: process.env.CATALOG_MONITOR_FETCH_FUNCTION || '',
+    // Items read per hourly run; about 130 catalog items need 6 a run.
+    perRun: Number(process.env.CATALOG_MONITOR_PER_RUN) || 30,
+    // 'browser' (today's Chrome name) or 'named' (KindredlyBot); MON-7 decides.
+    userAgent: (process.env.CATALOG_MONITOR_USER_AGENT === 'named' ? 'named' : 'browser') as 'browser' | 'named',
+  },
+  // DeepSeek's models, which Kindredly no longer offers (HAT-503); the key is set only in development,
+  // for the evals. Without it, a request naming one runs on GPT-6 Luna (`servableModel`).
+  deepseek: {
+    apiKey: process.env.DEEPSEEK_API_KEY || '',
+    baseUrl: process.env.DEEPSEEK_BASE_URL || 'https://api.deepseek.com',
+  },
+  // Ten wrong PINs in fifteen minutes and that person's PIN waits fifteen minutes; their password
+  // still works (HAT-848). PIN_LOCKOUT_ENABLED=false turns it off.
+  pinLockout: {
+    enabled: process.env.PIN_LOCKOUT_ENABLED !== 'false', // default ON
+  },
+  // Stored passwords and PINs in the new per-person form (HAT-848). Off until the founder turns it on:
+  // STORED_SECRET_V2=true writes the new form and lets the upgrade job run. Every server that reads
+  // these rows must already read both forms. STORED_SECRET_V2_ROUNDS is measured per server
+  // (`admin_cli --stored_secret_measure`).
+  storedSecretV2: {
+    write: process.env.STORED_SECRET_V2 === 'true', // default OFF
+    rounds: Number(process.env.STORED_SECRET_V2_ROUNDS) || 210_000,
   },
   // Content-safety gate for the published library. When the gate is enabled,
   // content that trips moderation at or above `threshold` is NOT published —
@@ -411,7 +469,8 @@ const config = {
     .filter(Boolean),
   googleServiceApiKey: process.env.GOOGLE_SERVICE_API_KEY || '',
 
-  maxFileSize: 200 * 1024 * 1024, // 200MB
+  // 2GB, the largest plan's limit (HAT-937), less one byte: user_files.fileSize is a 32-bit integer.
+  maxFileSize: 2 * 1024 * 1024 * 1024 - 1,
   // envConfig: dotenv.config().parsed,
   cookieSecret: process.env.COOKIE_SECRET || 'jaklsdfjalsdf',
   origin: process.env.ORIGIN || 'kindredly.ai',

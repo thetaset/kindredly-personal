@@ -5,8 +5,8 @@
  * names an ORDERED CHAIN of engine ids rather than a single provider. That
  * shape is deliberate:
  *
- *   ['hosted:gpt-5.4-nano', 'hosted:gpt-4o-mini']   cheap first, fallback
- *   ['browser:gemini-nano', 'hosted:gpt-4o-mini']   on-device first, degrades
+ *   ['hosted:gpt-6-luna', 'hosted:gpt-6-sol']       cheap first, fallback
+ *   ['browser:gemini-nano', 'hosted:gpt-6-luna']    on-device first, degrades
  *   ['browser:gemini-nano']                          never leaves the device
  *
  * A local/remote boolean cannot express any of those, and a single global
@@ -47,7 +47,8 @@ export type AICapability = {
   smallModelInputBudgetChars?: number;
 };
 
-const HOSTED_DEFAULT = 'hosted:gpt-4o-mini';
+// `AI_MODEL_ALLOWLIST[0]`, the default hosted model (HAT-503).
+const HOSTED_DEFAULT = 'hosted:gpt-6-luna';
 
 export const AI_CAPABILITIES: AICapability[] = [
   // --- Good fits: short input, short structured output, little reasoning ---
@@ -178,6 +179,30 @@ export const AI_CAPABILITIES: AICapability[] = [
     defaultChain: [HOSTED_DEFAULT],
     fit: 'poor',
     fitNote: 'Worst case in both directions: very large input and very large structured output.',
+  },
+  {
+    id: 'feed-builder',
+    label: 'Learning feed builder',
+    description: "Kinbot's chat that plans and changes a learning feed beside it.",
+    defaultChain: [HOSTED_DEFAULT],
+    fit: 'poor',
+    fitNote: 'Eight tools the feed page carries out, and a plan to keep straight across turns.',
+  },
+  {
+    id: 'lesson-builder',
+    label: 'Lesson builder',
+    description: "Kinbot's chat that writes and changes a lesson beside it.",
+    defaultChain: [HOSTED_DEFAULT],
+    fit: 'poor',
+    fitNote: 'Six tools the lesson page carries out, and a lesson of steps and questions to keep straight.',
+  },
+  {
+    id: 'track-gen',
+    label: 'Write a learning feed',
+    description: 'Plan a feed from its sources, write each item, and check it against its source.',
+    defaultChain: [HOSTED_DEFAULT],
+    fit: 'poor',
+    fitNote: 'Long sources in, structured items out, each claim checked against its source.',
   },
   {
     id: 'wiki-plan',
