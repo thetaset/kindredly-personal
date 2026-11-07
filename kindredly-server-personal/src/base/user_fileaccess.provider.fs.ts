@@ -2,7 +2,7 @@ import {config} from '@/config';
 import fs from 'fs';
 import path from 'path';
 import {saveURLDatatoFile} from '../utils/binary_utils';
-import {UserFileAccessProvider} from './user_fileaccess.provider';
+import {UserFileAccessProvider, isFileGroupMember} from './user_fileaccess.provider';
 import {resolveWithinRoot} from './storage_path';
 
 /**
@@ -125,5 +125,29 @@ export class UserFileAccessProviderFS implements UserFileAccessProvider {
   async removeFile(refType: string, refId: string, filename: string) {
     const fullpath = resolveWithinRoot(this.userRoot(), refType, refId, filename);
     fs.unlinkSync(fullpath);
+  }
+
+  async removeFileGroup(refType: string, refId: string, filename: string) {
+    let folder: string;
+    try {
+      folder = resolveWithinRoot(this.userRoot(), refType, refId);
+    } catch {
+      return;
+    }
+
+    let names: string[];
+    try {
+      names = await fs.promises.readdir(folder);
+    } catch {
+      return;
+    }
+
+    for (const name of names.filter((stored) => isFileGroupMember(stored, filename))) {
+      try {
+        await fs.promises.unlink(resolveWithinRoot(folder, name));
+      } catch (error: any) {
+        if (error?.code !== 'ENOENT') throw error;
+      }
+    }
   }
 }

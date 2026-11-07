@@ -1,1 +1,1 @@
-6.4.299
+6.4.299+strip-corejs-object-create-2

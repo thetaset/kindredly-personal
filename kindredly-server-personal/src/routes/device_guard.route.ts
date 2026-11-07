@@ -19,7 +19,7 @@ import {
 import SSEManager from '@/services/sse.manager';
 import {config} from '@/config';
 import {isRateLimitingEnabled} from '@/services/rate_limit_switch';
-import {describeNewApps} from '@/services/companionTamperPolicy';
+import {deviceHoldsAll, newAppsNotice, whoseDevice} from '@/services/companionTamperPolicy';
 import {escapeHtml} from '@/utils/text_utils';
 import {selfRemovalApprover} from '@/services/companionSelfRemoval';
 import {RefStateRepo} from '@/db/ref_state.repo';
@@ -50,6 +50,40 @@ const SETTINGS_EVENTS_HEADERS = {
  */
 /** Enough to be useful in a notification, few enough to stay one readable line. */
 const MAX_REPORTED_APPS = 5;
+
+/**
+ * The only body `/companion/apps/inventory` takes: `{data: {encryptedData}, encInfo: {v: 1, iv, keys}}`,
+ * as `encryptForPush` makes it, rebuilt from the fields it names so nothing else rides along. Null
+ * for anything else, a readable list included.
+ */
+export function encryptedInventoryShape(
+  body: any,
+): {data: {encryptedData: string}; encInfo: {v: 1; iv: string; keys: any[]}} | null {
+  const encryptedData = body?.data?.encryptedData;
+  const encInfo = body?.encInfo;
+  if (!body?.data || Object.keys(body.data).length !== 1) return null;
+  if (typeof encryptedData !== 'string' || !encryptedData || !/^[A-Za-z0-9+/]+={0,2}$/.test(encryptedData)) return null;
+  if (!encInfo || encInfo.v !== 1 || typeof encInfo.iv !== 'string') return null;
+  if (Buffer.from(encInfo.iv, 'base64').length !== 12) return null;
+  const keys = Array.isArray(encInfo.keys) ? encInfo.keys : [];
+  if (keys.length < 1 || keys.length > 4) return null;
+  if (
+    !keys.every((k: any) => k && typeof k.unwrappingKeyId === 'string' && k.unwrappingKeyId && k.wrappedEncKey != null)
+  )
+    return null;
+  return {
+    data: {encryptedData},
+    encInfo: {
+      v: 1,
+      iv: encInfo.iv,
+      keys: keys.map((k: any) => ({
+        wrappedEncKey: k.wrappedEncKey,
+        wrappingKeyId: k.wrappingKeyId,
+        unwrappingKeyId: k.unwrappingKeyId,
+      })),
+    },
+  };
+}
 
 class DeviceGuardRoute implements Routes {
   public router = Router();
@@ -291,40 +325,112 @@ class DeviceGuardRoute implements Routes {
 
         const pkgs = Array.isArray(req.body?.pkgs) ? req.body.pkgs.filter((p) => typeof p === 'string' && p) : [];
         const labels = Array.isArray(req.body?.labels) ? req.body.labels.filter((l) => typeof l === 'string' && l) : [];
-        // Bounded so a malformed or hostile client can't turn one sync into a
-        // thousand-line notification.
-        const shown = (labels.length ? labels : pkgs).slice(0, MAX_REPORTED_APPS);
-        if (shown.length === 0) return res.json({success: true, results: {ok: true, notified: 0}});
+        if (pkgs.length === 0 && labels.length === 0)
+          return res.json({success: true, results: {ok: true, notified: 0}});
 
         const child = childUserId ? await ctx.getUserById(childUserId) : null;
         const childName = child?.displayedName || child?.username || 'a child';
+        const platform = typeof req.body?.platform === 'string' ? req.body.platform : undefined;
+
+        // Which computer, by its own name, as a tamper alert says it (HAT-1016). A phone's
+        // Kindredly reports on the child's own session, which names no device.
+        const deviceId = ctx.getTokenDeviceId() || '';
+        let deviceLabel: string | undefined;
+        if (deviceId && childUserId) {
+          const [status] = await this.refStates.listByRef({
+            refType: 'device-guard',
+            refId: 'companion',
+            ownerType: 'user',
+            ownerId: childUserId,
+            stateKey: 'status',
+            stateSubKey: deviceId,
+            limit: 1,
+          });
+          deviceLabel = status?.data?.deviceLabel || status?.data?.deviceName || undefined;
+        }
+        const device = whoseDevice({childName, deviceLabel, platform});
+
+        // New apps start blocked (NAP-6, NAP-8): the device says which of these it holds for the
+        // guardian, from its own compile. Not read from the policy here: a device on an older build
+        // does not hold them, and the notice must not say it does.
+        const waiting = deviceHoldsAll(pkgs, req.body?.waiting);
 
         // ONE notification per sync, never one per app: a child restoring a backup
         // installs dozens at once, and a notification per app is how a parent
         // learns to swipe the whole category away without reading it.
-        const total = pkgs.length;
-        const listed = shown.join(', ');
-        const extra = total > shown.length ? ` and ${total - shown.length} more` : '';
-        const copy = describeNewApps({total, listed: `${listed}${extra}`, childName, platform: req.body?.platform});
+        // Names bounded, so a malformed or hostile client can't turn one sync into a
+        // thousand-line notification.
+        const notice = newAppsNotice({
+          childUserId: childUserId || '',
+          childName,
+          platform,
+          device,
+          pkgs,
+          labels,
+          maxNamed: MAX_REPORTED_APPS,
+          waiting,
+        });
         await this.notificationService.addAccountNotification(
           ctx,
           NotificationType.DEVICE_APP_REVIEW,
           childUserId,
           ctx.accountId,
           {
-            ...copy,
+            ...notice.copy,
             // HTML in the notice: the app names come from the child's device, the name from the child.
-            message: escapeHtml(copy.message),
+            message: escapeHtml(notice.copy.message),
+            // Strings only: the push carries refInfo as its data, and a push's data takes no arrays.
             refInfo: {
               resourceType: 'companionDevice',
               resourceId: childUserId || '',
               requestType: 'newApps',
+              deviceId,
+              path: notice.path,
             },
+            actions: notice.actions,
           },
           true,
         );
 
-        res.json({success: true, results: {ok: true, notified: total}});
+        res.json({success: true, results: {ok: true, notified: pkgs.length}});
+      }),
+    );
+    /**
+     * The desktop Companion's own app list (NAP-5, DCP-22 item 2, founder 2026-11-07).
+     *
+     * Only the browser wrote a computer's `appInventory`, at linking and from the setup screen, so an
+     * app installed later was missing from the guardian's App controls. The Companion now stores it
+     * after a scan that changed the list.
+     *
+     * Device token only, and the body names no one: the row is the token's child's, under the token's
+     * device, so a device can neither write another device's list nor another child's. It must be
+     * end-to-end encrypted with exactly the shape `encryptForPush` makes; anything readable is refused.
+     * `RefStateService.upsert` adds the rest: a provisioning row for this device, the encInfo guards,
+     * and the size cap.
+     */
+    this.router.post(
+      '/companion/apps/inventory',
+      authenticateJWT,
+      errorHelper(async (req: ApiReq<'/companion/apps/inventory'>, res) => {
+        const ctx = RequestContext.instance(req);
+        const deviceId = ctx.getTokenDeviceId();
+        const childUserId = ctx.getSessionUserId();
+        if (!deviceId || !childUserId) {
+          return res.json({success: false, message: 'Only a linked device can send its app list.', status: 403});
+        }
+        const shape = encryptedInventoryShape(req.body);
+        if (!shape) {
+          return res.json({success: false, message: 'The app list must be encrypted.', status: 400});
+        }
+        await this.refStateService.upsert(ctx, 'user', {
+          refType: 'device-guard',
+          refId: 'companion',
+          stateKey: 'appInventory',
+          stateSubKey: deviceId,
+          data: shape.data,
+          encInfo: shape.encInfo,
+        });
+        res.json({success: true, results: {ok: true}});
       }),
     );
     /**

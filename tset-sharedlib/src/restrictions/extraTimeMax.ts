@@ -2,9 +2,10 @@
  * The most extra time a day a limit can be given (HAT-950 rule B), shared by every writer of extra
  * time and by the server, which holds each save to it.
  *
- * A limit's ceiling is its `extraTimeMax` entry (minutes, or 'any'), else today's daily limit: a
- * 10-minute limit takes up to 10 more minutes a day. A limit with no time today, or the whole day,
- * has no daily limit to measure against and so no ceiling. Extra time already given today, the
+ * A limit's ceiling is its `extraTimeMax` entry: minutes, or 'same' for today's daily limit (a
+ * 10-minute limit takes up to 10 more minutes a day). No entry, or 'any', is no ceiling (HAT-998:
+ * a guardian's grant must land where they gave it). 'same' on a limit with no time today, or the
+ * whole day, has no daily limit to measure against and so no ceiling. Extra time already given today, the
  * override's hours above today's limit, counts against it.
  */
 import type {ExtraTimeMax, LimitRule, RuleOverride, TimeLimit} from '../types/usage-limits.types';
@@ -29,8 +30,8 @@ export function extraTimeCeilingMinutes(
   dayOfWeek: number,
 ): number | null {
   const set = rule?.id ? extraTimeMax?.[rule.id] : undefined;
-  if (set === 'any') return null;
   if (typeof set === 'number' && Number.isFinite(set)) return Math.max(0, Math.round(set));
+  if (set !== 'same') return null;
   const hours = enforcedTimeLimitOn(rule, dayOfWeek)?.hours;
   return typeof hours === 'number' && hours > 0 && hours < 24 ? Math.round(hours * 60) : null;
 }

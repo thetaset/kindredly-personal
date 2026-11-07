@@ -49,6 +49,12 @@ const typeToTitle = {
 /** At most this many lesson notices per child a day: a pack has five parts, and the child's device reports them. */
 const LESSON_PART_DONE_PER_DAY = 5;
 
+/**
+ * Types whose push is titled by the notice itself. Every other type has one fixed push title, so
+ * a "New app" push read "New Notification" over "1 new app on Emma's computer." (HAT-1016).
+ */
+const PUSH_TITLE_FROM_NOTICE = new Set(['DEVICE_APP_REVIEW']);
+
 function notiticationTypeToTitle(type: string) {
   if (typeToTitle[type]) {
     return typeToTitle[type];
@@ -548,7 +554,7 @@ class NotificationService {
         this.sendPushNotificationToAllUserDevicesMultipleUsers(
           pushEnabledAdminUserIds,
           {
-            title: notiticationTypeToTitle(type),
+            title: PUSH_TITLE_FROM_NOTICE.has(type) && data.title ? data.title : notiticationTypeToTitle(type),
             body: data.shortMessage || data.title,
           },
           {

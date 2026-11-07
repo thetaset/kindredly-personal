@@ -1,8 +1,8 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "generatedFrom": "src/api/api-route-map.ts",
-  "routeCount": 1039,
-  "validatedRouteCount": 1039,
+  "routeCount": 1049,
+  "validatedRouteCount": 1049,
   "unrepresentableTypes": {},
   "routes": {
     "/": "#/definitions/InlineRequest_",
@@ -117,6 +117,10 @@
     "/continue/record": "#/definitions/ContinueRecordRequest",
     "/continue/list": "#/definitions/ContinueListRequest",
     "/continue/remove": "#/definitions/ContinueRemoveRequest",
+    "/project/list": "#/definitions/ProjectListRequest",
+    "/project/create": "#/definitions/ProjectCreateRequest",
+    "/project/rename": "#/definitions/ProjectRenameRequest",
+    "/project/setNote": "#/definitions/ProjectSetNoteRequest",
     "/account/stats": "#/definitions/InlineRequest_account_stats",
     "/account/users": "#/definitions/InlineRequest_account_users",
     "/activity/clearHistory": "#/definitions/InlineRequest_activity_clearHistory",
@@ -408,6 +412,7 @@
     "/extension/removalAlert/register": "#/definitions/InlineRequest_extension_removalAlert_register",
     "/extension/removed": "#/definitions/InlineRequest_extension_removed",
     "/companion/apps/reportNew": "#/definitions/InlineRequest_companion_apps_reportNew",
+    "/companion/apps/inventory": "#/definitions/InlineRequest_companion_apps_inventory",
     "/companion/rules/current": "#/definitions/InlineRequest_companion_rules_current",
     "/companion/settings/current": "#/definitions/DeviceSettingsCurrentRequest",
     "/companion/settings/version": "#/definitions/InlineRequest_companion_settings_version",
@@ -619,6 +624,8 @@
     "/library/hidden": "#/definitions/GetHiddenItemsRequest",
     "/library/uncategorized": "#/definitions/GetUncategorizedItemsRequest",
     "/item/listSharedWithUser": "#/definitions/ListSharedWithUserRequest",
+    "/item/notInLibrary/list": "#/definitions/InlineRequest_item_notInLibrary_list",
+    "/item/notInLibrary/remove": "#/definitions/InlineRequest_item_notInLibrary_remove",
     "/item/listRecentAccessibleByUser": "#/definitions/ListRecentAccessibleByUserRequest",
     "/item/listSharedByUser": "#/definitions/ListSharedByUserRequest",
     "/item/matchesForPubIds": "#/definitions/InlineRequest_item_matchesForPubIds",
@@ -873,6 +880,9 @@
     "/realm/claim/list": "#/definitions/InlineRequest_realm_claim_list",
     "/realm/claim/withPassword": "#/definitions/InlineRequest_realm_claim_withPassword",
     "/system/status": "#/definitions/InlineRequest_system_status",
+    "/box/admin/status": "#/definitions/InlineRequest_box_admin_status",
+    "/box/admin/signupLink": "#/definitions/InlineRequest_box_admin_signupLink",
+    "/box/admin/resetLink": "#/definitions/InlineRequest_box_admin_resetLink",
     "/system/version": "#/definitions/InlineRequest_system_version",
     "/system/updateCheck": "#/definitions/InlineRequest_system_updateCheck",
     "/test/client/dbtest": "#/definitions/InlineRequest_test_client_dbtest",
@@ -2453,6 +2463,7 @@
         "art_work",
         "article",
         "artist",
+        "audio",
         "audiobook",
         "book",
         "ebook",
@@ -2473,6 +2484,7 @@
         "person",
         "plant",
         "product",
+        "podcast_episode",
         "project",
         "task",
         "song",
@@ -6040,6 +6052,55 @@
       "required": [
         "kind",
         "itemId"
+      ]
+    },
+    "ProjectListRequest": {
+      "type": "object",
+      "properties": {
+        "refresh": {
+          "type": "boolean"
+        }
+      }
+    },
+    "ProjectCreateRequest": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "name"
+      ]
+    },
+    "ProjectRenameRequest": {
+      "type": "object",
+      "properties": {
+        "tag": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "tag",
+        "name"
+      ]
+    },
+    "ProjectSetNoteRequest": {
+      "type": "object",
+      "properties": {
+        "tag": {
+          "type": "string"
+        },
+        "note": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "tag",
+        "note"
       ]
     },
     "InlineRequest_account_stats": {
@@ -11369,6 +11430,12 @@
             },
             "sessionToken": {
               "type": "string"
+            },
+            "boxSignupCode": {
+              "type": [
+                "string",
+                "null"
+              ]
             }
           },
           "required": [
@@ -13228,6 +13295,12 @@
         "reviewedAt": {
           "type": "number"
         },
+        "seenApps": {
+          "$ref": "#/definitions/Record%3Cstring%2Cnumber%3E"
+        },
+        "newAppsBlockedAt": {
+          "type": "number"
+        },
         "updatedAt": {
           "type": "number"
         }
@@ -13390,10 +13463,56 @@
         },
         "platform": {
           "type": "string"
+        },
+        "waiting": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
         }
       },
       "required": [
         "pkgs"
+      ]
+    },
+    "InlineRequest_companion_apps_inventory": {
+      "type": "object",
+      "properties": {
+        "data": {
+          "type": "object",
+          "properties": {
+            "encryptedData": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "encryptedData"
+          ]
+        },
+        "encInfo": {
+          "type": "object",
+          "properties": {
+            "v": {
+              "type": "number"
+            },
+            "iv": {
+              "type": "string"
+            },
+            "keys": {
+              "type": "array",
+              "items": {}
+            }
+          },
+          "required": [
+            "v",
+            "iv",
+            "keys"
+          ]
+        }
+      },
+      "required": [
+        "data",
+        "encInfo"
       ]
     },
     "InlineRequest_companion_rules_current": {
@@ -13584,6 +13703,24 @@
         },
         "notifyOthers": {
           "type": "boolean"
+        },
+        "notInLibrary": {
+          "type": "boolean"
+        },
+        "copyOfPostAttachment": {
+          "type": "object",
+          "properties": {
+            "postId": {
+              "type": "string"
+            },
+            "key": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "postId",
+            "key"
+          ]
         },
         "options": {
           "$ref": "#/definitions/CreateCollectionOptions"
@@ -16434,6 +16571,34 @@
         }
       }
     },
+    "InlineRequest_item_notInLibrary_list": {
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string"
+        },
+        "limit": {
+          "type": "number"
+        },
+        "countOnly": {
+          "type": "boolean"
+        }
+      }
+    },
+    "InlineRequest_item_notInLibrary_remove": {
+      "type": "object",
+      "properties": {
+        "itemIds": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "itemIds"
+      ]
+    },
     "ListRecentAccessibleByUserRequest": {
       "type": "object",
       "properties": {
@@ -16761,6 +16926,12 @@
           "items": {
             "type": "string"
           }
+        },
+        "madeWithAi": {
+          "type": "boolean"
+        },
+        "notOpened": {
+          "type": "boolean"
         },
         "text": {
           "type": "string"
@@ -20421,6 +20592,23 @@
     },
     "InlineRequest_system_status": {
       "type": "object"
+    },
+    "InlineRequest_box_admin_status": {
+      "type": "object"
+    },
+    "InlineRequest_box_admin_signupLink": {
+      "type": "object"
+    },
+    "InlineRequest_box_admin_resetLink": {
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "userId"
+      ]
     },
     "InlineRequest_system_version": {
       "type": "object"

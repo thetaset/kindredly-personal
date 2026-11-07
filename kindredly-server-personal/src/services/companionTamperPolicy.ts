@@ -14,7 +14,12 @@
  * parents learn to ignore us, at which point the real alert is worthless too.
  */
 
-import {isDesktopPlatform} from 'tset-sharedlib/restrictions/deviceAppIds';
+import {
+  isDesktopPlatform,
+  isDevicePlatform,
+  platformPrefixOf,
+  toDeviceAppId,
+} from 'tset-sharedlib/restrictions/deviceAppIds';
 import {DEVICE_GUARD_QUIET_GAP_MS} from 'tset-sharedlib/types/device-guard.types';
 import type {DeviceTamperKind} from 'tset-sharedlib/types/device-guard.types';
 
@@ -311,17 +316,133 @@ export function describeReason(reason: TamperReason, device: string, platform?: 
  * The new-app notice, saying phone or computer from the device whose app list it came from. `listed`
  * is the names already joined and capped by the caller.
  */
-export function describeNewApps(input: {total: number; listed: string; childName: string; platform?: unknown}): {
+/**
+ * The "New app" notice. `device` is `whoseDevice`'s answer ("Emma's computer (orbit)"); without it,
+ * the child's name and the kind of device.
+ *
+ * The push shows `title` over `shortMessage`, so the push names the apps (HAT-1016): it used to say
+ * "1 new app on Emma's computer." under "New Notification", and a guardian had to open Kindredly to
+ * learn which app it was. `steamGame` says the one app is a Steam game, which is the "what is it" a
+ * name like "Among Us" does not answer.
+ */
+export function describeNewApps(input: {
+  total: number;
+  listed: string;
+  childName: string;
+  platform?: unknown;
+  device?: string;
+  steamGame?: boolean;
+}): {
   title: string;
   message: string;
   shortMessage: string;
 } {
   const {kind} = deviceWords(typeof input.platform === 'string' ? input.platform : undefined);
   const {total, childName} = input;
+  const device = String(input.device || '').trim() || `${childName}'s ${kind}`;
+  const steam = total === 1 && input.steamGame;
   return {
-    title: total === 1 ? `New app on ${childName}'s ${kind}` : `${total} new apps on ${childName}'s ${kind}`,
-    message: `${input.listed} appeared on ${childName}'s ${kind}. Review what's allowed.`,
-    shortMessage: `${total} new app${total === 1 ? '' : 's'} on ${childName}'s ${kind}.`,
+    title: total === 1 ? `New app on ${device}` : `${total} new apps on ${device}`,
+    message: steam
+      ? `${input.listed}, a game from Steam, appeared on ${device}.`
+      : `${input.listed} appeared on ${device}.`,
+    shortMessage: steam ? `${input.listed}, a game from Steam` : input.listed,
+  };
+}
+
+/** A long app name cut at a word, for a button: "Fortnite Installer for Heroic…". */
+function shortName(label: string, max = 32): string {
+  if (label.length <= max) return label;
+  const cut = label.slice(0, max - 1);
+  const space = cut.lastIndexOf(' ');
+  return `${(space > max / 2 ? cut.slice(0, space) : cut).replace(/[\s,:;(–-]+$/, '')}…`;
+}
+
+/**
+ * Everything the "New app" notice holds, from what the device reported (HAT-1016).
+ *
+ * `pkgs` are the ids the device lists its apps by, a Steam game as `steam:<appid>`; `labels` their
+ * names, in the same order. The notice carries where it leads: one app opens its own screen on All
+ * apps and has Block on the notice; several open All apps, where the new ones come first.
+ */
+/**
+ * Whether the device holds every app it reported for a guardian (New apps start blocked, NAP-6, NAP-8),
+ * from the `waiting` list it sent. A device that sends none, an older build, holds none.
+ */
+export function deviceHoldsAll(pkgs: string[], waiting: unknown): boolean {
+  const holding = new Set(Array.isArray(waiting) ? waiting.filter((p): p is string => typeof p === 'string') : []);
+  return pkgs.length > 0 && pkgs.every((p) => holding.has(p));
+}
+
+export function newAppsNotice(input: {
+  childUserId: string;
+  childName: string;
+  platform?: string;
+  device: string;
+  pkgs: string[];
+  labels: string[];
+  maxNamed: number;
+  /**
+   * New apps start blocked is on and this device blocks them (NAP-6): the notice says the app waits
+   * for the guardian, and its button is Allow.
+   */
+  waiting?: boolean;
+}): {
+  copy: {title: string; message: string; shortMessage: string};
+  path: string;
+  appIds: string[];
+  actions: Array<{name: string; label: string; data: Record<string, string>}>;
+} {
+  const total = input.pkgs.length || input.labels.length;
+  const shown = (input.labels.length ? input.labels : input.pkgs).slice(0, input.maxNamed);
+  const extra = total > shown.length ? ` and ${total - shown.length} more` : '';
+  // The id App controls names each app by: a Steam game carries its own prefix.
+  const devicePlatform = isDevicePlatform(input.platform) ? input.platform : 'android';
+  const appIds = input.pkgs.map((pkg) => (platformPrefixOf(pkg) ? pkg : toDeviceAppId(devicePlatform, pkg)));
+  const allApps = `/manage/user/${input.childUserId}/blocked/apps`;
+  const copy = describeNewApps({
+    total,
+    listed: `${shown.join(', ')}${extra}`,
+    childName: input.childName,
+    platform: input.platform,
+    device: input.device,
+    steamGame: total === 1 && Boolean(appIds[0]?.startsWith('steam:')),
+  });
+  if (input.waiting) {
+    copy.title = total === 1 ? `New app waiting on ${input.device}` : `${total} new apps waiting on ${input.device}`;
+    copy.message = `${copy.message} ${total === 1 ? 'It is blocked until you allow it.' : 'They are blocked until you allow them.'}`;
+    copy.shortMessage = `${copy.shortMessage}, blocked until you allow ${total === 1 ? 'it' : 'them'}`;
+  }
+  if (total !== 1 || !appIds[0]) {
+    return {
+      copy,
+      path: allApps,
+      appIds,
+      actions: [{name: 'openPath', label: 'See the new apps', data: {path: allApps}}],
+    };
+  }
+  const label = String(input.labels[0] || input.pkgs[0]);
+  // The name too: the app may not be in the child's stored list yet, which is where it would come from.
+  const path = `${allApps}?app=${encodeURIComponent(appIds[0])}&name=${encodeURIComponent(label)}`;
+  return {
+    copy,
+    path,
+    appIds,
+    actions: [
+      // The name comes from the child's device; the button renders it as text.
+      input.waiting
+        ? {
+            name: 'allowDeviceApp',
+            label: `Allow ${shortName(label)}`,
+            data: {childUserId: input.childUserId, appId: appIds[0], label},
+          }
+        : {
+            name: 'blockDeviceApp',
+            label: `Block ${shortName(label)}`,
+            data: {childUserId: input.childUserId, appId: appIds[0], label},
+          },
+      {name: 'openPath', label: 'Open', data: {path}},
+    ],
   };
 }
 

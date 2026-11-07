@@ -73,6 +73,8 @@ const NAMED_BEHAVIOURS = [
   // an opening, exactly as a rule with a task step does.
   'earn-access-confirm-holds',
   'earn-access-confirm-opened-today',
+  // New apps start blocked (NAP-6, NAP-8): an app that arrived after the switch waits, saying it is new.
+  'new-app-waiting',
 ];
 
 const DEVICE_ACTIONS = new Set(['allow', 'warn', 'block']);
@@ -84,6 +86,7 @@ const DEVICE_REASONS = new Set([
   'app-blocked',
   'family-downtime',
   'earn-access',
+  'new-app',
 ]);
 
 function loadSources(): any[] {
@@ -133,7 +136,11 @@ function settingsForPlatform(settings: any, platform: (typeof PLATFORMS)[number]
   for (const [key, entry] of Object.entries(settings.appPolicy.entries || {})) {
     entries[key.includes(':') ? key : `${platform}:${key}`] = entry;
   }
-  return { ...settings, appPolicy: { ...settings.appPolicy, entries } };
+  // Apps marked seen are keyed by app id (NAP-6): the Android one in a source, this platform's here.
+  const seenApps = settings.appPolicy.seenApps
+    ? Object.fromEntries(Object.entries(settings.appPolicy.seenApps).map(([id, at]) => [id.replace(/^android:/, `${platform}:`), at]))
+    : undefined;
+  return { ...settings, appPolicy: { ...settings.appPolicy, entries, ...(seenApps ? { seenApps } : {}) } };
 }
 
 /**

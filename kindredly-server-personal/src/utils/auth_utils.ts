@@ -551,6 +551,12 @@ export const DEVICE_AGENT_ALLOWED_PATHS = new Set([
   // changes no setting, and the child is the token's, so rules 1 and 2 hold. Self-reported, as it
   // always was; enforcement is the app policy, which blocks by name.
   '/companion/apps/reportNew',
+  // The computer's own app list (NAP-5, DCP-22 item 2, founder 2026-11-07): the browser was the only
+  // writer, so an app installed later was missing from the guardian's list. A report, never a grant:
+  // the list changes no setting, and enforcement is the app policy, which blocks by name. It takes no
+  // id: the child and the device come from the token, it writes only that device's `appInventory`
+  // row, and it refuses anything not end-to-end encrypted, so rules 1 and 2 hold.
+  '/companion/apps/inventory',
 ]);
 
 /** How long a parent's approval at the computer lasts: as long as the Companion keeps their PIN. */

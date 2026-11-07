@@ -4573,6 +4573,8 @@ export interface CreateUserRequest {
     inviteCode: string | null;
     accessToken?: string;
     sessionToken?: string;
+    /** A self-hosted server's sign-up link code, from its admin (HAT-1022). */
+    boxSignupCode?: string | null;
   };
   recaptchaToken?: string;
   /**
@@ -5786,24 +5788,39 @@ export function readMcpRelayRouting(value: unknown): McpRelayRouting {
 }
 
 /**
- * How long an adult's Agree lasts for one AI app (HAT-880), chosen on the ask or in Settings.
+ * How long an adult's Agree lasts for one AI app (HAT-880, HAT-1000), chosen on the ask or in Settings.
  * `connect`: the AI app connects without asking, as with `askFirst` off, for this AI app only.
- * `changes`: its library and task changes run without asking; parental changes always ask.
+ * `add`: what it adds to the library runs without asking, up to 2 hours.
+ * `edit`: its edits to the library run without asking, up to 15 minutes. Removing always asks, and
+ * so do parental changes and anything that reaches a child.
  * Each AI app and kind is its own user pref of the adult's (`mcpRelayAgreedUntilPrefKey`), an ISO
  * time, so a save is one write and two saves never overwrite each other. The relay reads `connect`
- * on every call; the answering Kindredly reads `changes` before asking.
+ * on every call; the answering Kindredly reads `add` and `edit` before asking.
  */
 export const MCP_RELAY_AGREE_PERIODS = ['2h', '24h', 'week', 'month', 'year'] as const;
-export type McpRelayAgreePeriod = (typeof MCP_RELAY_AGREE_PERIODS)[number];
-export const MCP_RELAY_AGREED_KINDS = ['connect', 'changes'] as const;
+/** The times Agree may cover adding (HAT-1000): short, since an AI app can add a lot in an hour. */
+export const MCP_RELAY_ADD_PERIODS = ['15m', '2h'] as const;
+export const MCP_RELAY_EDIT_PERIODS = ['15m'] as const;
+export type McpRelayAgreePeriod = (typeof MCP_RELAY_AGREE_PERIODS)[number] | (typeof MCP_RELAY_ADD_PERIODS)[number];
+export const MCP_RELAY_AGREED_KINDS = ['connect', 'add', 'edit'] as const;
 export type McpRelayAgreedKind = (typeof MCP_RELAY_AGREED_KINDS)[number];
+/**
+ * HAT-880's one `changes` time, which covered adding, editing and archiving for up to a year. No
+ * longer read (HAT-1000): the adult is asked again. Kept so removing an AI app clears it.
+ */
+export const MCP_RELAY_RETIRED_AGREED_KIND = 'changes';
 
-export function mcpRelayAgreedUntilPrefKey(connectionId: string, kind: McpRelayAgreedKind): string {
+export function mcpRelayAgreedUntilPrefKey(
+  connectionId: string,
+  kind: McpRelayAgreedKind | typeof MCP_RELAY_RETIRED_AGREED_KIND,
+): string {
   return `connectedAiApps.agreedUntil.${connectionId}.${kind}`;
 }
 
-const HOUR_MS = 3600_000;
+const MINUTE_MS = 60_000;
+const HOUR_MS = 60 * MINUTE_MS;
 const AGREE_PERIOD_MS: Record<McpRelayAgreePeriod, number> = {
+  '15m': 15 * MINUTE_MS,
   '2h': 2 * HOUR_MS,
   '24h': 24 * HOUR_MS,
   week: 7 * 24 * HOUR_MS,
@@ -5811,17 +5828,26 @@ const AGREE_PERIOD_MS: Record<McpRelayAgreePeriod, number> = {
   year: 365 * 24 * HOUR_MS,
 };
 
+/**
+ * The longest a saved time may run for each kind, slack included: the time was worked out on the
+ * saving device's clock, which can differ from this one's.
+ */
+const LONGEST_AGREED_MS: Record<McpRelayAgreedKind, number> = {
+  connect: AGREE_PERIOD_MS.year + 24 * HOUR_MS,
+  add: AGREE_PERIOD_MS['2h'] + HOUR_MS,
+  edit: AGREE_PERIOD_MS['15m'] + HOUR_MS,
+};
+
 /** The value to save for `period` from now: when it ends, as an ISO time. */
 export function mcpRelayAgreedUntilValue(period: McpRelayAgreePeriod, now = Date.now()): string {
   return new Date(now + AGREE_PERIOD_MS[period]).toISOString();
 }
 
-/** Until when (ms) a saved value lets the AI app connect or change without asking, or null when it must ask. */
-export function readMcpRelayAgreedUntil(value: unknown, now = Date.now()): number | null {
+/** Until when (ms) a saved value lets the AI app connect, add or edit without asking, or null when it must ask. */
+export function readMcpRelayAgreedUntil(value: unknown, now = Date.now(), kind: McpRelayAgreedKind = 'connect'): number | null {
   const until = typeof value === 'string' ? Date.parse(value) : NaN;
-  // Never past the longest choice, so an edited pref cannot make it last for ever. A day of slack:
-  // the time was worked out on the saving device's clock, which can differ from this one's.
-  return Number.isFinite(until) && until > now && until <= now + AGREE_PERIOD_MS.year + 24 * HOUR_MS ? until : null;
+  // Never past the longest choice, so an edited pref cannot make it last for ever.
+  return Number.isFinite(until) && until > now && until <= now + LONGEST_AGREED_MS[kind] ? until : null;
 }
 
 /** A connected AI app as one Kindredly sees it: answering here, or asking for Agree (HAT-814). */

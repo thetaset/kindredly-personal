@@ -23,6 +23,7 @@ import type {
 } from '../types/device-guard.types'
 import type { EarnAccessOpenings } from '../types/earn-access.types'
 import { buildAppCatalog, compileAppPolicy, type AppCatalogEntry } from './deviceAppPolicy'
+import { withNewAppsBlocked } from './newApps'
 import { deviceAppGrants } from '../restrictions/appGrants'
 import { compileNotCountedAppIds } from './notScreenTime'
 import {
@@ -185,7 +186,8 @@ export function compileDeviceSettings(input: DeviceSettingsCompileInput): Compil
   }
 
   const access = settings.accessControlSettings || {}
-  const appPolicy = compileAppPolicy(policy, catalog)
+  // New apps start blocked (NAP-6): added to the list, from this device's own apps.
+  const appPolicy = withNewAppsBlocked(compileAppPolicy(policy, catalog), input.installedApps, policy)
   const familyDowntime = compileFamilyDowntime(settings.familyDowntime, nowMs)
   // The blocks and limits are compiled as usual underneath it, so they resume when it ends.
   const restrictionsPause = restrictionsPauseAt(settings, nowMs)

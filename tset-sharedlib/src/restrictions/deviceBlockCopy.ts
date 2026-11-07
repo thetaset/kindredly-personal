@@ -53,7 +53,12 @@ export type DeviceBlockReason =
    * An Earn access rule holds this app until its steps are done (HAT-836). Not a time and not a
    * parent's off switch: the child can open it, and Kindredly says what is left.
    */
-  | 'earn-access';
+  | 'earn-access'
+  /**
+   * New apps start blocked (NAP-6): the app arrived after a parent turned that on, and waits for
+   * them. Its own reason so the child is told the app is new, not that someone turned it off.
+   */
+  | 'new-app';
 
 const DEVICE_BLOCK_REASONS: readonly string[] = [
   'budget-exhausted',
@@ -63,6 +68,7 @@ const DEVICE_BLOCK_REASONS: readonly string[] = [
   'browser-unprotected',
   'family-downtime',
   'earn-access',
+  'new-app',
 ];
 
 /**
@@ -221,6 +227,8 @@ export function deviceBlockCopy(input: DeviceBlockCopyInput): DeviceBlockCopy {
     case 'app-blocked':
       // Checked first on purpose: "your time is used up" would be a lie for an app with no budget.
       return { headline: `${appLabel} is turned off`, detail: 'A parent turned this off. Ask them if you need it.' };
+    case 'new-app':
+      return { headline: `${appLabel} is new`, detail: 'New apps open once a parent allows them. Ask them if you need it.' };
     case 'browser-unprotected': {
       // The one block here with a fix behind it, so it says the fix instead of "ask a parent".
       // Names the browser, because a child who has three of them needs to know this is about the
@@ -285,6 +293,8 @@ export function deviceBlockSubtitle(input: DeviceBlockCopyInput): string {
       return downtimeUntilSentence(input) || 'An admin set Family Downtime.';
     case 'app-blocked':
       return `A parent chooses which apps can be used on ${noun}.`;
+    case 'new-app':
+      return `New apps on ${noun} open once a parent allows them.`;
     case 'browser-unprotected': {
       const open = formatBrowserList(input.allowedBrowsers);
       return open

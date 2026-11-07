@@ -15168,6 +15168,183 @@
           "ruleId": "r-all-apps"
         }
       ]
+    },
+    {
+      "id": "42-new-app-waiting",
+      "platform": "android",
+      "behaviour": "New apps start blocked (NAP-6, NAP-8): an app that arrived after the switch went on is blocked, saying it is new; one that came before, one marked seen, and one that came with the device open; an app the guardian blocked says so, new or not.",
+      "nowMs": 1789448400000,
+      "dateKey": "2026-09-14",
+      "floor": [
+        "com.android.settings"
+      ],
+      "usageByPkgMs": {},
+      "ruleSet": {
+        "version": 1,
+        "generatedAt": 1789448400000,
+        "tzOffsetMinutes": -420,
+        "serverTimeSkewMs": 0,
+        "rules": [],
+        "safetyAllowlist": [
+          "com.thetaset.companion",
+          "com.thetaset.kindred"
+        ],
+        "usageSeed": {
+          "dateKey": "2026-09-14",
+          "perRuleUsedMs": {}
+        },
+        "appPolicy": {
+          "blocked": [
+            "com.example.blockednew",
+            "com.roblox.client"
+          ],
+          "scopedBlocked": [
+            "android:com.example.blockednew",
+            "android:com.roblox.client"
+          ],
+          "newApps": [
+            "android:com.roblox.client"
+          ]
+        },
+        "notCountedAppIds": [
+          "android",
+          "com.android.calculator2",
+          "com.android.camera",
+          "com.android.camera2",
+          "com.android.deskclock",
+          "com.android.dialer",
+          "com.android.incallui",
+          "com.android.packageinstaller",
+          "com.android.permissioncontroller",
+          "com.android.server.telecom",
+          "com.android.settings",
+          "com.android.systemui",
+          "com.coloros.alarmclock",
+          "com.google.android.GoogleCamera",
+          "com.google.android.calculator",
+          "com.google.android.deskclock",
+          "com.google.android.dialer",
+          "com.google.android.inputmethod.latin",
+          "com.google.android.packageinstaller",
+          "com.google.android.permissioncontroller",
+          "com.miui.calculator",
+          "com.oneplus.calculator",
+          "com.oneplus.camera",
+          "com.oneplus.deskclock",
+          "com.oplus.camera",
+          "com.samsung.android.dialer",
+          "com.samsung.android.honeyboard",
+          "com.samsung.android.incallui",
+          "com.sec.android.app.camera",
+          "com.sec.android.app.clockpackage",
+          "com.sec.android.app.popupcalculator",
+          "com.sec.android.inputmethod",
+          "com.touchtype.swiftkey"
+        ]
+      },
+      "expect": [
+        {
+          "pkg": "com.roblox.client",
+          "action": "block",
+          "reason": "new-app",
+          "ruleId": null
+        },
+        {
+          "pkg": "com.example.blockednew",
+          "action": "block",
+          "reason": "app-blocked",
+          "ruleId": null
+        },
+        {
+          "pkg": "com.whatsapp",
+          "action": "allow",
+          "reason": null,
+          "ruleId": null
+        },
+        {
+          "pkg": "com.example.allowed",
+          "action": "allow",
+          "reason": null,
+          "ruleId": null
+        },
+        {
+          "pkg": "com.oneplus.camera",
+          "action": "allow",
+          "reason": null,
+          "ruleId": null
+        }
+      ]
+    },
+    {
+      "id": "42-new-app-waiting",
+      "platform": "macos",
+      "behaviour": "New apps start blocked (NAP-6, NAP-8): an app that arrived after the switch went on is blocked, saying it is new; one that came before, one marked seen, and one that came with the device open; an app the guardian blocked says so, new or not.",
+      "nowMs": 1789448400000,
+      "dateKey": "2026-09-14",
+      "floor": [
+        "com.android.settings"
+      ],
+      "usageByPkgMs": {},
+      "ruleSet": {
+        "version": 1,
+        "generatedAt": 1789448400000,
+        "tzOffsetMinutes": -420,
+        "serverTimeSkewMs": 0,
+        "rules": [],
+        "safetyAllowlist": [
+          "com.thetaset.companion",
+          "com.thetaset.kindred"
+        ],
+        "usageSeed": {
+          "dateKey": "2026-09-14",
+          "perRuleUsedMs": {}
+        },
+        "appPolicy": {
+          "blocked": [
+            "macos:com.example.blockednew",
+            "macos:com.roblox.client"
+          ],
+          "scopedBlocked": [
+            "macos:com.example.blockednew",
+            "macos:com.roblox.client"
+          ],
+          "newApps": [
+            "macos:com.roblox.client"
+          ]
+        }
+      },
+      "expect": [
+        {
+          "pkg": "com.roblox.client",
+          "action": "block",
+          "reason": "new-app",
+          "ruleId": null
+        },
+        {
+          "pkg": "com.example.blockednew",
+          "action": "block",
+          "reason": "app-blocked",
+          "ruleId": null
+        },
+        {
+          "pkg": "com.whatsapp",
+          "action": "allow",
+          "reason": null,
+          "ruleId": null
+        },
+        {
+          "pkg": "com.example.allowed",
+          "action": "allow",
+          "reason": null,
+          "ruleId": null
+        },
+        {
+          "pkg": "com.oneplus.camera",
+          "action": "allow",
+          "reason": null,
+          "ruleId": null
+        }
+      ]
     }
   ]
 }

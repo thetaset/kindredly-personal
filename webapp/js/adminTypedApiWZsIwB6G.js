@@ -1,1 +1,0 @@
-import{s as i}from"./subscription.storeDgI-qPhv.js";import"./appLifecycle.storeCIRbKlhW.js";import"./vue-runtimetcX7J1Xt.js";import"./cjs-helpersC4iS2aBk.js";import"./dexie2jmnBxhj.js";import"./bootstrap-vue-nextBII_jLmU.js";import"./memoryPressure1IY91O5M.js";import"./StoreManagerCcZtDsPo.js";async function f(r,o,t){return i(r,o,t)}export{f as adminTypedSendReq};

@@ -1,1 +1,0 @@
-import{S as a}from"./appLifecycle.storeCIRbKlhW.js";import{s as o,e}from"./freshSignInBebPRGSU.js";const t=[...a],r=t.map(s=>`^https?:\\/\\/([^\\/?#]*\\.)?${e(s)}(?:[\\/:?#]|$).*`);function A(s){return o(s)!==null}export{t as S,r as a,A as i};

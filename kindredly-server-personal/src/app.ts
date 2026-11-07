@@ -49,6 +49,7 @@ import RefStateRoute from './routes/ref_state.route';
 import DeviceGuardRoute from './routes/device_guard.route';
 import ExtensionRemovalRoute from './routes/extension_removal.route';
 import RealmRecoveryRoute from './routes/realm_recovery.route';
+import BoxAdminRoute from './routes/box_admin.route';
 import StandaloneAppRoute from './routes/standalone_app.route';
 import PluginService from './services/plugin.service';
 import {asPath} from './utils/crypto_util';
@@ -111,6 +112,7 @@ class App {
         new DeviceGuardRoute(),
         new ExtensionRemovalRoute(),
         new RealmRecoveryRoute(),
+        new BoxAdminRoute(),
         new SetupCatalogRoute(),
         new EmbeddingCacheRoute(),
         new ExternalDataRoute(),
@@ -337,7 +339,16 @@ class App {
 
         // includeSubDomains is off on purpose: it would force HTTPS on every subdomain of
         // the apex, including any that are not TLS-terminated yet. Scope it to this host.
-        hsts: {maxAge: 15552000, includeSubDomains: false, preload: false},
+        //
+        // Never on a self-hosted server (HAT-1021). A box answers http and https on one port, and
+        // the extension is often pointed at its http address. Once a browser has seen this header
+        // over https it rewrites every later http request to https with an internal redirect, and
+        // Chrome drops `Authorization` on that redirect: register succeeds, then every signed-in
+        // request reaches the server with no token ("AuthError: Not authorized").
+        hsts:
+          config.privateServer || config.profile === 'lite'
+            ? false
+            : {maxAge: 15552000, includeSubDomains: false, preload: false},
 
         // A box serves the webapp itself, and the extension runs standalone apps by framing
         // that webapp from a chrome-extension:// page — which is never same-origin, so

@@ -1,3 +1,4 @@
+import {config} from '@/config';
 import {CreateUserDto} from '@dtos/users.dto';
 import {HttpException} from '@exceptions/HttpException';
 import {LoginType} from 'tset-sharedlib/shared.types';
@@ -22,7 +23,13 @@ class OpenAuthValidatorService implements AuthValidatorService {
       }
       userData.username = userData.username.toLowerCase();
       checkUserName(userData.username);
-      checkEmail(userData.email);
+      // A personal server sends no mail, so an email has no use there and is optional (HAT-1027).
+      // Stored as absent rather than '': the column is unique, and two '' would collide.
+      if (!userData.email && config.privateServer) {
+        delete userData.email;
+      } else {
+        checkEmail(userData.email);
+      }
       checkPassword(userData.password);
       await this.userService._checkUsernameExists(userData.username);
     } else {

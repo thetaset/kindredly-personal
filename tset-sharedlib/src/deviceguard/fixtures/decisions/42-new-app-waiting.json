@@ -1,0 +1,112 @@
+{
+  "id": "42-new-app-waiting",
+  "behaviour": "New apps start blocked (NAP-6, NAP-8): an app that arrived after the switch went on is blocked, saying it is new; one that came before, one marked seen, and one that came with the device open; an app the guardian blocked says so, new or not.",
+  "clock": {
+    "nowMs": 1789448400000,
+    "familyTimeZone": "America/Los_Angeles",
+    "deviceTimeZone": "America/Los_Angeles"
+  },
+  "settings": {
+    "usageLimitsData": {
+      "contentUsageLimits": [],
+      "temporaryRules": []
+    },
+    "ruleOverrideSettings": {
+      "ruleOverrides": []
+    },
+    "accessControlSettings": {},
+    "appPolicy": {
+      "version": 1,
+      "blockedCategories": [],
+      "entries": {
+        "com.example.blockednew": {
+          "pkg": "com.example.blockednew",
+          "decision": "block",
+          "updatedAt": 1789300000000
+        }
+      },
+      "seenApps": {
+        "android:com.example.allowed": 1789300000000
+      },
+      "newAppsBlockedAt": 1789000000000,
+      "updatedAt": 1789300000000
+    },
+    "appPolicyStatus": "readable"
+  },
+  "installedApps": [
+    {
+      "pkg": "com.whatsapp",
+      "label": "WhatsApp",
+      "firstSeenAt": 1788000000000,
+      "installedAt": 1787000000000
+    },
+    {
+      "pkg": "com.roblox.client",
+      "label": "Roblox",
+      "firstSeenAt": 1788000000000,
+      "installedAt": 1789400000000
+    },
+    {
+      "pkg": "com.example.allowed",
+      "label": "Allowed",
+      "firstSeenAt": 1788000000000,
+      "installedAt": 1789200000000
+    },
+    {
+      "pkg": "com.example.blockednew",
+      "label": "Blocked new",
+      "firstSeenAt": 1788000000000,
+      "installedAt": 1789200000000
+    },
+    {
+      "pkg": "com.oneplus.camera",
+      "label": "Camera",
+      "isSystem": true,
+      "firstSeenAt": 1788000000000,
+      "installedAt": 1789200000000
+    }
+  ],
+  "floor": [
+    "com.android.settings"
+  ],
+  "usage": {
+    "appMsByPkg": {},
+    "webLogs": []
+  },
+  "usageSeed": {
+    "perRuleUsedMs": {}
+  },
+  "expectDevice": [
+    {
+      "pkg": "com.roblox.client",
+      "action": "block",
+      "reason": "new-app",
+      "ruleId": null
+    },
+    {
+      "pkg": "com.example.blockednew",
+      "action": "block",
+      "reason": "app-blocked",
+      "ruleId": null
+    },
+    {
+      "pkg": "com.whatsapp",
+      "action": "allow",
+      "reason": null,
+      "ruleId": null
+    },
+    {
+      "pkg": "com.example.allowed",
+      "action": "allow",
+      "reason": null,
+      "ruleId": null
+    },
+    {
+      "pkg": "com.oneplus.camera",
+      "action": "allow",
+      "reason": null,
+      "ruleId": null
+    }
+  ],
+  "browserNotApplicable": "Device-only: a browser has no installed apps to hold."
+}

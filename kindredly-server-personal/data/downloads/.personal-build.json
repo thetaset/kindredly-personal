@@ -1,7 +1,7 @@
 {
   "mode": "personal-prod",
   "personalServer": true,
-  "clientVersion": "3.1.5",
-  "internalSha": "ff5a96af833463aafdb3ec7bdb594f37fcad7a22",
-  "builtAt": "2026-11-02T23:21:23Z"
+  "clientVersion": "3.1.6",
+  "internalSha": "e93d09a1a27b5b69cd2fee2eb25b0f569c96a9ea",
+  "builtAt": "2026-11-07T22:05:33Z"
 }

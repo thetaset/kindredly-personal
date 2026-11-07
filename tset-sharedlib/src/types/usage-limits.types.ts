@@ -213,10 +213,10 @@ export interface CheckpointRelease {
 }
 
 /**
- * The most extra time a day each limit can be given (HAT-950), by limit id: minutes, or 'any'. A
- * limit missing here takes up to its own daily limit; 0 takes none.
+ * The most extra time a day each limit can be given (HAT-950), by limit id: minutes, 'same' (up to
+ * its own daily limit) or 'any'. A limit missing here takes any amount (HAT-998); 0 takes none.
  */
-export type ExtraTimeMax = Record<string, number | 'any'>;
+export type ExtraTimeMax = Record<string, number | 'any' | 'same'>;
 
 export interface AccessControlSettings {
   /** See ExtraTimeMax. */

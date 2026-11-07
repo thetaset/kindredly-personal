@@ -1,1 +1,0 @@
-import{d as p,N as m,F as a}from"./vue-runtimetcX7J1Xt.js";const F=p({name:"FillText",props:{text:{type:String,required:!0}},setup(n,{slots:e}){return()=>m(a,n.text.split(/\{(\w+)\}/).map((t,i)=>{var r;return i%2===0?t:((r=e[t])==null?void 0:r.call(e))??`{${t}}`}))}});export{F};

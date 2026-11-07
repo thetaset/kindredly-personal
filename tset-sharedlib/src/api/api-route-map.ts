@@ -2897,9 +2897,25 @@ export interface ApiRouteMap {
    * to carry readable text, and "Roblox was installed" is not browsing history.
    */
   "/companion/apps/reportNew": {
-    /** `platform` is the app list's (absent = Android), so the notice says phone or computer. */
-    request: { pkgs: string[]; labels?: string[]; platform?: string };
+    /**
+     * `platform` is the app list's (absent = Android), so the notice says phone or computer.
+     * `waiting`: the reported apps the device holds for a guardian (New apps start blocked, NAP-6),
+     * so the notice says "waiting" only when the device itself does.
+     */
+    request: { pkgs: string[]; labels?: string[]; platform?: string; waiting?: string[] };
     response: { ok: boolean; notified?: number };
+  };
+  /**
+   * SERVER route, device token only (NAP-5, DCP-22). The desktop Companion storing its own app list,
+   * so a guardian's App controls is current with no browser open on that computer.
+   *
+   * End-to-end encrypted with the device's own key, exactly as its app-time upload is
+   * (`encryptForPush`), so the guardian's client reads it with the code that reads the browser's copy.
+   * The row is the token's child's, under the token's device: the body names neither.
+   */
+  "/companion/apps/inventory": {
+    request: { data: { encryptedData: string }; encInfo: { v: number; iv: string; keys: unknown[] } };
+    response: { ok: boolean };
   };
   /**
    * SERVER route, device token only. Answers with NO `ruleSet` since DCP-2 (2026-09-13).
@@ -5577,7 +5593,39 @@ export interface ApiRouteMap {
   };
   "/system/status": {
     request: {};
-    response: { underAccountLimit?: boolean; allowInviteCode?: boolean | null };
+    response: {
+      underAccountLimit?: boolean;
+      allowInviteCode?: boolean | null;
+      /** A server the family runs itself: email is optional at sign-up (HAT-1027). */
+      personalServer?: boolean;
+      /** Set up already, so a new family needs a sign-up link from its admin (HAT-1022). */
+      signupNeedsLink?: boolean;
+    };
+  };
+  // --- The person who set up a self-hosted server (HAT-1022) ----------------
+  // Refused on Kindredly's own servers and for anyone but that person. Both links stand in for the
+  // email a self-hosted server cannot send; the family still chooses its own password.
+  "/box/admin/status": {
+    request: {};
+    response: {
+      isBoxAdmin: boolean;
+      families: Array<{
+        accountId: string;
+        createdAt: string | null;
+        members: Array<{
+          userId: string;
+          username: string | null;
+          displayedName: string | null;
+          type: string;
+          canReset: boolean;
+        }>;
+      }>;
+    };
+  };
+  "/box/admin/signupLink": { request: {}; response: { code: string; expiresAt: string } };
+  "/box/admin/resetLink": {
+    request: { userId: string };
+    response: { code: string; kind: "reset" | "recovery"; expiresAt: string };
   };
   "/system/version": { request: {}; response: ServerVersionInfo };
   "/system/updateCheck": { request: {}; response: PersonalUpdateInfo };

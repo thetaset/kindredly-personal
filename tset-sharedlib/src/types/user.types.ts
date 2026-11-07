@@ -35,6 +35,8 @@ export enum VerificationType {
   accountRecovery = 'accountRecovery',
   regToken = 'regToken',
   confirmEmail = 'confirmEmail',
+  /** A self-hosted server's sign-up link for a new family (HAT-1022). */
+  boxSignup = 'boxSignup',
 }
 
 export interface UserOptions {

@@ -1,4 +1,5 @@
 import {config} from '@/config';
+import {BoxAdminService, isSelfHosted} from '@/services/box_admin.service';
 import {AccountRepo} from '@/db/account.repo';
 import {UserRepo} from '@/db/user.repo';
 import {RefStateRepo} from '@/db/ref_state.repo';
@@ -129,6 +130,18 @@ class AuthService {
       }
     }
 
+    // HAT-1022: once a self-hosted server is set up, a new family needs a sign-up link from the
+    // person who set it up. Joining an existing family (an invite code above) needs none.
+    const box = BoxAdminService.instance;
+    const boxSignupCode: string | null = (userData.refData as any)?.boxSignupCode ?? null;
+    const boxHasOwner = isSelfHosted() && !verificationCode && !!(await box.ownerUserId());
+    if (boxHasOwner && !(await box.signupCodeValid(boxSignupCode))) {
+      throw new HttpException(
+        403,
+        'This server takes new families only with a sign-up link from the person who set it up.',
+      );
+    }
+
     await this.authValidatorService.validateUserCredentialsForRegistration(userData);
 
     await this._checkEmailExists(userData.email);
@@ -144,6 +157,12 @@ class AuthService {
 
     if (!user) {
       throw new HttpException(400, 'Failed to create account');
+    }
+
+    if (isSelfHosted()) {
+      // The first family on a self-hosted server is the person who set it up.
+      if (boxHasOwner && boxSignupCode) await box.useSignupCode(boxSignupCode);
+      else if (!verificationCode && !(await box.ownerUserId())) await box.recordOwner(user._id);
     }
 
     try {
@@ -239,10 +258,10 @@ class AuthService {
     ) {
       throw new Error(ERROR_MESSAGE.USERNAME_TAKEN);
     }
-    if (
-      (userData.loginType == LoginType.internal || !!userData.email) &&
-      (await this.userService._checkEmailExists(userData.email))
-    ) {
+    // `_checkEmailExists('')` answers true, which turns "no email" into "email taken". On a
+    // personal server an email is optional (HAT-1027), so only a real one is checked there.
+    const emailRequired = userData.loginType == LoginType.internal && !config.privateServer;
+    if ((emailRequired || !!userData.email) && (await this.userService._checkEmailExists(userData.email))) {
       throw new Error(ERROR_MESSAGE.EMAIL_TAKEN);
     }
 

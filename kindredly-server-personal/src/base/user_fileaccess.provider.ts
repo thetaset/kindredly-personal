@@ -1,5 +1,14 @@
 import {Readable} from 'stream';
 
+/**
+ * Whether a stored object name belongs to `filename`: the file itself, or one of its pieces.
+ * A large file is stored as `<filename>__chunk_<n>` and nothing under `<filename>`, so deleting a
+ * file has to delete the pieces too (HAT-1007).
+ */
+export function isFileGroupMember(name: string, filename: string): boolean {
+  return name === filename || name.startsWith(`${filename}__chunk_`);
+}
+
 export interface UserFileAccessProvider {
   uploadImageDirect(imageData, filename: string, prefix?: string): Promise<string>;
 
@@ -30,4 +39,11 @@ export interface UserFileAccessProvider {
   getImageStream(filename): Promise<Readable>;
 
   removeFile(refType: string, refId: string, filename: string): Promise<void>;
+
+  /**
+   * Delete a file and every part stored beside it. A file sent in pieces (a large attachment) is
+   * stored as `<filename>__chunk_<n>` objects and has no object under `<filename>` at all, so
+   * `removeFile` left every chunk behind (HAT-1007).
+   */
+  removeFileGroup(refType: string, refId: string, filename: string): Promise<void>;
 }

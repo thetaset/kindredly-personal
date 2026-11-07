@@ -1,3 +1,4 @@
+import {BoxAdminService, isSelfHosted} from '@/services/box_admin.service';
 import PluginService from '@/services/plugin.service';
 import {Routes} from '@interfaces/routes.interface';
 import {NextFunction, Router, Request, Response} from 'express';
@@ -40,7 +41,15 @@ class SystemRoute implements Routes {
       try {
         console.log('systemStatus');
         const results = await this.setupService.systemInfo();
-        res.status(201).json({success: true, message: 'request complete', results});
+        // HAT-1022, HAT-1027: what a sign-up page needs to know before showing its form. A
+        // self-hosted server makes email optional and, once set up, takes new families only with a
+        // sign-up link from the person who set it up.
+        const box = BoxAdminService.instance;
+        res.status(201).json({
+          success: true,
+          message: 'request complete',
+          results: {...results, personalServer: isSelfHosted(), signupNeedsLink: await box.signupNeedsLink()},
+        });
       } catch (error) {
         next(error);
       }

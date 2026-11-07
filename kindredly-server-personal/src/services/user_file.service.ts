@@ -614,7 +614,7 @@ class UserFileService {
     }
     await ctx.verifySelfOrAdmin(userFile.userId);
 
-    await this.fileAccessProvider.removeFile(userFile.refType, userFile.refId, userFile.filename);
+    await this.fileAccessProvider.removeFileGroup(userFile.refType, userFile.refId, userFile.filename);
     await this.userFileRepo.deleteWithId(id);
   }
 

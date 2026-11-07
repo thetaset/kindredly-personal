@@ -69,6 +69,17 @@ export interface DeviceAppInventoryEntry {
    */
   firstSeenAt?: number;
   /**
+   * Android: when the phone says the app was installed (`PackageInfo.firstInstallTime`), sent by
+   * Kindredly Companion for phones (NAP-8). A phone app's arrival for New apps start blocked, so Guard,
+   * which keeps no list of its own, and the guardian's screens decide alike.
+   */
+  installedAt?: number;
+  /**
+   * Android: when Kindredly Companion for phones told the guardian about this app itself (NAP-7), so
+   * Kindredly's own list read does not tell them again.
+   */
+  reportedAt?: number;
+  /**
    * Android's own `ApplicationInfo.category` (API 26+). Omitted when UNDEFINED(-1).
    * Developer-self-reported, so it is a hint, not the truth — the curated seed map
    * in kinds/appCategorySeed.ts deliberately outranks it.
@@ -165,8 +176,23 @@ export interface DeviceAppPolicy {
    * now ignores it and every save from Blocked or Counting rules drops it. Kept so old rows parse.
    */
   countInUsageLimits?: boolean;
-  /** Last time the parent saved, for the "new since you last looked" set. */
+  /**
+   * When a guardian last pressed Mark all seen on All apps (HAT-1044): an app first seen before it is
+   * not new. Until 2026-11-07 every save set it.
+   */
   reviewedAt?: number;
+  /**
+   * Apps a guardian left open from All apps' New section, by app id (`<platform>:<pkg>`), with when.
+   * Readable, as the rest of the policy is: a new app's name already reaches the server in its notice.
+   * Entries before `reviewedAt` say nothing more and are dropped on save.
+   */
+  seenApps?: Record<string, number>;
+  /**
+   * New apps start blocked (NAP-6, HAT-1046): when a guardian turned it on; absent is off. An app
+   * first seen on a device after this, and after the device's first list, is blocked there until a
+   * guardian decides about it or leaves it open. Apps that came with the device are never blocked.
+   */
+  newAppsBlockedAt?: number;
   updatedAt: number;
 }
 
@@ -190,6 +216,12 @@ export interface CompiledAppPolicy {
   /** Platform-qualified identities. Desktop uses this when present so an Android
    * package with the same name cannot block or allow the desktop app. */
   scopedBlocked?: string[];
+  /**
+   * Of the blocked apps, the ones blocked only for being new (NAP-6), platform-qualified. They are
+   * in `blocked` and `scopedBlocked` too, so a device that does not read this still blocks them; it
+   * picks the shield's words ("Among Us is new").
+   */
+  newApps?: string[];
 }
 
 /**

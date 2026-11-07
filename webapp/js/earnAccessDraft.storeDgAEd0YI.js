@@ -1,1 +1,0 @@
-import{a2 as e}from"./vue-runtimetcX7J1Xt.js";const s=e({});function u(n,t,r){s[n]={userId:t,rule:JSON.parse(JSON.stringify(r))}}function c(n,t){if(!n)return null;const r=s[n];return!r||(r.userId||null)!==(t||null)?null:JSON.parse(JSON.stringify(r.rule))}export{u as p,c as t};
