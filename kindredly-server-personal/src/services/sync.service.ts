@@ -90,6 +90,10 @@ class SyncService {
     let fullResetRequest = false;
     let fullResetReason: string | undefined;
     const updatedItemIdsSet = new Set<string>();
+    // Ids named by at least one row that is not `detailsOnly`. A changed collection is sent with
+    // its members only when it is in here, so one row without the flag (a share, a subscription,
+    // a move into a shared parent, any row written before SYNC-17) is enough to expand it.
+    const expandItemIdsSet = new Set<string>();
     if (cursor.lastRevision == null && !cursor.lastUpdate) {
       fullResetRequest = true;
       fullResetReason = 'noCursor';
@@ -114,7 +118,11 @@ class SyncService {
       for (const v of lst) {
         const data = v.data as DynamicObject;
         if (data?.type == SyncType.itemUpdate && Array.isArray(data.items)) {
-          for (const itemId of data.items) updatedItemIdsSet.add(itemId);
+          const expand = data.detailsOnly !== true;
+          for (const itemId of data.items) {
+            updatedItemIdsSet.add(itemId);
+            if (expand) expandItemIdsSet.add(itemId);
+          }
         } else if (data?.type == SyncType.fullReset) {
           fullResetRequest = true;
           break;
@@ -183,7 +191,10 @@ class SyncService {
 
     // Otherwise, get changed items only
 
-    return {...(await this._syncPartial(ctx, targetUserId, updatedItemIdsSet, opts.chunked === true)), revision};
+    return {
+      ...(await this._syncPartial(ctx, targetUserId, updatedItemIdsSet, opts.chunked === true, expandItemIdsSet)),
+      revision,
+    };
   }
 
   /**
@@ -264,11 +275,13 @@ class SyncService {
     targetUserId: string,
     updatedItemIdsSet: Set<string>,
     chunked: boolean = false,
+    // Which changed ids may be expanded into their members; every one of them when not given.
+    expandItemIdsSet: Set<string> = updatedItemIdsSet,
   ): Promise<ItemChangeLogUpdate> {
     // ************************ADDED ITEMS***********************
     // Cases:
     // 1 - items in change log
-    // 2 - items in collections that were added
+    // 2 - items in collections that were added, or whose rows do not all say `detailsOnly`
 
     const updatedItemsInLibrary =
       updatedItemIdsSet.size > 0
@@ -286,7 +299,11 @@ class SyncService {
       .filter((v) => v.details.type == ItemTypeEnum.collection)
       .map((v) => v.details);
 
-    const updatedCollectionIds = updatedCollectionsInLibrary.map((v) => v._id);
+    // A collection is sent with every member, in full, because that is how its items reach someone
+    // who has just been given it. A change to its own details alone (a rename, a picture) gives no
+    // one anything new, so it is sent alone: a rename of a shared collection of 200 used to send
+    // 201 full items to every device of every person on it (SYNC-17).
+    const updatedCollectionIds = updatedCollectionsInLibrary.map((v) => v._id).filter((id) => expandItemIdsSet.has(id));
 
     // get items added because collection was added
     const additionalAddedItemIdsSet = new Set(

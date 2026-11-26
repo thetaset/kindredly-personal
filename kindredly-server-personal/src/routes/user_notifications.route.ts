@@ -50,6 +50,34 @@ class UserNotificationsRoute implements Routes {
     );
 
     // SCH-OK
+    // A child's own device: they asked for a Helper AI helper (HAT-1105). The service decides who is
+    // told and what it says; the request carries nothing, so its words never reach the server.
+    this.router.post(
+      '/user/notification/helperAsked',
+      authenticateJWT,
+      errorHelper(async (req: ApiReq<'/user/notification/helperAsked'>, res) => {
+        const results = await this.notificationService.addHelperRequestNotification(RequestContext.instance(req));
+        res.json({success: true, results});
+      }),
+    );
+
+    // SCH-OK
+    // A child's own device: their helper asked their adults a question (HAT-1105, HAI-10). Carries
+    // nothing; the question stays in the child's encrypted progress.
+    this.router.post(
+      '/user/notification/helperQuestion',
+      authenticateJWT,
+      errorHelper(async (req: ApiReq<'/user/notification/helperQuestion'>, res) => {
+        const results = await this.notificationService.addHelperRequestNotification(
+          RequestContext.instance(req),
+          Date.now(),
+          'question',
+        );
+        res.json({success: true, results});
+      }),
+    );
+
+    // SCH-OK
     this.router.post(
       '/user/notification/list',
       authenticateJWT,

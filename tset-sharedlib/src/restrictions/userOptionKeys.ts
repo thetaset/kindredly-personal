@@ -22,6 +22,11 @@ export const USER_OPTION_SWITCH_KEYS = [
   'aiToolsEnabled',
   /** Web search inside Kinbot (HAT-288). Absent = off. */
   'aiWebSearchEnabled',
+  /**
+   * Helper AI (HAT-1105): set when an adult saves a helper for this child, so the server admits
+   * their helper chat while Kinbot and AI tools stay off (`personAllowsHelpers`). Absent = off.
+   */
+  'aiHelpersEnabled',
   'assistantReviewEnabled',
   'appEditorEnabled',
   'commandBarEnabled',
@@ -39,6 +44,8 @@ export const USER_OPTION_SWITCH_KEYS = [
   'companionDevicesEnabled',
   'remoteChildActionsEnabled',
   'shoppingCartEnabled',
+  /** Offline saves (HAT-1225, OFS-5): an adult's changes save on the device first. Absent = off. */
+  'offlineSavesEnabled',
 ] as const;
 
 /** Stored exactly as sent: whole objects their pages read, change and write back. */

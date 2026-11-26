@@ -25,14 +25,28 @@ export type AppGrant = {
 /** What a device needs: the app and the end. Who said yes stays on the server. */
 export type DeviceAppGrant = { appId: string; until: number }
 
-/** The choices a guardian has. `today` ends at the guardian's local midnight. */
-export type AppGrantDuration = 15 | 60 | 'today'
+/**
+ * How long a guardian allows the app: minutes from now, or `today`, which ends at the guardian's
+ * local midnight. 15 minutes, an hour and today are one tap; any other amount is typed (HAT-1377).
+ */
+export type AppGrantDuration = number | 'today'
 
 /** More than this many live grants for one child is a mistake, not a decision. */
 export const MAX_APP_GRANTS = 50
 
 /** A grant longer than a day is a rule change, which belongs on the App blocking page. */
 export const MAX_APP_GRANT_MS = 24 * 60 * 60_000
+
+/** The most minutes a typed amount can be: a day. */
+export const MAX_APP_GRANT_MINUTES = MAX_APP_GRANT_MS / 60_000
+
+/** A typed amount as whole minutes, or null when it is not 1 minute to a day. */
+export function appGrantMinutes(raw: unknown): number | null {
+  const minutes = typeof raw === 'number' ? raw : typeof raw === 'string' && raw.trim() ? Number(raw) : NaN
+  if (!Number.isFinite(minutes)) return null
+  const whole = Math.round(minutes)
+  return whole >= 1 && whole <= MAX_APP_GRANT_MINUTES ? whole : null
+}
 
 const APP_ID = /^(android|macos|linux|windows|ios|steam):\S{1,300}$/
 
@@ -67,7 +81,7 @@ export function deviceAppGrants(raw: unknown): DeviceAppGrant[] {
 
 /** When a grant made at `nowMs` ends. `today` is the next local midnight in `tzOffsetMinutes` (local minus UTC). */
 export function appGrantUntil(duration: AppGrantDuration, nowMs: number, tzOffsetMinutes: number): number {
-  if (duration === 15 || duration === 60) return nowMs + duration * 60_000
+  if (typeof duration === 'number') return nowMs + (appGrantMinutes(duration) ?? 0) * 60_000
   const dayMs = 24 * 60 * 60_000
   const offsetMs = tzOffsetMinutes * 60_000
   return (Math.floor((nowMs + offsetMs) / dayMs) + 1) * dayMs - offsetMs

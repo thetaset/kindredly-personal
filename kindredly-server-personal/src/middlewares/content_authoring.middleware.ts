@@ -4,6 +4,7 @@ import {AI_OFF_FOR_PERSON, personAllowsAiTools} from 'tset-sharedlib/family-ai';
 import {getSharedPlanPolicy} from 'tset-sharedlib/plan-policy';
 import {FEED_BUILDER_CHAT_MODE, FEED_BUILDER_UNAVAILABLE} from 'tset-sharedlib/track-generation';
 import {LESSON_BUILDER_CHAT_MODE, LESSON_BUILDER_UNAVAILABLE} from 'tset-sharedlib/lesson-authoring';
+import {PROJECT_FILL_FOR_ADULTS} from 'tset-sharedlib/project-generation';
 
 export const CONTENT_AUTHORING_PLUS_MESSAGE = 'Writing lessons and learning feeds with Kindredly AI is part of Plus.';
 
@@ -90,5 +91,32 @@ export async function requireBuilderChat(req: Request, res: Response, next: Next
   } catch (error: any) {
     console.error('[content_authoring] could not check the builder chat', error);
     if (!res.headersSent) res.status(500).json({success: false, message: 'Could not check the plan.', statusCode: 500});
+  }
+}
+
+/**
+ * Refuses a child (a restricted user): filling a Project with AI is for adults (projects Decision 3,
+ * PRJ-6). `requireContentAuthoring` admits a child whose AI tools are on, and `requireBuilderChat`
+ * only reads the builder chat modes, so this runs after the first on the project routes.
+ *
+ * Mount it after `requireContentAuthoring` and before `aiCostGuard`, so a refused request takes no
+ * hold on the family's limits. A 428, never a 403: installed clients sign out on an auth status.
+ */
+export async function refuseRestricted(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const user = await RequestContext.instance(req).getCurrentUser();
+    if (user?.type === 'restricted') {
+      res.status(428).json({
+        success: false,
+        errorType: PROJECT_FILL_FOR_ADULTS,
+        message: 'Filling a project with AI is for adults.',
+      });
+      return;
+    }
+    next();
+  } catch (error: any) {
+    console.error('[content_authoring] could not check who is asking', error);
+    if (!res.headersSent)
+      res.status(500).json({success: false, message: 'Could not check who is asking.', statusCode: 500});
   }
 }

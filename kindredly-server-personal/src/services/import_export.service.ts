@@ -28,6 +28,7 @@ import {
 import {OFFICIAL_PUBLISHER_PUBLIC_ID, OFFICIAL_PUBLISHER_USERNAME} from 'tset-sharedlib/constants';
 import {urlToKey} from 'tset-sharedlib/text.utils';
 import {mapLegacyCategoryIds} from 'tset-sharedlib/publishedCategoryMapping';
+import {moveRetiredTopicTags} from 'tset-sharedlib/content.types';
 import {v4 as uuidv4} from 'uuid';
 // TYPE-ONLY. These three live under services/_internal, which is withheld from
 // the published Kindredly Personal repo — and this file cannot be withheld with
@@ -360,6 +361,11 @@ class ImportExportService {
         batchSource: 'package',
       };
       const nextInfo = setPostImportProcessingOnInfo(importedInfo as any, processing);
+      // A retired topic tag becomes its Topics tree topic or its format tag (CLS-11).
+      const tags = moveRetiredTopicTags({
+        useCriteria: this.normalizeStringArray(record.useCriteria),
+        categories: mapLegacyCategoryIds(this.normalizeStringArray(record.categories)),
+      });
 
       const payload = this.publishedItemSchemaUpdater({
         ...(existing || {}),
@@ -371,8 +377,8 @@ class ImportExportService {
         subType: (record.subType as any) || existing?.subType || null,
         name: record.name,
         description: record.description || null,
-        categories: mapLegacyCategoryIds(this.normalizeStringArray(record.categories)),
-        useCriteria: this.normalizeStringArray(record.useCriteria),
+        categories: tags.categories,
+        useCriteria: tags.useCriteria,
         imageFilename: importedAssets.imageFilename,
         published:
           importVisibility === 'preserve'

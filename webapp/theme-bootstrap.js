@@ -167,7 +167,24 @@
       return null;
     }
     if (params.get('blockType') === 'downtime' || params.get('intervention') === '1') return null;
+    // While the block page shows inspiration in the shield's spot (HAT-1216), a picture or a line on
+    // its own, the first frame is the theme colour alone: drawing a shield that then turns into a
+    // painting or a quote is the flash to avoid. Recorded by
+    // src/app/inspiration/inspirationLibrary.ts (rememberInspirationShown). A check-in block keeps
+    // its shield, but its reason is not on the address (a child could change it), so its first frame
+    // is the colour alone too, and the page fades in over it.
+    if (resolveInspirationShown()) return 'none';
     return params.get('blockType') === 'time' ? 'clock-history' : 'shield-fill';
+  }
+
+  // Nothing recorded yet (a new device, cleared data) counts as shown: it is on by default, and
+  // the first block on a device is the one that fetches a picture (HAT-1261, HAT-1267).
+  function resolveInspirationShown() {
+    try {
+      return window.localStorage.getItem('knd:ui:blockedPage:inspiration') !== '0';
+    } catch (error) {
+      return true;
+    }
   }
 
   var blockedBadge = resolveBlockedBadge();
@@ -185,4 +202,44 @@
       applyBigSimple(window.__KND_BOOT_BIG_SIMPLE__ === true);
     }, { once: true });
   }
+
+  /**
+   * An extension page starts opening its local database here, while the app's code loads
+   * (HAT-1208). The app's first read (who is signed in) otherwise opened it only once all of that
+   * code had run, and the first open of a page is the slow one. This connection reads nothing: it
+   * never creates the database (a first start leaves that to the app's own schema), closes for an
+   * upgrade, and closes once the app has had time to open its own. The name is DB_NAME in
+   * src/core/storage/AppDatabase.ts.
+   */
+  function startOpeningAppDatabase() {
+    if (!/^(chrome|moz)-extension:$/.test(window.location.protocol)) return;
+    if (!window.indexedDB) return;
+    try {
+      var request = window.indexedDB.open('kindredly_app');
+      request.onupgradeneeded = function () {
+        try {
+          request.transaction.abort();
+        } catch (error) {
+          // Already ending.
+        }
+      };
+      request.onsuccess = function () {
+        var db = request.result;
+        db.onversionchange = function () {
+          db.close();
+        };
+        window.setTimeout(function () {
+          db.close();
+        }, 5000);
+      };
+      request.onerror = function (event) {
+        // No database yet, or storage refused: the app's own open reports what matters.
+        if (event && event.preventDefault) event.preventDefault();
+      };
+    } catch (error) {
+      // Storage unavailable here: the app opens it as before.
+    }
+  }
+
+  startOpeningAppDatabase();
 })();

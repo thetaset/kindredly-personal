@@ -1,0 +1,1 @@
+import{U as a}from"./appHandoffGuestD3H_h1r5.js";const s=[{value:a.admin,label:"Guardian",description:"Full access to the family’s settings, children and subscription."},{value:a.restricted,label:"Child",description:"Managed by a guardian: limits, filters and requests apply."}],i=new Map(s.map(e=>[e.value,e]));function l(e){return e&&i.get(e)||s[1]}export{l as u};

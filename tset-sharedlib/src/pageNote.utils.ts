@@ -86,11 +86,55 @@ export function youTubeVideoIdOf(url: string | null | undefined): string | null 
 }
 
 /**
+ * A file in Kindredly (a PDF in an item, PGN-20) has no web address, so its notes are filed under
+ * `kindredly-file:<fileId>`; an item seen in Kindredly's own viewer (a video file on its item page,
+ * a book in the ebook reader, HAT-1068) under `kindredly-item:<itemId>`. No URL parser here accepts
+ * either, so neither can become a URL pattern, a reminder's site or anything that opens a page; the
+ * app opens the file or the item itself.
+ */
+const FILE_KEY_PREFIX = 'kindredly-file:';
+const ITEM_KEY_PREFIX = 'kindredly-item:';
+const FILE_ID = /^[A-Za-z0-9_.-]{1,128}$/;
+
+/** The key notes about a file in Kindredly are filed under, or null for an id that is not one. */
+export function pageNoteFileKey(fileId: string | null | undefined): string | null {
+  const id = String(fileId ?? '').trim();
+  return FILE_ID.test(id) ? `${FILE_KEY_PREFIX}${id}` : null;
+}
+
+/** The file a note is about, from its key or source; null for a web page. */
+export function pageNoteFileIdOf(key: string | null | undefined): string | null {
+  const raw = String(key ?? '').trim();
+  if (!raw.startsWith(FILE_KEY_PREFIX)) return null;
+  const id = raw.slice(FILE_KEY_PREFIX.length);
+  return FILE_ID.test(id) ? id : null;
+}
+
+/** The key notes about an item in Kindredly are filed under, or null for an id that is not one. */
+export function pageNoteItemKey(itemId: string | null | undefined): string | null {
+  const id = String(itemId ?? '').trim();
+  return FILE_ID.test(id) ? `${ITEM_KEY_PREFIX}${id}` : null;
+}
+
+/** The item a note is about, from its key or source; null for a web page or a file. */
+export function pageNoteItemIdOf(key: string | null | undefined): string | null {
+  const raw = String(key ?? '').trim();
+  if (!raw.startsWith(ITEM_KEY_PREFIX)) return null;
+  const id = raw.slice(ITEM_KEY_PREFIX.length);
+  return FILE_ID.test(id) ? id : null;
+}
+
+/**
  * The key a page's notes are filed under: one key for every form of one page. Every form of a YouTube
  * video gives its watch address; any other page is `cleanURL`'s address without `www.`, the part after
- * `#`, or tracking parameters. Null for anything that is not a web page.
+ * `#`, or tracking parameters. A file's or an item's key (above) stays as it is. Null for anything
+ * else.
  */
 export function pageNoteKey(url: string | null | undefined): string | null {
+  const fileId = pageNoteFileIdOf(url);
+  if (fileId) return pageNoteFileKey(fileId);
+  const itemId = pageNoteItemIdOf(url);
+  if (itemId) return pageNoteItemKey(itemId);
   const parsed = parseWebUrl(url);
   if (!parsed) return null;
 
@@ -114,7 +158,7 @@ export function pageNoteKey(url: string | null | undefined): string | null {
   }
 }
 
-/** Whether notes can be taken on this address: any web page. */
+/** Whether notes can be taken on this address: any web page, or a file or an item in Kindredly. */
 export function canTakePageNotes(url: string | null | undefined): boolean {
   return pageNoteKey(url) !== null;
 }

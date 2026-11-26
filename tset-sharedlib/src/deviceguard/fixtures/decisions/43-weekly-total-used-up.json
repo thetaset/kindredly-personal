@@ -1,0 +1,107 @@
+{
+  "id": "43-weekly-total-used-up",
+  "behaviour": "A weekly total used up blocks the limit's apps even with today's time left (HAT-1086): the week's web time from the seed plus this device's app time since Monday reach it.",
+  "clock": {
+    "nowMs": 1789491600000,
+    "familyTimeZone": "America/Los_Angeles",
+    "deviceTimeZone": "America/Los_Angeles"
+  },
+  "settings": {
+    "usageLimitsData": {
+      "contentUsageLimits": [
+        {
+          "id": "simple-custom-games",
+          "name": "Games",
+          "type": "advanced",
+          "conditions": [
+            {
+              "type": "attribute",
+              "values": [
+                "game"
+              ]
+            }
+          ],
+          "timeLimits": [
+            {
+              "hours": 1,
+              "daysOfWeek": [
+                0,
+                1,
+                2,
+                3,
+                4,
+                5,
+                6
+              ]
+            }
+          ],
+          "weeklyHours": 5
+        }
+      ],
+      "temporaryRules": []
+    },
+    "ruleOverrideSettings": {
+      "ruleOverrides": []
+    },
+    "accessControlSettings": {},
+    "appPolicy": null,
+    "appPolicyStatus": "absent"
+  },
+  "installedApps": [
+    {
+      "pkg": "com.roblox.client",
+      "label": "Roblox",
+      "platform": "android"
+    },
+    {
+      "pkg": "com.mojang.minecraftpe",
+      "label": "Minecraft",
+      "platform": "android"
+    },
+    {
+      "pkg": "com.duolingo",
+      "label": "Duolingo",
+      "platform": "android"
+    }
+  ],
+  "floor": [],
+  "usage": {
+    "appMsByPkg": {
+      "com.roblox.client": 1200000
+    },
+    "weekAppMsByPkg": {
+      "com.roblox.client": 2400000
+    },
+    "webLogs": []
+  },
+  "usageSeed": {
+    "perRuleUsedMs": {
+      "simple-custom-games": 600000
+    },
+    "weekKey": "2026-09-14",
+    "perRuleWeekUsedMs": {
+      "simple-custom-games": 16200000
+    }
+  },
+  "expectDevice": [
+    {
+      "pkg": "com.roblox.client",
+      "action": "block",
+      "reason": "budget-exhausted",
+      "ruleId": "simple-custom-games"
+    },
+    {
+      "pkg": "com.mojang.minecraftpe",
+      "action": "block",
+      "reason": "budget-exhausted",
+      "ruleId": "simple-custom-games"
+    },
+    {
+      "pkg": "com.duolingo",
+      "action": "allow",
+      "reason": null,
+      "ruleId": null
+    }
+  ],
+  "browserNotApplicable": "Device-only: the week's earlier days reach the device as the usage seed's perRuleWeekUsedMs, and app time since Monday exists only on the device. The browser's weekly total is tested with UsageSummaryCache."
+}

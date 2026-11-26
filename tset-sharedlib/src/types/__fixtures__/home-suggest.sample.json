@@ -1,0 +1,33 @@
+{
+  "own": {
+    "v": 1,
+    "userId": "u-1",
+    "searches": ["volcanoes", "fractions"],
+    "links": [
+      { "title": "Khan Academy math", "url": "https://www.khanacademy.org/math" },
+      { "title": "example.org", "url": "https://example.org/a" }
+    ],
+    "savedAt": 1763000000000
+  },
+  "sites": {
+    "v": 1,
+    "userId": "u-1",
+    "isChild": true,
+    "classifierVersionId": "v7",
+    "sites": [
+      { "domain": "khanacademy.org", "name": "Khan Academy", "eduValue": "eduval_educational" },
+      { "domain": "pbskids.org", "name": "PBS Kids", "eduValue": "eduval_edutainment" }
+    ],
+    "savedAt": 1763000000000
+  },
+  "catalog": {
+    "v": 1,
+    "userId": "u-1",
+    "isChild": true,
+    "items": [
+      { "id": "p1", "title": "Khan Academy", "url": "https://www.khanacademy.org", "type": "link" },
+      { "id": "p3", "title": "Science collection", "url": null, "type": "col" }
+    ],
+    "savedAt": 1763000000000
+  }
+}

@@ -153,7 +153,82 @@ html[data-knd-boot-badge="clock-history"] {
   --knd-boot-badge-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M8.515 1.019A7 7 0 0 0 8 1V0a8 8 0 0 1 .589.022zm2.004.45a7 7 0 0 0-.985-.299l.219-.976q.576.129 1.126.342zm1.37.71a7 7 0 0 0-.439-.27l.493-.87a8 8 0 0 1 .979.654l-.615.789a7 7 0 0 0-.418-.302zm1.834 1.79a7 7 0 0 0-.653-.796l.724-.69q.406.429.747.91zm.744 1.352a7 7 0 0 0-.214-.468l.893-.45a8 8 0 0 1 .45 1.088l-.95.313a7 7 0 0 0-.179-.483m.53 2.507a7 7 0 0 0-.1-1.025l.985-.17q.1.58.116 1.17zm-.131 1.538q.05-.254.081-.51l.993.123a8 8 0 0 1-.23 1.155l-.964-.267q.069-.247.12-.501m-.952 2.379q.276-.436.486-.908l.914.405q-.24.54-.555 1.038zm-.964 1.205q.183-.183.35-.378l.758.653a8 8 0 0 1-.401.432z'/%3E%3Cpath d='M8 1a7 7 0 1 0 4.95 11.95l.707.707A8.001 8.001 0 1 1 8 0z'/%3E%3Cpath d='M7.5 3a.5.5 0 0 1 .5.5v5.21l3.248 1.856a.5.5 0 0 1-.496.868l-3.5-2A.5.5 0 0 1 7 9V3.5a.5.5 0 0 1 .5-.5'/%3E%3C/svg%3E");
 }
 
+/* The Kindredly shield (HAT-1197): the page draws this mark above a check-in, so the first frame
+   draws the same one in the same spot — a plain shield that turned into the logo was a flash. It is
+   a fixed brand mark, not a theme-tinted glyph, because the page's is fixed too. */
+html[data-knd-boot-badge="shield-fill"] #knd-boot::before {
+  background: none;
+}
+
+html[data-knd-boot-badge="shield-fill"] #knd-boot::after {
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 52'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='24' y1='2' x2='24' y2='48' gradientUnits='userSpaceOnUse'%3E%3Cstop offset='0' stop-color='%233fb3e0'/%3E%3Cstop offset='1' stop-color='%231478b4'/%3E%3C/linearGradient%3E%3C/defs%3E%3Cpath d='M24 2.4 42.6 9.6v14.9c0 11.2-7.4 19.6-18.6 23.2C12.8 44.1 5.4 35.7 5.4 24.5V9.6L24 2.4Z' fill='url(%23g)'/%3E%3Ccircle cx='24' cy='22.4' r='7.6' fill='none' stroke='%23fff' stroke-width='3.4'/%3E%3Crect x='18.2' y='20.7' width='11.6' height='3.4' rx='1.7' fill='%23fff'/%3E%3C/svg%3E") center / 3.75rem 3.75rem no-repeat;
+  -webkit-mask: none;
+  mask: none;
+  filter: drop-shadow(0 8px 14px color-mix(in srgb, var(--bs-primary, #2771b7) 24%, transparent));
+}
+
+/* The block page shows a picture where its shield is (HAT-1216): the first frame is the theme colour
+   alone, with no shield to turn into a painting and no logo. */
+html[data-knd-boot-badge="none"] #knd-boot::before,
+html[data-knd-boot-badge="none"] #knd-boot::after {
+  content: none;
+}
+
 #knd-boot.knd-boot--handoff {
   background: transparent;
   pointer-events: none;
+}
+
+/* The copy of Home the extension new tab starts on (public/home-snapshot.js, HAT-1208): over the
+   start-up layer, whose wallpaper shows through it, until the app's own Home appears in the same
+   place. Shown as soon as it is put on the page, its later CSS with it; nothing in it animates,
+   since it stands for a page that has already arrived. */
+.knd-home-snapshot {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  overflow: hidden;
+  visibility: hidden;
+  /* The app lays itself out under it; its changes must not lay the copy out again. */
+  contain: strict;
+}
+
+.knd-home-snapshot.knd-home-snapshot--shown {
+  visibility: visible;
+}
+
+.knd-home-snapshot,
+.knd-home-snapshot * {
+  animation: none !important;
+  transition: none !important;
+}
+
+/* A click on the copy is carried out when the live Home appears. */
+.knd-home-snapshot.knd-home-snapshot--busy,
+.knd-home-snapshot.knd-home-snapshot--busy * {
+  cursor: progress !important;
+}
+
+/* When the live Home differs from the copy (a pin added elsewhere, a new Recent item), the copy fades
+   off it rather than the page jumping. Clicks go to the live page underneath. */
+.knd-home-snapshot.knd-home-snapshot--leaving {
+  pointer-events: none;
+  animation: kndHomeSnapshotLeave 180ms ease-out forwards !important;
+}
+
+@keyframes kndHomeSnapshotLeave {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .knd-home-snapshot.knd-home-snapshot--leaving {
+    animation: none !important;
+    opacity: 0;
+  }
+}
+
+/* The logo would come up through the copy on a slow start. */
+html.knd-home-snapshot-on #knd-boot .loading-overlay {
+  display: none;
 }

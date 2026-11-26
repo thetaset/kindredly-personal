@@ -19,7 +19,7 @@
 import type { CompiledAppPolicy, DeviceAppInventoryEntry, DeviceAppPolicy } from '../types/device-guard.types'
 import { isSystemFurniture, policyEntryFor, policyKeyFor } from './deviceAppPolicy'
 import { isNotScreenTimeApp } from './notScreenTime'
-import { platformPrefixOf, toDeviceAppId, type DevicePlatform } from '../restrictions/deviceAppIds'
+import { canEnforceAppBlocking, platformPrefixOf, toDeviceAppId, type DevicePlatform } from '../restrictions/deviceAppIds'
 
 /** The platform-qualified ids of one device's apps that wait for a guardian, sorted. */
 export function newAppsWaiting(
@@ -38,6 +38,9 @@ export function newAppsWaiting(
     const prefix = platformPrefixOf(app.pkg)
     const platform = (prefix || app.platform || 'android') as DevicePlatform
     const pkg = prefix ? app.pkg.slice(prefix.length + 1) : app.pkg
+    // Only where Kindredly offers app blocking: on Windows (DCP-12) a held app was blocked on the
+    // computer while App controls listed no switch to allow it (CMP-122).
+    if (!canEnforceAppBlocking(platform)) continue
     const entry = { ...app, pkg, platform }
     if (isSystemFurniture(entry) || isNotScreenTimeApp(entry, policy)) continue
     const appId = toDeviceAppId(platform, pkg)
@@ -69,5 +72,10 @@ export function withNewAppsBlocked(
     blocked.add(keyOf(appId))
     scopedBlocked.add(appId)
   }
-  return { blocked: [...blocked].sort(), scopedBlocked: [...scopedBlocked].sort(), newApps: waiting }
+  return {
+    ...compiled,
+    blocked: [...blocked].sort(),
+    scopedBlocked: [...scopedBlocked].sort(),
+    newApps: waiting,
+  }
 }

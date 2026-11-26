@@ -560,7 +560,7 @@ describe('renderCurationChecklistForPrompt', () => {
     const text = renderCurationChecklistForPrompt(v1, COLLECTION);
     for (const check of checksFor(v1, COLLECTION)) expect(text).toContain(`### ${check.key}: ${check.publicLabel}`);
     expect(text).not.toContain('### ads:');
-    expect(text).toContain('"eduval_junk" (Junk)');
+    expect(text).toContain('"eduval_junk" (Low Value)');
     expect(text).toContain('an empty list means none found');
   });
 

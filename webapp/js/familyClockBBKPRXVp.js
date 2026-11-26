@@ -1,0 +1,1 @@
+import{a as e,aV as i}from"./appHandoffGuestD3H_h1r5.js";function c(n=Date.now()){var o,a;const t=(a=(o=e.account)==null?void 0:o.options)==null?void 0:a.familyTimeZone;return i(n,t??null)}export{c as p};

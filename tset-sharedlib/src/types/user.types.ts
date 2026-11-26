@@ -62,6 +62,11 @@ export interface UserOptions {
    * it off for one person. Independent of Kinbot, so a child can have AI tools without chat.
    */
   aiToolsEnabled?: boolean;
+  /**
+   * Helper AI (HAT-1105): an adult made a helper for this person. Lets the server admit their helper
+   * chats while Kinbot and AI tools stay off (`personAllowsHelpers`). Admin-written, like `aiChatEnabled`.
+   */
+  aiHelpersEnabled?: boolean;
   /** Kinbot may search the web (HAT-288). Off until an admin turns it on (`personAllowsWebSearch`). */
   aiWebSearchEnabled?: boolean;
   /**
@@ -98,6 +103,11 @@ export interface UserOptions {
    * than in a userPref the person it describes can write.
    */
   emailEnabled?: boolean;
+  /**
+   * Offline saves (HAT-1225): this adult's changes to their own library save on the device first
+   * and are sent when the server can be reached. Experimental, admin-granted, never for a child.
+   */
+  offlineSavesEnabled?: boolean;
   /** Speech mode: talk to the assistant and hear the reply. Admin-granted per person. */
   speechModeEnabled?: boolean;
   /** The wake word inside speech mode. Admin-granted per person. */
@@ -180,6 +190,9 @@ export interface UserView extends User {
   // compares it against the revision it last synced to. Absent from an older server's
   // response, where the client falls back to comparing `updatedAt` dates.
   syncRevision?: number;
+  // What this server's code accepts beyond the original routes (`SERVER_SUPPORTS` in
+  // `api/serverSupports.ts`), listed when the user record is read. Absent from an older server.
+  serverSupports?: string[];
 }
 
 
@@ -210,6 +223,21 @@ export interface UserPreferences {
  * sides must agree on the exact key or the gate silently rejects everyone.
  */
 export const IMAGE_IMPROVEMENT_PREF_KEY = 'features.imageImprovement.enabled';
+
+/**
+ * The same agreement, given with the wording that also covers Category changes (CLS-12): a parent's
+ * change of a page's Category sends that page's address and title and both Categories. Set only by
+ * agreeing to that wording, so an agreement given before it covered them shares no Category changes.
+ */
+export const CATEGORY_CORRECTIONS_PREF_KEY = 'features.imageImprovement.categoryCorrections';
+
+/**
+ * The same agreement, given with the wording that also covers pages (CLS-19): this member's devices
+ * send, once a day, the pages they classified (address, title, description, text and the Category
+ * given), with nothing that says whose or when. Written onto each included member, as the agreement
+ * above is, because each device sends its own member's pages.
+ */
+export const PAGE_SHARING_PREF_KEY = 'features.imageImprovement.pages';
 
 export interface UserPrefsData {
   pinnedToHome?: string[];

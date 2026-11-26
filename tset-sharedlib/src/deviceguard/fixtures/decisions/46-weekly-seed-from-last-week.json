@@ -1,0 +1,105 @@
+{
+  "id": "46-weekly-seed-from-last-week",
+  "behaviour": "A week's usage seed counted last week is not counted this week (HAT-1086): on Monday the week starts again from this device's own app time.",
+  "clock": {
+    "nowMs": 1789401600000,
+    "familyTimeZone": "America/Los_Angeles",
+    "deviceTimeZone": "America/Los_Angeles"
+  },
+  "settings": {
+    "usageLimitsData": {
+      "contentUsageLimits": [
+        {
+          "id": "simple-custom-games",
+          "name": "Games",
+          "type": "advanced",
+          "conditions": [
+            {
+              "type": "attribute",
+              "values": [
+                "game"
+              ]
+            }
+          ],
+          "timeLimits": [
+            {
+              "hours": 1,
+              "daysOfWeek": [
+                0,
+                1,
+                2,
+                3,
+                4,
+                5,
+                6
+              ]
+            }
+          ],
+          "weeklyHours": 2
+        }
+      ],
+      "temporaryRules": []
+    },
+    "ruleOverrideSettings": {
+      "ruleOverrides": []
+    },
+    "accessControlSettings": {},
+    "appPolicy": null,
+    "appPolicyStatus": "absent"
+  },
+  "installedApps": [
+    {
+      "pkg": "com.roblox.client",
+      "label": "Roblox",
+      "platform": "android"
+    },
+    {
+      "pkg": "com.mojang.minecraftpe",
+      "label": "Minecraft",
+      "platform": "android"
+    },
+    {
+      "pkg": "com.duolingo",
+      "label": "Duolingo",
+      "platform": "android"
+    }
+  ],
+  "floor": [],
+  "usage": {
+    "appMsByPkg": {
+      "com.roblox.client": 1800000
+    },
+    "weekAppMsByPkg": {
+      "com.roblox.client": 1800000
+    },
+    "webLogs": []
+  },
+  "usageSeed": {
+    "perRuleUsedMs": {},
+    "weekKey": "2026-09-07",
+    "perRuleWeekUsedMs": {
+      "simple-custom-games": 10800000
+    }
+  },
+  "expectDevice": [
+    {
+      "pkg": "com.roblox.client",
+      "action": "allow",
+      "reason": null,
+      "ruleId": null
+    },
+    {
+      "pkg": "com.mojang.minecraftpe",
+      "action": "allow",
+      "reason": null,
+      "ruleId": null
+    },
+    {
+      "pkg": "com.duolingo",
+      "action": "allow",
+      "reason": null,
+      "ruleId": null
+    }
+  ],
+  "browserNotApplicable": "Device-only: the week's earlier days reach the device as the usage seed's perRuleWeekUsedMs, and app time since Monday exists only on the device. The browser's weekly total is tested with UsageSummaryCache."
+}

@@ -41,10 +41,15 @@ class UserPrefsRoute implements Routes {
       '/user/options/update',
       authenticateJWT,
       errorHelper(async (req: ApiReq<'/user/options/update'>, res) => {
-        await this.userService.setUserOptions(RequestContext.instance(req), getTargetUserId(req), req.body.options);
+        const results = await this.userService.setUserOptions(
+          RequestContext.instance(req),
+          getTargetUserId(req),
+          req.body.options,
+          req.body.ifRevision,
+        );
         const result = {
           success: true,
-          results: {},
+          results,
         };
         res.json(result);
       }),
@@ -57,6 +62,24 @@ class UserPrefsRoute implements Routes {
       authenticateJWT,
       errorHelper(async (req: ApiReq<'/user/checkpoint/clear'>, res) => {
         const results = await this.userService.clearOwnCheckpoint(RequestContext.instance(req));
+        const result = {
+          success: true,
+          results,
+        };
+        res.json(result);
+      }),
+    );
+
+    // Your own Block page customization (HAT-1267). Takes no userId on purpose — see
+    // UserService.setOwnBlockPage.
+    this.router.post(
+      '/user/blockPage/setOwn',
+      authenticateJWT,
+      errorHelper(async (req: ApiReq<'/user/blockPage/setOwn'>, res) => {
+        const results = await this.userService.setOwnBlockPage(RequestContext.instance(req), {
+          off: req.body?.off,
+          collections: req.body?.collections,
+        });
         const result = {
           success: true,
           results,

@@ -1,0 +1,1 @@
+import{a as o,cs as s}from"./appHandoffGuestD3H_h1r5.js";import{useSiteBlocks as i}from"./useSiteBlocksCdlmZEiB.js";import{o as n}from"./vue-runtimeCY_KIElv.js";function f(r){const t=i(r);n(()=>{var e;((e=o.currentUser)==null?void 0:e.type)!=="admin"||!r.value||s(!1).then(()=>{if((o.users||[]).length)return t.convertMirrors()}).catch(()=>{})})}export{f as u};

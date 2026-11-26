@@ -41,17 +41,19 @@ export type KindTemplateEmphasis = 'standard' | 'bold'
  * Renderer layout: 'cards' = detail rows at rest; 'symbols' = icon/image tile
  * grid, tap a tile to expand its contents; 'gallery' = every member as a picture
  * grid, no slots involved; 'cart' = products grouped by what they are and where
- * they are sold, with prices where a page gave one. Unknown values fall back to
- * 'cards' on old clients (MV3-safe enum-of-shipped-renderers pattern).
+ * they are sold, with prices where a page gave one; 'project' = a Project
+ * (HAT-1064): its sub-collections as cards of things to read, watch and do, with
+ * progress. Unknown values fall back to 'cards' on old clients
+ * (MV3-safe enum-of-shipped-renderers pattern).
  */
-export type KindTemplateLayout = 'cards' | 'symbols' | 'gallery' | 'cart'
+export type KindTemplateLayout = 'cards' | 'symbols' | 'gallery' | 'cart' | 'project'
 
 /**
  * Layouts whose whole job is to render the collection's members, so an empty
  * `slots` array is the correct shape rather than a malformed one. Keep this in
  * sync with the layouts that ignore slots entirely.
  */
-const SLOTLESS_LAYOUTS = new Set<string>(['gallery', 'cart'])
+const SLOTLESS_LAYOUTS = new Set<string>(['gallery', 'cart', 'project'])
 
 export type KindTemplate = {
   id: string
@@ -82,6 +84,10 @@ const HEALTH_SLOTS: KindTemplateSlot[] = [
 /** The cart view, and the chooser card that creates a collection using it. */
 export const CART_KIND_TEMPLATE_ID = 'kindtpl.cart.v1'
 export const CART_COLLECTION_TEMPLATE_ID = 'home.shoppingcart.v1'
+
+/** The Project view (HAT-1064) and the chooser entry that makes one. */
+export const PROJECT_KIND_TEMPLATE_ID = 'kindtpl.project.v1'
+export const PROJECT_COLLECTION_TEMPLATE_ID = 'personal.project.v1'
 
 export const KIND_TEMPLATES: KindTemplate[] = [
   {
@@ -158,6 +164,15 @@ export const KIND_TEMPLATES: KindTemplate[] = [
     layout: 'gallery',
     // No slots on purpose: a gallery shows what you put in it, so there is
     // nothing to prompt for. See SLOTLESS_LAYOUTS.
+    slots: [],
+  },
+  {
+    id: PROJECT_KIND_TEMPLATE_ID,
+    name: 'Project',
+    group: 'Projects',
+    description: 'Its parts as cards of things to read, watch, listen to and do, with your progress.',
+    layout: 'project',
+    // Slotless: a project's parts are its sub-collections, not kind slots.
     slots: [],
   },
   {

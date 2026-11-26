@@ -107,5 +107,27 @@
       "ruleId": null
     }
   ],
-  "browserNotApplicable": "Device-only here: the browser's Always allowed is tested in ActivityService.alwaysAllowed.test.ts and SentryProcessor.earlyUrlBlock.test.ts."
+  "browserNotApplicable": "Device-only here: the browser's Always allowed is tested in ActivityService.alwaysAllowed.test.ts and SentryProcessor.earlyUrlBlock.test.ts.",
+  "expectDeviceByPlatform": {
+    "macos": [
+      {
+        "pkg": "com.google.android.calendar",
+        "action": "allow",
+        "reason": null,
+        "ruleId": null
+      },
+      {
+        "pkg": "com.roblox.client",
+        "action": "allow",
+        "reason": null,
+        "ruleId": null
+      },
+      {
+        "pkg": "com.android.chrome",
+        "action": "allow",
+        "reason": null,
+        "ruleId": null
+      }
+    ]
+  }
 }

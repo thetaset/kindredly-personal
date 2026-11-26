@@ -11,7 +11,7 @@
  *   blank line, then bullet facts (no section headers)
  *   `## Sources` — the ONLY header allowed, always last
  */
-import { tagOptionsMap } from './content.types';
+import { RETIRED_FORMAT_TOPIC_TAGS, RETIRED_SUBJECT_TOPIC_TREE, tagOptionsMap } from './content.types';
 import { CANONICAL_CATEGORY_IDS } from './publishedCategoryMapping';
 
 export const FEED_MANIFEST_SCHEMA = 'kindredly.admin-content-loader-manifest.v1';
@@ -168,7 +168,9 @@ export function validateFeedManifest(manifest: any): FeedManifestValidation {
         err(id, `useCriteria tag "${t}" — the multi-level system was removed; feeds are single-level (drop all level_* tags).`);
         continue;
       }
-      if (!KNOWN_TAGS.has(t)) err(id, `unknown useCriteria tag "${t}".`);
+      const movedTo = (RETIRED_SUBJECT_TOPIC_TREE as Record<string, string>)[t] || (RETIRED_FORMAT_TOPIC_TAGS as Record<string, string>)[t];
+      if (movedTo) warn(id, `topic tag "${t}" is retired; the loader uses "${movedTo}" instead.`);
+      else if (!KNOWN_TAGS.has(t)) err(id, `unknown useCriteria tag "${t}".`);
     }
     const minages = uc.filter((t: any) => typeof t === 'string' && t.startsWith('minage_'));
     if (isPost || isFeedCol) {

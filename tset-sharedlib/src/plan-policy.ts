@@ -55,6 +55,12 @@ export type SharedPlanPolicy = {
      * Kept separate from `aiChat`: this one is genuinely Plus-only.
      */
     contentAuthoring: boolean;
+    /**
+     * Device folders (HAT-1321): a folder on a computer running the Companion, shared with the
+     * family. Plus only while it is Experimental; the server refuses sharing and every frame
+     * without it, so the client's check is only what it shows.
+     */
+    deviceFolders: boolean;
   };
   assistantReview: {
     /**
@@ -126,6 +132,7 @@ export const sharedPlanPolicies: Record<SharedPlanKey, SharedPlanPolicy> = {
       aiChat: true,
       advancedStandaloneApps: false,
       contentAuthoring: false,
+      deviceFolders: false,
     },
     assistantReview: {
       weeklyPerChild: 3,
@@ -172,6 +179,7 @@ export const sharedPlanPolicies: Record<SharedPlanKey, SharedPlanPolicy> = {
       aiChat: true,
       advancedStandaloneApps: false,
       contentAuthoring: true,
+      deviceFolders: true,
     },
     assistantReview: {
       weeklyPerChild: 20,

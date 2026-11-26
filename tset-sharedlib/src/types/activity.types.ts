@@ -399,11 +399,18 @@ export interface MetaLookupEntry {
 export interface ClassificationRequestInfo {
   url: string;
   channelId?: string;
+  /** A YouTube page's channel handle (no "@") and name, for the version's channel list (CLS-22). */
+  channelHandle?: string;
+  channelName?: string;
+  /** YouTube's own category for the video ("Education", "Gaming"), for the version's list (CLS-23). */
+  youtubeGenre?: string;
   itemId?: string;
   features?: {
     extractedText?: string;
     title?: string;
     description?: string;
     pageType?: string;
+    /** RAKE keywords the content script derives from the title and text; the text model weighs them. */
+    keywords?: string[];
   };
 }

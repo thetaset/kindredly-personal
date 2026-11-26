@@ -1,4 +1,5 @@
 import type { DeviceGrant } from "../restrictions/deviceGrants";
+import type { OptionRevisions } from "../restrictions/optionRevisions";
 import type {
   FamilyDowntimeAllow,
   FamilyDowntimeSchedule,
@@ -15,6 +16,36 @@ import type {
   AccessRequestAddResponse,
   AccountInfoResponse,
   SiteStyleForUrlRequest,
+  PageChangeListRequest,
+  PageChangeListResponse,
+  PageChangeSaveRequest,
+  PageChangeSaveResponse,
+  PageChangeSetForRequest,
+  PageChangeSetForResponse,
+  PageChangeDeleteRequest,
+  PageChangeDeleteResponse,
+  PageChangeOpenOnPageRequest,
+  PageChangeOpenOnPageResponse,
+  PageChangePeopleRequest,
+  PageChangePeopleResponse,
+  PageChangeForPageRequest,
+  PageChangeForPageResponse,
+  PageChangeTargetRequest,
+  PageChangeTargetResponse,
+  PageChangeDraftRequest,
+  PageChangeDraftResponse,
+  PageChangeDraftEditRequest,
+  PageChangeDraftEditResponse,
+  PageChangeDraftSaveRequest,
+  PageChangeDraftSaveResponse,
+  PageChangeDraftShowRequest,
+  PageChangeDraftShowResponse,
+  PageChangeDraftPickRequest,
+  PageChangeDraftPickResponse,
+  PageChangePickedRequest,
+  PageChangePickedResponse,
+  PageChangeStartRequest,
+  PageChangeStartResponse,
   SiteStyleGenerateRequest,
   SiteStyleGenerateResponse,
   SiteStyleListRequest,
@@ -115,6 +146,8 @@ import type {
   AdminPublishedApplyPatchesResponse,
   AdminPublishedImportBatchesRequest,
   AdminPublishedImportBatchesResponse,
+  AdminPublishedIntakeSummaryRequest,
+  AdminPublishedIntakeSummaryResponse,
   AdminPublishedApproveBatchRequest,
   AdminPublishedApproveBatchResponse,
   AdminUpdateContentBundleCatalogRequest,
@@ -239,6 +272,8 @@ import type {
   SearchHistoryResponse,
   SearchMainRequest,
   SearchPlace,
+  PinnedSearch,
+  PinnedSearchesPref,
   SignInRequest,
   AuthResponse,
   StandaloneAppBootstrapRequest,
@@ -257,6 +292,8 @@ import type {
   UpdateActivityLogRequest,
   RecordInAppActivityRequest,
   UpdateItemRequest,
+  UpdateItemResponse,
+  UnsentChangeView,
   UpdatePostEncInfoRequest,
   UpdateProfileImageRequest,
   UpdatePublicProfileRequest,
@@ -386,14 +423,31 @@ import type {
   FilePiecesReadRequest,
   FilePiecesReadResponse,
   FilePiecesCloseRequest,
+  ProjectOutlineRequest,
+  ProjectOutlineResponse,
+  ProjectFillPartRequest,
+  ProjectFillPartResponse,
+  ProjectChangePartRequest,
+  ProjectChangePartResponse,
 } from "./api-types";
 
 import type { AccountType } from "../types/user.types";
+import type { HomeSuggestSiteRule } from "../types/home-suggest.types";
 import type { ReasonCode } from "../types/activity.types";
+import type { InspirationSettings } from "../inspiration/inspiration";
+import type { BlockPageDefaultEntry, BlockPageDefaults, BlockPageDefaultsForDevices } from "../inspiration/blockPageDefaults";
+
+/** The admin page's view of the defaults (HAT-1268). */
+export type AdminBlockPageDefaultsResponse = {
+  defaults: BlockPageDefaults | null;
+  published: Record<string, { name: string; shown: number; missing?: true }>;
+};
 import type { StoredFamilyPolicyRule } from "../types/family-policy.types";
-import type { DeviceGuardStatus, DeviceAppInventory, DeviceAppPolicy, CompanionDeviceView, DeviceAdminCodeView, CompanionProbeResult, CompanionOpenTarget, CompanionAppDecision, DesktopBridgeStatus, CompiledDeviceRuleSet, DeviceSettingsCurrentRequest, DeviceSettingsCurrentResponse } from "../types/device-guard.types";
+import type { DeviceGuardStatus, DeviceAppInventory, DeviceAppPolicy, CompanionDeviceView, DeviceAdminCodeView, CompanionProbeResult, CompanionOpenTarget, CompanionAppDecision, DesktopBridgeStatus, CompiledDeviceRuleSet, DeviceSettingsCurrentRequest, DeviceSettingsCurrentResponse, DeviceUsageSyncRequest, DeviceUsageSyncResponse } from "../types/device-guard.types";
 import type { LessonGenRequest, LessonGenResponse, LessonGradeRequest, LessonGradeResponse } from "../lesson.utils";
-import type { McpRelaySealedEnvelope, McpRelayPairingRedeemed, McpUploadClaim, McpUploadStatus, McpUploadView } from "./mcp-relay.types";
+import type { AiAppPendingPermission, McpRelaySealedEnvelope, McpRelayPairingRedeemed, McpUploadClaim, McpUploadPageView, McpUploadStatus, McpUploadView } from "./mcp-relay.types";
+import type { DeviceFolderHostView, DeviceFolderIceServer, DeviceFolderListItem, DeviceFolderRelayState, DeviceFolderRefusalReason, DeviceFolderSealedFrame, DeviceFolderSearchRefusal, DeviceFolderSearchResult, DeviceFolderPerson, DeviceFolderShareRequest, DeviceFolderSharing, DeviceFolderSort, DeviceFolderUpdateRequest, DeviceFolderView } from "./device-folders.types";
+import type { HtmlFileCheckResult, HtmlFileScan } from "../types/html-file.types";
 import type {
   TrackImproveRequest,
   TrackImproveResponse,
@@ -404,6 +458,7 @@ import type {
 } from "../track-generation";
 
 import type { KeyEntry } from "../shared.types";
+import type { EncryptionDisabledResponse, KeyBackupView, RecoveryKeyView } from "../types/encryption.types";
 
 import UserFile from "../schemas/public/UserFile";
 import type PublishedRelation from "../schemas/public/PublishedRelation";
@@ -459,13 +514,27 @@ import type { EventDefinition, EventOccurrenceView } from "../types/event.types"
 // Types previously referenced with inline import() syntax, which the request-schema generator
 // cannot resolve. Same types, ordinary imports.
 import type {SiteOverridesEnvelope} from '../content.types';
+import type {ClassifierVersion} from '../classifiers/classifierVersion';
+import type {
+  ClassifierActivationRecord,
+  ClassifierActiveVersion,
+  ClassifierScorecardAnswer,
+  ClassifierScorecardMetrics,
+  ClassifierScorecardRecord,
+  ClassifierSynthBatch,
+  ClassifierRecipe,
+  ClassifierWeakSpots,
+  ClassifierSynthPage,
+  ClassifierVersionSummary,
+  LabelingPromptHistoryEntry,
+} from './api-types';
 import type {EduValue} from '../shared.types';
 import type {ArticleAnalyzeRequest, ArticleAnalyzeResponse} from '../types/articleTrust.types';
 import type {CheckpointRelease, CheckpointTaskGateStatus} from '../types/usage-limits.types';
 import type {EarnAccessOpening, EarnAccessRule, EarnAccessStatus} from '../types/earn-access.types';
 import type { PageNoteReadResult, PageNoteReminder, PageNoteSaveRequest, PageNoteSaveResult, PageNoteSummary, PageNotesForUrl } from '../pageNote.utils';
 import type {TaskCompletionStatus} from '../types/task.types';
-import type {ArtifactDeleteRequest, ArtifactDeleteResponse, ContinueListRequest, ContinueListResponse, ContinueRecordRequest, ContinueRecordResponse, ContinueRemoveRequest, ContinueRemoveResponse, ProjectCreateRequest, ProjectListRequest, ProjectListResponse, ProjectRenameRequest, ProjectResponse, ProjectSetNoteRequest, ArtifactGetRequest, ArtifactGetResponse, ArtifactListRequest, ArtifactListResponse, ArtifactSyncPendingRequest, ArtifactSyncPendingResponse, ArtifactUpsertRequest, ArtifactUpsertResponse, GetClassificationEvalProgramStatusRequest, GetClassificationEvalProgramStatusResponse, GetGroupedEntriesSinceRequest, GetGroupedEntriesSinceResponse, PlatformAlertReceiverView, GetSessionSummarySnapshotRequest, GetSessionSummarySnapshotResponse, GetTopicAttentionRequest, GetTopicAttentionResponse, GetUsageInsightsReportRequest, GetUsageInsightsReportResponse, GetUsageSessionsSinceRequest, GetUsageSessionsSinceResponse, InvalidateActivityMonitorsRequest, InvalidateActivityMonitorsResponse, LearnedClassifierArtifact, ReportClassificationIssueRequest, ReportClassificationIssueResponse, SaveUserActivityLogResponse, UploadClassificationDatasetSamplesRequest, UploadClassificationDatasetSamplesResponse, UploadImageClassificationSamplesRequest, UploadImageClassificationSamplesResponse, UsageLogCollapseMode, UserActivityLogListResponse} from './api-types';
+import type {ArtifactDeleteRequest, ArtifactDeleteResponse, ContinueListRequest, ContinueListResponse, ContinueRecordRequest, ContinueRecordResponse, ContinueRemoveRequest, ContinueRemoveResponse, ArtifactGetRequest, ArtifactGetResponse, ArtifactListRequest, ArtifactListResponse, ArtifactSyncPendingRequest, ArtifactSyncPendingResponse, ArtifactUpsertRequest, ArtifactUpsertResponse, GetClassificationEvalProgramStatusRequest, GetClassificationEvalProgramStatusResponse, GetGroupedEntriesSinceRequest, GetGroupedEntriesSinceResponse, PlatformAlertReceiverView, GetSessionSummarySnapshotRequest, GetSessionSummarySnapshotResponse, GetTimeSpentRequest, GetTimeSpentResponse, GetTopicAttentionRequest, GetTopicAttentionResponse, GetUsageInsightsReportRequest, GetUsageInsightsReportResponse, GetUsageSessionsSinceRequest, GetUsageSessionsSinceResponse, InvalidateActivityMonitorsRequest, InvalidateActivityMonitorsResponse, LearnedClassifierArtifact, ReportClassificationIssueRequest, ReportClassificationIssueResponse, SaveUserActivityLogResponse, UploadClassificationDatasetSamplesRequest, UploadClassificationDatasetSamplesResponse, UploadImageClassificationSamplesRequest, UploadImageClassificationSamplesResponse, UsageLogCollapseMode, UserActivityLogListResponse, SharePagesRequest, SharePagesResponse, SharePagesNowResponse} from './api-types';
 
 /** Queue widths as the classifier currently has them, with the build's defaults alongside. */
 export type ImageClassifyQueueWidths = {
@@ -621,6 +690,10 @@ export interface ApiRouteMap {
     request: { taskId: string; userId: string; occurrenceStartMs: number };
     response: { success: true };
   };
+  "/task/subtask/set": {
+    request: { taskId: string; userId: string; occurrenceStartMs: number; key: string; done: boolean };
+    response: { subtasksDoneKeys: string[]; completed: boolean };
+  };
   "/task/status/list": {
     request: { userId: string; nowMs?: number };
     response: {
@@ -635,6 +708,7 @@ export interface ApiRouteMap {
         completedByUserId?: string;
         dueAtMs?: number;
         overdue?: boolean;
+        subtasksDoneKeys?: string[];
       }>;
     };
   };
@@ -787,6 +861,18 @@ export interface ApiRouteMap {
     request: { itemId: string };
     response: { itemId: string };
   };
+  /** Attach a library item to a task (HAT-1083); the task's people are let open it. */
+  "/task_items/attachItem": {
+    request: { taskId: string; itemId: string };
+    response: { taskId: string; alreadyAttached: boolean; sharedWithUserIds: string[]; shareFailedUserIds: string[] };
+  };
+  /** The tasks this person can see, each saying whether it points at the item and whether they can attach it. */
+  "/task_items/listForItem": {
+    request: { itemId: string };
+    response: {
+      tasks: Array<{ taskId: string; title: string; attached: boolean; canAttach: boolean; sharesWith: string[]; updatedAt: number }>;
+    };
+  };
 
   // Task completion via RefState (user-owned)
   "/task_completion/upsert": {
@@ -912,6 +998,20 @@ export interface ApiRouteMap {
   "/usertask/track/improve": {
     request: TrackImproveRequest;
     response: TrackImproveResponse;
+  };
+  // Projects filled with Kindredly AI (HAT-1064, PRJ-6): Plus only, adults only, metered, nothing
+  // saved on the server. The project page writes what comes back.
+  "/usertask/project/outline": {
+    request: ProjectOutlineRequest;
+    response: ProjectOutlineResponse;
+  };
+  "/usertask/project/fillPart": {
+    request: ProjectFillPartRequest;
+    response: ProjectFillPartResponse;
+  };
+  "/usertask/project/changePart": {
+    request: ProjectChangePartRequest;
+    response: ProjectChangePartResponse;
   };
   "/access_request/add": {
     request: { key: string; type?: string; details?: any; message?: string };
@@ -1137,6 +1237,82 @@ export interface ApiRouteMap {
     response: SiteStyleForUrlResponse;
   };
 
+  // Local-only: a parent's page changes (HAT-1232), stored as family rules
+  "/sitestyle/pageChanges/list": {
+    request: PageChangeListRequest;
+    response: PageChangeListResponse;
+  };
+
+  "/sitestyle/pageChanges/save": {
+    request: PageChangeSaveRequest;
+    response: PageChangeSaveResponse;
+  };
+
+  "/sitestyle/pageChanges/setFor": {
+    request: PageChangeSetForRequest;
+    response: PageChangeSetForResponse;
+  };
+
+  "/sitestyle/pageChanges/delete": {
+    request: PageChangeDeleteRequest;
+    response: PageChangeDeleteResponse;
+  };
+
+  "/sitestyle/pageChanges/openOnPage": {
+    request: PageChangeOpenOnPageRequest;
+    response: PageChangeOpenOnPageResponse;
+  };
+
+  "/sitestyle/pageChanges/people": {
+    request: PageChangePeopleRequest;
+    response: PageChangePeopleResponse;
+  };
+
+  "/sitestyle/pageChanges/forPage": {
+    request: PageChangeForPageRequest;
+    response: PageChangeForPageResponse;
+  };
+
+  "/sitestyle/pageChanges/target": {
+    request: PageChangeTargetRequest;
+    response: PageChangeTargetResponse;
+  };
+
+  "/sitestyle/pageChanges/draft": {
+    request: PageChangeDraftRequest;
+    response: PageChangeDraftResponse;
+  };
+
+  "/sitestyle/pageChanges/draft/edit": {
+    request: PageChangeDraftEditRequest;
+    response: PageChangeDraftEditResponse;
+  };
+
+  "/sitestyle/pageChanges/draft/save": {
+    request: PageChangeDraftSaveRequest;
+    response: PageChangeDraftSaveResponse;
+  };
+
+  "/sitestyle/pageChanges/draft/show": {
+    request: PageChangeDraftShowRequest;
+    response: PageChangeDraftShowResponse;
+  };
+
+  "/sitestyle/pageChanges/draft/pick": {
+    request: PageChangeDraftPickRequest;
+    response: PageChangeDraftPickResponse;
+  };
+
+  "/sitestyle/pageChanges/picked": {
+    request: PageChangePickedRequest;
+    response: PageChangePickedResponse;
+  };
+
+  "/sitestyle/pageChanges/start": {
+    request: PageChangeStartRequest;
+    response: PageChangeStartResponse;
+  };
+
   // Local-only session state (handled in client background, not the server)
   "/ref_state/session/upsert": {
     request: RefStateUpsertRequest;
@@ -1186,11 +1362,6 @@ export interface ApiRouteMap {
     request: ContinueRemoveRequest;
     response: ContinueRemoveResponse;
   };
-  // Projects: a `project:` tag's display name and note (client background, AIM-13)
-  "/project/list": { request: ProjectListRequest; response: ProjectListResponse };
-  "/project/create": { request: ProjectCreateRequest; response: ProjectResponse };
-  "/project/rename": { request: ProjectRenameRequest; response: ProjectResponse };
-  "/project/setNote": { request: ProjectSetNoteRequest; response: ProjectResponse };
   "/account/stats": {
     request: {};
     response: { userCount: number; itemCount: number; collectionCount: number };
@@ -1205,6 +1376,10 @@ export interface ApiRouteMap {
   "/activity/getUsageInsightsReport": {
     request: GetUsageInsightsReportRequest;
     response: GetUsageInsightsReportResponse;
+  };
+  "/activity/getTimeSpent": {
+    request: GetTimeSpentRequest;
+    response: GetTimeSpentResponse;
   };
   "/activity/lookupChannelNames": {
     request: { channelIds: string[] };
@@ -1266,6 +1441,8 @@ export interface ApiRouteMap {
     request: UploadImageClassificationSamplesRequest;
     response: UploadImageClassificationSamplesResponse;
   };
+  "/activity/sharePages": { request: SharePagesRequest; response: SharePagesResponse };
+  "/activity/sharePagesNow": { request: {}; response: SharePagesNowResponse };
   "/activity/syncUsageLog": { request: {}; response: any };
   "/activityMonitor/startFrameEventTrackingForCurrentTab": {
     request: { url: string; userId?: string };
@@ -1551,7 +1728,7 @@ export interface ApiRouteMap {
   };
   "/admin/classificationEval/samples/list": {
     request: {
-      filterBy?: { userId?: string; datasetId?: string; search?: string; mismatchOnly?: boolean } | null;
+      filterBy?: { userId?: string; datasetId?: string; search?: string; mismatchOnly?: boolean; notConfirmedOnly?: boolean } | null;
       pageInfo: {
         currentPage: number;
         perPage?: number;
@@ -1702,6 +1879,11 @@ export interface ApiRouteMap {
     request: { sampleId: number; humanOverride: string | null };
     response: { updated: boolean; humanOverride: string | null };
   };
+  /** A person's topics for a page (CLS-11): Topics tree topic ids, [] for none fits, null to clear. */
+  "/admin/classificationEval/samples/saveTopics": {
+    request: { sampleId: number; topics: string[] | null };
+    response: { updated: boolean; topics: string[] | null };
+  };
   "/admin/classificationEval/datasets/recrawlPageText": {
     request: { datasetId: string; maxSamples?: number; offset?: number; onlyMissing?: boolean; sampleIds?: number[]; includeMetadata?: boolean };
     response: {
@@ -1730,7 +1912,16 @@ export interface ApiRouteMap {
       total: number;
       rows: Array<{
         id: number;
-        pageData: { pageTitle: string | null; description: string | null; extractedText: string | null };
+        /** The page's address: its canonical address, else the address it was read at. */
+        url?: string | null;
+        pageData: {
+          pageTitle: string | null;
+          description: string | null;
+          extractedText: string | null;
+          /** A YouTube page's channel (CLS-22) and YouTube's own category (CLS-23), when captured. */
+          channel?: { handle?: string; name?: string };
+          youtubeGenre?: string;
+        };
         groundTruth: any;
         sessionContext: any;
       }>;
@@ -1840,17 +2031,106 @@ export interface ApiRouteMap {
     request: { version: string };
     response: { deleted: boolean };
   };
+  /**
+   * Seeding a test set (CLS-6): the AI's label becomes the Final label wherever it is the Category
+   * the page was picked for (a curated catalog item's, a starter page's, or the admin's hint).
+   * Pages a person already labelled are left alone; the rest are counted for review.
+   */
+  "/admin/classificationEval/datasets/acceptAgreeing": {
+    request: { datasetId: string };
+    response: { datasetId: string; accepted: number; toReview: number; alreadyConfirmed: number; unlabelled: number };
+  };
+  /** The labelling prompt in use, the default, the hash labels made with it record, and every earlier one (CLS-5). */
   "/admin/classificationEval/labelPrompt/get": {
     request: {};
-    response: { prompt: string; isCustom: boolean; default: string };
+    response: { prompt: string; isCustom: boolean; default: string; hash: string; history: LabelingPromptHistoryEntry[] };
   };
   "/admin/classificationEval/labelPrompt/save": {
     request: { prompt: string };
-    response: { prompt: string; isCustom: boolean };
+    response: { prompt: string; isCustom: boolean; hash: string };
   };
   "/admin/classificationEval/labelPrompt/reset": {
     request: {};
-    response: { prompt: string; isCustom: boolean };
+    response: { prompt: string; isCustom: boolean; hash: string };
+  };
+  /** Classifier versions (CLS-3): every saved version, newest first, then the bundled 'v1'. */
+  "/admin/classifier/versions/list": {
+    request: {};
+    response: { versions: ClassifierVersionSummary[] };
+  };
+  "/admin/classifier/versions/get": {
+    request: { id: string };
+    response: { version: ClassifierVersion };
+  };
+  /**
+   * Saves a new version, written once and never removed. The server sets its id ('v2', 'v3', …),
+   * createdAt, and parent (the draft's own when it names a version that exists, else the active one).
+   */
+  "/admin/classifier/versions/save": {
+    request: { version: Omit<ClassifierVersion, "id" | "parent" | "createdAt"> & { id?: string; parent?: string | null; createdAt?: string } };
+    response: { id: string; hash: string };
+  };
+  /**
+   * Makes a saved version, or the bundled 'v1', the active one. `reason` is required: it goes in the
+   * activation log. Going back ('v1', or a version that has been active before) is never checked.
+   * Any other version needs `datasetId`, a test set on which it and the active version both have a
+   * current scorecard, and is refused (409) when it scores more than a point lower, answers Unknown
+   * more than two points more often, or gets any page of a pinned set wrong.
+   */
+  "/admin/classifier/versions/activate": {
+    request: { id: string; reason: string; datasetId?: string };
+    response: { active: ClassifierActiveVersion };
+  };
+  "/admin/classifier/activations/list": {
+    request: { limit?: number };
+    response: { activations: ClassifierActivationRecord[] };
+  };
+  /**
+   * Scores a version on a dataset (CLS-7) from the classifier's answer for each page. The server
+   * reads the gold labels itself; an answer naming a page not in the dataset is refused.
+   */
+  "/admin/classifier/scorecards/save": {
+    request: { versionId: string; datasetId: string; answers: ClassifierScorecardAnswer[] };
+    response: { id: number; metrics: ClassifierScorecardMetrics; datasetSignature: string };
+  };
+  /** Saved scorecards, newest first. */
+  /** Synthetic page batches (CLS-9), newest first. */
+  "/admin/classifier/synth/list": {
+    request: { limit?: number };
+    response: { batches: ClassifierSynthBatch[] };
+  };
+  "/admin/classifier/synth/get": {
+    request: { batchId: number };
+    response: { batch: ClassifierSynthBatch; pages: ClassifierSynthPage[] };
+  };
+  /**
+   * Accept a ready batch into a training set (role train or hard), the pages in `keepSampleIds`
+   * only, each one the blind relabel agreed with; or drop it (`accept: false`). `reason` is kept.
+   */
+  "/admin/classifier/synth/decide": {
+    request: { batchId: number; accept: boolean; reason: string; keepSampleIds?: number[]; intoDatasetId?: string };
+    response: { batch: ClassifierSynthBatch };
+  };
+  /** CLS-10: a version's weak spots, the active one's by default. */
+  "/admin/classifier/weakSpots": {
+    request: { versionId?: string };
+    response: ClassifierWeakSpots;
+  };
+  "/admin/classifier/recipes/list": {
+    request: { status?: 'open' | 'closed'; limit?: number };
+    response: { recipes: ClassifierRecipe[] };
+  };
+  "/admin/classifier/recipes/save": {
+    request: { category: string; kind: string; topicId?: string | null; notes: string; pages: number };
+    response: { recipe: ClassifierRecipe };
+  };
+  "/admin/classifier/recipes/close": {
+    request: { recipeId: number };
+    response: { recipe: ClassifierRecipe };
+  };
+  "/admin/classifier/scorecards/list": {
+    request: { versionId?: string; datasetId?: string; includeAnswers?: boolean; limit?: number };
+    response: { scorecards: ClassifierScorecardRecord[] };
   };
   "/admin/classificationEval/datasets/create": {
     request: {
@@ -1952,6 +2232,24 @@ export interface ApiRouteMap {
   "/admin/setupCatalog/reset": {
     request: {};
     response: AdminSetupCatalogResponse;
+  };
+  /**
+   * Kindredly's default collections for Block page customization (HAT-1268). `published` says,
+   * for each chosen published collection, its name and how many of its items can show (pictures
+   * stored on Kindredly's server and notes), or that it can no longer be read.
+   */
+  "/admin/blockPage/defaults/get": {
+    request: {};
+    response: AdminBlockPageDefaultsResponse;
+  };
+  "/admin/blockPage/defaults/save": {
+    request: { collections: BlockPageDefaultEntry[] };
+    response: AdminBlockPageDefaultsResponse;
+  };
+  /** Back to what ships: the built-in collections and the age rule. */
+  "/admin/blockPage/defaults/reset": {
+    request: {};
+    response: AdminBlockPageDefaultsResponse;
   };
   // Thinking Puzzles content store (self-contained; not tied to published or library items)
   "/admin/thinkingPuzzles/list": {
@@ -2241,6 +2539,10 @@ export interface ApiRouteMap {
     request: AdminPublishedImportBatchesRequest;
     response: AdminPublishedImportBatchesResponse;
   };
+  "/admin/published/intakeSummary": {
+    request: AdminPublishedIntakeSummaryRequest;
+    response: AdminPublishedIntakeSummaryResponse;
+  };
   "/admin/published/approveBatch": {
     request: AdminPublishedApproveBatchRequest;
     response: AdminPublishedApproveBatchResponse;
@@ -2416,6 +2718,16 @@ export interface ApiRouteMap {
   };
   "/ai/setCurrentSessionId": { request: { id: string }; response: void };
   "/ai/updateSession": { request: { session: any }; response: { success: boolean } };
+  /** Client-only: a helper chat's turn the helper refused, kept in the conversation (HAI). `success` false: not a helper chat. */
+  "/ai/appendRefusedTurn": {
+    request: { sessionId: string; message: string; reply: string; replyId: string };
+    response: { success: boolean; message?: string };
+  };
+  /** Client-only: Kinbot's conversations that mention the words, each with the line that matched (HAT-1224). */
+  "/ai/searchSessions": {
+    request: { query: string };
+    response: Array<{ id: string; snippet: string }>;
+  };
   /** Client-only: renames merge into the persisted record in the background. No server handler. */
   "/ai/renameSession": {
     request: { sessionId: string; name: string };
@@ -2431,6 +2743,14 @@ export interface ApiRouteMap {
   "/ai/childMessageCheck": {
     request: { text: string };
     response: { verdict: 'ok' | 'selfHarm' | 'sexual'; reply?: string };
+  };
+  /**
+   * Helper AI's topic check (HAT-1105, HAI-3): the device's check prompt and a child's newest
+   * message, read by the helper's model. Only a verdict comes back, null when the model gave none.
+   */
+  "/ai/helperTopicCheck": {
+    request: { mode: 'helper'; system: string; text: string };
+    response: { verdict: 'on_topic' | 'off_topic' | 'unsafe' | 'injection' | null };
   };
   // Client-only (extension/native) direct-provider bgroutes. No server handler.
   "/ai/provider/listOllamaModels": {
@@ -2940,6 +3260,14 @@ export interface ApiRouteMap {
     response: DeviceSettingsCurrentResponse;
   };
   /**
+   * DCP-27: a linked device's sealed app-time report and its pull of the child's other devices' in
+   * one call. Device token only; the child and the device come from the token.
+   */
+  "/companion/usage/sync": {
+    request: DeviceUsageSyncRequest;
+    response: DeviceUsageSyncResponse;
+  };
+  /**
    * SERVER route (DCP-10): a user's current device settings version, for the user or a guardian over
    * them. Compared with a device's reported `appliedSettingsVersion` to say whether a save arrived.
    */
@@ -2970,6 +3298,116 @@ export interface ApiRouteMap {
    * `/companion/settings/current`. Returns an event stream, not JSON.
    */
   "/companion/settings/events": { request: {}; response: void }; // SSE endpoint - returns event stream
+  /**
+   * SERVER route, device-agent token only (HAT-1321): share a folder from this computer. Needs a
+   * guardian's approval typed here, and a Plus family. The folder's path never leaves the computer.
+   */
+  "/companion/deviceFolders/share": {
+    request: DeviceFolderShareRequest;
+    response: { folderId?: string; refused?: DeviceFolderRefusalReason };
+  };
+  /**
+   * SERVER route, device-agent token only (HAT-1321): the people a folder here can be shared with —
+   * the family but the folder's owner (with `folderId`) or the approving admin.
+   */
+  "/companion/deviceFolders/family": {
+    request: { approval: string; folderId?: string };
+    /** `current`: with `folderId`, who the folder is shared with now. */
+    response: { people?: DeviceFolderPerson[]; current?: DeviceFolderSharing; refused?: DeviceFolderRefusalReason };
+  };
+  /**
+   * SERVER route, device-agent token only (HAT-1321): change who may open a folder here and whether
+   * they may add files. `newKey`: someone lost access, so the computer makes a new folder key.
+   */
+  "/companion/deviceFolders/update": {
+    request: DeviceFolderUpdateRequest;
+    response: { newKey?: boolean; refused?: DeviceFolderRefusalReason };
+  };
+  /** SERVER route, device-agent token only (HAT-1321): stop sharing one of this computer's folders. */
+  "/companion/deviceFolders/stop": {
+    request: { folderId: string };
+    response: { stopped: boolean };
+  };
+  /** SERVER route, device-agent token only (HAT-1321): the folders this computer serves, with everyone's role. */
+  "/companion/deviceFolders/mine": {
+    request: {};
+    response: { folders: DeviceFolderHostView[] };
+  };
+  /**
+   * SERVER route, device-agent token only, GET (HAT-1321): the host's stream of members' sealed
+   * frames (`deviceFolderFrame`). Returns an event stream, not JSON.
+   */
+  "/companion/deviceFolders/events": { request: {}; response: void }; // SSE endpoint - returns event stream
+  /**
+   * SERVER route, device-agent token only (HAT-1321): the host's sealed answer to one frame, or
+   * `refused: true` when the host would not open it.
+   */
+  "/companion/deviceFolders/answer": {
+    request: { frameId: string; replyTo: string; frame?: DeviceFolderSealedFrame; refused?: true };
+    response: { accepted: boolean };
+  };
+  /**
+   * SERVER route, device-agent token only (HAT-1321): the host's sealed copies of a folder key, one
+   * per person who may open it. The server stores what it cannot open.
+   */
+  "/companion/deviceFolders/keys": {
+    request: { folderId: string; keys: Array<{ userId: string; wrappedKey: string }> };
+    response: { stored?: number; refused?: DeviceFolderRefusalReason };
+  };
+  /** SERVER route (HAT-1321): the device folders this person may open, and whether each computer is on. */
+  "/deviceFolder/list": {
+    request: {};
+    response: { folders: DeviceFolderView[] };
+  };
+  /**
+   * Client-only bgroute (HAT-1321): the device folders this person may open, with whether this device
+   * holds each folder's key. The sealed keys stay in the background.
+   */
+  "/deviceFolder/myList": {
+    request: {};
+    response: { folders: DeviceFolderListItem[] };
+  };
+  /**
+   * Client-only bgroute (HAT-1321): a direct connection's handshake. The page's WebRTC offer goes to
+   * the folder's computer sealed, and its answer comes back opened.
+   */
+  "/deviceFolder/connect": {
+    request: { folderId: string; offer: { type: 'offer'; sdp: string } };
+    response:
+      | { ok: true; answer: { type: 'answer'; sdp: string } }
+      | { ok: false; reason: DeviceFolderSearchRefusal | 'no_direct' };
+  };
+  /**
+   * SERVER route (HAT-1321): the STUN and TURN servers this person's app tries when it connects to
+   * a folder's computer. TURN, from Cloudflare, only while the fallback is set up and they are under
+   * this month's allowance; `relay` says which. Same checks as a frame: a role on the folder, Plus.
+   */
+  "/deviceFolder/iceServers": {
+    request: { folderId: string };
+    response: { iceServers?: DeviceFolderIceServer[]; relay?: DeviceFolderRelayState; refused?: DeviceFolderRefusalReason };
+  };
+  /** Client-only bgroute (HAT-1321): `/deviceFolder/iceServers` for a page, which holds the connection. */
+  "/deviceFolder/myIceServers": {
+    request: { folderId: string };
+    response: { iceServers: DeviceFolderIceServer[]; relay: DeviceFolderRelayState };
+  };
+  /** Client-only bgroute (HAT-1321): search one folder on its computer; sealed and opened in the background. */
+  "/deviceFolder/search": {
+    /** `dir`: a folder inside the shared one ('' the top); with no query, that folder's level (HAT-1338). */
+    request: { folderId: string; query?: string; offset?: number; dir?: string; sort?: DeviceFolderSort };
+    response: DeviceFolderSearchResult;
+  };
+  /** Client-only bgroute (HAT-1321): small pictures of up to 8 files, made on the folder's computer. */
+  "/deviceFolder/thumbs": {
+    request: { folderId: string; paths: string[] };
+    /** `later`: not made in time or too many for one answer; ask again (HAT-1373). */
+    response: { thumbs: Record<string, string>; later?: string[] };
+  };
+  /** SERVER route (HAT-1321): one sealed frame to a folder's computer, and its sealed answer. */
+  "/deviceFolder/frame": {
+    request: DeviceFolderSealedFrame;
+    response: { frame?: DeviceFolderSealedFrame; refused?: DeviceFolderRefusalReason };
+  };
   /**
    * SERVER route: a parent removes one of a child's devices — disconnect and forget,
    * in that order.
@@ -3029,6 +3467,47 @@ export interface ApiRouteMap {
   "/collection/related": {
     request: { collectionId: string };
     response: ItemInfoView[];
+  };
+  // HAT-1056: library items that fit a collection's name and description, on the device.
+  "/collection/findItemsFor": {
+    request: { name: string; description?: string | null; excludeCollectionId?: string; limit?: number };
+    response: {
+      matches: Array<{
+        itemId: string;
+        name: string;
+        url: string | null;
+        subType?: string | null;
+        collectionNames: string[];
+        collectionIds?: string[];
+        score: number;
+        strong: boolean;
+        by: "meaning" | "words";
+      }>;
+    };
+  };
+  // HAT-1082: collections to suggest merging into this one, found on the device, for Merge.
+  "/collection/mergeSuggestions": {
+    request: { collectionId: string };
+    response: {
+      /** False when too few of this collection's items had a vector to compare what it is about; only shared items count then. */
+      compared: boolean;
+      /** Best first. `itemCount` is everything directly in it, collections too: what a merge moves. */
+      collections: Array<{ collectionId: string; name: string; itemCount: number; inBoth: number }>;
+    };
+  };
+  // HAT-1058: a collection's own items in groups by meaning, on the device, for Split.
+  "/collection/splitGroups": {
+    request: { collectionId: string };
+    response: {
+      /** The collection's items that could be grouped: not its collections, archived or hidden ones. */
+      total: number;
+      /** Largest first, each item most typical first; `name` is '' where no words are shared. */
+      groups: Array<{ name: string; items: Array<{ itemId: string; name: string; url: string | null }> }>;
+      /** Of `total`, how many fit no group. */
+      left: number;
+      /** False when the on-device model gave too few of its items a vector: `groups` is empty because nothing was compared. */
+      compared: boolean;
+    };
   };
   "/collection/create": { request: SaveItemRequest; response: string };
   "/collection/decrypt": {
@@ -3457,6 +3936,38 @@ export interface ApiRouteMap {
       };
     };
   };
+  /** Background only (HAT-806): the closer video check's switch, for pages with no extension storage. */
+  "/content/videoCloseWatch/get": {
+    request: {};
+    response: { on: boolean };
+  };
+  /** Background only (HAT-921): what an HTML file may show the person opening it, by their own filtering. */
+  "/content/htmlFileCheck": {
+    request: HtmlFileScan;
+    response: HtmlFileCheckResult;
+  };
+  /**
+   * Background only (HAT-806): a video frame cut from a screenshot of the sender's tab and checked like
+   * any picture. `null` outside an extension or when the tab is not on screen. The result carries more
+   * than this (the decision detail, timings); these are the fields the content script reads.
+   */
+  "/content/videoFrameFromScreen": {
+    request: {
+      id: string;
+      rect: { x: number; y: number; width: number; height: number };
+      devicePixelRatio: number;
+      decisionConfig?: { imageAggressionLevel?: 'strict' | 'moderate' | 'relaxed' | 'off'; disableSexyBlocking?: boolean };
+    };
+    response: {
+      id: string;
+      flagged: boolean;
+      predictions: Array<{ className: string; probability: number }>;
+      error?: string;
+      undecodable?: boolean;
+      unavailable?: boolean;
+      pending?: boolean;
+    } | null;
+  };
   "/content/classificationLab": {
     request: {
       url?: string;
@@ -3514,6 +4025,20 @@ export interface ApiRouteMap {
         createdAt: string | null;
       } | null;
     };
+  };
+  /** The classifier version apps should use (CLS-4); the bundled 'v1' when none was activated. */
+  /**
+   * The classifier version apps should use. `activated: false` means nothing has been activated on
+   * this server: an app keeps the version it ships. Servers before 2026-11-10 leave it out.
+   */
+  "/data/classifier/active": {
+    request: {};
+    response: { active: ClassifierActiveVersion; activated?: boolean };
+  };
+  /** One classifier version by id: a saved one, or the bundled 'v1'. */
+  "/data/classifier/get": {
+    request: { id: string };
+    response: { version: ClassifierVersion };
   };
   "/data/siteOverrides/getActive": {
     request: Record<string, never>;
@@ -3777,11 +4302,12 @@ export interface ApiRouteMap {
   };
   "/encryption/enable": {
     request: { password: string; userId?: string };
-    response: void;
+    response: { cachedUserSecretKeyString: string | null } | EncryptionDisabledResponse;
   };
+  /** Encrypts the whole request with the user secret. `null`: no key on this device, or device-only mode. */
   "/encryption/encrypt": {
     request: { data: any; userId?: string };
-    response: { data: any; encInfo?: any };
+    response: string | null;
   };
   "/encryption/diagnoseEncInfo": {
     request: {
@@ -3851,18 +4377,21 @@ export interface ApiRouteMap {
     request: { itemId: string };
     response: { ok: boolean; usedWrappingKeyIds?: string[] };
   };
+  /** Makes and saves a new recovery key; read it with `/encryption/getRecoveryKey`. */
   "/encryption/generateRecoveryKey": {
-    request: {};
-    response: { recoveryKey: string; keyId: string; createdAt: string };
+    request: { userId?: string };
+    response: void | EncryptionDisabledResponse;
   };
+  /** `null` in device-only mode. */
   "/encryption/getKeyBackup": {
-    request: { userId: string };
-    response: { backup: string; keyId: string; createdAt: string };
+    request: { userId?: string };
+    response: KeyBackupView | null;
   };
   "/encryption/getKeys": { request: { userId?: string }; response: any };
+  /** `null` in device-only mode. */
   "/encryption/getRecoveryKey": {
-    request: {};
-    response: { recoveryKey: string; keyId: string; createdAt: string };
+    request: { userId?: string };
+    response: RecoveryKeyView | null;
   };
   "/encryption/keyCopy/remove": {
     request: { userId?: string };
@@ -3870,7 +4399,7 @@ export interface ApiRouteMap {
   };
   "/encryption/replaceRecoveryKey": {
     request: { userId?: string };
-    response: { keyString: string; keyId: string; createdAt: string };
+    response: RecoveryKeyView | EncryptionDisabledResponse;
   };
   "/encryption/listKeys": { request: { userId?: string }; response: any[] };
   "/encryption/listKeysWithStatus": {
@@ -3881,28 +4410,32 @@ export interface ApiRouteMap {
   // never a field it looked at, so every real caller failed the typecheck.
   "/encryption/recoverUsingKey": {
     request: { recoveryKey: string; password?: string; userId?: string };
-    response: void;
+    response: void | EncryptionDisabledResponse;
   };
   "/encryption/removeRecoveryKeyFromServer": { request: RemoveRecoveryKeyFromServerRequest; response: void };
   "/encryption/saveRecoveryKeyOnServer": {
     request: { userId?: string };
     response: void;
   };
+  /** With `userId`: shared with that person (`true` when done). Without: shared with everyone who needs it (how many). */
   "/encryption/shareAccountKey": {
     request: { userId?: string };
-    response: void;
+    response: boolean | number | void;
   };
+  /** `{ enabled: false }` in device-only mode. */
   "/encryption/status": {
     request: { userId?: string };
-    response: EncryptionStatusResponse;
+    response: EncStatus | { enabled: false };
   };
+  /** `true` when the secret was wrapped. Refused (403) in device-only mode. */
   "/encryption/wrapSecretWithPasskey": {
     request: { prfOutput?: number[]; credentialId: string; discoverablePrfOutput?: number[] };
-    response: { success: boolean };
+    response: boolean;
   };
+  /** Refused (403) when the passkey does not unlock this device's data, and in device-only mode. */
   "/encryption/unlockWithPasskey": {
     request: { prfOutput: number[] };
-    response: { success: boolean };
+    response: { success: true };
   };
   "/feed/getByPostId": {
     request: { postId: string };
@@ -3990,6 +4523,84 @@ export interface ApiRouteMap {
     request: { userId?: string; refId: string };
     response: void;
   };
+  /** Helper AI (HAT-1105), background only: the helpers in your library, or a child's. */
+  "/helper/list": {
+    request: { userId?: string };
+    response: { items: ItemInfoView[] };
+  };
+  /** Helper AI, background only: view-only with the people it is for, editor with the other adults. */
+  "/helper/share": {
+    request: { itemId: string; viewerIds?: string[]; editorIds?: string[] };
+    response: { shared: number };
+  };
+  /** Helper AI, background only: one chat as the child saw it, under their key (HAI-10). */
+  "/helper/chat/save": {
+    request: { helperId: string; sessionId: string; data: unknown };
+    response: { saved: true };
+  };
+  /** Helper AI, background only: a person's chats with a helper, or a child's for their guardian. */
+  "/helper/chat/list": {
+    request: { helperId: string; ownerId?: string };
+    /** `readable` false: this device couldn't decrypt it, and `data` is null. */
+    response: { chats: Array<{ key: string; updatedAt: string | null; readable: boolean; data: unknown }> };
+  };
+  "/helper/chat/delete": {
+    request: { helperId: string; sessionId: string; ownerId?: string };
+    response: { deleted: true };
+  };
+  /** Helper AI, background only: a guardian's AI check of one chat, in their own ref state. */
+  "/helper/review/save": {
+    request: { helperId: string; key: string; data: unknown };
+    response: { saved: true };
+  };
+  "/helper/review/list": {
+    request: { helperId: string };
+    response: { reviews: Array<{ key: string; updatedAt: string | null; readable: boolean; data: unknown }> };
+  };
+  "/helper/review/delete": {
+    request: { helperId: string; key: string };
+    response: { deleted: true };
+  };
+  /** Helper AI, background only: a family helper's shared chat, under the family's key (HAI-8). */
+  "/helper/family/list": {
+    request: { helperId: string };
+    response: { messages: Array<{ key: string; updatedAt: string | null; readable: boolean; data: unknown }> };
+  };
+  /** `key` starts with the sender's own id and `_`: the server refuses any other. */
+  "/helper/family/post": {
+    request: { helperId: string; key: string; data: unknown };
+    response: { saved: true };
+  };
+  /** Your own message, or anyone's as a guardian. */
+  "/helper/family/delete": {
+    request: { helperId: string; key: string };
+    response: { deleted: true };
+  };
+  /** Helper AI, background only: a child's helper asked their adults a question; they get a notice. */
+  "/helper/notifyQuestion": {
+    request: {};
+    response: { notified: boolean };
+  };
+  /** Helper AI, background only: a child asked for a helper; their family's adults get a notice. */
+  "/helper/notifyAsked": {
+    request: {};
+    response: { notified: boolean };
+  };
+  /** Helper AI, background only: one person's progress with a helper, read with their key. */
+  "/helper/progress/load": {
+    request: { helperId: string; ownerId?: string };
+    response: { data: unknown | null };
+  };
+  /** Helper AI, background only: one person's progress, encrypted with their key whoever writes it. */
+  "/helper/progress/save": {
+    request: { helperId: string; ownerId?: string; data: unknown };
+    response: { saved: true };
+  };
+  /** Helper AI, background only: the topic check before a child's message, sent to `/ai/helperTopicCheck`. */
+  "/helper/topicCheck": {
+    request: { system: string; text: string };
+    response: { verdict: 'on_topic' | 'off_topic' | 'unsafe' | 'injection' | null };
+  };
   "/invite/checkCode": {
     request: { code: string };
     response: { isValidCode: boolean };
@@ -4051,6 +4662,8 @@ export interface ApiRouteMap {
       attachmentInfo?: any;
       encInfo?: any;
       existingFileId?: string;
+      /** False when the request that follows nudges the other devices (SYNC-15). Absent nudges. */
+      nudge?: boolean;
     };
     response: AttachmentAddResponse;
   };
@@ -4335,8 +4948,10 @@ export interface ApiRouteMap {
     /**
      * `notes`: the person's own page notes about the page, for the notes dot (PGN-8). `openNotes`:
      * the phone's Save page asked to open notes on this page (PGN-7), once; `openNoteId` the note.
+     * `openPageChange`: a phone's Save page, settings, Kinbot or the MCP asked for Change this page on
+     * this site (HAT-1232); `pageChangeRequest` is what to change, filled in (HAT-1235).
      */
-    response: { saved: boolean; itemId: string | null; notes: number; openNotes?: boolean; openNoteId?: string | null };
+    response: { saved: boolean; itemId: string | null; notes: number; openNotes?: boolean; openNoteId?: string | null; openPageChange?: boolean; pageChangeRequest?: string };
   };
   /**
    * The signed-in person's own notes about a page (Page notes, PGN-2). Background route: notes are
@@ -4353,11 +4968,28 @@ export interface ApiRouteMap {
   };
   /**
    * The person's notes this page can be added to (HAT-926, Add to a note): their own, newest
-   * first, not already about the page, and without links. Background route.
+   * first, not already about the page, and without links; `withLinks` counts the ones left out for
+   * their links. Background route.
    */
   "/pageNotes/choices": {
     request: { url: string };
-    response: { notes: PageNoteSummary[] };
+    response: { notes: PageNoteSummary[]; withLinks: number };
+  };
+  /**
+   * The page note the person wrote in last, when that was today and this page can be added to it
+   * (HAT-1059, PGN-15): Take notes on a page with no notes carries on in it. Background route.
+   */
+  "/pageNotes/carryOn": {
+    request: { url: string };
+    response: { note: PageNoteSummary | null };
+  };
+  /**
+   * Every page the person has their own notes about, as page keys (`pageNoteKey`): the amber dot on
+   * feed cards (PGN-21). Read from the device's page-note index. Background route.
+   */
+  "/pageNotes/pages": {
+    request: {};
+    response: { keys: string[] };
   };
   /** A page note's whole text, for the iPhone's notes sheet (PGN-6). Background route. */
   "/pageNotes/read": {
@@ -4393,7 +5025,7 @@ export interface ApiRouteMap {
     request: { itemId: string; userId: string };
     response: void;
   };
-  "/item/update": { request: UpdateItemRequest; response: void };
+  "/item/update": { request: UpdateItemRequest; response: UpdateItemResponse };
   "/item/notifyAddedToCollections": {
     request: {
       itemId: string;
@@ -4573,6 +5205,15 @@ export interface ApiRouteMap {
     request: RecommendContentBundlesRequest;
     response: RecommendContentBundlesResponse;
   };
+  /**
+   * Kindredly's default collections for Block page customization and each chosen published
+   * collection's pictures and notes (HAT-1268). Public: the same for everyone, signed in or not.
+   * `defaults` is null when nothing is chosen, and on a server with no admin page.
+   */
+  "/blockPage/defaults": {
+    request: {};
+    response: BlockPageDefaultsForDevices;
+  };
   "/setup/catalog/get": {
     request: GetSetupCatalogRequest;
     response: GetSetupCatalogResponse;
@@ -4708,6 +5349,23 @@ export interface ApiRouteMap {
    * stateless. Takes an agent key (`kag_…`), never a JWT. A batch of only notifications gets 202.
    */
   "/agent/mcp/curation": {
+    request: McpJsonRpcMessage | McpJsonRpcMessage[];
+    response: McpJsonRpcResponse | McpJsonRpcResponse[];
+  };
+  /**
+   * The classifier MCP endpoint (CLS-9, docs/guides/classifier-synth-mcp.md): weak spots, the key's
+   * batches, and send_batch. Takes an agent key made for synthetic pages, never a JWT.
+   */
+  "/agent/mcp/classifier": {
+    request: McpJsonRpcMessage | McpJsonRpcMessage[];
+    response: McpJsonRpcResponse | McpJsonRpcResponse[];
+  };
+  /**
+   * The classifier versions MCP endpoint (HAT-1111, docs/guides/classifier-versions-mcp.md): list, save,
+   * score and activate versions, under the same drop test as the admin page. Takes an agent key made
+   * for classifier versions, never a JWT.
+   */
+  "/agent/mcp/classifier-versions": {
     request: McpJsonRpcMessage | McpJsonRpcMessage[];
     response: McpJsonRpcResponse | McpJsonRpcResponse[];
   };
@@ -4924,6 +5582,31 @@ export interface ApiRouteMap {
     request: { connectionId: string };
     response: { done: false } | { done: true; code: string };
   };
+  /** Background only (HAT-690): an AI app's permission requests waiting on the adult, opened with their key. */
+  "/aiAppPermission/pending": {
+    request: {};
+    response: AiAppPendingPermission[];
+  };
+  /** Background only (HAT-690): Agree or Deny. `decided` false: the request was already answered or expired. */
+  "/aiAppPermission/decide": {
+    request: { requestId: string; approved: boolean };
+    response: { decided: boolean };
+  };
+  /** Background only (HAT-964): the page an AI app's upload link opens on. `null`: used or expired. */
+  "/mcpUploadPage/open": {
+    request: { token: string };
+    response: McpUploadPageView | null;
+  };
+  /** Background only (HAT-964): the picked file, filed from this device so it never reaches the server unencrypted. */
+  "/mcpUploadPage/add": {
+    request: { token: string; fileData: string; fileType: string; filename: string };
+    response: { itemId: string };
+  };
+  /** Background only (HAT-1169): a page taking an AI app's check of a Kindredly App (`claim`), then its `report`. */
+  "/aiAppCheck/answer": {
+    request: { checkId: string; claim?: boolean; report?: unknown };
+    response: { taken: boolean };
+  };
   /** The program's sealed call. Takes its token (`kmr_…`); the server cannot open the envelope. */
   "/mcpRelay/call": {
     request: { envelope: McpRelaySealedEnvelope };
@@ -4990,7 +5673,8 @@ export interface ApiRouteMap {
   };
   /** Returns the key once; only its hash is stored. */
   "/admin/agentKeys/create": {
-    request: { label: string };
+    /** `scope` defaults to 'curation-propose'. */
+    request: { label: string; scope?: AgentKeyView["scope"] };
     response: { key: string; agentKey: AgentKeyView };
   };
   "/admin/agentKeys/revoke": {
@@ -5155,6 +5839,8 @@ export interface ApiRouteMap {
       itemId: string;
       approved: boolean;
       comment?: string | null;
+      /** Curator's Choice: 'curator' sets the mark (and curated), null clears it; left out, unchanged (CCH-1). */
+      choice?: 'curator' | null;
       /** Required when a family's suggestion is not added; one of DECLINE_REASONS. */
       declineReason?: string | null;
     };
@@ -5208,6 +5894,11 @@ export interface ApiRouteMap {
     request: { query: string; limit?: number };
     response: any[];
   };
+  /** Chrome's "tt" keyword (HAT-1366): library items of every kind; bg handler only. */
+  "/search/omnibox": {
+    request: { query: string; limit?: number };
+    response: Array<{ itemId: string; title: string; type: string; kindName: string | null; url: string | null }>;
+  };
   "/search/history": {
     request: SearchHistoryRequest;
     response: SearchHistoryResponse;
@@ -5231,6 +5922,21 @@ export interface ApiRouteMap {
         marked: boolean;
       }>;
       indexHydrated: boolean;
+    };
+  };
+  /**
+   * Local lookup (bg handler only) — what the native Home searches before the web app is up
+   * (PNH-5): the library's links, most recently used first, and the classifier version's
+   * known-site rules. The web app filters them and writes the phone's suggestion files.
+   */
+  "/search/homeSuggestSources": {
+    request: { links?: boolean; rules?: boolean };
+    response: {
+      /** The person the background has signed in, whose links these are. */
+      userId: string | null;
+      classifierVersionId: string;
+      rules: HomeSuggestSiteRule[];
+      links: Array<{ title: string; url: string }>;
     };
   };
   // Read-only telemetry: library size (sampled, not scanned) plus a rolling
@@ -5369,6 +6075,15 @@ export interface ApiRouteMap {
     request: { type: string; userId?: string };
     response: Array<{ key: string; text: string; count: number }>;
   };
+  // Searches pinned to Home (HAT-1107), encrypted on this device before the pref is saved.
+  "/search/pinned/seal": {
+    request: { searches: PinnedSearch[] };
+    response: PinnedSearchesPref;
+  };
+  "/search/pinned/open": {
+    request: { pref: PinnedSearchesPref | null };
+    response: { searches: PinnedSearch[] };
+  };
   "/access/evaluate": {
     request: AccessEvaluateRequest;
     response: AccessEvaluateResponse;
@@ -5486,6 +6201,11 @@ export interface ApiRouteMap {
     request: {};
     response: { at: string; userId: string; source: string; reasons: string[] }[];
   };
+  // Offline saves (HAT-1225): background only.
+  "/sync/unsent/list": { request: {}; response: UnsentChangeView[] };
+  "/sync/unsent/retry": { request: { key: string }; response: void };
+  "/sync/unsent/discard": { request: { key: string }; response: void };
+  "/sync/unsent/send": { request: {}; response: void };
   "/sync/retryFailed": { request: {}; response: void };
   "/sync/retryOperation": { request: { operationId: string }; response: void };
   "/sync/trigger": { request: {}; response: void };
@@ -5691,6 +6411,7 @@ export interface ApiRouteMap {
     request: UploadImageClassificationSamplesRequest;
     response: UploadImageClassificationSamplesResponse;
   };
+  "/user/activity/sharePages": { request: SharePagesRequest; response: SharePagesResponse };
   "/user/activity/pushEntries": { request: { entries: any[] }; response: void };
   "/user/activity/removeEntry": { request: { id: string }; response: void };
   "/activity/updateItemVisitHistory": {
@@ -5758,7 +6479,7 @@ export interface ApiRouteMap {
   };
   "/user/client/remoteAction/localDecision": {
     request: { token: string; approved: boolean };
-    response: { success: boolean; result: { matched: boolean } };
+    response: { matched: boolean };
   };
   "/user/client/remoteAction/forceSyncSettings": {
     request: { userId?: string; clientId: string; refreshCurrentUser?: boolean; refreshUserPrefs?: boolean };
@@ -5941,6 +6662,10 @@ export interface ApiRouteMap {
    * pack, never the part. Capped per child per day.
    */
   "/user/notification/lessonPartDone": { request: {}; response: { notified: boolean } };
+  /** A child's device: they asked for a Helper AI helper (HAT-1105). Carries nothing. */
+  "/user/notification/helperAsked": { request: {}; response: { notified: boolean } };
+  /** A child's device: their helper asked their adults a question (HAT-1105). Carries nothing. */
+  "/user/notification/helperQuestion": { request: {}; response: { notified: boolean } };
   "/user/notification/markRead": { request: { ids: string[] }; response: void };
   "/user/notification/markUnread": {
     request: { ids: string[] };
@@ -5951,13 +6676,17 @@ export interface ApiRouteMap {
     request: { userId?: string };
     response: { [key: string]: any };
   };
+  // `ifRevision` is the revision of the limits and of extra time the caller read (RVW-9, S6). When
+  // either is stored newer and this save would change it, nothing is saved and the answer is
+  // `conflict: true` with the stored revisions. A server from before revisions answers `{}`.
   "/user/options/update": {
     request: {
       userId?: string;
       options?: Partial<UserOptions>;
       tempAuthToken?: TokenData;
+      ifRevision?: Partial<OptionRevisions>;
     };
-    response: void;
+    response: { revisions?: OptionRevisions; conflict?: boolean };
   };
   /**
    * Mark your OWN daily check-in done for today.
@@ -5972,12 +6701,37 @@ export interface ApiRouteMap {
     response: { release: CheckpointRelease };
   };
   /**
+   * Set your OWN Block page customization (HAT-1267): `off`, and which of Kindredly's collections. Like
+   * /user/checkpoint/clear, a write a restricted user may make for themselves: it takes no userId,
+   * writes only `accessControlSettings.inspiration`, and keeps the collections a guardian added
+   * from their own library. A guardian setting a child's goes through /user/options/update.
+   */
+  "/user/blockPage/setOwn": {
+    request: { off?: boolean; collections?: string[] };
+    response: { inspiration: InspirationSettings };
+  };
+  /**
    * A guardian approves a child's Daily Check-in for today (background route; Kinbot's Approve
    * check-in, HAT-627). Not approved when the check-in is not holding them now.
    */
   "/user/checkpoint/approve": {
     request: { userId: string };
     response: { approved: boolean; reason?: string; release?: CheckpointRelease };
+  };
+  /**
+   * Give one child extra time today from Manage activity on a time block (HAT-1192). The same
+   * computation the guardian's extra-time window uses, including the limit's daily ceiling. Today
+   * only. `granted: false` carries the sentence to show, never a silent no-op.
+   */
+  "/user/extraTime/grant": {
+    request: { userId: string; minutes?: number; ruleId?: string };
+    response: {
+      granted: boolean;
+      minutes?: number;
+      minutesLabel?: string;
+      ruleNames?: string;
+      error?: string;
+    };
   };
   /**
    * Open one of your OWN Earn access rules once its steps are done (HAT-836). Like
@@ -6151,6 +6905,16 @@ export interface ApiRouteMap {
   "/appbuild/seal": {
     request: { format: string; runtime: number; hash: string; jsDigest: string; cssDigest: string; libs: string[] };
     response: { seal: string | null };
+  };
+  // The build this account made of an app on this device, kept so the next open runs it without
+  // building (HAT-1115; tset-client/src/bg/services/appBuildCache.ts). Background only.
+  "/appbuild/cache/get": {
+    request: { itemId: string };
+    response: { build: unknown | null };
+  };
+  "/appbuild/cache/set": {
+    request: { itemId: string; build: unknown };
+    response: { saved: boolean };
   };
   "/userfile/getMetaById": {
     request: { fileId: string; previewId?: string };
@@ -6549,6 +7313,9 @@ export const authOptionalRoutes: Array<keyof ApiRouteMap> = [
 
   // Thinking Puzzles catalog — the app is `requiresLogin: false`, so guest play reads it too
   "/thinkingPuzzles/catalog",
+
+  // Kindredly's default block page collections (HAT-1268): the block page may show before sign-in
+  "/blockPage/defaults",
 
   // Public user profiles
   "/user/public/get",

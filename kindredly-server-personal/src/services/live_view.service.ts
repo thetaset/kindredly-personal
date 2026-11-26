@@ -101,9 +101,13 @@ class LiveViewService {
    * of the device list entirely rather than shown as tiles that could never
    * fill. `supportsLiveView` on the view is therefore always true; it is kept on
    * the type so a future partially-capable platform has somewhere to say so.
+   *
+   * The desktop app (`electron`) is left out until it can capture (Phase C): it
+   * was listed, a guardian could pick it, and its tile waited for a frame that
+   * `LiveViewCaptureService` never sends from there.
    */
   private supportsLiveView(appType: string | null | undefined): boolean {
-    return appType === 'extension' || appType === 'ios' || appType === 'android' || appType === 'electron';
+    return appType === 'extension' || appType === 'ios' || appType === 'android';
   }
 
   private normalizeConnectionClientId(clientId: string | null | undefined, userId: string): string {

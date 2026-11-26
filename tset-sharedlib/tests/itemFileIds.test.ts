@@ -111,6 +111,41 @@ describe('rewriteItemFileSchemaIds', () => {
     expect(published['kindredly.appRef.v1']).toEqual({ runtime: 'hosted', sourceKind: 'published', sourceId: 'pub_123' });
   });
 
+  it("follows a page note's item key, removes its file key and keeps a web page (HAT-1068)", () => {
+    const book = { sourceUrl: 'kindredly-item:item_a', sourceKey: 'kindredly-item:item_a', title: 'The Wild Robot' };
+    const pdf = { sourceUrl: 'kindredly-file:file_abc', sourceKey: 'kindredly-file:file_abc', title: 'Workbook.pdf' };
+    const video = { sourceUrl: 'https://www.youtube.com/watch?v=Fq0XRb7mB2s', sourceKey: 'https://youtube.com/watch?v=Fq0XRb7mB2s', videoId: 'Fq0XRb7mB2s' };
+    const elsewhere = { sourceUrl: 'kindredly-item:item_elsewhere', sourceKey: 'kindredly-item:item_elsewhere' };
+
+    // Export: the item in the file becomes its local id; a file and an item outside the file go.
+    const exported = rewriteItemFileSchemaIds(
+      { 'kindredly.pageNote.v1': { schemaVersion: 1, ...pdf, morePages: [book, elsewhere, video] } },
+      exportMaps,
+    );
+    expect(exported['kindredly.pageNote.v1']).toEqual({
+      schemaVersion: 1,
+      sourceUrl: 'kindredly-item:i1',
+      sourceKey: 'kindredly-item:i1',
+      title: 'The Wild Robot',
+      morePages: [video],
+    });
+
+    // Import: the local id becomes the new item's.
+    const imported = rewriteItemFileSchemaIds(exported, { itemIds: new Map([['i1', 'item_new1']]) });
+    expect(imported['kindredly.pageNote.v1']).toMatchObject({ sourceUrl: 'kindredly-item:item_new1', sourceKey: 'kindredly-item:item_new1' });
+
+    // No page left: the schema goes, and the note is an ordinary note.
+    const none = rewriteItemFileSchemaIds(
+      { 'kindredly.pageNote.v1': { schemaVersion: 1, ...pdf, morePages: [elsewhere] }, 'kindredly.note.v1': { color: 'blue' } },
+      exportMaps,
+    );
+    expect(none).toEqual({ 'kindredly.note.v1': { color: 'blue' } });
+
+    // A web page alone is kept as it is.
+    const web = rewriteItemFileSchemaIds({ 'kindredly.pageNote.v1': { schemaVersion: 1, ...video } }, exportMaps);
+    expect(web['kindredly.pageNote.v1']).toEqual({ schemaVersion: 1, ...video });
+  });
+
   it('does not change its input', () => {
     const input = { 'kindredly.track.v1': { itemOrder: ['item_a'] } };
     rewriteItemFileSchemaIds(input, exportMaps);

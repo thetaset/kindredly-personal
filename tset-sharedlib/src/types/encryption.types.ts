@@ -1,6 +1,7 @@
 /**
  * Encryption and key management types
  */
+import type KeyEntry from '../schemas/public/KeyEntry';
 
 export interface EncInfoKey {
   wrappedEncKey: any;
@@ -51,4 +52,29 @@ export interface EncStatus {
   acntEncEnabled: boolean;
   acntEncSupported: boolean;
   needsPassword: boolean;
+}
+
+/** What an encryption background route answers in device-only mode, where encryption is off. */
+export type EncryptionDisabledResponse = { enabled: false; disabled: true };
+
+/** A serialized key as the background hands it out: the parts every caller can read. */
+export interface SerializedKeyView {
+  keyId: string;
+  format: 'wrapped' | 'jwk';
+  data: string;
+}
+
+/** A recovery key as the background returns it. `keyString` is what the person saves. */
+export interface RecoveryKeyView {
+  keyString: string;
+  jwk: JsonWebKey;
+  serializedRecoveryKey: SerializedKeyView;
+}
+
+/** The keys this device holds for a user, serialized: the encryption settings' key backup. */
+export interface KeyBackupView {
+  userId: string;
+  accountId: string;
+  userSecret: SerializedKeyView;
+  keyEntries: KeyEntry[];
 }

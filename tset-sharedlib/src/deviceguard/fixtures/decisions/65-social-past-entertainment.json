@@ -1,0 +1,96 @@
+{
+  "id": "65-social-past-entertainment",
+  "behaviour": "Social media can have more time than Entertainment (HAT-1092): Entertainment leaves social apps out, so Instagram is not stopped by Entertainment's 30 minutes while YouTube is.",
+  "clock": {
+    "nowMs": 1789491600000,
+    "familyTimeZone": "America/Los_Angeles",
+    "deviceTimeZone": "America/Los_Angeles"
+  },
+  "settings": {
+    "usageLimitsData": {
+      "contentUsageLimits": [
+        {
+          "id": "simple-entertainment",
+          "name": "Entertainment",
+          "type": "advanced",
+          "conditions": [
+            {
+              "type": "eduValue",
+              "values": [
+                "eduval_fun",
+                "eduval_junk"
+              ]
+            }
+          ],
+          "timeLimits": [
+            {
+              "hours": 0.5,
+              "daysOfWeek": [
+                0,
+                1,
+                2,
+                3,
+                4,
+                5,
+                6
+              ]
+            }
+          ],
+          "excludes": [
+            {
+              "type": "socialDesignation",
+              "values": [
+                "social"
+              ]
+            }
+          ]
+        }
+      ],
+      "temporaryRules": []
+    },
+    "ruleOverrideSettings": {
+      "ruleOverrides": []
+    },
+    "accessControlSettings": {},
+    "appPolicy": null,
+    "appPolicyStatus": "readable"
+  },
+  "installedApps": [
+    {
+      "pkg": "com.instagram.android",
+      "label": "Instagram",
+      "platform": "android"
+    },
+    {
+      "pkg": "com.google.android.youtube",
+      "label": "YouTube",
+      "platform": "android"
+    }
+  ],
+  "floor": [],
+  "usage": {
+    "appMsByPkg": {
+      "com.instagram.android": 2400000,
+      "com.google.android.youtube": 2400000
+    },
+    "webLogs": []
+  },
+  "usageSeed": {
+    "perRuleUsedMs": {}
+  },
+  "expectDevice": [
+    {
+      "pkg": "com.instagram.android",
+      "action": "allow",
+      "reason": null,
+      "ruleId": null
+    },
+    {
+      "pkg": "com.google.android.youtube",
+      "action": "block",
+      "reason": "budget-exhausted",
+      "ruleId": "simple-entertainment"
+    }
+  ],
+  "browserNotApplicable": "Device-only: per-app time exists only on the device; the browser reads the same rule for pages (CMP-128)."
+}

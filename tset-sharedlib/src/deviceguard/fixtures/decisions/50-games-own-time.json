@@ -1,0 +1,122 @@
+{
+  "id": "50-games-own-time",
+  "behaviour": "Games can have more time than Entertainment (HAT-1092): Entertainment leaves games out, so a game app counts toward Games alone and Entertainment keeps its time for the rest.",
+  "clock": {
+    "nowMs": 1789491600000,
+    "familyTimeZone": "America/Los_Angeles",
+    "deviceTimeZone": "America/Los_Angeles"
+  },
+  "settings": {
+    "usageLimitsData": {
+      "contentUsageLimits": [
+        {
+          "id": "simple-entertainment",
+          "name": "Entertainment",
+          "type": "advanced",
+          "conditions": [
+            {
+              "type": "eduValue",
+              "values": [
+                "eduval_fun"
+              ]
+            }
+          ],
+          "excludes": [
+            {
+              "type": "attribute",
+              "values": [
+                "game"
+              ]
+            }
+          ],
+          "timeLimits": [
+            {
+              "hours": 0.5,
+              "daysOfWeek": [
+                0,
+                1,
+                2,
+                3,
+                4,
+                5,
+                6
+              ]
+            }
+          ]
+        },
+        {
+          "id": "simple-custom-games",
+          "name": "Games",
+          "type": "advanced",
+          "conditions": [
+            {
+              "type": "attribute",
+              "values": [
+                "game"
+              ]
+            }
+          ],
+          "timeLimits": [
+            {
+              "hours": 1,
+              "daysOfWeek": [
+                0,
+                1,
+                2,
+                3,
+                4,
+                5,
+                6
+              ]
+            }
+          ]
+        }
+      ],
+      "temporaryRules": []
+    },
+    "ruleOverrideSettings": {
+      "ruleOverrides": []
+    },
+    "accessControlSettings": {},
+    "appPolicy": null,
+    "appPolicyStatus": "absent"
+  },
+  "installedApps": [
+    {
+      "pkg": "com.roblox.client",
+      "label": "Roblox",
+      "platform": "android"
+    },
+    {
+      "pkg": "com.google.android.youtube",
+      "label": "YouTube",
+      "platform": "android"
+    }
+  ],
+  "floor": [],
+  "usage": {
+    "appMsByPkg": {
+      "com.roblox.client": 2400000,
+      "com.google.android.youtube": 600000
+    },
+    "webLogs": []
+  },
+  "usageSeed": {
+    "perRuleUsedMs": {}
+  },
+  "expectDevice": [
+    {
+      "pkg": "com.roblox.client",
+      "action": "allow",
+      "reason": null,
+      "ruleId": null
+    },
+    {
+      "pkg": "com.google.android.youtube",
+      "action": "allow",
+      "reason": null,
+      "ruleId": null
+    }
+  ],
+  "browserNotApplicable": "Device-only: app time exists only on the device. The browser's half, a game page left out of Entertainment, is checkRuleConditions' test (excludes)."
+}

@@ -1,4 +1,5 @@
 import {
+  appGrantMinutes,
   appGrantUntil,
   appPlatformLabel,
   appRequestSubject,
@@ -53,6 +54,26 @@ describe('appGrantUntil', () => {
     expect(appGrantUntil(60, NOW, 0)).toBe(NOW + 60 * 60_000);
     // 02:00 UTC is 19:00 the day before in Los Angeles (UTC-7); midnight there is 07:00 UTC.
     expect(appGrantUntil('today', NOW, -420)).toBe(Date.UTC(2026, 9, 3, 7, 0, 0));
+  });
+
+  it('ends a typed amount that many minutes from now (HAT-1377)', () => {
+    expect(appGrantUntil(45, NOW, 0)).toBe(NOW + 45 * 60_000);
+    expect(appGrantUntil(150, NOW, 0)).toBe(NOW + 150 * 60_000);
+  });
+});
+
+describe('appGrantMinutes', () => {
+  it('takes whole minutes from 1 to a day, typed or not', () => {
+    expect(appGrantMinutes(45)).toBe(45);
+    expect(appGrantMinutes('90')).toBe(90);
+    expect(appGrantMinutes(' 20.4 ')).toBe(20);
+    expect(appGrantMinutes(1440)).toBe(1440);
+  });
+
+  it('refuses nothing, zero, less than nothing, words and more than a day', () => {
+    for (const raw of ['', '  ', 0, -5, 'soon', 1441, NaN, Infinity, null, undefined]) {
+      expect(appGrantMinutes(raw)).toBeNull();
+    }
   });
 });
 

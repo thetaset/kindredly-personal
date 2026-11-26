@@ -26,6 +26,8 @@ export type PublishedAction =
   | 'readable_id'
   | 'curated'
   | 'uncurated'
+  | 'choice'
+  | 'unchoice'
   | 'declined'
   | 'proposal_applied'
   | 'proposal_rejected'

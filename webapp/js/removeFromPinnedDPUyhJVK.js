@@ -1,0 +1,1 @@
+import{dy as r,aJ as e}from"./appHandoffGuestD3H_h1r5.js";import{unpinSearch as n}from"./pinnedSearches.storeD1K7YNhU.js";async function d(a){if(a.type==="savedSearch"){await n(r(a._id));return}await e(a._id,!1)}export{d as r};

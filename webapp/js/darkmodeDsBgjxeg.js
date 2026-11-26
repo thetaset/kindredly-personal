@@ -1,0 +1,1 @@
+import{u as e,s as o,c as t,g as a}from"./shared.routerDVPRZaHe.js";import{d}from"./vue-runtimeCY_KIElv.js";const m=d({components:{},data:function(){return{}},computed:{darkMode:a.darkMode},methods:{checkDarkMode:t,setUIMode:o,updateUI:e}});export{m};

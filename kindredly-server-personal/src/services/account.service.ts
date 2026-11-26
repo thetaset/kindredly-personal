@@ -46,6 +46,7 @@ import {
 } from 'tset-sharedlib/restrictions/familyDowntime';
 import SSEManager from './sse.manager';
 import {FamilyDowntimeNoticeService} from './family_downtime_notice.service';
+import {normalizeSchoolDays} from 'tset-sharedlib/restrictions/schoolDays';
 
 function resolveDisplayAccount(account: Account | null) {
   if (!account) return account;
@@ -295,6 +296,18 @@ class AccountService {
       timeZoneChanged = (account.options?.familyTimeZone ?? null) !== next;
     }
 
+    // School days (HAT-1283): stored in today's shape, and every member's device recompiles, since
+    // which schedule a child's day takes depends on it.
+    let schoolDaysChanged = false;
+    if ('schoolDays' in patch) {
+      patch.schoolDays = {
+        ...normalizeSchoolDays(patch.schoolDays),
+        updatedAt: Date.now(),
+        updatedBy: ctx.currentUserId,
+      };
+      schoolDaysChanged = true;
+    }
+
     // Recurring downtime is worked out in the family timezone, so a zone cannot be cleared under it.
     if (timeZoneChanged && !patch.familyTimeZone && this._usesRecurringDowntime(account.options?.familyDowntime)) {
       throw new Error('Family Downtime uses the family timezone. Turn off its schedules first.');
@@ -306,7 +319,7 @@ class AccountService {
     // Family AI going to anything but On turns Connected AI apps off, so turning AI back on never
     // brings outside AI apps back without an adult choosing it again.
     if ('aiSetting' in patch && patch.aiSetting !== 'on') merged.mcpRelayEnabled = false;
-    if (!timeZoneChanged) {
+    if (!timeZoneChanged && !schoolDaysChanged) {
       await this.accounts.updateWithId(ctx.accountId, {options: merged});
       return true;
     }

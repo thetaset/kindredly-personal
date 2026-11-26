@@ -1,0 +1,107 @@
+{
+  "id": "57-school-days-school-day",
+  "behaviour": "School days (HAT-1283): on a school day the School days amount holds, here none, so Roblox is blocked; the same rule as 56.",
+  "clock": {
+    "nowMs": 1799967600000,
+    "familyTimeZone": "America/Los_Angeles",
+    "deviceTimeZone": "America/Los_Angeles"
+  },
+  "settings": {
+    "usageLimitsData": {
+      "contentUsageLimits": [
+        {
+          "id": "r-fun",
+          "name": "Fun",
+          "type": "advanced",
+          "conditions": [
+            {
+              "type": "eduValue",
+              "values": [
+                "eduval_fun"
+              ]
+            }
+          ],
+          "timeLimits": [
+            {
+              "hours": 0,
+              "daysOfWeek": [
+                1,
+                2,
+                3,
+                4,
+                5
+              ],
+              "dayKind": "school"
+            },
+            {
+              "hours": 2,
+              "daysOfWeek": [
+                0,
+                6
+              ],
+              "dayKind": "notSchool"
+            }
+          ]
+        }
+      ],
+      "temporaryRules": []
+    },
+    "ruleOverrideSettings": {
+      "ruleOverrides": []
+    },
+    "accessControlSettings": {},
+    "appPolicy": null,
+    "appPolicyStatus": "absent",
+    "schoolDays": {
+      "week": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "daysOff": [
+        {
+          "id": "winter",
+          "name": "Winter break",
+          "from": "2026-12-21",
+          "to": "2027-01-01"
+        }
+      ],
+      "updatedAt": 0,
+      "updatedBy": ""
+    }
+  },
+  "installedApps": [
+    {
+      "pkg": "com.roblox.client",
+      "label": "Roblox",
+      "platform": "android"
+    }
+  ],
+  "floor": [],
+  "usage": {
+    "appMsByPkg": {
+      "com.roblox.client": 600000
+    },
+    "webLogs": []
+  },
+  "usageSeed": {
+    "perRuleUsedMs": {}
+  },
+  "expectDevice": [
+    {
+      "pkg": "com.roblox.client",
+      "action": "block",
+      "reason": "always-blocked",
+      "ruleId": "r-fun"
+    }
+  ],
+  "expectBrowser": [
+    {
+      "ruleId": "r-fun",
+      "exceeded": true,
+      "reason": "always-blocked"
+    }
+  ]
+}

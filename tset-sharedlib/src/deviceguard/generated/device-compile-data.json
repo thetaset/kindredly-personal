@@ -18,6 +18,24 @@
     "remote": "eduval_unknown",
     "other": "eduval_task"
   },
+  "categoryLabels": {
+    "games": "Games",
+    "social": "Social",
+    "video": "Video & streaming",
+    "music": "Music & audio",
+    "communication": "Messaging & calls",
+    "learning": "Learning",
+    "creative": "Creative & photos",
+    "productivity": "Productivity",
+    "shopping": "Shopping & money",
+    "news": "News & reading",
+    "utilities": "Utilities & system",
+    "stores": "App stores",
+    "browsers": "Other browsers",
+    "vpn": "VPN & proxy",
+    "remote": "Remote access",
+    "other": "Other"
+  },
   "androidCategoryToAppCategory": {
     "0": "games",
     "1": "music",
@@ -828,6 +846,17 @@
     "animal-jam": [],
     "prodigy": []
   },
+  "aiApps": [
+    "android:com.openai.chatgpt",
+    "android:com.anthropic.claude",
+    "android:com.google.android.apps.bard",
+    "android:com.microsoft.copilot",
+    "android:ai.perplexity.app.android",
+    "android:com.deepseek.chat",
+    "android:ai.character.app",
+    "macos:com.openai.chat",
+    "macos:com.anthropic.claudefordesktop"
+  ],
   "earnAccessHolds": [
     {
       "hold": "entertainment",

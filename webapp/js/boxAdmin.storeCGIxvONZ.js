@@ -1,0 +1,1 @@
+import{t as a}from"./appHandoffGuestD3H_h1r5.js";import{a1 as n}from"./vue-runtimeCY_KIElv.js";const t=n({isBoxAdmin:null,families:[]});let s=null;function m(e=!1){return s&&!e||(s=(async()=>{const i=await a("/box/admin/status",{});i!=null&&i.success&&i.result?(t.isBoxAdmin=i.result.isBoxAdmin===!0,t.families=i.result.families??[]):t.isBoxAdmin=!1})()),s}export{t as b,m as l};

@@ -116,6 +116,20 @@ export type TaskDefinition = {
 
   completePolicy?: TaskCompletePolicy
   requiresApproval?: boolean
+
+  /**
+   * The task's subtasks, ticked in any order (HAT-1104). They live inside the task and have no
+   * page, due date or assignee of their own. Each person's ticks are in that occurrence's
+   * completion record, encrypted (`task.subtasks.ts`). Linked items stay separate: they are context.
+   */
+  subtasks?: TaskSubtask[]
+}
+
+/** One subtask of a task. `itemId` is a library item it opens, if any. */
+export type TaskSubtask = {
+  key: string
+  title: string
+  itemId?: string
 }
 
 export type TaskCompletionBy = 'admin' | 'child' | 'system'
@@ -152,6 +166,8 @@ export type TaskOccurrenceView = {
   completionNote?: string
   completedByUserId?: string
   overdue?: boolean
+  /** The keys of the subtasks this person has ticked for this occurrence. */
+  subtasksDoneKeys?: string[]
 }
 
 export type TaskGateScope = 'internet' | 'content_types'

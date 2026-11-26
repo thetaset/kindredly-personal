@@ -7,9 +7,10 @@
  * See docs/proposals/kindredly-companion-device-app-controls.md.
  */
 
+import type { SchoolDaysSettings } from '../restrictions/schoolDays';
 import type { EncInfoKey } from './encryption.types';
 import type { InterventionMode } from './activity.types';
-import type { LimitRule, RuleOverride } from './usage-limits.types';
+import type { CheckpointRelease, CheckpointSettings, LimitRule, RuleOverride } from './usage-limits.types';
 import type { EarnAccessOpenings, EarnAccessSettings } from './earn-access.types';
 import type { TemporaryLimitRule } from './reward.types';
 import type { DeviceHealth } from '../deviceguard/deviceHealth';
@@ -165,8 +166,19 @@ export interface DeviceAppPolicyEntry {
  * never checked in. `entries` holds only the apps a parent overrode individually.
  * Both together stay far under the 64KB ref_state cap.
  */
+/**
+ * The Browsers setting (HAT-1348): where a child may browse, the same on every device. `any`: nothing
+ * is closed. `withKindredly`: only where Kindredly filters — a phone blocks every other browser, a
+ * computer closes a browser with no Kindredly in it. `lockedDown`: that, and Browser lockdown on each
+ * computer (Kindredly forced into every browser, no private windows), which is turned on at the
+ * computer. Absent: `withKindredly` for a child, `any` for an admin's own policy.
+ */
+export type DeviceBrowsersLevel = 'any' | 'withKindredly' | 'lockedDown';
+
 export interface DeviceAppPolicy {
   version: 1;
+  /** The Browsers setting (HAT-1348). Absent: see `DeviceBrowsersLevel`. */
+  browsers?: DeviceBrowsersLevel;
   /** Curated categories the parent turned off wholesale. */
   blockedCategories: string[];
   /** Per-app exceptions ONLY; an entry.decision outranks its category. */
@@ -222,6 +234,13 @@ export interface CompiledAppPolicy {
    * picks the shield's words ("Among Us is new").
    */
   newApps?: string[];
+  /**
+   * The App controls category (`AppCategoryId`, e.g. `social`) that blocked each app, so a block
+   * screen can name the setting (HAT-1348): category → ids, sorted. An id is a bare package for a
+   * category's own apps (the same on every platform) or a platform-qualified one for an app found
+   * on a device. An app blocked by its own choice, or only for being new, is in none.
+   */
+  blockedBy?: Record<string, string[]>;
 }
 
 /**
@@ -376,6 +395,12 @@ export interface DeviceGuardStatus {
    * Absent: not known, or not a child's computer.
    */
   accountIsAdmin?: boolean;
+  /**
+   * Computers: Browser lockdown over the browsers installed here (HAT-1348), so App controls can say
+   * which computers still need it under Locked down. `off` also covers a computer nobody linked yet.
+   * Absent: an older build, or nothing to lock down (no supported browser).
+   */
+  browserLockdown?: 'on' | 'partial' | 'off';
   /** The device's timezone differs from the family's (D3). Schedules still follow the family's. */
   timeZoneMismatch?: boolean;
   /** The device clock is far from the server's, which a child can do to slide a schedule. */
@@ -528,6 +553,14 @@ export interface CompiledDeviceRule {
   schedule: CompiledScheduleWindow[];
   /** Daily budget in ms keyed by day-of-week (0=Sun..6=Sat). Absent day = no budget that day. */
   dailyBudgetMsByDow: Record<number, number>;
+  /**
+   * HAT-1086: the rule's weekly total in ms, from Monday's start on the family clock, with any extra
+   * time given today already added (`applyOverrides`). It limits every day, including one with no
+   * `dailyBudgetMsByDow` entry, and blocks once this week's web time (`usageSeed.perRuleWeekUsedMs`)
+   * plus this device's own app time since Monday reaches it. Omitted when the rule has no weekly
+   * total, so every other rule's JSON, and `fingerprintOf()`, is unchanged.
+   */
+  weeklyBudgetMs?: number;
   /** Lower = evaluated first; assigned from source order. */
   priority: number;
   /**
@@ -551,14 +584,31 @@ export interface CompiledDeviceRuleSet {
   rules: CompiledDeviceRule[];
   /** Never-blockable packages (dialer/emergency, launcher, Kindredly, system UI). */
   safetyAllowlist: string[];
-  /** Web usage already accrued today (per rule id), so combined web+app budgets start seeded. */
-  usageSeed: { dateKey: string; perRuleUsedMs: Record<string, number> };
+  /**
+   * Web usage already accrued today (per rule id), so combined web+app budgets start seeded.
+   *
+   * HAT-1086: `weekKey` (`familyWeekKey`, Monday's `yyyy-MM-dd`) and `perRuleWeekUsedMs`, this
+   * family week's web time per rule with today's included, are present only when some rule has
+   * `weeklyBudgetMs`. A device counts them only while `weekKey` is the current family week, and adds
+   * its own app time since Monday, as it adds today's to `perRuleUsedMs`. Web-only like the day's.
+   */
+  usageSeed: {
+    dateKey: string;
+    perRuleUsedMs: Record<string, number>;
+    weekKey?: string;
+    perRuleWeekUsedMs?: Record<string, number>;
+  };
   /**
    * Parent's allow/block posture. OPTIONAL on purpose: absent means "no posture",
    * so an older main app pushing to a newer Guard — or a family that never opened
    * the Apps page — behaves exactly as it did before this field existed.
    */
   appPolicy?: CompiledAppPolicy;
+  /**
+   * The Browsers setting as a guardian chose it (HAT-1348), for a computer, which closes a browser
+   * with no Kindredly in it itself. Absent when nobody chose: the computer defaults by who is linked.
+   */
+  browsers?: DeviceBrowsersLevel;
   /**
    * Family Downtime, passed through from the settings unchanged apart from dropping stretches that
    * have already ended. Not gated on a pause. Absent from an older compile, which behaves as before.
@@ -616,6 +666,24 @@ export interface CompiledDeviceRuleSet {
     rules?: Array<{ ruleId: string; name: string; appIds: string[]; open: Array<{ startMs: number; endMs: number }> }>;
     horizonEndMs?: number;
   };
+  /**
+   * "Block all access" (CMP-118), while it is on at compile time: the apps it closes on this device
+   * until `untilMs` (0 means until a guardian turns it off). Every app that is not Task-Related or a
+   * system app, and on a phone the other browsers, since Kindredly's filtering is not in them; the
+   * founder's call (2026-11-23): Kindredly's own apps are left to handle themselves, and a task app
+   * stays open. Below the floor and a guardian's grant, above everything else, as the browser checks
+   * it before Always allowed. Absent while it is off, so every other ruleset is unchanged.
+   */
+  blockAll?: { untilMs: number; appIds: string[] };
+  /**
+   * The Daily Check-in (CMP-117, MAC-15), while it can block: on and not in reminder mode. Until
+   * `releasedUntilMs` (0 when today's is not done), `appIds` are blocked: every app a time limit
+   * covers on this device, less those the check-in's exceptions name (MAC-15's locked decision: what
+   * the browser leaves unlimited, a device leaves alone). A release lasts until the check-in's reset,
+   * so the device needs nothing but its clock to hold it again the next day. `self` means the child
+   * clears it in Kindredly, `guardian` that a parent does. Absent when there is no such check-in.
+   */
+  checkin?: { mode: 'self' | 'guardian'; releasedUntilMs: number; appIds: string[] };
   /**
    * The linked child's display name, so a Companion can name them with no browser attached.
    *
@@ -693,6 +761,13 @@ export interface DeviceSettings {
     /** Earn access rules and when each was last opened (HAT-836). The device works out which hold. */
     earnAccessSettings?: EarnAccessSettings;
     earnAccessOpenings?: EarnAccessOpenings;
+    /**
+     * The Daily Check-in as data saved before HAT-913 holds it; newer data keeps it as an Earn access
+     * rule (`checkinRuleOf`). Read through `checkpointSettingsOf`.
+     */
+    checkpointSettings?: CheckpointSettings;
+    /** When today's check-in was done, until its reset (CMP-117). */
+    checkpointRelease?: CheckpointRelease;
   };
   appPolicy: DeviceAppPolicy | null;
   appPolicyStatus: DeviceAppPolicyStatus;
@@ -706,6 +781,12 @@ export interface DeviceSettings {
    * `intervals` is empty for a family with no downtime.
    */
   familyDowntime?: DeviceFamilyDowntime;
+  /**
+   * School days (HAT-1283): the family's school week and breaks and days off, as stored. A device
+   * applies `applySchoolDays` (Guard: `DeviceSettingsCompiler.applySchoolDays`) before extra time, so a
+   * day off uses the Not school days schedule. Absent from a server that predates it.
+   */
+  schoolDays?: SchoolDaysSettings;
   /**
    * Always allowed apps (`user.options.alwaysAllowed.appIds`, HAT-152), `<platform>:<id>`. Open during
    * Family Downtime and past every time limit; an app block still wins. Absent when there are none,
@@ -764,4 +845,75 @@ export interface DeviceSettingsCurrentResponse {
    * The Companion hands `message` and `signature` to the root guard unchanged.
    */
   browserPause?: {message: string; signature: string; untilMs: number};
+}
+
+/**
+ * DCP-27: app time added up across a child's devices. Each device reports its own time per limit,
+ * sealed with the child's usage key before it leaves the device; the server stores the latest one
+ * per device and passes it to the child's other devices, and never reads it (usage is history and
+ * stays encrypted; founder, 2026-11-10). Design: docs/proposals/app-time-across-devices.md.
+ *
+ * Rows, under `refType: 'device-guard'`, `refId: USAGE_REF_ID`, owned by the child:
+ * - `report/<deviceId>`: `{report: SealedUsageBlob, receivedAtMs}`, written only by
+ *   `/companion/usage/sync` with that device's token.
+ * - `deviceKey/<deviceId>`: the usage key's raw bytes sealed with that device's own data key, written
+ *   by a Kindredly app (unencrypted row; the blob is the encryption).
+ * - `childKey/child`: a `ChildUsageKeyRecord`, encrypted for the child like any ref_state row.
+ */
+export const USAGE_REF_ID = 'usage';
+export const USAGE_REPORT_STATE = 'report';
+export const USAGE_DEVICE_KEY_STATE = 'deviceKey';
+export const USAGE_CHILD_KEY_STATE = 'childKey';
+export const USAGE_CHILD_KEY_SUBKEY = 'child';
+
+/** AES-256-GCM: a 12-byte `iv` and `data` as ciphertext followed by the 16-byte tag, both standard base64. */
+export interface SealedUsageBlob {
+  /** The usage key's id, so a device holding an older key knows to wait for the new one. */
+  keyId: string;
+  iv: string;
+  data: string;
+}
+
+/**
+ * What a sealed report opens to: the device's own app time per limit id, on the family's day and
+ * week (`familyClock`). Never web time or other devices' time, so nothing is counted twice.
+ */
+export interface DeviceUsageReport {
+  dateKey: string;
+  perRuleUsedMs: Record<string, number>;
+  weekKey?: string;
+  perRuleWeekUsedMs?: Record<string, number>;
+}
+
+export interface OtherDeviceUsageReport {
+  deviceId: string;
+  /** When the server received it, on the server's clock. */
+  receivedAtMs: number;
+  report: SealedUsageBlob;
+}
+
+/**
+ * A device's report and pull in one call. `report` absent is a pull. `limitUsedUp`: a limit ran
+ * out on this device, so the server nudges the child's other devices to pull now.
+ */
+export interface DeviceUsageSyncRequest {
+  report?: SealedUsageBlob;
+  limitUsedUp?: boolean;
+}
+
+export interface DeviceUsageSyncResponse {
+  serverTimeMs: number;
+  /** The usage key, sealed with the calling device's own data key. Absent until a Kindredly app has made one. */
+  usageKey?: SealedUsageBlob;
+  /** The child's other devices' latest reports, newest first. */
+  others: OtherDeviceUsageReport[];
+}
+
+/** The child's usage key, held in the child's encrypted `childKey/child` row. */
+export interface ChildUsageKeyRecord {
+  keyId: string;
+  rawKeyB64: string;
+  /** The devices it was sealed for. One no longer linked means the key is replaced (rotation). */
+  deviceIds: string[];
+  createdAtMs: number;
 }

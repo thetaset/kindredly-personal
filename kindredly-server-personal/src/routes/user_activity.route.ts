@@ -93,6 +93,15 @@ class UserActivityRoute implements Routes {
     );
 
     this.router.post(
+      '/user/activity/sharePages',
+      authenticateJWT,
+      errorHelper(async (req: ApiReq<'/user/activity/sharePages'>, res) => {
+        const results = await this.activityService.sharePages(RequestContext.instance(req), req.body);
+        res.json({success: true, results});
+      }),
+    );
+
+    this.router.post(
       '/user/activity/uploadClassificationDatasetSamples',
       authenticateJWT,
       errorHelper(async (req: ApiReq<'/user/activity/uploadClassificationDatasetSamples'>, res) => {

@@ -23,6 +23,8 @@ import {deviceHoldsAll, newAppsNotice, whoseDevice} from '@/services/companionTa
 import {escapeHtml} from '@/utils/text_utils';
 import {selfRemovalApprover} from '@/services/companionSelfRemoval';
 import {RefStateRepo} from '@/db/ref_state.repo';
+import {DeviceUsageService} from '@/services/device_usage.service';
+import {USAGE_DEVICE_KEY_STATE, USAGE_REF_ID, USAGE_REPORT_STATE} from 'tset-sharedlib/types/device-guard.types';
 
 const SETTINGS_EVENTS_HEADERS = {
   'Content-Type': 'text/event-stream',
@@ -92,6 +94,7 @@ class DeviceGuardRoute implements Routes {
   private refStateService = new RefStateService();
   private refStates = new RefStateRepo();
   private deviceSettingsService = new DeviceSettingsService();
+  private deviceUsageService = new DeviceUsageService();
   private sseManager = SSEManager.getInstance();
 
   constructor() {
@@ -218,6 +221,17 @@ class DeviceGuardRoute implements Routes {
           });
           deletedRows += result?.deletedCount || 0;
         }
+        // Its app-time report and its copy of the usage key (DCP-27), under their own refId.
+        for (const stateKey of [USAGE_REPORT_STATE, USAGE_DEVICE_KEY_STATE]) {
+          deletedRows += await this.refStates.deleteOne({
+            refType: 'device-guard',
+            refId: USAGE_REF_ID,
+            ownerType: 'user',
+            ownerId: childUserId,
+            stateKey,
+            stateSubKey: deviceId,
+          });
+        }
 
         // Audited because of who else can reach it: a child who has used "Unlock
         // settings" is a server-authorized admin for five minutes and can remove
@@ -281,6 +295,16 @@ class DeviceGuardRoute implements Routes {
           deletedRows += await this.refStates.deleteOne({
             refType: 'device-guard',
             refId: 'companion',
+            ownerType: 'user',
+            ownerId: childUserId,
+            stateKey,
+            stateSubKey: deviceId,
+          });
+        }
+        for (const stateKey of [USAGE_REPORT_STATE, USAGE_DEVICE_KEY_STATE]) {
+          deletedRows += await this.refStates.deleteOne({
+            refType: 'device-guard',
+            refId: USAGE_REF_ID,
             ownerType: 'user',
             ownerId: childUserId,
             stateKey,
@@ -539,6 +563,29 @@ class DeviceGuardRoute implements Routes {
         const raw = req.body?.knownVersion;
         const knownVersion = typeof raw === 'number' && Number.isFinite(raw) ? raw : undefined;
         const results = await this.deviceSettingsService.currentForUser(userId, knownVersion, Date.now(), deviceId);
+        res.json({success: true, results});
+      }),
+    );
+
+    /**
+     * DCP-27: this device's sealed app-time report, and the child's other devices' (see
+     * `DeviceUsageService`). Device token only: the child and the device come from the token, so a
+     * device can report only for itself and read only its own child's reports.
+     */
+    this.router.post(
+      '/companion/usage/sync',
+      authenticateJWT,
+      errorHelper(async (req: ApiReq<'/companion/usage/sync'>, res) => {
+        const ctx = RequestContext.instance(req);
+        const userId = ctx.getSessionUserId();
+        const deviceId = ctx.getTokenDeviceId();
+        if (!userId || !deviceId) {
+          return res.json({success: false, message: 'Only a linked device can report its time.', status: 403});
+        }
+        const results = await this.deviceUsageService.sync(
+          {userId, deviceId, report: req.body?.report, limitUsedUp: req.body?.limitUsedUp},
+          Date.now(),
+        );
         res.json({success: true, results});
       }),
     );

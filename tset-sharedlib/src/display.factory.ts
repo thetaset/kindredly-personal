@@ -424,6 +424,8 @@ export function createPublishedDisplayItem(
     curatorComment: curation?.curatorComment,
     underReview: !!curation?.underReviewAt,
     archived: !!curation?.archivedAt,
+    // Curator's Choice (CCH-3): shown only while the item is recommendable.
+    curatorsChoice: curation?.choice === 'curator' && !curation?.underReviewAt && !curation?.archivedAt,
     nextReviewAt: curation?.nextReviewAt ?? undefined,
 
     inLibrary,

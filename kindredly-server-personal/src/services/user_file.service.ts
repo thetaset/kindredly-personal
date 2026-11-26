@@ -10,6 +10,7 @@ import {UserFileAccessProvider} from '../base/user_fileaccess.provider';
 import PermissionService from './permission.service';
 import {getDetailsByAccountType} from '@/defaults/products_and_plans';
 import {base64ByteSize} from '@/utils/binary_utils';
+import {UserMessageError} from 'tset-sharedlib/user-message';
 
 /**
  * A preview id off a query string or JSON body. `undefined`, `null`, empty, an array with no
@@ -53,7 +54,9 @@ class UserFileService {
 
     if (fileSize > maxUploadBytes) {
       const limit = Math.round(maxUploadBytes / 1024 / 1024);
-      throw new Error(`File too large. File size limit is ${limit} MB. Current Size is ${fileSize / 1024 / 1024} MB.`);
+      throw new UserMessageError(
+        `This file is ${Math.ceil(fileSize / 1024 / 1024)} MB. The most you can upload is ${limit} MB.`,
+      );
     }
 
     const maxVisibleStorageBytes = Number(limits?.maxVisibleStorageBytes ?? 0);

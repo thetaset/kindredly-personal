@@ -1,1 +1,0 @@
-const e={strip:{launchpad:"Launchpad",defaults:"Defaults",edit:"Edit Launchpad",open:"Open {label}",openNew:"Open new: {target}",default:"Default",thisTab:"this tab",current:"current",closeTab:"Close tab",closeAll:"Close all"}};export{e as l};

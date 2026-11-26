@@ -1,1 +1,0 @@
-import{bm as t}from"./appLifecycle.storeBsQj5XV4.js";import{s as e,z as o}from"./vue-runtimeBK7yvp5X.js";import"./dexie2jmnBxhj.js";import"./bootstrap-vue-next4HGAzTgs.js";import"./cjs-helpersC4iS2aBk.js";const r={};function c(m,n){return o(),e("div")}const f=t(r,[["render",c]]);export{f as default};

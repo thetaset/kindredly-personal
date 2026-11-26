@@ -59,6 +59,10 @@ class MemoryPipeline implements KvPipeline {
     this.steps.push(() => this.store.del(...keys));
     return this;
   }
+  sadd(key: string, ...members: string[]): this {
+    this.steps.push(() => this.store.sadd(key, ...members));
+    return this;
+  }
   srem(key: string, ...members: string[]): this {
     this.steps.push(() => this.store.srem(key, ...members));
     return this;

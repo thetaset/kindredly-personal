@@ -12,7 +12,15 @@ export enum SyncType {
 // row with an unknown/missing type as corrupt and forces a FULL reset for
 // that user (sync.service.ts runSync). Typing the writers makes an untyped
 // `{}` payload a compile error instead of a silent full-sync bomb.
-export type SyncChangeLogData = {type: SyncType.itemUpdate; items: string[]} | {type: SyncType.fullReset};
+//
+// `detailsOnly: true` says the change was to these items' own details (a collection's name, picture,
+// description), not to what a collection holds or who can see it, so a pull need not send the
+// collection's members again (SYNC-17). Absent means expand, which every row written before it, and
+// every writer that does not say otherwise, keeps. A new field, never a new `type`: an unknown type is
+// a full reset.
+export type SyncChangeLogData =
+  | {type: SyncType.itemUpdate; items: string[]; detailsOnly?: true}
+  | {type: SyncType.fullReset};
 
 export class UserChangeLogRepo extends BaseRepo<UserChangeLog> {
   constructor(db: Knex = knex) {

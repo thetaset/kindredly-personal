@@ -1,0 +1,69 @@
+{
+  "v": 1,
+  "userId": "u-1",
+  "isChild": true,
+  "nativeHome": true,
+  "theme": "dark",
+  "bigAndSimple": false,
+  "searchPlaceholder": "Search or ask",
+  "canAsk": true,
+  "wallpaper": {
+    "color": "rgb(18, 18, 18)",
+    "image": "home-wallpaper.jpg",
+    "tone": "dark"
+  },
+  "chips": [
+    {
+      "id": "notes",
+      "label": "Notes",
+      "icon": "journal-text",
+      "drawing": "notepad",
+      "to": "/notes"
+    },
+    {
+      "id": "tasks",
+      "label": "Tasks",
+      "icon": "check2-square",
+      "drawing": null,
+      "to": "/tasks"
+    }
+  ],
+  "pinned": [
+    {
+      "id": "i1",
+      "title": "Bedtime stories",
+      "icon": "book",
+      "to": "/collection/i1",
+      "thumb": "home-pinned-i1.jpg"
+    },
+    {
+      "id": "i2",
+      "title": "Math practice",
+      "icon": "calculator",
+      "to": "/collection/i2",
+      "thumb": null
+    }
+  ],
+  "recent": [
+    {
+      "id": "r1",
+      "title": "Volcano video",
+      "icon": "film",
+      "to": null,
+      "thumb": "home-pinned-r1.jpg"
+    }
+  ],
+  "quickbar": {
+    "collectionId": "col_quick",
+    "items": [
+      {
+        "id": "q1",
+        "title": "Weather",
+        "icon": "link-45deg",
+        "to": null,
+        "thumb": null
+      }
+    ]
+  },
+  "savedAt": 1763000000000
+}

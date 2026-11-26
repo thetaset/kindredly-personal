@@ -1,0 +1,87 @@
+{
+  "id": "64-social-media-limit",
+  "behaviour": "The Social media limit covers the social apps: Instagram past its 30 minutes is blocked, and a game it does not cover stays open.",
+  "clock": {
+    "nowMs": 1789491600000,
+    "familyTimeZone": "America/Los_Angeles",
+    "deviceTimeZone": "America/Los_Angeles"
+  },
+  "settings": {
+    "usageLimitsData": {
+      "contentUsageLimits": [
+        {
+          "id": "simple-social",
+          "name": "Social media",
+          "type": "advanced",
+          "conditions": [
+            {
+              "type": "socialDesignation",
+              "values": [
+                "social"
+              ]
+            }
+          ],
+          "timeLimits": [
+            {
+              "hours": 0.5,
+              "daysOfWeek": [
+                0,
+                1,
+                2,
+                3,
+                4,
+                5,
+                6
+              ]
+            }
+          ]
+        }
+      ],
+      "temporaryRules": []
+    },
+    "ruleOverrideSettings": {
+      "ruleOverrides": []
+    },
+    "accessControlSettings": {},
+    "appPolicy": null,
+    "appPolicyStatus": "readable"
+  },
+  "installedApps": [
+    {
+      "pkg": "com.instagram.android",
+      "label": "Instagram",
+      "platform": "android"
+    },
+    {
+      "pkg": "com.roblox.client",
+      "label": "Roblox",
+      "platform": "android"
+    }
+  ],
+  "floor": [],
+  "usage": {
+    "appMsByPkg": {
+      "com.instagram.android": 2400000,
+      "com.roblox.client": 2400000
+    },
+    "webLogs": []
+  },
+  "usageSeed": {
+    "perRuleUsedMs": {}
+  },
+  "expectDevice": [
+    {
+      "pkg": "com.instagram.android",
+      "action": "block",
+      "reason": "budget-exhausted",
+      "ruleId": "simple-social"
+    },
+    {
+      "pkg": "com.roblox.client",
+      "action": "allow",
+      "reason": null,
+      "ruleId": null
+    }
+  ],
+  "browserNotApplicable": "Device-only: per-app time exists only on the device; the browser reads the same rule for pages (CMP-128)."
+}

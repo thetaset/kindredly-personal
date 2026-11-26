@@ -6,6 +6,23 @@ import PermissionService from './permission.service';
 import SSEManager from './sse.manager';
 import {logger} from '@/utils/logger';
 
+/**
+ * `nudge: false` writes the journal row and skips only the `syncUpdate` nudge. It is for the first
+ * request of a pair the client always sends together, whose second request nudges: a note save
+ * uploads its text and sends `/item/update`, in one order or the other (SYNC-15). The row is never
+ * skipped, so a second request that does not land costs a late arrival on the next pull, never a
+ * lost change. Absent means nudge, as every caller did before.
+ */
+export type LogItemChangeOptions = {
+  nudge?: boolean;
+  /**
+   * True only from a change to the items' own details, which gives no one new access to anything
+   * and changes no collection's members: the journal row then says so, and a pull sends a changed
+   * collection alone instead of with every member (SYNC-17). Absent means expand.
+   */
+  detailsOnly?: boolean;
+};
+
 class ChangeLogService {
   private changeLogRepo = new UserChangeLogRepo();
   private permissionService = new PermissionService();
@@ -20,10 +37,15 @@ class ChangeLogService {
    * changes an item must use this one, or those people never hear about the edit.
    * SYNC-2.
    */
-  async logItemChange(ctx: RequestContext, itemId: string, changeType: SyncType.itemUpdate = SyncType.itemUpdate) {
+  async logItemChange(
+    ctx: RequestContext,
+    itemId: string,
+    changeType: SyncType.itemUpdate = SyncType.itemUpdate,
+    options: LogItemChangeOptions = {},
+  ) {
     if (!itemId) return false;
     const userIds = await this.permissionService._listUserIdsWithPermissionsToItem(ctx, itemId, true);
-    await this.logItemChangeForUserIds(userIds, [itemId], changeType);
+    await this.logItemChangeForUserIds(userIds, [itemId], changeType, options);
     return true;
   }
 
@@ -68,18 +90,22 @@ class ChangeLogService {
    * the repo (`logLastUpdateForUsers`) that wrote the row and skipped the broadcast,
    * so five kinds of change -- permission grants above all -- only reached a device
    * on its next poll. SYNC-2 removed it; do not reintroduce a write that does not
-   * broadcast.
+   * broadcast. The one exception is `nudge: false`, for the first of two requests whose
+   * second one nudges (see LogItemChangeOptions); it still writes the row.
    */
   async logItemChangeForUserIds(
     userIds: string[],
     itemIds: string[],
     changeType: SyncType.itemUpdate = SyncType.itemUpdate,
+    options: LogItemChangeOptions = {},
   ) {
     // Nothing to record and nobody to wake. Also keeps an empty list out of the
     // batched insert below, which is pinned by a test.
     if (userIds.length === 0) return true;
 
-    const data: SyncChangeLogData = {type: changeType, items: itemIds};
+    const data: SyncChangeLogData = options.detailsOnly
+      ? {type: changeType, items: itemIds, detailsOnly: true}
+      : {type: changeType, items: itemIds};
 
     // The changelog row IS the sync contract -- delta sync is built entirely on it.
     // A dropped row means no client ever learns about this change: nothing detects
@@ -95,7 +121,7 @@ class ChangeLogService {
     // harmless: sync.service.ts unions changed ids into a Set. SYNC-5.
     await this.changeLogRepo.addChangeLogEntries(userIds, data);
 
-    this.broadcastItemChangeForUserIds(userIds, itemIds, changeType);
+    if (options.nudge !== false) this.broadcastItemChangeForUserIds(userIds, itemIds, changeType);
 
     return true;
   }

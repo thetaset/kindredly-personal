@@ -197,6 +197,8 @@ export interface SharedClientSettings {
   dismissedWhatsNew?: boolean;
   installDate?: string;
   installVersion?: string;
+  /** The product version (`config.appVersion`) this device last ran; the update notice keys on it (HAT-1099). */
+  whatsNewVersion?: string;
   offlineFallbackEnabled?: boolean;
   storageCleanup?: StorageCleanupSettings;
 }

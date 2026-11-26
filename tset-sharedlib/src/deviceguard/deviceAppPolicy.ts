@@ -27,6 +27,7 @@ import type {
   CompiledAppPolicy,
   DeviceAppInventoryEntry,
   DeviceAppPolicy,
+  DeviceBrowsersLevel,
   DeviceAppPolicyEntry,
 } from '../types/device-guard.types'
 import { parseDeviceAppId, toDeviceAppId, type DevicePlatform } from '../restrictions/deviceAppIds'
@@ -235,6 +236,42 @@ const PACKAGES_BY_CATEGORY: Map<string, string[]> = (() => {
   return byCategory
 })()
 
+/**
+ * The Browsers setting a guardian chose (HAT-1348), or null when nobody did. App controls' old
+ * Browsers category ("Block browsers except Kindredly") counts as choosing Browsers with Kindredly.
+ */
+export function chosenBrowsersLevel(policy?: Pick<DeviceAppPolicy, 'browsers' | 'blockedCategories'> | null): DeviceBrowsersLevel | null {
+  const set = policy?.browsers
+  if (set === 'any' || set === 'withKindredly' || set === 'lockedDown') return set
+  return policy?.blockedCategories?.includes('browsers') ? 'withKindredly' : null
+}
+
+/**
+ * The Browsers setting in force: the chosen one, else Browsers with Kindredly for a child (founder,
+ * 2026-11-25, on every device) and Any browser for an admin's own policy.
+ */
+export function browsersLevelOf(
+  policy: Pick<DeviceAppPolicy, 'browsers' | 'blockedCategories'> | null | undefined,
+  opts: { child: boolean },
+): DeviceBrowsersLevel {
+  return chosenBrowsersLevel(policy) ?? (opts.child ? 'withKindredly' : 'any')
+}
+
+/**
+ * Whether an app type is blocked, for an app on `platform` or, without one, for the type's own row.
+ * Browsers follow the Browsers setting (HAT-1348): blocked on a phone unless it is Any browser, and
+ * never app-blocked on a computer, where the Companion closes a browser with no Kindredly in it.
+ */
+export function typeBlockedFor(
+  policy: Pick<DeviceAppPolicy, 'browsers' | 'blockedCategories'> | null | undefined,
+  categoryId: string,
+  opts: { child?: boolean; platform?: string | null } = {},
+): boolean {
+  if (categoryId !== 'browsers') return !!policy?.blockedCategories?.includes(categoryId)
+  if (opts.platform && opts.platform !== 'android') return false
+  return browsersLevelOf(policy, { child: opts.child ?? true }) !== 'any'
+}
+
 /** Every package a protection covers, installed or not. Exported for the UI's counts. */
 export function packagesInCategory(categoryId: string): string[] {
   return PACKAGES_BY_CATEGORY.get(categoryId) ?? []
@@ -283,18 +320,35 @@ export function compileAppPolicy(
   if (!policy) return undefined
 
   const blockedCategories = new Set(policy.blockedCategories || [])
+  // Browsers are the Browsers setting's (HAT-1348), not an App controls category. A phone blocks
+  // every other browser below; a computer closes a browser with no Kindredly in it itself (the
+  // Companion's `unprotectedBrowsers`), so no computer browser is app-blocked from here. Phones are
+  // a child's (Guard), so an unchosen setting is Browsers with Kindredly there.
+  blockedCategories.delete('browsers')
+  const phoneBrowsersBlocked = browsersLevelOf(policy, { child: true }) !== 'any'
 
   const blocked = new Set<string>()
   const scopedBlocked = new Set<string>()
+  /** The category that blocked each scoped id, so the block screen can name it (HAT-1348). */
+  const categoryOf = new Map<string, string>()
   for (const categoryId of blockedCategories) {
     for (const pkg of packagesInCategory(categoryId)) {
       blocked.add(pkg)
+      if (!categoryOf.has(pkg)) categoryOf.set(pkg, categoryId)
       // A category is a deliberate choice across devices. Name each platform so
       // a single-app override on Android cannot change the same-named Mac app.
       scopedBlocked.add(toDeviceAppId('android', pkg))
       scopedBlocked.add(toDeviceAppId('macos', pkg))
       scopedBlocked.add(toDeviceAppId('linux', pkg))
       scopedBlocked.add(toDeviceAppId('windows', pkg))
+    }
+  }
+
+  if (phoneBrowsersBlocked) {
+    for (const pkg of packagesInCategory('browsers')) {
+      blocked.add(pkg)
+      scopedBlocked.add(toDeviceAppId('android', pkg))
+      if (!categoryOf.has(pkg)) categoryOf.set(pkg, 'browsers')
     }
   }
 
@@ -311,9 +365,11 @@ export function compileAppPolicy(
   // page uses (override → seed → inference → declared), so an app the parent
   // re-filed by hand is expanded under the category they chose, not ours.
   for (const app of catalog || []) {
-    if (app?.pkg && blockedCategories.has(app.categoryId)) {
+    const phoneBrowser = phoneBrowsersBlocked && app?.categoryId === 'browsers' && (app.platform || 'android') === 'android'
+    if (app?.pkg && (blockedCategories.has(app.categoryId) || phoneBrowser)) {
       blocked.add(policyKeyFor(app))
       scopedBlocked.add(catalogAppId(app))
+      if (!categoryOf.has(catalogAppId(app))) categoryOf.set(catalogAppId(app), app.categoryId)
     }
   }
 
@@ -326,6 +382,9 @@ export function compileAppPolicy(
     if (entry.decision === 'block') {
       blocked.add(deviceBlockId(key))
       scopedBlocked.add(scopedId)
+      // Its own choice, whatever category it is also in.
+      categoryOf.delete(scopedId)
+      categoryOf.delete(pkg)
     }
     // An explicit allow is an exception to a blocked category, so it must be
     // applied AFTER the expansion above rather than alongside it. Only spellings
@@ -368,5 +427,17 @@ export function compileAppPolicy(
 
   // Sorted because `fingerprintOf(set)` hashes the JSON: an unstable order would
   // re-push an identical ruleset over IPC every 15 minutes forever.
-  return { blocked: [...blocked].sort(), scopedBlocked: [...scopedBlocked].sort() }
+  // Only ids still blocked: the floor and an allow took some back out.
+  const byCategory = new Map<string, string[]>()
+  for (const [id, category] of categoryOf) {
+    if (!blocked.has(id) && !scopedBlocked.has(id)) continue
+    byCategory.set(category, [...(byCategory.get(category) || []), id])
+  }
+  const blockedBy: Record<string, string[]> = {}
+  for (const category of [...byCategory.keys()].sort()) blockedBy[category] = byCategory.get(category)!.sort()
+  return {
+    blocked: [...blocked].sort(),
+    scopedBlocked: [...scopedBlocked].sort(),
+    ...(byCategory.size ? { blockedBy } : {}),
+  }
 }

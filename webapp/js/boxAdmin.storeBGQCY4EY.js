@@ -1,1 +1,0 @@
-import{t as a}from"./appLifecycle.storeBsQj5XV4.js";import{a2 as n}from"./vue-runtimeBK7yvp5X.js";const t=n({isBoxAdmin:null,families:[]});let s=null;function m(e=!1){return s&&!e||(s=(async()=>{const i=await a("/box/admin/status",{});i!=null&&i.success&&i.result?(t.isBoxAdmin=i.result.isBoxAdmin===!0,t.families=i.result.families??[]):t.isBoxAdmin=!1})()),s}export{t as b,m as l};

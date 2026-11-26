@@ -34,6 +34,7 @@ import {
   WELCOME_TITLE_MESSAGE,
 } from '@/defaults/message_templates';
 import {AccountType, ClientInfoView, LoginType, UserType, VerificationType} from 'tset-sharedlib/shared.types';
+import {USER_NOT_FOUND_MESSAGE} from 'tset-sharedlib/sign-in-errors';
 import ClientInfoService from './client_info.service';
 
 import {generateUsernameAndDisplayedName} from '@/utils/user.utils';
@@ -330,7 +331,7 @@ class AuthService {
 
     if (!user || user.deleted) {
       recordFailure('user_not_found');
-      throw new HttpException(409, `User not found `);
+      throw new HttpException(409, USER_NOT_FOUND_MESSAGE);
     } else if (user.disabled) {
       recordFailure('account_locked', user._id);
       throw new HttpException(409, 'User account is locked');

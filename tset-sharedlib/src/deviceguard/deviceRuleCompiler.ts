@@ -30,6 +30,8 @@ import type { CompiledAppPolicy } from '../types/device-guard.types'
 import { catalogAppId, type AppCatalogEntry } from './deviceAppPolicy';
 import { GAME_ATTRIBUTE, hasGameAttribute } from '../restrictions/games';
 import { gamesInConditions } from '../restrictions/gamesList';
+import { AI_APP_IDS, AI_ATTRIBUTE, hasAiAttribute } from '../restrictions/ai';
+import { hasWeeklyTotal, weeklyBudgetMs } from '../restrictions/weeklyLimit';
 
 const HR_OF_MS = 1000 * 60 * 60
 
@@ -49,7 +51,11 @@ export type CompileOptions = {
   /** Account-level intervention mode (accessControlSettings.usageLimitInterventionMode); default 'block'. */
   mode?: InterventionMode
   safetyAllowlist?: string[]
-  usageSeed?: { dateKey: string; perRuleUsedMs: Record<string, number> }
+  /**
+   * Today's web time per rule, and (HAT-1086) this family week's under `weekKey`. The week's part is
+   * kept only for rules with a weekly total; with none, the ruleset carries no week at all.
+   */
+  usageSeed?: CompiledDeviceRuleSet['usageSeed']
   /**
    * The child's installed apps with a resolved eduValue, so an `eduValue` limit
    * condition can reach phone apps. Defaults to empty, which reproduces the
@@ -111,6 +117,15 @@ function namedGameAppIds(rule: LimitRule): string[] {
   return gamesInConditions(rule.conditions).flatMap((game) => game.apps)
 }
 
+/**
+ * The AI limit's apps (HAT-1359): its `ai` attribute matches a listed AI site on the web and the
+ * listed AI apps on a phone or computer. Named apps, like a game's: no catalog needed. A rule that
+ * also names sites or library items is narrowed to those on the web, so it adds no apps here.
+ */
+function namedAiAppIds(rule: LimitRule): string[] {
+  return hasAiAttribute(rule.conditions) && !hasBrowserTarget(rule) ? [...AI_APP_IDS] : []
+}
+
 /** Conditions only a browser can test: a page's library item, its address, or what it is doing. */
 const BROWSER_TARGET_TYPES = new Set<string>(['itemIds', 'urlPatterns', 'attribute'])
 
@@ -120,10 +135,11 @@ const BROWSER_TARGET_TYPES = new Set<string>(['itemIds', 'urlPatterns', 'attribu
  * nothing: expanding it would count every entertainment app against a YouTube limit (HAT-596).
  */
 function hasBrowserTarget(rule: LimitRule): boolean {
-  // The Games attribute is not a browser-only target: it names the Games app type on a device
-  // (`expandGameAppIds`). Video playback, the other attribute, is only knowable in a browser.
+  // The Games and AI attributes are not browser-only targets: on a device they name the Games app
+  // type (`expandGameAppIds`) and the listed AI apps (`namedAiAppIds`). Video playback, the other
+  // attribute, is only knowable in a browser.
   return (rule.conditions ?? []).some((c) =>
-    BROWSER_TARGET_TYPES.has(c.type) && !(c.type === 'attribute' && (c.values ?? []).every((v) => v === GAME_ATTRIBUTE)))
+    BROWSER_TARGET_TYPES.has(c.type) && !(c.type === 'attribute' && (c.values ?? []).every((v) => v === GAME_ATTRIBUTE || v === AI_ATTRIBUTE)))
 }
 
 /**
@@ -138,6 +154,12 @@ function hasBrowserTarget(rule: LimitRule): boolean {
  *
  * Without this, a parent granting extra time changes nothing on the phone and
  * the shield stays up.
+ *
+ * A rule with a weekly total (HAT-1086) is read as the browser reads it: the
+ * override's hours above today's own amount are added to `weeklyHours` as well,
+ * so the extra time gets the child past the week too. On a day with no amount
+ * of its own the rule has no daily cap, so today's TimeLimit is left absent and
+ * the override adds only to the week.
  */
 export function applyOverrides(
   rules: LimitRule[],
@@ -154,12 +176,34 @@ export function applyOverrides(
   return rules.map((rule) => {
     const override = byRuleId.get(rule.id)
     if (!override) return rule
-    const otherDays = (rule.timeLimits ?? [])
-      .map((tl) => ({ ...tl, daysOfWeek: (tl.daysOfWeek ?? []).filter((d) => d !== dowIndex) }))
-      .filter((tl) => tl.daysOfWeek.length > 0)
-    const today: TimeLimit = { ...override.timeLimit, daysOfWeek: [dowIndex] }
-    return { ...rule, timeLimits: [today, ...otherDays] }
+    if (hasWeeklyTotal(rule)) return withWeeklyOverride(rule, override, dowIndex)
+    return withTodayOverride(rule, override, dowIndex)
   })
+}
+
+/** Today's TimeLimit replaced wholesale by the override's; the other days as authored. */
+function withTodayOverride(rule: LimitRule, override: RuleOverride, dowIndex: number): LimitRule {
+  const otherDays = (rule.timeLimits ?? [])
+    .map((tl) => ({ ...tl, daysOfWeek: (tl.daysOfWeek ?? []).filter((d) => d !== dowIndex) }))
+    .filter((tl) => tl.daysOfWeek.length > 0)
+  const today: TimeLimit = { ...override.timeLimit, daysOfWeek: [dowIndex] }
+  return { ...rule, timeLimits: [today, ...otherDays] }
+}
+
+/**
+ * Extra time on a rule with a weekly total, as `UsageSummaryCache` gives it: today's amount is the
+ * first TimeLimit for today, else one with no days (every day), and the extra is the override's
+ * hours above it, 0 at least.
+ */
+function withWeeklyOverride(rule: LimitRule, override: RuleOverride, dowIndex: number): LimitRule {
+  const limits = rule.timeLimits ?? []
+  const todays = limits.find((tl) => (tl.daysOfWeek ?? []).includes(dowIndex))
+    ?? limits.find((tl) => (tl.daysOfWeek ?? []).length === 0)
+  const overrideHours = Number(override.timeLimit.hours)
+  const extraHours = Number.isFinite(overrideHours) ? Math.max(0, overrideHours - (todays?.hours || 0)) : 0
+  const weeklyHours = (rule.weeklyHours as number) + extraHours
+  if (!todays) return { ...rule, weeklyHours }
+  return { ...withTodayOverride(rule, override, dowIndex), weeklyHours }
 }
 
 /**
@@ -287,6 +331,7 @@ export function isDeviceAppRule(
   // deliberately, and no account-level accounting preference should undo it.
   if (appIdConditions(rule.conditions).length > 0) return true
   if (namedGameAppIds(rule).length > 0) return true
+  if (namedAiAppIds(rule).length > 0) return true
   if (!categoryExpansionAllowed(rule, categoryExpansion)) return false
   if (expandEduValueAppIds(rule, catalog).length > 0) return true
   if (expandGameAppIds(rule, catalog).length > 0) return true
@@ -294,15 +339,42 @@ export function isDeviceAppRule(
 }
 
 /**
- * The apps a rule counts on a device: its named apps and games, then its categories' apps. Exported
- * so the Blocked page's app rows (`blockedPageRows`) read the same expansion the phone compiles.
+ * The apps a rule leaves out (`excludes`, HAT-1092): an exception such as "Games can have more time
+ * than Entertainment" leaves every game app out of Entertainment. Read as the browser reads it
+ * (`checkRuleConditions`): games by the Games app type, social media by the social category, a
+ * category by the app's resolved eduValue.
+ */
+export function excludedAppIds(rule: LimitRule, catalog: AppCatalogEntry[]): Set<string> {
+  const out = new Set<string>()
+  for (const c of rule.excludes ?? []) {
+    // Skipped as the browser and Guard skip it, so a malformed entry never stops the compile.
+    if (!c) continue
+    const values = (c.values ?? []).map((v) => String(v))
+    const matches = (a: AppCatalogEntry): boolean => {
+      if (c.type === 'attribute') return values.includes(GAME_ATTRIBUTE) && a.categoryId === 'games'
+      if (c.type === 'socialDesignation') {
+        const affirmative = values.length === 0 || values.some((v) => !NON_SOCIAL_VALUES.has(v.toLowerCase()))
+        return affirmative && a.categoryId === 'social'
+      }
+      if (c.type === 'eduValue') return values.includes(a.eduValue)
+      return false
+    }
+    for (const a of catalog) if (matches(a)) out.add(catalogAppId(a))
+  }
+  return out
+}
+
+/**
+ * The apps a rule counts on a device: its named apps and games, then its categories' apps, less
+ * what the rule leaves out. Apps a guardian named stay: a leave-out narrows a category, never a pick.
+ * Exported so the Blocked page's app rows (`blockedPageRows`) read the same expansion the phone compiles.
  */
 export function resolveAppIds(
   rule: LimitRule,
   catalog: AppCatalogEntry[] = [],
   categoryExpansion: CategoryExpansion = 'all',
 ): string[] | typeof ALL_DEVICE_APPS {
-  const explicit = [...appIdConditions(rule.conditions).flatMap((c) => c.values), ...namedGameAppIds(rule)]
+  const explicit = [...appIdConditions(rule.conditions).flatMap((c) => c.values), ...namedGameAppIds(rule), ...namedAiAppIds(rule)]
   if (explicit.includes(ALL_DEVICE_APPS)) return ALL_DEVICE_APPS
   if (!categoryExpansionAllowed(rule, categoryExpansion)) return [...new Set(explicit)]
   // Union, not intersection. `checkConditionList` ANDs conditions on the web side,
@@ -313,14 +385,13 @@ export function resolveAppIds(
   // and no site stay a union; the UI does not write that.
   //
   // De-dupe, preserve first-seen order for deterministic output.
-  return [
-    ...new Set([
-      ...explicit,
-      ...expandEduValueAppIds(rule, catalog),
-      ...expandSocialAppIds(rule, catalog),
-      ...expandGameAppIds(rule, catalog),
-    ]),
-  ]
+  const excluded = excludedAppIds(rule, catalog)
+  const expanded = [
+    ...expandEduValueAppIds(rule, catalog),
+    ...expandSocialAppIds(rule, catalog),
+    ...expandGameAppIds(rule, catalog),
+  ].filter((id) => !excluded.has(id))
+  return [...new Set([...explicit, ...expanded])]
 }
 
 function compileRule(
@@ -342,6 +413,9 @@ function compileRule(
       schedule.push({ daysOfWeek: [...(tl.daysOfWeek ?? [])], timeRanges: tl.timeRanges.map((r) => ({ ...r })) })
     }
   }
+  // HAT-1086. A day missing from `dailyBudgetMsByDow` is unlimited on every device (`budgetBlocks`
+  // returns early), so a rule with only a weekly total that day is limited by the week alone.
+  const weekly = weeklyBudgetMs(rule)
   return {
     ruleId: rule.id,
     name: rule.name,
@@ -350,11 +424,33 @@ function compileRule(
     schedule,
     dailyBudgetMsByDow,
     priority,
+    // Spread, like `coversEverything`: a rule with no weekly total emits no key, so its JSON is unchanged.
+    ...(weekly !== null ? { weeklyBudgetMs: weekly } : {}),
     // Spread, so a normal rule emits no key at all and its JSON — and therefore
     // `fingerprintOf()` — is byte-identical to before. Emitting `false` everywhere
     // would re-push every ruleset once for a purely cosmetic field.
     ...(rule.type === 'all' ? { coversEverything: true } : {}),
   }
+}
+
+/**
+ * The seed as a device reads it. The week's part (HAT-1086) only when a compiled rule has a weekly
+ * total and the caller counted the week, and only for those rules: any other ruleset carries the
+ * day's seed alone, as before.
+ */
+function usageSeedFor(
+  seed: CompileOptions['usageSeed'],
+  rules: CompiledDeviceRule[],
+): CompiledDeviceRuleSet['usageSeed'] {
+  if (!seed) return { dateKey: '', perRuleUsedMs: {} }
+  const { weekKey, perRuleWeekUsedMs, ...day } = seed
+  const weeklyIds = new Set(rules.filter((r) => r.weeklyBudgetMs !== undefined).map((r) => r.ruleId))
+  if (!weekKey || weeklyIds.size === 0) return day
+  const week: Record<string, number> = {}
+  for (const [ruleId, ms] of Object.entries(perRuleWeekUsedMs ?? {})) {
+    if (weeklyIds.has(ruleId) && typeof ms === 'number' && ms > 0) week[ruleId] = ms
+  }
+  return { ...day, weekKey, perRuleWeekUsedMs: week }
 }
 
 /**
@@ -377,7 +473,7 @@ export function compileDeviceRules(rules: LimitRule[], opts: CompileOptions): Co
     serverTimeSkewMs: opts.serverTimeSkewMs ?? 0,
     rules: deviceRules,
     safetyAllowlist: opts.safetyAllowlist ?? DEFAULT_SAFETY_ALLOWLIST,
-    usageSeed: opts.usageSeed ?? { dateKey: '', perRuleUsedMs: {} },
+    usageSeed: usageSeedFor(opts.usageSeed, deviceRules),
     // Spread rather than assigned, so an absent policy leaves no key at all.
     // Emitting `appPolicy: undefined` would still change the JSON and re-push.
     ...(opts.appPolicy ? { appPolicy: opts.appPolicy } : {}),

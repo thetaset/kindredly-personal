@@ -861,6 +861,13 @@ function createKindredlyHostApi(params) {
           return await hostRequest('sharedRefState', 'delete', { key, ...(options || {}) })
         },
       },
+      // Who is using the app (HAT-1169): { id, name, isChild }. The id is this person's in this
+      // app only, so two apps cannot match up the same person.
+      user: {
+        current: async () => {
+          return await hostRequest('user', 'current', {})
+        },
+      },
       net: {
         fetchJson: async (url, options) => {
           return await hostRequest('net', 'fetchJson', { url, ...(options || {}) })

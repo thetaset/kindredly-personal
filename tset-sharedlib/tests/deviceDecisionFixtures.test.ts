@@ -13,7 +13,7 @@
  * After changing a fixture or the compiler, regenerate, then run the three consumers:
  *   cd tset-sharedlib && UPDATE_DECISION_FIXTURES=1 npx jest tests/deviceDecisionFixtures.test.ts
  *   cd tset-client/android && ./gradlew :companion:testDebugUnitTest
- *   cd tset-electron && npm run test -- src/rules/__tests__/decisionFixtures.test.ts
+ *   cd tset-electron && npx vitest run src/rules/__tests__/decisionFixtures.test.ts
  *   cd tset-client && npm run test -- src/bg/services/activitylog/__tests__/decisionFixtures.browser.test.ts
  */
 import * as fs from 'fs';
@@ -75,6 +75,36 @@ const NAMED_BEHAVIOURS = [
   'earn-access-confirm-opened-today',
   // New apps start blocked (NAP-6, NAP-8): an app that arrived after the switch waits, saying it is new.
   'new-app-waiting',
+  // A weekly total (HAT-1086): whichever of the day and the week runs out first stops it, a day with no
+  // amount of its own has the week alone, and a week's seed counts only in its own family week.
+  'weekly-total-used-up',
+  'weekly-only-day-before-used',
+  'weekly-only-day-used-up',
+  'weekly-seed-from-last-week',
+  'weekly-seed-stale-after-monday',
+  'daily-used-up-week-left',
+  'weekly-extra-time',
+  // App time on the child's other devices (DCP-27): it counts toward the day's limit and the weekly
+  // total beside this device's own, and only on its own day.
+  'other-devices-day-used-up',
+  'other-devices-time-left',
+  'other-devices-other-day',
+  'other-devices-week-used-up',
+  // "Block all access" on a device (CMP-118): every app but Task-Related and system ones, a guardian's
+  // grant still opens one, and an end time already past closes nothing.
+  'block-all-closes-all-but-task-apps',
+  'block-all-grant-opens-one-app',
+  'block-all-expired',
+  // The Daily Check-in on a device (CMP-117, MAC-15): the apps a limit covers, until today's is done,
+  // less the check-in's exceptions; in the old field and as an Earn access rule.
+  'checkin-holds-limited-apps',
+  'checkin-released-today',
+  'checkin-self-exception',
+  // The Social media limit and two HAT-1092 exceptions on a device (CMP-128). "Lesson videos" has no
+  // case: the Video limit names sites, so it never reaches a device.
+  'social-media-limit',
+  'social-past-entertainment',
+  'learning-games',
 ];
 
 const DEVICE_ACTIONS = new Set(['allow', 'warn', 'block']);
@@ -87,6 +117,9 @@ const DEVICE_REASONS = new Set([
   'family-downtime',
   'earn-access',
   'new-app',
+  'block-all',
+  'checkin',
+  'checkin-self',
 ]);
 
 function loadSources(): any[] {
@@ -173,6 +206,11 @@ function compileAll(sources: any[]) {
         dateKey: dateKeyInTimeZone(decideAtMs(c), compileZone(c)),
         floor: c.floor,
         usageByPkgMs: c.usage.appMsByPkg,
+        // This device's app time since Monday, today's included, for a weekly total (HAT-1086). Only
+        // a case that has one says it; the evaluators read today's in its place otherwise.
+        ...(c.usage.weekAppMsByPkg ? { weekUsageByPkgMs: c.usage.weekAppMsByPkg } : {}),
+        // The child's other devices' app time per limit, as their reports add up (DCP-27).
+        ...(c.usage.otherDevices ? { otherDevices: c.usage.otherDevices } : {}),
         ruleSet: compileDeviceSettings({
           settings: settingsForPlatform(c.settings, platform),
           nowMs: c.clock.nowMs,

@@ -1,7 +1,18 @@
 import {HttpException} from '@/exceptions/HttpException';
+import {SERVER_SUPPORTS} from 'tset-sharedlib/api/serverSupports';
 import {UserChangeLogRepo} from '@/db/user_changelog.repo';
 import type {DeviceGrant} from 'tset-sharedlib/restrictions/deviceGrants';
 import {holdOverridesToExtraTimeMax} from 'tset-sharedlib/restrictions/extraTimeMax';
+import {heldUsageLimitRules} from 'tset-sharedlib/restrictions/weeklyLimit';
+import {
+  REVISED_OPTION_KEYS,
+  applyOptionRevisions,
+  optionRevision,
+  optionRevisions,
+  staleOptionKeys,
+  type OptionRevisions,
+  type RevisedOptionKey,
+} from 'tset-sharedlib/restrictions/optionRevisions';
 import {buildDeviceGrants} from '@/services/deviceGrantBuilder';
 import {config} from '@/config';
 import {AccountRepo} from '@/db/account.repo';
@@ -45,6 +56,11 @@ import {
 } from 'tset-sharedlib/restrictions/earnAccess';
 import {familyClock} from 'tset-sharedlib/deviceguard/familyClock';
 import type {EarnAccessOpening} from 'tset-sharedlib/types/earn-access.types';
+import {
+  checkOwnBlockPageChange,
+  mergeOwnBlockPageChange,
+  type InspirationSettings,
+} from 'tset-sharedlib/inspiration/inspiration';
 import {isAllowListEmpty, normalizeAllowList} from 'tset-sharedlib/restrictions/alwaysAllowed';
 import {normalizePageNoteReminders} from 'tset-sharedlib/pageNote.utils';
 import {normalizeSocialMediaSettings} from 'tset-sharedlib/restrictions/socialMedia';
@@ -66,6 +82,7 @@ import {
   buildContentFilteringCopySnapshot,
   buildUsageLimitsCopySnapshot,
   buildWebsiteSettingsCopySnapshot,
+  keepTargetOwnAccessControlSettings,
   USER_SETTINGS_COPY_FILTERING_PREF_KEYS,
   USER_SETTINGS_COPY_WEBSITE_PREF_KEYS,
 } from 'tset-sharedlib/restrictions/userSettingsCopy';
@@ -502,7 +519,13 @@ class UserService {
     // revision it last synced to and skips the request when they match, exactly as it
     // used to compare dates -- but without a write on the hot path, and without
     // depending on an SSE connection being up.
-    return {...user, syncRevision: await this.changeLogRepo.maxRevisionForUser(user._id)};
+    return {
+      ...user,
+      syncRevision: await this.changeLogRepo.maxRevisionForUser(user._id),
+      // OFS-4. What this server accepts beyond the original routes, so a newer app talking to an
+      // older server sends a new field only where it is understood.
+      serverSupports: [...SERVER_SUPPORTS],
+    };
   }
 
   updateLastActiveAt(ctx: RequestContext) {
@@ -573,7 +596,12 @@ class UserService {
     }
   }
 
-  async setUserOptions(ctx: RequestContext, targetUserId: string, options: any) {
+  async setUserOptions(
+    ctx: RequestContext,
+    targetUserId: string,
+    options: any,
+    ifRevision?: Partial<OptionRevisions> | null,
+  ): Promise<{revisions: OptionRevisions; conflict?: boolean}> {
     await ctx.verifyAdminPermissions(targetUserId);
     const targetUser = await ctx.getUserById(targetUserId);
     if (!targetUser || targetUser.deleted) {
@@ -586,15 +614,35 @@ class UserService {
       options && typeof options === 'object' && 'historyRetentionDays' in options ? await ctx.getAccount() : null;
     const updatedOptions = this._mergeUserOptions(targetUser, options, {accountType: (account as any)?.accountType});
 
+    // RVW-9 (S6): limits and extra time are saved whole from an earlier read. A save read at an older
+    // revision that would change one of them is refused, so it cannot write back another guardian's
+    // older copy; the caller reads again.
+    if (staleOptionKeys(targetUser.options, updatedOptions, ifRevision).length) {
+      return {conflict: true, revisions: optionRevisions(targetUser.options)};
+    }
+    const revisions = applyOptionRevisions(targetUser.options, updatedOptions);
+
     // A device-relevant change raises the device settings version in the SAME statement as the
     // options, so no device can read the new version with the old settings (DCP-5). A display
     // preference changes nothing a device reads and wakes no device. Neither does re-saving
     // identical limits: the version tells a device nothing changed.
     const deviceChanged = deviceSettingsChanged(targetUser.options, updatedOptions);
-    await this._updateUserWithId(targetUserId, {
-      options: updatedOptions,
-      ...(deviceChanged ? {deviceSettingsVersion: nextDeviceSettingsVersionSql(this.userRepo.knex)} : {}),
-    });
+    const written = await this._updateUserOptionsIfRevisions(
+      targetUserId,
+      {
+        options: updatedOptions,
+        ...(deviceChanged ? {deviceSettingsVersion: nextDeviceSettingsVersionSql(this.userRepo.knex)} : {}),
+      },
+      // Each revision this save read and changes must still be the stored one when it is written:
+      // a save that landed between the read above and this write refuses this one too.
+      REVISED_OPTION_KEYS.filter(
+        (key) => typeof ifRevision?.[key] === 'number' && revisions[key] !== optionRevision(targetUser.options, key),
+      ).map((key) => ({key, revision: optionRevision(targetUser.options, key)})),
+    );
+    if (!written) {
+      const latest = await this.userRepo.findById(targetUserId);
+      return {conflict: true, revisions: optionRevisions(latest?.options)};
+    }
     this.broadcastUserSettingsRefresh(targetUserId, {
       refreshCurrentUser: true,
       refreshUserPrefs: false,
@@ -605,7 +653,7 @@ class UserService {
     // or appear to fail, because a push provider was slow.
     if (deviceChanged) notifyDeviceSettingsChanged([targetUserId]);
 
-    return null;
+    return {revisions};
   }
 
   /**
@@ -648,12 +696,16 @@ class UserService {
 
     const release = buildCheckpointRelease(Date.now(), checkpointSettings, userId, true);
 
+    // The release is a device setting (CMP-117): its version moves in the same statement, and the
+    // devices are told, so the child's phone and computer open the apps it held.
     await this._updateUserWithId(userId, {
       options: {
         ...options,
         accessControlSettings: {...accessControlSettings, checkpointRelease: release},
       },
+      deviceSettingsVersion: nextDeviceSettingsVersionSql(this.userRepo.knex),
     });
+    notifyDeviceSettingsChanged([userId]);
     this.broadcastUserSettingsRefresh(userId, {
       refreshCurrentUser: true,
       refreshUserPrefs: false,
@@ -661,6 +713,66 @@ class UserService {
     });
 
     return {release};
+  }
+
+  /**
+   * Set your OWN Block page customization (HAT-1261, HAT-1267): whether the block page shows it, and which of
+   * Kindredly's collections. A restricted user may make this write for themselves, so it is narrow
+   * like `clearOwnCheckpoint`: no target user, and only `accessControlSettings.inspiration` is
+   * written, inside the stored options under a lock, so no other setting can be dropped or changed.
+   * The collections a guardian added from their own library stay as they are: adding one shares it
+   * with the child and removing it takes that share back, which is the guardian's to do.
+   */
+  // ROUTE-METHOD
+  async setOwnBlockPage(
+    ctx: RequestContext,
+    input: {off?: unknown; collections?: unknown},
+  ): Promise<{inspiration: InspirationSettings}> {
+    const userId = ctx.getCurrentUserId();
+    if (!userId) {
+      throw new Error('You must be signed in');
+    }
+    // The same rule the device applies in device-only mode (tset-sharedlib inspiration.ts).
+    const checked = checkOwnBlockPageChange(input);
+    if ('error' in checked) {
+      throw new HttpException(400, checked.error);
+    }
+
+    let inspiration: InspirationSettings;
+    const trx = await this.userRepo.createTransaction();
+    try {
+      const row = (await trx('user').where({_id: userId}).forUpdate().first('_id', 'options', 'deleted')) as
+        | {_id: string; options: any; deleted?: boolean}
+        | undefined;
+      if (!row || row.deleted) {
+        throw new HttpException(404, 'User not found');
+      }
+      const merged = mergeOwnBlockPageChange(row.options?.accessControlSettings?.inspiration, checked.change);
+      if ('error' in merged) {
+        throw new HttpException(400, merged.error);
+      }
+      inspiration = merged.inspiration;
+      await trx('user')
+        .where({_id: userId})
+        .update({
+          options: trx.raw(
+            `(jsonb_set(coalesce(options::jsonb, '{}'::jsonb), '{accessControlSettings}',
+              coalesce(options::jsonb -> 'accessControlSettings', '{}'::jsonb) || jsonb_build_object('inspiration', ?::jsonb)))::json`,
+            [JSON.stringify(inspiration)],
+          ) as any,
+        });
+      await trx.commit();
+    } catch (error) {
+      await trx.rollback();
+      throw error;
+    }
+
+    this.broadcastUserSettingsRefresh(userId, {
+      refreshCurrentUser: true,
+      refreshUserPrefs: false,
+      source: 'options-update',
+    });
+    return {inspiration};
   }
 
   /**
@@ -908,7 +1020,18 @@ class UserService {
       const txUserPref = this.userPref.withTransaction(tx) as UserPrefRepo;
 
       if (Object.keys(optionPatches).length > 0) {
+        // The copy replaces `accessControlSettings` whole; the target keeps its own Live View, remote
+        // actions and pause (UX-087).
+        if ('accessControlSettings' in optionPatches) {
+          optionPatches.accessControlSettings = keepTargetOwnAccessControlSettings(
+            optionPatches.accessControlSettings as Record<string, unknown> | null,
+            (targetUser.options as Record<string, any> | null | undefined)?.accessControlSettings,
+          );
+        }
         const updatedOptions = this._mergeUserOptions(targetUser, optionPatches);
+        // The target's own revisions go on from its own, never the source's (RVW-9, S6): a page open
+        // on the target then reads its next save as stale, as it is.
+        applyOptionRevisions(targetUser.options, updatedOptions);
         // Copying usage limits is a device settings change for the target (DCP-5).
         deviceChanged = deviceSettingsChanged(targetUser.options, updatedOptions);
         await txUserRepo.where({_id: targetUserId}).update({
@@ -1000,6 +1123,26 @@ class UserService {
     return null;
   }
 
+  /**
+   * `_updateUserWithId`, written only while each named setting still holds the revision read
+   * (RVW-9, S6). False when one moved on, and nothing was written.
+   */
+  private async _updateUserOptionsIfRevisions(
+    userId: string,
+    data: Record<string, unknown>,
+    expected: {key: RevisedOptionKey; revision: number}[],
+  ): Promise<boolean> {
+    if (!expected.length) {
+      await this._updateUserWithId(userId, data);
+      return true;
+    }
+    const query = this.userRepo.where({_id: userId});
+    for (const {key, revision} of expected) {
+      query.andWhereRaw(`coalesce(options::jsonb -> ? ->> 'revision', '0') = ?`, [key, String(revision)]);
+    }
+    return (await query.update(data)) > 0;
+  }
+
   private readonly reportedUndeclaredOptionKeys = new Set<string>();
 
   /**
@@ -1078,6 +1221,16 @@ class UserService {
         );
         if (earnAccessSettings !== nextAccess.earnAccessSettings) {
           updatedOptions.accessControlSettings = {...nextAccess, earnAccessSettings};
+        }
+      }
+      // RVW-9: the limits are stored held to their own rules, whichever app or assistant wrote them:
+      // amounts are numbers from 0 to 24 hours, and a day never has more than its weekly total. The
+      // second ran only in the app (HAT-1088).
+      const sentLimits = updatedOptions.usageLimitsData as Record<string, unknown> | null | undefined;
+      if ('usageLimitsData' in options && sentLimits && Array.isArray(sentLimits.contentUsageLimits)) {
+        const heldLimits = heldUsageLimitRules(sentLimits.contentUsageLimits);
+        if (heldLimits !== sentLimits.contentUsageLimits) {
+          updatedOptions.usageLimitsData = {...sentLimits, contentUsageLimits: heldLimits};
         }
       }
       // HAT-950 rule B: no save gives a limit more extra time a day than its ceiling, whichever

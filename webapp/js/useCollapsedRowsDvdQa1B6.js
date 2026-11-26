@@ -1,1 +1,0 @@
-import{r as u,c as s}from"./vue-runtimeBK7yvp5X.js";const n=5;function i(e,a=n){const l=u(!1),t=s(()=>l.value?e.value:e.value.slice(0,a)),o=s(()=>l.value?0:Math.max(0,e.value.length-a));return{showAll:l,visible:t,hiddenCount:o}}export{i as u};

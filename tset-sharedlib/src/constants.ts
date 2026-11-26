@@ -64,7 +64,9 @@ export function isOfficialPublisherId(value: string | null | undefined): boolean
 // picker (AdminClassificationEvalData.vue). The first entry is the default used
 // whenever no (valid) model is requested.
 // Every entry must be in AI_HOSTED_TEXT_MODELS so it has a price; gpt-4o-mini never could.
-export const GROUND_TRUTH_MODELS = ['gpt-6-luna', 'gpt-6-sol'] as const;
+// DeepSeek first, for seeding test pages for now (founder, 2026-11-10). It labels only pages the
+// server fetched from a public address; any other row is labelled by GPT-6 Luna (admin.service.ts).
+export const GROUND_TRUTH_MODELS = ['deepseek-flash', 'gpt-6-luna', 'gpt-6-sol'] as const;
 export const DEFAULT_GROUND_TRUTH_MODEL = GROUND_TRUTH_MODELS[0];
 
 const YOUTUBE_CATEGORIES = {

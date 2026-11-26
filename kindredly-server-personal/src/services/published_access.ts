@@ -30,6 +30,8 @@ export interface PublishedReader {
     searchData: unknown,
     pageInfo?: unknown,
   ): Promise<{rows: Published[]; moreAvailable: boolean}>;
+  /** A published collection's items that `ctx` may see, the newest `limit` at most; empty when it no longer exists. */
+  getCollectionItemFeed(ctx: RequestContext, id: string, limit?: number): Promise<Published[]>;
 }
 
 /** Nothing published here, and that is not an error - there is nothing to read. */
@@ -42,6 +44,9 @@ const EMPTY_CATALOG: PublishedReader = {
   },
   async filteredSearchPublished() {
     return {rows: [], moreAvailable: false};
+  },
+  async getCollectionItemFeed() {
+    return [];
   },
 };
 

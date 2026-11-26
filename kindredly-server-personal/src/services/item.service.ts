@@ -7,6 +7,7 @@ import {ItemRepo} from '@/db/item.repo';
 import {PostRepo} from '@/db/post.repo';
 import {UserRepo} from '@/db/user.repo';
 import Item from 'tset-sharedlib/schemas/public/Item';
+import {UserMessageError} from 'tset-sharedlib/user-message';
 import AccessRequestService from './access_request.service';
 import FeedbackService from './feedback.service';
 import ItemRelationService from './item.relations';
@@ -18,6 +19,7 @@ import {UserPermRepo} from '@/db/user_perm.repo';
 import {ItemRelationRepo} from '@/db/item_relation.repo';
 import {SubscriptionRepo, SUBSCRIPTION_LIBRARY_COLLECTION_REF_TYPES} from '@/db/subscription.repo';
 import ChangeLogService from './change_log.service';
+import {SyncType} from '@/db/user_changelog.repo';
 import UserFileService from './user_file.service';
 import {EventRecordName, EventRecordType, NotificationType} from '@/typing/enum_strings';
 import {
@@ -39,7 +41,7 @@ import {assertEncInfoUpdateIsSafe, payloadContainsCiphertext} from '@/utils/enci
 import {SysInfoRepo} from '@/db/sysinfo.repo';
 import {container} from '@/inversify.config';
 import {CANONICAL_CATEGORIES} from 'tset-sharedlib/publishedCategoryMapping';
-import {SaveItemRequest, SaveItemResponse, CreateCollectionOptions} from 'tset-sharedlib/api';
+import {SaveItemRequest, SaveItemResponse, CreateCollectionOptions, UpdateItemResponse} from 'tset-sharedlib/api';
 import {postAttachmentCopyKey, postCopyItemId} from 'tset-sharedlib/post-copy';
 import {getFeedbackData} from '@/utils/feedback_helpers';
 import {escapeHtml} from '@/utils/text_utils';
@@ -91,6 +93,28 @@ const validAttributes = new Set([
   'encrypted',
 ]);
 
+/**
+ * Fields a change can touch and still be journalled `detailsOnly` (SYNC-17): an item's own details,
+ * which neither add to nor take from what a collection holds, nor change who can see it. Kept
+ * deliberately short. Anything else (`type`, `visibility`, `deleted`, `archived`, the publish fields,
+ * the content rules `patterns`, `useCriteria` and `kinds`) leaves the row without the flag, and a
+ * changed collection is then sent with all its members, as before.
+ */
+export const DETAILS_ONLY_FIELDS = new Set([
+  'name',
+  'description',
+  'comment',
+  'imageFilename',
+  'tags',
+  'categories',
+  'info',
+  'meta',
+  'metaUpdatedAt',
+  'sourceInfo',
+  'encInfo',
+  'encrypted',
+]);
+
 export function getSanitizedItemForSaving(data: Item): Item {
   let newData: Item = {};
   for (const [key, value] of Object.entries(data)) {
@@ -126,6 +150,36 @@ export function hasValidEncInfoKeys(encInfo: any): boolean {
 
 interface UserData {
   collectionIdHistory?: string[];
+}
+
+const NEW_ITEM_ID_PATTERN = /^(item|col)_[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
+
+/**
+ * A device's `newItemId` (OFS-1) is the id the server would have made: `col_` and a v4 uuid for a
+ * collection, `item_` and a v4 uuid for anything else.
+ */
+function assertNewItemId(newItemId: unknown, type: string | null | undefined): asserts newItemId is string {
+  const match = typeof newItemId === 'string' ? NEW_ITEM_ID_PATTERN.exec(newItemId) : null;
+  const prefix = type === ItemTypeEnum.collection ? 'col' : 'item';
+  if (!match || match[1] !== prefix) {
+    throw new HttpException(400, `newItemId must be ${prefix}_ followed by a v4 uuid`);
+  }
+}
+
+/** `ifUpdatedAt` from a request (OFS-2), or 400 when it isn't a time. */
+function parseIfUpdatedAt(value: unknown): Date | null {
+  if (value == null || value === '') return null;
+  const at = typeof value === 'string' ? new Date(value) : null;
+  if (!at || Number.isNaN(at.getTime())) {
+    throw new HttpException(400, 'ifUpdatedAt must be a time');
+  }
+  return at;
+}
+
+/** Whether a stored `updatedAt` is later than `since`, to the millisecond (see `updateWithIdIfUnchangedSince`). */
+function changedSince(updatedAt: Date | string | null | undefined, since: Date): boolean {
+  if (!updatedAt) return false;
+  return new Date(updatedAt).getTime() > since.getTime();
 }
 
 class ItemService {
@@ -423,7 +477,9 @@ class ItemService {
 
     const itemCount = await this._getLibraryItemCount(ctx.accountId);
     if (itemCount >= maxTotalItems) {
-      throw new Error(`You already have the maximum number (${maxTotalItems}) of library items in your account.`);
+      throw new UserMessageError(
+        `You already have the maximum number (${maxTotalItems}) of library items in your account.`,
+      );
     }
   }
 
@@ -489,6 +545,78 @@ class ItemService {
   //----- Collections-------
   //------------------------
 
+  /**
+   * The second arrival of a collection create with a `newItemId` (OFS-1): its details saved over,
+   * if it is the target person's (anyone else's id is refused), and the rest of a create done
+   * again — its parents, their people's permissions, the change log — since the first arrival may
+   * have stopped after inserting the row (OFS-15). Each step is safe to repeat; no notifications.
+   */
+  private async saveOverOwnNewCollection(
+    ctx: RequestContext,
+    existing: Item | null | undefined,
+    targetUserId: string,
+    details: Partial<Item>,
+    options: CreateCollectionOptions,
+  ): Promise<string> {
+    const collectionId = await this.saveOverOwnNewItem(ctx, existing, targetUserId, details);
+    await this.placeAndShareNewCollection(ctx, targetUserId, collectionId, null, options);
+    return collectionId;
+  }
+
+  /**
+   * A new collection put in its parents and shared with their people (or `permList`), and the
+   * change logged for everyone who has it. `item` is given for the share notifications; null
+   * sends none.
+   */
+  private async placeAndShareNewCollection(
+    ctx: RequestContext,
+    targetUserId: string,
+    itemId: string,
+    item: Item | null,
+    options: CreateCollectionOptions,
+  ): Promise<void> {
+    const collectionIds = options?.collectionIds || [];
+    const skipNotifications = !item || options?.skipNotifications === true;
+    const permList = [...(options?.permList || [])];
+
+    // add item to parents
+    for (const colId of collectionIds) {
+      await this.itemRelationService._addItemToCollection(ctx, colId, itemId, ItemTypeEnum.collection);
+    }
+
+    if (permList.length == 0 && collectionIds.length > 0) {
+      const permMap: Record<string, {userId: string; permission: PermissionType}> = {};
+      for (const pcolId of collectionIds) {
+        const parentPerms = await this.permissionService._listAllDirectPermissionsForAllUsersPermissionToItem(pcolId);
+        for (const parentPerm of parentPerms) {
+          permMap[parentPerm.userId] = parentPerm as {userId: string; permission: PermissionType};
+        }
+      }
+      permList.push(...Object.values(permMap));
+    }
+
+    for (const perm of permList) {
+      if (perm.userId != targetUserId && PermissionTypeList.includes(perm.permission)) {
+        let addedPermission = perm.permission;
+
+        //We can only have one owner, the user adding the collection
+        if (addedPermission == PermissionType.owner) addedPermission = PermissionType.editor;
+        await this.permissionService._setUserPermission(ctx, perm.userId, itemId, addedPermission);
+
+        if (item && ctx.currentUserId != perm.userId && perm.permission != PermissionType.owner && !skipNotifications) {
+          this.permissionService._sendShareNotification(ctx, perm.userId, item).catch((e) => {
+            console.error('Error sending share notification', e);
+          });
+        }
+      }
+    }
+
+    // list all users with permission
+    const usersToUpdate = new Set([targetUserId]);
+    for (const perm of permList) usersToUpdate.add(perm.userId);
+    await this.changeLoggerService.logItemChangeForUserIds(Array.from(usersToUpdate), [itemId]);
+  }
+
   // ROUTE-METHOD
   async createCollection(
     ctx: RequestContext,
@@ -500,20 +628,30 @@ class ItemService {
       customPermissions: false,
       skipNotifications: false,
     },
+    /** The id the device chose (OFS-1); see `SaveItemRequest.newItemId`. */
+    newItemId?: string,
   ): Promise<string> {
     //TODO: convert to limited to avoid admins adding collections for other admin users
     await ctx.verifySelfOrAdmin(targetUserId);
+
+    if (newItemId != null) {
+      assertNewItemId(newItemId, ItemTypeEnum.collection);
+      const existing = await this.itemRepo.findById(newItemId);
+      if (existing) return await this.saveOverOwnNewCollection(ctx, existing, targetUserId, itemDetails, options);
+    }
 
     const account = await this.accounts.findById(ctx.accountId);
     const planLimits = getDetailsByAccountType(account?.accountType);
     const colCount = await this._getCollectionCount(ctx.accountId);
     const maxCollections = Number(planLimits?.maxCollection ?? account?.maxCollections ?? 0);
     if (maxCollections > 0 && colCount >= maxCollections)
-      throw Error(`You already have the maximum number (${maxCollections}) of collections in your account.`);
+      throw new UserMessageError(
+        `You already have the maximum number (${maxCollections}) of collections in your account.`,
+      );
 
     const now = new Date();
 
-    const itemId = 'col_' + uuidv4();
+    const itemId = newItemId ?? 'col_' + uuidv4();
 
     const itemToSave = getSanitizedItemForSaving(itemDetails);
 
@@ -540,7 +678,20 @@ class ItemService {
 
     let {collectionIds = [], permList = [], customPermissions = false, skipNotifications = false} = options;
 
-    await this.itemRepo.create(item);
+    if (newItemId != null) {
+      if (!(await this.itemRepo.createIfAbsent(item))) {
+        // Another copy of this create was saved between the read and the insert.
+        return await this.saveOverOwnNewCollection(
+          ctx,
+          await this.itemRepo.findById(newItemId),
+          targetUserId,
+          itemDetails,
+          options,
+        );
+      }
+    } else {
+      await this.itemRepo.create(item);
+    }
 
     try {
       await AuditLogService.instance.log(ctx, {
@@ -551,13 +702,6 @@ class ItemService {
       });
     } catch (e) {
       console.error('audit_log: failed to log collection.create', e);
-    }
-
-    // add item to parents
-    if (collectionIds) {
-      for (const colId of collectionIds) {
-        await this.itemRelationService._addItemToCollection(ctx, colId, itemId, ItemTypeEnum.collection);
-      }
     }
 
     if (ctx.currentUserId != targetUserId && !skipNotifications) {
@@ -573,44 +717,12 @@ class ItemService {
     userData.collectionIdHistory = collectionIdHistory;
     await this.users.updateWithId(targetUserId, {userData});
 
-    if ((!permList || permList.length == 0) && collectionIds) {
-      const permMap: Record<string, {userId: string; permission: PermissionType}> = {};
-      for (const pcolId of collectionIds) {
-        const parentPerms = await this.permissionService._listAllDirectPermissionsForAllUsersPermissionToItem(pcolId);
-        for (const parentPerm of parentPerms) {
-          permMap[parentPerm.userId] = parentPerm as {userId: string; permission: PermissionType};
-        }
-      }
-      permList.push(...Object.values(permMap));
-    }
-
-    if (permList && permList.length > 0) {
-      for (const perm of permList) {
-        if (perm.userId != targetUserId && PermissionTypeList.includes(perm.permission)) {
-          let addedPermission = perm.permission;
-
-          //We can only have one owner, the user adding the collection
-          if (addedPermission == PermissionType.owner) addedPermission = PermissionType.editor;
-          await this.permissionService._setUserPermission(ctx, perm.userId, itemId, addedPermission);
-
-          if (ctx.currentUserId != perm.userId && perm.permission != PermissionType.owner && !skipNotifications) {
-            this.permissionService._sendShareNotification(ctx, perm.userId, item).catch((e) => {
-              console.error('Error sending share notification', e);
-            });
-          }
-        }
-      }
-    }
-
-    // list all users with permission
-    const usersToUpdate = new Set([targetUserId]);
-    if (permList && permList.length > 0) {
-      for (const perm of permList) {
-        usersToUpdate.add(perm.userId);
-      }
-    }
-
-    await this.changeLoggerService.logItemChangeForUserIds(Array.from(usersToUpdate), [itemId]);
+    await this.placeAndShareNewCollection(ctx, targetUserId, itemId, item, {
+      collectionIds,
+      permList,
+      customPermissions,
+      skipNotifications,
+    });
 
     this.evenLogService
       .recordEvent({
@@ -1767,6 +1879,16 @@ class ItemService {
       }
     }
 
+    // Whether it is in your library goes with your permission. An item you took out of your
+    // library keeps the permission, so the item and collection pages, which read the record until
+    // the permissions list lands (HAT-1140, HAT-1137), showed it as still in it.
+    if (data.details.permissionUserId === ctx.currentUserId) {
+      const ownRow = await this.permissionsRepo.findById(
+        this.permissionService.createPermissionKey(ctx.currentUserId, itemId),
+      );
+      if (ownRow?.notInLibrary === true) data.details.notInLibrary = true;
+    }
+
     if (includeFeedback && !data.feedback) {
       const feedback = await this.feedbackService._getItemFeedbackForUser(ctx, itemId);
       data['feedback'] = feedback;
@@ -1820,7 +1942,15 @@ class ItemService {
       encrypted: encrypted,
     };
 
-    await this.itemRepo.create(itemDetailsNew);
+    if (fixedItemId) {
+      // An id chosen before the save can arrive twice. Never merge over a row that already has
+      // it: the caller decides what an existing row means.
+      if (!(await this.itemRepo.createIfAbsent(itemDetailsNew))) {
+        throw new HttpException(409, 'An item with this id already exists');
+      }
+    } else {
+      await this.itemRepo.create(itemDetailsNew);
+    }
 
     try {
       await AuditLogService.instance.log(ctx, {
@@ -1865,6 +1995,7 @@ class ItemService {
       notifyOthers = false,
       notInLibrary = false,
       copyOfPostAttachment,
+      newItemId,
     } = saveRequest;
 
     if (!details) {
@@ -1911,6 +2042,10 @@ class ItemService {
         await ctx.verifySelfOrAdmin(targetUserId);
       }
 
+      if (newItemId != null && (copyOfPostAttachment || useAccessRequestOverrideFlow)) {
+        throw new HttpException(400, 'newItemId is only for an item saved straight to a library');
+      }
+
       if (copyOfPostAttachment) {
         if (targetUserId || accessRequestId) {
           throw new HttpException(400, 'A copy of a shared post attachment is only made for yourself');
@@ -1920,11 +2055,11 @@ class ItemService {
         return {itemId: made};
       }
 
-      itemId = await this._createItem(
-        useAccessRequestOverrideFlow ? targetCtx : directTargetCreateCtx,
-        details,
-        noCollections,
-      );
+      const createCtx = useAccessRequestOverrideFlow ? targetCtx : directTargetCreateCtx;
+      itemId =
+        newItemId != null
+          ? await this.createItemWithNewItemId(createCtx, details, noCollections, newItemId)
+          : await this._createItem(createCtx, details, noCollections);
     } else {
       const updateCtx = useAccessRequestOverrideFlow
         ? await this.selectSaveItemUpdateContext(sessionCtx, targetCtx, itemId)
@@ -1993,9 +2128,11 @@ class ItemService {
       }
     }
 
+    const savedAt = savedItem?.updatedAt ? new Date(savedItem.updatedAt as any) : null;
     return {
       itemId,
       feedback: savedFeedback,
+      ...(savedAt && !Number.isNaN(savedAt.getTime()) ? {updatedAt: savedAt.toISOString()} : {}),
     };
   }
 
@@ -2041,6 +2178,46 @@ class ItemService {
     return {itemId: postCopyItemId(ctx.currentUserId, postId, key), sharedByUserId: post.userId};
   }
 
+  /**
+   * A create with the id the device chose (OFS-1). The same create can arrive more than once: its
+   * first answer was lost, or it is sent again with edits made since. So an id that is already
+   * the saver's item has these details saved over it, and the newest edits win; an id that is
+   * anyone else's is refused.
+   */
+  private async createItemWithNewItemId(
+    ctx: RequestContext,
+    details: Partial<Item>,
+    assignDirectOwnerPermission: boolean,
+    newItemId: string,
+  ): Promise<string> {
+    assertNewItemId(newItemId, details.type);
+
+    const existing = await this.itemRepo.findById(newItemId);
+    if (existing) return await this.saveOverOwnNewItem(ctx, existing, ctx.currentUserId, details);
+
+    try {
+      return await this._createItem(ctx, details as Item, assignDirectOwnerPermission, newItemId);
+    } catch (e) {
+      if (!(e instanceof HttpException && e.status === 409)) throw e;
+      // Another copy of this create was saved between the read and the insert.
+      return await this.saveOverOwnNewItem(ctx, await this.itemRepo.findById(newItemId), ctx.currentUserId, details);
+    }
+  }
+
+  /** The second arrival of a create with a `newItemId`: saved over, if the item is `ownerUserId`'s. */
+  private async saveOverOwnNewItem(
+    ctx: RequestContext,
+    existing: Item | null | undefined,
+    ownerUserId: string,
+    details: Partial<Item>,
+  ): Promise<string> {
+    if (!existing || existing.userId !== ownerUserId) {
+      throw new HttpException(409, 'That item id is already in use');
+    }
+    await this.updateItem(ctx, existing._id, details);
+    return existing._id;
+  }
+
   /** Makes the copy once, kept out of the library and recorded as shared by the post's author. */
   private async createPostAttachmentCopy(
     ctx: RequestContext,
@@ -2056,8 +2233,12 @@ class ItemService {
     try {
       await this._createItem(ctx, details as Item, true, copy.itemId);
     } catch (e: any) {
-      // Another device made it first.
-      if (e?.code === '23505' && (await this.itemRepo.findById(copy.itemId))?.userId === ctx.currentUserId) {
+      // Another device made it first. A fixed-id insert never merges, so a second one is a 409.
+      if (
+        e instanceof HttpException &&
+        e.status === 409 &&
+        (await this.itemRepo.findById(copy.itemId))?.userId === ctx.currentUserId
+      ) {
         return copy.itemId;
       }
       throw e;
@@ -2340,11 +2521,18 @@ class ItemService {
     ctx: RequestContext,
     itemId: string,
     itemDetails: Partial<Item>,
-    options: {allowDecrypt: boolean; skipEncUpdate: boolean} = {
+    options: {
+      allowDecrypt: boolean;
+      skipEncUpdate: boolean;
+      /** Save only if unchanged since this time (OFS-2); see `UpdateItemRequest.ifUpdatedAt`. */
+      ifUpdatedAt?: string | null;
+      /** False: journal the change and leave the nudge to the request that follows (SYNC-15). */
+      nudge?: boolean;
+    } = {
       allowDecrypt: false,
       skipEncUpdate: false,
     },
-  ): Promise<void> {
+  ): Promise<UpdateItemResponse> {
     console.log('Updating item', itemId, itemDetails, options);
 
     // verify permission
@@ -2355,6 +2543,28 @@ class ItemService {
 
       throw new Error('No permission to edit item');
     }
+
+    // Changed since the device read it: answer with the time that won and save nothing. Checked
+    // before the encInfo guards so a stale encInfo is reported as a conflict, not refused; the
+    // write below checks again in the same statement, for a change made in between.
+    const ifUpdatedAt = parseIfUpdatedAt(options.ifUpdatedAt);
+    if (ifUpdatedAt) {
+      const current = await this.itemRepo.findById(itemId);
+      if (current && changedSince(current.updatedAt, ifUpdatedAt)) {
+        return {conflict: true, updatedAt: new Date(current.updatedAt).toISOString()};
+      }
+    }
+    const write = async (update: Item): Promise<boolean> => {
+      if (!ifUpdatedAt) {
+        await this.itemRepo.updateWithId(itemId, update);
+        return true;
+      }
+      return (await this.itemRepo.updateWithIdIfUnchangedSince(itemId, update, ifUpdatedAt)) > 0;
+    };
+    const conflictNow = async (): Promise<UpdateItemResponse> => {
+      const current = await this.itemRepo.findById(itemId);
+      return {conflict: true, updatedAt: current?.updatedAt ? new Date(current.updatedAt).toISOString() : undefined};
+    };
 
     const now = new Date();
     let encrypted = checkIfItemIsEncrypted(itemDetails);
@@ -2372,7 +2582,7 @@ class ItemService {
         updatedAt: now,
       };
 
-      await this.itemRepo.updateWithId(itemId, itemDetailsUpdate);
+      if (!(await write(itemDetailsUpdate as Item))) return await conflictNow();
     } else {
       // Server-side guardrail (payload-aware):
       // - If the update includes ciphertext, encInfo may legitimately change (rewrite).
@@ -2409,7 +2619,7 @@ class ItemService {
         encrypted: encrypted,
       };
 
-      await this.itemRepo.updateWithId(itemId, info);
+      if (!(await write(info as Item))) return await conflictNow();
     }
 
     // Recipients come from logItemChange's own lookup, which includes people who
@@ -2417,7 +2627,11 @@ class ItemService {
     // lookup that used to be here missed them, and /item/update papered over it by
     // logging a second time at the route -- while updateItem's three other callers
     // got no such compensation. SYNC-2.
-    await this.changeLoggerService.logItemChange(ctx, itemId);
+    await this.changeLoggerService.logItemChange(ctx, itemId, SyncType.itemUpdate, {
+      nudge: options.nudge !== false,
+      detailsOnly: Object.keys(itemUpdates).every((key) => DETAILS_ONLY_FIELDS.has(key)),
+    });
+    return {updatedAt: now.toISOString()};
   }
 
   async archiveItemUpdate(ctx: RequestContext, itemId: string, value: boolean) {

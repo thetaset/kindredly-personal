@@ -1,0 +1,1 @@
+const t=["minage_kids","minage_preteen","minage_teen"],_=["minage_preteen","minage_teen","minage_adult"],i=["minage_adult"],g=["minage_na","minage_prek","minage_kids","minage_preteen","minage_teen","minage_adult","minage_unknown"];function m(e,n){if(!e||e.length===0)return!0;const a=n??"minage_adult";return e.includes(a)}export{i as A,t as K,_ as T,g as a,m};

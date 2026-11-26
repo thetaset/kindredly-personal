@@ -34,7 +34,7 @@ import type {
   PodcastFeedLookupResponse,
 } from 'tset-sharedlib/api';
 
-const PODCAST_USE_CRITERIA = ['ct_other', 'topic_podcasts'];
+const PODCAST_USE_CRITERIA = ['ct_podcast'];
 const MANIFEST_SCHEMA = 'kindredly.admin-content-loader-manifest.v1';
 
 /**

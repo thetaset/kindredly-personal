@@ -15,6 +15,7 @@ import Subscription from 'tset-sharedlib/schemas/public/Subscription';
 import {assertEncInfoUpdateIsSafe, assertEncryptedUpdateHasEncInfo} from '@/utils/encinfo_guards';
 import {HttpException} from '@/exceptions/HttpException';
 import SSEManager from './sse.manager';
+import {UserMessageError} from 'tset-sharedlib/user-message';
 
 /**
  * Postgres unique_violation. Rediscover has a partial unique index on ("userId"), and every other
@@ -122,17 +123,17 @@ class SubscriptionService {
     if (!isAdmin) {
       if (!isSelf) throw new Error('User auth error');
       if (refType !== 'item_feed' && refType !== 'col' && refType !== 'shared_col' && refType !== 'pub_col') {
-        throw new Error('You do not have permission to manage subscriptions');
+        throw new UserMessageError('You do not have permission to manage subscriptions');
       }
       if (refType === 'pub_col') {
         // Checked below, for admins too.
       } else if (refType === 'shared_col') {
         const canView = await this._canViewCollectionForSubscription(ctx, refId);
-        if (!canView) throw new Error('You do not have permission to subscribe to this collection');
+        if (!canView) throw new UserMessageError('You do not have permission to subscribe to this collection');
       } else {
         const inLibrary = await this.permissionService.isInLibraryForUser(ctx, targetUserId, refId);
         if (!inLibrary) {
-          throw new Error('Subscriptions are only available for items in your library');
+          throw new UserMessageError('Subscriptions are only available for items in your library');
         }
       }
     }
@@ -145,7 +146,7 @@ class SubscriptionService {
       // collection id here, which no published-collection read can resolve.
       const info = await this.publishedService.assertCanViewPublishedById(ctx, refId);
       if ((info as any)?.type !== 'col') {
-        throw new Error('You do not have permission to subscribe to this collection');
+        throw new UserMessageError('You do not have permission to subscribe to this collection');
       }
     }
 
@@ -157,12 +158,12 @@ class SubscriptionService {
 
     if (refType == 'item_feed') {
       const hasViewPermission = await this.permissionService._hasAnyPermissionDirectOrAsAdmin(ctx, refId);
-      if (!hasViewPermission) throw new Error('You do not have permission to view this item feed');
+      if (!hasViewPermission) throw new UserMessageError('You do not have permission to view this item feed');
     }
 
     if (refType == 'shared_col') {
       const canView = await this._canViewCollectionForSubscription(ctx, refId);
-      if (!canView) throw new Error('You do not have permission to subscribe to this collection');
+      if (!canView) throw new UserMessageError('You do not have permission to subscribe to this collection');
     }
 
     let _id = 'sub_' + uuidv4();

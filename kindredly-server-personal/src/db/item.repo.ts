@@ -38,6 +38,32 @@ export class ItemRepo extends BaseRepo<Item> {
     return (await this.query().insert(this._updateInput(input)).onConflict('_id').merge().returning('*')) as any;
   }
 
+  /**
+   * Inserts the row only if no row has its `_id`, and answers whether it did. For an id chosen
+   * before the save (a device's `newItemId`, a post attachment's copy), where `create`'s merge
+   * would let a second save write over the first one's row.
+   */
+  async createIfAbsent(input: Item): Promise<boolean> {
+    const rows = await this.query().insert(this._updateInput(input)).onConflict('_id').ignore().returning('_id');
+    return Array.isArray(rows) && rows.length > 0;
+  }
+
+  /**
+   * Updates the row only if its `updatedAt` is not later than `since`, compared to the
+   * millisecond, and answers how many rows changed (0 or 1). `node-pg` drops the microseconds of a
+   * stored time on the way out, so the time a client sends back is the stored one truncated,
+   * never later than it. Same rule as `SubscriptionRepo.updateWithIdIfUnchangedSince`.
+   */
+  async updateWithIdIfUnchangedSince(id: string, update: Item, since: Date): Promise<number> {
+    if (update.userId) {
+      delete update.userId;
+    }
+    return await this.query()
+      .where({_id: id})
+      .andWhereRaw(`date_trunc('milliseconds', "updatedAt") <= ?::timestamptz`, [since.toISOString()])
+      .update(this._updateInput(update));
+  }
+
   async deleteWithId(id: string) {
     return await this.where({_id: id}).delete();
   }

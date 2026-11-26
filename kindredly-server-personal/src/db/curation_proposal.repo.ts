@@ -12,6 +12,8 @@ export type CurationProposalRow = {
   recommendCurated: boolean;
   /** The AI suggests taking the item out of the catalog (HAT-623). */
   recommendRemoval: boolean;
+  /** The AI suggests Curator's Choice (CCH-4). */
+  recommendChoice: boolean;
   agentKeyId: string | null;
   proposedBy: string | null;
   decidedBy: string | null;
@@ -30,6 +32,7 @@ export type CurationProposalInsertRow = Pick<
   | 'reason'
   | 'recommendCurated'
   | 'recommendRemoval'
+  | 'recommendChoice'
   | 'agentKeyId'
   | 'proposedBy'
 >;
@@ -91,7 +94,14 @@ export class CurationProposalRepo {
     patch: Partial<
       Pick<
         CurationProposalRow,
-        'changes' | 'imageSourceUrl' | 'reason' | 'recommendCurated' | 'recommendRemoval' | 'agentKeyId' | 'proposedBy'
+        | 'changes'
+        | 'imageSourceUrl'
+        | 'reason'
+        | 'recommendCurated'
+        | 'recommendRemoval'
+        | 'recommendChoice'
+        | 'agentKeyId'
+        | 'proposedBy'
       >
     >,
   ): Promise<CurationProposalRow> {

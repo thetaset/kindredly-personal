@@ -1,0 +1,109 @@
+{
+  "id": "58-block-all-closes-all-but-task-apps",
+  "behaviour": "\"Block all access\" closes every app but Task-Related and system ones: the game and the learning app close and the calendar stays open. On a phone the other browser closes too, since Kindredly does not filter it; a computer's browsers are left to Kindredly in them (CMP-118, founder 2026-11-23).",
+  "clock": {
+    "nowMs": 1789491600000,
+    "familyTimeZone": "America/Los_Angeles",
+    "deviceTimeZone": "America/Los_Angeles"
+  },
+  "settings": {
+    "usageLimitsData": {
+      "contentUsageLimits": [],
+      "temporaryRules": []
+    },
+    "ruleOverrideSettings": {
+      "ruleOverrides": []
+    },
+    "accessControlSettings": {
+      "restrictAll": true,
+      "restrictAllExpires": 0
+    },
+    "appPolicy": null,
+    "appPolicyStatus": "readable"
+  },
+  "installedApps": [
+    {
+      "pkg": "com.roblox.client",
+      "label": "Roblox",
+      "platform": "android"
+    },
+    {
+      "pkg": "com.duolingo",
+      "label": "Duolingo",
+      "platform": "android"
+    },
+    {
+      "pkg": "com.google.android.calendar",
+      "label": "Calendar",
+      "platform": "android"
+    },
+    {
+      "pkg": "com.android.chrome",
+      "label": "Chrome",
+      "platform": "android"
+    }
+  ],
+  "floor": [],
+  "usage": {
+    "appMsByPkg": {},
+    "webLogs": []
+  },
+  "usageSeed": {
+    "perRuleUsedMs": {}
+  },
+  "expectDevice": [
+    {
+      "pkg": "com.roblox.client",
+      "action": "block",
+      "reason": "block-all",
+      "ruleId": null
+    },
+    {
+      "pkg": "com.duolingo",
+      "action": "block",
+      "reason": "block-all",
+      "ruleId": null
+    },
+    {
+      "pkg": "com.google.android.calendar",
+      "action": "allow",
+      "reason": null,
+      "ruleId": null
+    },
+    {
+      "pkg": "com.android.chrome",
+      "action": "block",
+      "reason": "block-all",
+      "ruleId": null
+    }
+  ],
+  "expectDeviceByPlatform": {
+    "macos": [
+      {
+        "pkg": "com.roblox.client",
+        "action": "block",
+        "reason": "block-all",
+        "ruleId": null
+      },
+      {
+        "pkg": "com.duolingo",
+        "action": "block",
+        "reason": "block-all",
+        "ruleId": null
+      },
+      {
+        "pkg": "com.google.android.calendar",
+        "action": "allow",
+        "reason": null,
+        "ruleId": null
+      },
+      {
+        "pkg": "com.android.chrome",
+        "action": "allow",
+        "reason": null,
+        "ruleId": null
+      }
+    ]
+  },
+  "browserNotApplicable": "Device-only: the browser applies the same setting to pages through its own gate; this case pins what a phone and a computer close."
+}

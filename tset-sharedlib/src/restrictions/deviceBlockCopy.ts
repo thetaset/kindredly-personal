@@ -25,6 +25,7 @@
  * it through `@/`, and neither gets to have its own opinion about a Mac block.
  */
 import { isDesktopPlatform } from './deviceAppIds';
+import { APP_CATEGORY_BY_ID } from '../kinds/appCategories';
 
 /** Why a rule is blocking. The device decides in these terms; every surface reads them. */
 export type DeviceBlockReason =
@@ -58,7 +59,13 @@ export type DeviceBlockReason =
    * New apps start blocked (NAP-6): the app arrived after a parent turned that on, and waits for
    * them. Its own reason so the child is told the app is new, not that someone turned it off.
    */
-  | 'new-app';
+  | 'new-app'
+  /** "Block all access" is on (CMP-118). A parent's act, with an end time when they gave one. */
+  | 'block-all'
+  /** Today's Daily Check-in is not done, and a parent does it (`guardian` mode, CMP-117). */
+  | 'checkin'
+  /** Today's Daily Check-in is not done, and the child does it in Kindredly (`self` mode). */
+  | 'checkin-self';
 
 const DEVICE_BLOCK_REASONS: readonly string[] = [
   'budget-exhausted',
@@ -69,6 +76,9 @@ const DEVICE_BLOCK_REASONS: readonly string[] = [
   'family-downtime',
   'earn-access',
   'new-app',
+  'block-all',
+  'checkin',
+  'checkin-self',
 ];
 
 /**
@@ -112,7 +122,17 @@ export type DeviceBlockCopyInput = {
   allowedBrowsers?: readonly string[];
   /** The person's Blocked message, shown during Family Downtime. */
   note?: string | null;
+  /**
+   * For `app-blocked`: the App controls category that turned the app off (`AppCategoryId`), so the
+   * screen names the setting (HAT-1348). Absent for an app turned off on its own.
+   */
+  appCategory?: string | null;
 };
+
+/** "Social media in App controls", or "App controls" for an app turned off on its own. */
+function appControlsPlace(appCategory: string | null | undefined): { label: string | null } {
+  return { label: (appCategory && APP_CATEGORY_BY_ID[appCategory]?.label) || null };
+}
 
 /**
  * "1h 20m left", "20m left", "under a minute left", "none left".
@@ -162,14 +182,29 @@ function countsAsLine(input: DeviceBlockCopyInput, appLabel: string): string {
   return `${appLabel} counts as ${input.ruleName}.`;
 }
 
-function unlockLine(input: DeviceBlockCopyInput): string {
-  if (input.unlockAtMs == null) return '';
-  return sameLocalDay(input.nowMs, input.unlockAtMs, input.tzOffsetMinutes)
-    ? `Opens again at ${localClock(input.unlockAtMs, input.tzOffsetMinutes)}.`
-    : 'Opens again tomorrow.';
+const WEEKDAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+
+/** Whole wall-clock days from now to the unlock: 0 today, 1 tomorrow. */
+function daysUntilUnlock(input: DeviceBlockCopyInput): number {
+  const day = (ms: number) => Math.floor((ms + input.tzOffsetMinutes * 60_000) / 86_400_000);
+  return day(input.unlockAtMs as number) - day(input.nowMs);
 }
 
-const WEEKDAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+/** HAT-1086: opening later than tomorrow means a weekly total ran out; it opens on Monday. */
+function opensAfterTomorrow(input: DeviceBlockCopyInput): boolean {
+  return input.unlockAtMs != null && daysUntilUnlock(input) > 1;
+}
+
+function unlockLine(input: DeviceBlockCopyInput): string {
+  if (input.unlockAtMs == null) return '';
+  if (sameLocalDay(input.nowMs, input.unlockAtMs, input.tzOffsetMinutes)) {
+    return `Opens again at ${localClock(input.unlockAtMs, input.tzOffsetMinutes)}.`;
+  }
+  if (opensAfterTomorrow(input)) {
+    return `Opens again on ${WEEKDAY_NAMES[new Date(input.unlockAtMs + input.tzOffsetMinutes * 60_000).getUTCDay()]}.`;
+  }
+  return 'Opens again tomorrow.';
+}
 const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
 /**
@@ -224,9 +259,17 @@ export function deviceBlockCopy(input: DeviceBlockCopyInput): DeviceBlockCopy {
         detail: [until, note || 'Screens are off for the whole family right now.'].filter(Boolean).join(' '),
       };
     }
-    case 'app-blocked':
+    case 'app-blocked': {
       // Checked first on purpose: "your time is used up" would be a lie for an app with no budget.
-      return { headline: `${appLabel} is turned off`, detail: 'A parent turned this off. Ask them if you need it.' };
+      // Names the setting (HAT-1348): "turned off" alone sent an admin looking in Browser lockdown.
+      const { label } = appControlsPlace(input.appCategory);
+      return {
+        headline: `${appLabel} is turned off`,
+        detail: label
+          ? `A parent turned off ${label} in App controls. Ask them if you need it.`
+          : 'A parent turned this app off in App controls. Ask them if you need it.',
+      };
+    }
     case 'new-app':
       return { headline: `${appLabel} is new`, detail: 'New apps open once a parent allows them. Ask them if you need it.' };
     case 'browser-unprotected': {
@@ -250,6 +293,12 @@ export function deviceBlockCopy(input: DeviceBlockCopyInput): DeviceBlockCopy {
     case 'earn-access':
       // No time to give: it opens when the steps are done, and only Kindredly can show those.
       return { headline: 'Finish what comes first', detail: "Open Kindredly to see what's left." };
+    case 'block-all':
+      return { headline: `${appLabel} is off for now`, detail: [opens, 'A parent turned off apps like this one.'].filter(Boolean).join(' ') };
+    case 'checkin':
+      return { headline: 'Daily Check-in first', detail: 'A parent checks you in for today. Ask them.' };
+    case 'checkin-self':
+      return { headline: 'Daily Check-in first', detail: 'Check in on Kindredly, then this opens.' };
     // A time block's headline is one sentence that names the limit and when it opens (HAT-979);
     // the detail says why this app is under it.
     case 'always-blocked':
@@ -268,11 +317,13 @@ export function deviceBlockCopy(input: DeviceBlockCopyInput): DeviceBlockCopy {
         : `${name} opens tomorrow`;
       return { headline, detail: counts || (input.coversEverything ? 'It is outside your screen time hours.' : '') };
     }
-    case 'budget-exhausted':
+    case 'budget-exhausted': {
+      const when = opensAfterTomorrow(input) ? 'this week' : 'today';
       return {
-        headline: input.coversEverything ? 'No screen time left today' : `No ${timeSubject(input, appLabel)} time left today`,
+        headline: input.coversEverything ? `No screen time left ${when}` : `No ${timeSubject(input, appLabel)} time left ${when}`,
         detail: [countsAsLine(input, appLabel), opens || 'It comes back tomorrow.'].filter(Boolean).join(' '),
       };
+    }
     default:
       return { headline: `${appLabel} isn't available right now`, detail: opens };
   }
@@ -291,8 +342,10 @@ export function deviceBlockSubtitle(input: DeviceBlockCopyInput): string {
   switch (input.reason) {
     case 'family-downtime':
       return downtimeUntilSentence(input) || 'An admin set Family Downtime.';
-    case 'app-blocked':
-      return `A parent chooses which apps can be used on ${noun}.`;
+    case 'app-blocked': {
+      const { label } = appControlsPlace(input.appCategory);
+      return label ? `Turned off in App controls: ${label}.` : `Turned off in App controls on ${noun}.`;
+    }
     case 'new-app':
       return `New apps on ${noun} open once a parent allows them.`;
     case 'browser-unprotected': {
@@ -304,6 +357,12 @@ export function deviceBlockSubtitle(input: DeviceBlockCopyInput): string {
     case 'earn-access':
       // The web block page's own words for an Earn access block with no rule name to show.
       return 'Finish what comes first.';
+    case 'block-all':
+      return unlockLine(input) || 'A parent turned off apps like this one.';
+    case 'checkin':
+      return 'A parent checks you in for today.';
+    case 'checkin-self':
+      return 'Check in on Kindredly, then this opens.';
     case 'always-blocked':
       return 'A parent set no time for this today.';
     case 'outside-schedule':

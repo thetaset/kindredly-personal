@@ -1,0 +1,1 @@
+import{e as r,f as i}from"./shared.routerDVPRZaHe.js";import{c as s}from"./useScrollHideUZDmnFle.js";import{aw as o,a as t}from"./appHandoffGuestD3H_h1r5.js";import{r as a}from"./SearchHistoryStoreDhj1YF5I.js";function n(){var e;return{userType:(e=t.currentUser)==null?void 0:e.type,isDeveloperMode:o(),isAdvancedMode:i(),canAccess:r,canSeeFriends:s()}}a(n);

@@ -1,4 +1,6 @@
 import type { LessonGenRequest, LessonQuestionType } from './lesson.utils';
+import { familyAiSetting, familyAllowsHostedAi, personAllowsAiTools, type PersonAi } from './family-ai';
+import { getSharedPlanPolicy } from './plan-policy';
 
 // Authoring presets + prompt composition shared by the server generator, the
 // "copy prompt for another LLM" feature, and the builder UI. Keeping the depth/
@@ -229,6 +231,92 @@ export function parseLessonImportJson(text: string): any | null {
       return JSON.parse(s.slice(start, end + 1));
     } catch {
       return null;
+    }
+  }
+  return null;
+}
+
+/**
+ * What a tool that makes a lesson asks for, in one place (HAT-1203). The MCP `createlesson` tool
+ * reads these; Kinbot's own lesson tool and the builder's tools should read them too rather than
+ * restating the fields. `type` is the registry's param type; the allowed values are named in the
+ * description because the registry schema has no `enum`.
+ */
+export const LESSON_CREATE_FIELDS: Record<string, { type: 'string' | 'array'; required?: boolean; description: string }> = {
+  request: {
+    type: 'string',
+    required: true,
+    description:
+      'What the lesson teaches and who it is for, in the person’s words, with anything else they said. One sentence is enough.',
+  },
+  grade_band: {
+    type: 'string',
+    description: 'Who it is written for: early, elementary, middle, high or adult. Omit when the request says.',
+  },
+  style: {
+    type: 'string',
+    description:
+      'conceptual (understanding), exam_prep (recall and practice), vocabulary (terms), socratic (questions that make them think), practice (worked problems) or story (a narrative). Omit for conceptual.',
+  },
+  depth: {
+    type: 'string',
+    description: 'quick, standard, deep or comprehensive. Omit for standard.',
+  },
+  question_types: {
+    type: 'array',
+    description:
+      'Any of multiple_choice, true_false, short_answer, free_response or flashcard. Omit to let the style pick.',
+  },
+  extra_instructions: {
+    type: 'string',
+    description: 'Anything else the writer should know, in the person’s words.',
+  },
+};
+
+/**
+ * What an AI app is told about making a lesson. One string, so every surface that offers the tool
+ * says the same thing; the "asks first" sentence is added by the MCP layer, not here.
+ */
+export const LESSON_CREATE_INSTRUCTIONS =
+  'Make a lesson: a short run of steps a child works through, with questions that check understanding. ' +
+  'Kindredly writes it in the background from `request` and the optional settings; you never write the lesson, its steps or its questions. ' +
+  'Returns the new lesson’s id and the page to open it at once; it fills in about a minute, and the person can open it in Lessons or from the returned path.';
+
+/** The style and depth ids a lesson accepts, for a tool that validates what it was given. */
+export const LESSON_STYLE_IDS = LESSON_STYLE_PRESETS.map((s) => s.id);
+export const LESSON_DEPTH_IDS = LESSON_DEPTH_PRESETS.map((d) => d.id);
+
+/**
+ * Why Kindredly AI can't write a lesson for this person, or null when it can, from facts a
+ * background service has (HAT-1203). The page's `lessonAiUnavailableReason` and the MCP
+ * `createlesson` tool both read this, so the wording and the order of the checks cannot drift.
+ *
+ * A fact the caller does not have is left to the server rather than guessed: an absent
+ * `accountType` (no cached account) or `user` skips that check, where a known Standard plan or a
+ * person with AI tools off refuses. `developerMode` is the page's plan override.
+ */
+export interface LessonAiAccessInput {
+  accountType?: string | null;
+  /** `account.options.aiSetting`. Absent reads as the default, as `familyAiSetting` does. */
+  aiSetting?: unknown;
+  user?: PersonAi;
+  developerMode?: boolean;
+}
+
+export function lessonAiUnavailableReasonFor(input: LessonAiAccessInput): string | null {
+  if (!input.developerMode && input.accountType) {
+    if (getSharedPlanPolicy(input.accountType).readiness.contentAuthoring !== true) {
+      return 'Writing a lesson with Kindredly AI is part of Plus.';
+    }
+  }
+  if (input.aiSetting !== undefined) {
+    const setting = familyAiSetting({ aiSetting: input.aiSetting });
+    if (setting === 'privateOnly') return 'Writing a lesson uses Kindredly AI, and your family uses private AI only.';
+    if (!familyAllowsHostedAi(setting)) return 'AI is off for your family.';
+  }
+  if (input.user) {
+    if (!personAllowsAiTools(input.user)) {
+      return input.user.type === 'restricted' ? 'AI tools are off for you. Ask a parent to turn them on.' : 'AI tools are off for you.';
     }
   }
   return null;

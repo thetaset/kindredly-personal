@@ -4,6 +4,8 @@ import PermissionService from '@/services/permission.service';
 import SSEManager from './sse.manager';
 import {assertEncInfoUpdateIsSafe, assertEncryptedUpdateHasEncInfo} from '@/utils/encinfo_guards';
 import {notifyDeviceSettingsChanged} from '@/services/device_settings.service';
+import {USAGE_REF_ID, USAGE_REPORT_STATE} from 'tset-sharedlib/types/device-guard.types';
+import {HELPER_FAMILY_CHAT_STATE_KEY} from 'tset-sharedlib/helper-ai';
 
 const DEFAULT_LIMIT = 50;
 const MAX_LIMIT = 200;
@@ -195,6 +197,14 @@ export class RefStateService {
     throw new Error(`Unsupported refType: ${refType}`);
   }
 
+  /** A family chat message's key is its author's id, `_`, then the message's own id. */
+  private isOwnFamilyChatMessage(ctx: RequestContext, stateSubKey?: string | null): boolean {
+    const me = ctx.getCurrentUserId();
+    return (
+      !!me && typeof stateSubKey === 'string' && stateSubKey.startsWith(`${me}_`) && stateSubKey.length > me.length + 1
+    );
+  }
+
   private async resolveOwner(ctx: RequestContext, ownerType: 'user' | 'account', ownerId?: string) {
     const userId = ctx.getCurrentUserId();
     const accountId = ctx.accountId;
@@ -245,6 +255,18 @@ export class RefStateService {
     await this.assertCanAccessRef(ctx, input.refType, input.refId, ownerType);
 
     /**
+     * A family helper's chat (HAI-8, HAT-1105) is account-scoped so everyone the helper is for can
+     * read it, and account scope is otherwise ungated: a child could rewrite an adult's message, or
+     * write one in their name. Each message's key starts with its author's id, and only its author
+     * writes it.
+     */
+    if (input.refType === 'item' && input.stateKey === HELPER_FAMILY_CHAT_STATE_KEY) {
+      if (ownerType !== 'account' || !this.isOwnFamilyChatMessage(ctx, input.stateSubKey)) {
+        throw new Error('A family chat message is written only by its author');
+      }
+    }
+
+    /**
      * A child must never author their own app protections.
      *
      * `resolveOwner` below only checks admin when the row belongs to SOMEONE ELSE —
@@ -276,6 +298,15 @@ export class RefStateService {
      */
     if (input.refType === 'device-guard' && input.stateKey === 'tamperIncident') {
       throw new Error('Tamper incidents are managed by the server');
+    }
+
+    /**
+     * A device's app-time report (DCP-27) is written only by `/companion/usage/sync`, with that
+     * device's token. From here a child could replace the phone's report with an emptier one, and
+     * the computer would then count less of the phone's time.
+     */
+    if (input.refType === 'device-guard' && input.refId === USAGE_REF_ID && input.stateKey === USAGE_REPORT_STATE) {
+      throw new Error('App-time reports come only from the device that made them');
     }
 
     // For task assignment, require edit permission to the task definition item.
@@ -567,6 +598,20 @@ export class RefStateService {
     if (input.refType === 'device-guard' && (input.stateKey === 'appPolicy' || input.stateKey === 'provisioning')) {
       if (!(await ctx.isAdmin())) {
         throw new Error('Only a guardian can remove app protections or a linked device');
+      }
+    }
+    // Deleting the phone's app-time report would let the computer count none of the phone's time
+    // (DCP-27). Removing a device deletes it, from a guardian.
+    if (input.refType === 'device-guard' && input.refId === USAGE_REF_ID && input.stateKey === USAGE_REPORT_STATE) {
+      if (!(await ctx.isAdmin())) {
+        throw new Error('Only a guardian can remove an app-time report');
+      }
+    }
+
+    // The delete half of the family chat rule in `upsert`: your own message, or any as a guardian.
+    if (input.refType === 'item' && input.stateKey === HELPER_FAMILY_CHAT_STATE_KEY) {
+      if (!this.isOwnFamilyChatMessage(ctx, input.stateSubKey) && !(await ctx.isAdmin())) {
+        throw new Error('Only its author or a guardian can delete a family chat message');
       }
     }
 

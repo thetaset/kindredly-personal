@@ -29,6 +29,15 @@ describe('new apps that wait for a guardian', () => {
     expect(newAppsWaiting(apps, {...on, reviewedAt: 6_500})).toEqual([]);
   });
 
+  /** CMP-122: Kindredly offers no app switch for Windows yet, so nothing there may wait for one. */
+  it('holds nothing on a platform Kindredly cannot block on yet', () => {
+    const windows = [
+      { pkg: 'C:/Windows/notepad.exe', label: 'Notepad', platform: 'windows' as any, firstSeenAt: 1 },
+      { pkg: 'C:/Games/Roblox.exe', label: 'Roblox', platform: 'windows' as any, firstSeenAt: 9 },
+    ];
+    expect(newAppsWaiting(windows, {...base, newAppsBlockedAt: 2})).toEqual([]);
+  });
+
   it("never blocks a phone's own screens", () => {
     const phone = [
       { pkg: 'com.x', label: 'X', firstSeenAt: 1 },

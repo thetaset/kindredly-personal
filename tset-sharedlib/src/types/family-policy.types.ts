@@ -15,6 +15,13 @@ export type FamilyPolicyRuleTargetKind = typeof FAMILY_POLICY_RULE_TARGET_KINDS[
 export const FAMILY_POLICY_RULE_DECISION_KINDS = [
   'classify',
   'block',
+  // A page or site a guardian allowed from History (HAT-1192). It lifts content
+  // decisions only — the classifiers, image scanning, social media and short-form
+  // blocks — and never an access decision: Library mode, a site block, time,
+  // downtime, the check-in or Earn access keep their own answers. Read before the
+  // content pipeline in `SentryProcessor` / `blockRuleGate` and in the pipeline
+  // settings the content script runs with.
+  'allow',
   'skip_image_scanning',
   // A parent checked a catalog item under curation review for their own family
   // (docs/specs/curation-review.md). Only with target `published_id`. It decides nothing about
@@ -22,6 +29,11 @@ export const FAMILY_POLICY_RULE_DECISION_KINDS = [
   // with filtering rules. It lives here because a family policy rule is encrypted with the
   // account key and only a parent can write one.
   'curation_checked',
+  // A page change (HAT-1232): CSS a parent had AI write for a site, applied on the pages of
+  // that site for the people named in `userIds`. Only with target `domain`, and it decides
+  // nothing about browsing: blocking, classification and image scanning never see it, and it
+  // is not listed with filtering rules. Stored here for the same reasons as `curation_checked`.
+  'page_change',
 ] as const;
 
 export type FamilyPolicyRuleDecisionKind = typeof FAMILY_POLICY_RULE_DECISION_KINDS[number];
@@ -121,6 +133,24 @@ export interface FamilyPolicyTargetMatchRule extends FamilyPolicyRuleBase {
   // the target alone there would turn "YouTube when the title says Minecraft"
   // into "all of YouTube".
   terms?: string[];
+  // Only on a `page_change` rule: the CSS, its short name, and the parent's own words.
+  pageChange?: FamilyPolicyPageChange;
+}
+
+/** What a `page_change` rule does to its site's pages (HAT-1232). */
+export interface FamilyPolicyPageChange {
+  /** Sanitized with `sanitizeSiteStyleCss`: no `url()`, `@import` or script hooks. */
+  css: string;
+  /** "Hide the comments": the name a parent sees in settings. */
+  label: string;
+  /** What the parent asked for, so the change can be redone from the same words. */
+  request?: string;
+  /**
+   * Which of the site's pages it covers (HAT-1239): one page (`youtube.com/watch?v=abc`) or the
+   * pages whose address starts with `address` (`youtube.com/watch`). None: every page of the site.
+   * No scheme and no `www.`; lower case but for a query's values.
+   */
+  pages?: { kind: 'page' | 'prefix'; address: string };
 }
 
 export interface FamilyPolicyTermOverrideRule extends FamilyPolicyRuleBase {

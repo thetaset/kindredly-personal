@@ -152,6 +152,8 @@ export interface PublishedDisplayItem extends Omit<LibraryDisplayItem, 'baseType
   underReview?: boolean;
   /** A curator archived it: out of the catalog, its page still opens (CWS-2). */
   archived?: boolean;
+  /** Kindredly recommends it: Curator's Choice, and not under review or archived (CCH-3). */
+  curatorsChoice?: boolean;
   nextReviewAt?: string;
 
   inLibrary?: boolean;

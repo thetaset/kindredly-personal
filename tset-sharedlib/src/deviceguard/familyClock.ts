@@ -83,3 +83,25 @@ export function familyClock(nowMs: number, timeZone: string | null | undefined):
 export function familyDayEndMs(clock: FamilyClock): number {
   return familyClock(clock.dayStartMs + 30 * 60 * 60 * 1000, clock.timeZone).dayStartMs - 1
 }
+
+/** The family day start `daysBack` days before the clock's, landing on the right wall-clock day across DST. */
+export function familyDayStartDaysBack(clock: FamilyClock, daysBack: number): number {
+  if (daysBack <= 0) return clock.dayStartMs
+  return familyClock(clock.dayStartMs - daysBack * DAY_MS + 12 * 60 * 60 * 1000, clock.timeZone).dayStartMs
+}
+
+/** When this family week began: Monday's start on the family clock (the week Earn Access uses too). */
+export function familyWeekStartMs(clock: FamilyClock): number {
+  return familyDayStartDaysBack(clock, (clock.dayOfWeek + 6) % 7)
+}
+
+/** When the next family week begins: next Monday's start, when a used-up weekly total opens again. */
+export function familyNextWeekStartMs(clock: FamilyClock): number {
+  const daysLeft = 7 - ((clock.dayOfWeek + 6) % 7)
+  return familyClock(clock.dayStartMs + daysLeft * DAY_MS + 12 * 60 * 60 * 1000, clock.timeZone).dayStartMs
+}
+
+/** `yyyy-MM-dd` of this family week's Monday: the key a week-to-date usage seed is stored under. */
+export function familyWeekKey(clock: FamilyClock): string {
+  return familyClock(familyWeekStartMs(clock) + 12 * 60 * 60 * 1000, clock.timeZone).dateKey
+}

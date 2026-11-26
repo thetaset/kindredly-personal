@@ -40,6 +40,10 @@ class RedisPipeline implements KvPipeline {
     this.chain.del(...keys);
     return this;
   }
+  sadd(key: string, ...members: string[]): this {
+    this.chain.sadd(key, ...members);
+    return this;
+  }
   srem(key: string, ...members: string[]): this {
     this.chain.srem(key, ...members);
     return this;

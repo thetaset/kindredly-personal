@@ -23,6 +23,8 @@ export interface McpRelaySealedFrame {
   sealed: true;
   op: 'sealed';
   envelope: McpRelaySealedEnvelope;
+  /** See `McpRelayFrame.msLeft`. */
+  msLeft?: number;
 }
 
 /** What `/mcpRelay/pairing/redeem` gives the program: its token and the device's public key. */
@@ -54,4 +56,28 @@ export interface McpUploadView {
 /** A sent file, taken by one Kindredly to file it: the view and the bytes, base64. */
 export interface McpUploadClaim extends McpUploadView {
   data: string;
+}
+
+/** What an AI app may ask the adult's permission for (HAT-690). */
+export type AiAppPermissionKind = 'add' | 'edit' | 'remove' | 'child';
+
+/** A permission request as the popup and the Access requests page show it, opened with the adult's key. */
+export interface AiAppPendingPermission {
+  requestId: string;
+  createdAt: string;
+  toolId: string;
+  summary: string;
+  clientName: string;
+  connectionId?: string;
+  kind?: AiAppPermissionKind;
+}
+
+/** The page an AI app's upload link opens on (HAT-964): what the link is for, opened on the device. */
+export interface McpUploadPageView {
+  uploadId: string;
+  status: McpUploadView['status'];
+  clientName: string;
+  /** The new item's name, or empty when it attaches to an item or takes the file's name. */
+  name: string;
+  attachesToItem: boolean;
 }

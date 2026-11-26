@@ -2,6 +2,7 @@ import { UsageStatus, UsageSummaryData, TakeBreakAdvisory } from '../types';
 import type { CategorySet } from '../types/categoryExplorer.types';
 import type { FamilyDowntimeAdvisory } from '../restrictions/familyDowntime';
 import type { AiUsageKind } from '../ai-usage-kinds';
+import type { ScoreResult } from '../classifiers/classificationMetrics';
 import type { SiteStyleEntryV1 } from '../types/item.types';
 import type {
   AccountType,
@@ -399,6 +400,11 @@ export interface PublishedCategoryCoverageResponse {
   populated: Record<string, string[]>;
   /** Set id -> leaf id -> its curated items, for Explore's topic cards (HAT-554). Older servers send none. */
   counts?: Record<string, Record<string, TopicItemCounts>>;
+  /**
+   * Search kind (`PUBLISHED_SEARCH_KIND_KEYS`) -> its curated items, for Explore's YouTube channels,
+   * Podcasts and Apps and tools cards (HAT-1368). A kind with none is left out; older servers send none.
+   */
+  kinds?: Record<string, TopicItemCounts>;
 }
 
 /**
@@ -466,6 +472,8 @@ export interface AdminCategoryCoverageResponse {
   uncategorized: number;
   /** Ids tagged on published rows that no current set contains — stale tags to remap. */
   orphanCategoryIds: { id: string; count: number }[];
+  /** Curated items per search kind, overall and per age group (HAT-1368); kinds with none left out. */
+  kinds?: Record<string, TopicItemCounts>;
   /** ISO timestamp the underlying scan ran (results are cached briefly). */
   generatedAt: string;
 }
@@ -648,6 +656,8 @@ export type AdminAiPromptKey =
   | 'lessonGenLesson'
   // Checks a written lesson against its sources; what it names is cut by code (HAT-491).
   | 'lessonCheck'
+  // Names the Wikipedia articles that cover what the auto-found one didn't (UX-111).
+  | 'lessonSourceArticles'
   | 'lessonGradeAnswer'
   // The collection builder's copy/paste authoring prompt. Only `prompt` is used
   // (it carries the JSON format spec); `system` is unused.
@@ -659,7 +669,11 @@ export type AdminAiPromptKey =
   | 'trackSearch'
   | 'trackSyllabus'
   | 'trackWrite'
-  | 'trackCritic';
+  | 'trackCritic'
+  // Projects (HAT-1064, PRJ-6): the outline, filling one part, and changing one part.
+  | 'projectOutline'
+  | 'projectFill'
+  | 'projectChange';
 
 export interface AdminAiPromptOverride {
   system?: string;
@@ -820,6 +834,15 @@ export interface SaveItemRequest {
    * the copy already made.
    */
   copyOfPostAttachment?: { postId: string; key: string };
+  /**
+   * New items only (`/item/save` and `/collection/create`): the id the device chose for it,
+   * `item_<uuid>` or, for a collection, `col_<uuid>` (offline saves, OFS-1). The item is made
+   * with that id, so a create sent again after a lost answer makes nothing new. If the id is
+   * already the saver's item, `details` are saved over it, so a create sent again carries the
+   * newest edits; if it belongs to anyone else the save is refused (409). Only sent to a server
+   * whose `/user/current` lists `item.newItemId` in `serverSupports`.
+   */
+  newItemId?: string;
   options?: CreateCollectionOptions;
   targetUserId?: string;
   tempAuthToken?: TokenData;
@@ -849,7 +872,60 @@ export interface UpdateItemRequest {
   encInfo?: EncInfo;
   allowDecrypt?: boolean;
   skipEncUpdate?: boolean;
+  /**
+   * Save only if the item is unchanged since this `updatedAt` (OFS-2): the time the device last
+   * read or saved it. If someone changed it since, nothing is saved and the answer is
+   * `{conflict: true, updatedAt}`. Only sent to a server whose `/user/current` lists
+   * `item.ifUpdatedAt` in `serverSupports`.
+   */
+  ifUpdatedAt?: string;
+  /**
+   * False when a note's text upload follows and nudges the other devices itself (SYNC-15): the
+   * change is journalled, and the `syncUpdate` nudge is left to that request. Absent nudges.
+   */
+  nudge?: boolean;
   tempAuthToken?: TokenData;
+}
+
+/**
+ * Offline saves (HAT-1225): a change this device has not sent yet, or one the server refused.
+ * Background only (`/sync/unsent/*`); the server never sees this list.
+ */
+export interface UnsentChangeView {
+  /** Names the change for Retry and Discard. */
+  key: string;
+  route:
+    | '/item/update'
+    | '/item/delete'
+    | '/item/feedback/value/update'
+    | '/item/save'
+    | '/collection/create'
+    | '/item/addToCollections'
+    | '/ref_state/upsert'
+    | '/note/save';
+  /** The item; for a collection change, the item put in or taken out; for a task, the task. */
+  itemId: string;
+  /** The item's name on this device, when it is known. */
+  name: string | null;
+  state: 'waiting' | 'sending' | 'refused';
+  /** A feedback change only: which mark it is (`isReadLater`, `reaction`, …). */
+  attr?: string | null;
+  /** A collection change only: whether the item was put in or taken out. */
+  added?: boolean | null;
+  /** Why the server refused it, in its words. */
+  lastError: string | null;
+  /** False when sending it again cannot work: the item was deleted on another device. */
+  canRetry: boolean;
+  /** When it was last changed on this device, in ms. */
+  updatedAt: number;
+}
+
+/** What `/item/update` answers. An older server answers nothing. */
+export interface UpdateItemResponse {
+  /** The item's `updatedAt` now: the one just saved, or on a conflict the one that won. */
+  updatedAt?: string;
+  /** Only with `ifUpdatedAt`: the item had changed since, and nothing was saved. */
+  conflict?: boolean;
 }
 
 export interface UpdatePostEncInfoRequest {
@@ -1135,6 +1211,24 @@ export interface SearchMainRequest {
 }
 
 /**
+ * A search pinned to Home (HAT-1107): the words, the place, the filters and the sort, as the
+ * Search page had them. Kept in the `search.pinned` pref, encrypted under the person's own key,
+ * since the words are as private as their search history.
+ */
+export type PinnedSearch = {
+  id: string;
+  searchType: string;
+  value: string;
+  place: (SearchPlace & { label: string }) | null;
+  filters: Record<string, unknown>;
+  orderBy: string;
+  pinnedAt: number;
+};
+
+/** The `search.pinned` pref: encrypted, or plain in Device-only mode, where nothing reaches a server. */
+export type PinnedSearchesPref = { sealed: string } | { searches: PinnedSearch[] };
+
+/**
  * What "Search your history" can tell the page about itself, most decisive first:
  * `off` — the person does not have the feature, or is in Device-only mode;
  * `not-recording` — no history is being kept now, though older pages still answer;
@@ -1314,6 +1408,56 @@ export interface GetUsageInsightsReportResponse {
   topResourcesBySessions: UsageInsightsLeaderboardEntry[];
   topChannelsByTime: UsageInsightsLeaderboardEntry[];
   topChannelsBySessions: UsageInsightsLeaderboardEntry[];
+}
+
+/**
+ * Where a Usage row's time went (HAT-1147). `limitRuleId` is the row's limit; with none (or one since
+ * deleted), `usageType` is the category it counts; with neither, all screen time.
+ */
+export interface GetTimeSpentRequest {
+  userId?: string;
+  limitRuleId?: string | null;
+  usageType?: string | null;
+  /** The first moment counted: the family's day start for Today. At most 31 days back. */
+  startTime: number;
+  /** With neither a limit nor a usage type: also each category's time, for Usage by category (HAT-1172). */
+  byUsageType?: boolean;
+}
+
+/** A video, episode or page inside a site, or the one row an app is. */
+export interface TimeSpentItem {
+  key: string;
+  label: string;
+  /** A video's channel, when the log knows it. */
+  channelName: string | null;
+  url: string | null;
+  /** A video or other work that played, not an ordinary page. */
+  isVideo: boolean;
+  ms: number;
+}
+
+export interface TimeSpentPlace {
+  /** The usage node id History's `focus` matches: `domain:youtube.com`, `app:android:com.roblox`, `site:…`. */
+  key: string;
+  label: string;
+  /** Where an app ran (`android`, `macos`, …, or `kindredly` for a Kindredly app); null for a website. */
+  appPlatform: string | null;
+  /** Overlapping logs count once and a gap under two minutes counts, as the limits count it. */
+  ms: number;
+  videoCount: number;
+  pageCount: number;
+  /** The place's biggest items, most first; empty for an app. */
+  items: TimeSpentItem[];
+}
+
+export interface GetTimeSpentResponse {
+  startTime: number;
+  endTime: number;
+  /** All the time counted, once: equal to the Usage row's used time for the same window. */
+  totalMs: number;
+  places: TimeSpentPlace[];
+  /** Asked for with `byUsageType`: each category's time, counted as `totalMs` is, most first. */
+  usageTypes?: { usageType: string; ms: number }[];
 }
 
 export interface GetTopicAttentionRequest {
@@ -1585,6 +1729,12 @@ export interface AccessEvaluateResponse {
    * not clear those, because the scan would re-block.
    */
   clearedByOverride?: 'restrictions-paused' | 'privileged-temp-access' | null;
+  /**
+   * Set when an "allowed" verdict is explained by an allow rule a guardian wrote for this address
+   * (HAT-1192). Like an override, the allow also suppresses content-scan blocking, so a block page
+   * held on a content-derived reason may trust it and navigate.
+   */
+  clearedByContentAllow?: boolean;
   libraryPermitted: boolean | null;
   /**
    * May this URL be added to (or re-saved in) the user's own library?
@@ -1910,6 +2060,27 @@ export interface UploadImageClassificationSamplesResponse {
   rejected: number;
 }
 
+/**
+ * CLS-19: pages a member's device classified, from a member who agreed to share pages
+ * (PAGE_SHARING_PREF_KEY). Each is checked again on the server with `sharedPageFrom`
+ * (classifiers/pageSharing.ts); nothing in a request says whose they are or when they were visited.
+ */
+export interface SharePagesRequest {
+  pages: Array<{ url: string; title?: string; description?: string; text?: string; eduValue?: string | null }>;
+}
+
+export interface SharePagesResponse {
+  kept: number;
+  leftOut: number;
+}
+
+/** The parent's Send now: this device's pages since the last send. */
+export interface SharePagesNowResponse {
+  sent: number;
+  /** Why nothing went: the agreement doesn't cover pages, or there was nothing new to send. */
+  reason?: 'not_agreed' | 'nothing_new';
+}
+
 export interface UploadClassificationDatasetSamplesRequest {
   targetUserId?: string;
   datasetName?: string;
@@ -1929,6 +2100,8 @@ export interface UploadClassificationDatasetSamplesRequest {
       contentTypes?: string[];
       categories?: string[];
       topics?: string[];
+      /** Whose answer the Category was: 'library' for a library item's (HAT-1109). */
+      categoryFrom?: string | null;
     };
     pageData?: {
       pageTitle?: string | null;
@@ -2801,6 +2974,8 @@ export interface AdminContentBundleDefinition {
   itemLimit?: number;
   itemIds?: string[];
   curated?: boolean;
+  /** 'curator' = Curator's Choice (CCH-1). */
+  choice?: string | null;
   source: 'dynamic_curated' | 'manual';
   sections?: AdminContentBundleSectionDefinition[];
 }
@@ -2816,6 +2991,8 @@ export interface AdminContentBundleSectionDefinition {
   itemLimit?: number;
   itemIds?: string[];
   curated?: boolean;
+  /** 'curator' = Curator's Choice (CCH-1). */
+  choice?: string | null;
   links?: ContentBundleLinkItem[];
 }
 
@@ -2870,6 +3047,8 @@ export interface SetupGroupDefinition {
   itemIds?: string[];
   itemLimit?: number;
   curated?: boolean;
+  /** 'curator' = Curator's Choice (CCH-1). */
+  choice?: string | null;
   interestTags?: string[];
 }
 
@@ -2981,6 +3160,12 @@ export interface AdminContentLoaderManifestRecord {
   /** ISO date controlling when the record/relation becomes available (daily rotation). */
   availableAt?: string | null;
   published: boolean;
+  /**
+   * Curator's Choice (CCH-5): 'curator' marks the row recommended on create and on update, null
+   * clears it, left out leaves it. A created row is always curated: approving the import is the
+   * curator's check (HAT-1280, Q1).
+   */
+  choice?: 'curator' | null;
 }
 
 export type AdminContentLoaderAssetKind = 'banner_image' | 'published_attachment';
@@ -3548,6 +3733,8 @@ export interface AdminPublishedPackageRecord {
   blockContext?: Record<string, any> | null;
   visibilityCode?: number | null;
   curated?: boolean | null;
+  /** 'curator' = Curator's Choice (CCH-1). */
+  choice?: string | null;
   curationStatus?: string | null;
   publishType?: string | null;
   publishConfig?: Record<string, any> | null;
@@ -3724,6 +3911,32 @@ export interface AdminPublishedImportBatchSummary {
 
 export interface AdminPublishedImportBatchesResponse {
   batches: AdminPublishedImportBatchSummary[];
+}
+
+/** Ids and links from batch files, to learn which the catalog already holds. */
+export interface AdminPublishedIntakeSummaryRequest {
+  easyIds?: string[];
+  sourceItemIds?: string[];
+  urls?: string[];
+}
+
+/** Where one import batch's rows are on the way to curated. `batchId` null is every row with no batch. */
+export interface AdminPublishedIntakeBatch {
+  batchId: string | null;
+  batchLabel: string | null;
+  importedAt: string | null;
+  total: number;
+  notLive: number;
+  /** Not live, finished processing and not blocked: what Approve would publish. */
+  notLiveReady: number;
+  liveNotCurated: number;
+  curated: number;
+}
+
+export interface AdminPublishedIntakeSummaryResponse {
+  batches: AdminPublishedIntakeBatch[];
+  /** The requested ids and links that match a catalog row. */
+  inCatalog: {easyIds: string[]; sourceItemIds: string[]; urls: string[]};
 }
 
 export interface AdminPublishedApproveBatchRequest {
@@ -3973,8 +4186,14 @@ export type SiteStyleGenerateRequest = {
     url: string;
     title?: string;
     landmarks?: Array<{ role?: string; label?: string; tag?: string; textPreview?: string }>;
+    /** The live page, one element per line, for a page change (HAT-1232). */
+    outline?: string;
+    viewport?: string;
+    truncated?: boolean;
   };
   instructions?: string;
+  /** A parent's own request (HAT-1232), and the change already shown on the page if this one builds on it. */
+  pageChange?: { request: string; currentCss?: string };
 };
 
 export type SiteStyleGenerateResponse = {
@@ -3985,6 +4204,134 @@ export type SiteStyleGenerateResponse = {
   rationale?: string;
   issues: Array<{ selector: string; rule: string; detail: string }>;
   error?: string;
+  /** A page change: one sentence to the parent on what changed. */
+  summary?: string;
+  /** A page change CSS cannot make, and why. Set with no CSS. */
+  cannot?: string;
+};
+
+/** A page change (HAT-1232) as settings list it. */
+export type PageChangeView = {
+  ruleId: string;
+  site: string;
+  label: string;
+  request?: string;
+  /** Which of the site's pages it covers (HAT-1239). None: every page of `site`. */
+  pages?: { kind: 'page' | 'prefix'; address: string };
+  /** Who it is on for. Empty while it is off for everyone. */
+  userIds: string[];
+  createdAt: string;
+};
+
+export type PageChangeListRequest = Record<string, never>;
+export type PageChangeListResponse = { changes: PageChangeView[] };
+
+export type PageChangeSaveRequest = {
+  pageUrl: string;
+  css: string;
+  label: string;
+  request?: string;
+  userIds: string[];
+  /** Which of the site's pages, from `pageUrl` (HAT-1239): this page, pages like it, or every page (the default). */
+  pages?: 'page' | 'prefix' | 'site';
+};
+export type PageChangeSaveResponse = { ok: boolean; synced: boolean; syncError: string | null };
+
+export type PageChangeSetForRequest = { ruleId: string; userId: string; on: boolean };
+export type PageChangeSetForResponse = { ok: boolean; synced: boolean; syncError: string | null };
+
+export type PageChangeDeleteRequest = { ruleId: string };
+export type PageChangeDeleteResponse = { ok: boolean; syncError: string | null };
+
+/**
+ * The iPhone Save page's Change this page: recorded here, the browser opens its sheet over the page
+ * when it is back on it, and says `opened` once it has.
+ */
+export type PageChangeOpenOnPageRequest = { url: string; opened?: boolean };
+export type PageChangeOpenOnPageResponse = { ok: boolean };
+
+/**
+ * Open a page with Change this page started on it (HAT-1234): in the extension, a new tab with the
+ * panel on the page. `request` fills in what to change. The phones use `openOnPage` and their browser.
+ */
+export type PageChangeStartRequest = { url: string; request?: string };
+export type PageChangeStartResponse = { ok: boolean };
+
+/**
+ * The page changes on this page for whoever is signed in (HAT-1245), so the popup can say the page
+ * is changed and name how. A child reads these too: a name and where, never anything to change.
+ */
+export type PageChangeForPageRequest = { url: string };
+export type PageChangeForPageResponse = {
+  changes: Array<{ ruleId: string; site: string; label: string; pages?: { kind: 'page' | 'prefix'; address: string } }>;
+};
+
+/**
+ * Change a page with Kinbot (HAT-1239, PCR-4). `target` names the page the next Change a page
+ * conversation works on (the popup's ⋯ menu, Distraction filters, plain Kinbot); the rest are the
+ * list pinned in that conversation, by its session id.
+ */
+export type PageChangeTargetRequest = { url: string; tabId?: number | null; request?: string | null };
+export type PageChangeTargetResponse = { ok: boolean };
+
+export type PageChangeDraftChangeView = {
+  id: string;
+  label: string;
+  css: string;
+  pages: 'page' | 'prefix' | 'site';
+  found: number | null;
+  hides: boolean;
+  edited: boolean;
+  picked: boolean;
+};
+export type PageChangeDraftStepView = {
+  n: number;
+  at: number;
+  lines: Array<{ op: 'added' | 'changed' | 'removed'; id: string; label: string; found: number | null; hides: boolean }>;
+  kept: number;
+  /** Pictures of the page as data URLs, for the admin only. */
+  before: string | null;
+  after: string | null;
+};
+export type PageChangeDraftRequest = { sessionId: string };
+export type PageChangeDraftResponse = {
+  draft: {
+    url: string;
+    pages: { site: string; page: string; prefix: string | null } | null;
+    changes: PageChangeDraftChangeView[];
+    steps: PageChangeDraftStepView[];
+    saved: { count: number; names: string[]; at: number } | null;
+    /** A part the admin picked and asked Kinbot about, by its name, until Kinbot acts on it. */
+    picked: { name: string } | null;
+  } | null;
+};
+/** The admin's own edit in the list: a change's pages, its CSS, its name, or Remove; with no `id`, a change they wrote (a name and CSS). */
+export type PageChangeDraftEditRequest = {
+  sessionId: string;
+  edit: { id?: string; css?: string; label?: string; pages?: 'page' | 'prefix' | 'site'; remove?: boolean };
+};
+export type PageChangeDraftEditResponse = { ok: boolean; error?: string };
+export type PageChangeDraftSaveRequest = { sessionId: string; userIds: string[]; names: string[] };
+export type PageChangeDraftSaveResponse = { ok: boolean; saved: number; synced: boolean; error?: string };
+/** Pick on the page (PCR-3): the picker on the page's tab, adding to this list. `canAsk` offers Ask Kinbot about this. */
+export type PageChangeDraftPickRequest = { sessionId: string; canAsk?: boolean };
+export type PageChangeDraftPickResponse = { ok: boolean };
+/** From the page script: what was done with a picked part. The page is the sender's tab. */
+export type PageChangePickedRequest = {
+  sessionId?: string | null;
+  action: 'hide' | 'hideAll' | 'ask' | 'cancel';
+  label?: string;
+  css?: string;
+  part?: { name: string; selector: string; likeSelector: string | null; likeCount: number; text: string } | null;
+};
+export type PageChangePickedResponse = { ok: boolean; openPanel?: { session: string }; error?: string };
+export type PageChangeDraftShowRequest = { sessionId: string };
+export type PageChangeDraftShowResponse = { ok: boolean };
+
+/** Who a page change can be for, for the iPhone's sheet: children first, the person asking as `you`. */
+export type PageChangePeopleRequest = Record<string, never>;
+export type PageChangePeopleResponse = {
+  people: Array<{ id: string; name: string; child: boolean; you: boolean }>;
 };
 
 export type SiteStyleForUrlRequest = { url: string };
@@ -4810,6 +5157,11 @@ export interface SaveItemResponse {
   itemId: string;
   encInfo?: any;
   feedback?: ItemFeedbackView;
+  /**
+   * The item's `updatedAt` on the server after this save, so a device that saves first can check
+   * its next edit against the server's version and not its own clock (offline saves, OFS-14).
+   */
+  updatedAt?: string;
 }
 
 export interface ListPermissionsAndReactionsResponse {
@@ -5654,6 +6006,8 @@ export interface CurationProposalView {
   recommendCurated: boolean;
   /** The AI suggests taking the item out of the catalog; a proposal of its own, with no changes (HAT-623). */
   recommendRemoval: boolean;
+  /** The AI recommends Curator's Choice (CCH-4). */
+  recommendChoice?: boolean;
   /** The name of the key that proposed it. */
   proposedBy: string | null;
   createdAt: string;
@@ -5679,6 +6033,8 @@ export interface CurationProposalItemNow {
   feeds: AdminContentLoaderManifestFeed[];
   url: string | null;
   curated: boolean;
+  /** 'curator' = Curator's Choice (CCH-1). */
+  choice?: string | null;
   /** Kindredly's own row. A family's suggestion keeps the family's name and description. */
   official: boolean;
 }
@@ -5694,6 +6050,8 @@ export interface CurationProposalApplyRequest {
   proposalId: string;
   /** Also mark the item curated, as the curation page's Mark curated does. */
   markCurated?: boolean;
+  /** Also make it Curator's Choice; implies markCurated (CCH-4). */
+  makeChoice?: boolean;
   /**
    * The proposal as the curator edited it under Proposed changes (HAT-625). A field left out is not
    * applied. Only the proposal's own fields; a feed must be one it proposed or the item has, and the
@@ -5708,6 +6066,8 @@ export interface CurationProposalApplyResponse {
   /** Fields the item would not take, with the reason. */
   skipped: {field: string; reason: string}[];
   markedCurated: boolean;
+  /** The item was also made Curator's Choice (CCH-4). */
+  madeChoice?: boolean;
 }
 
 /** One MCP message (JSON-RPC 2.0). A message with no id is a notification and gets no reply. */
@@ -5729,7 +6089,11 @@ export interface McpJsonRpcResponse {
 export interface AgentKeyView {
   _id: string;
   label: string;
-  scope: 'curation-propose';
+  /**
+   * 'curation-propose': the curation MCP endpoint; 'classifier-synth': synthetic pages for the classifier (CLS-9);
+   * 'classifier-versions': save, score and activate classifier versions (HAT-1111).
+   */
+  scope: 'curation-propose' | 'classifier-synth' | 'classifier-versions';
   createdAt: string;
   lastUsedAt: string | null;
   revokedAt: string | null;
@@ -5763,6 +6127,8 @@ export interface McpRelayConnectionView {
   mine: boolean;
   /** The version the AI app gave when it last started a session (AIM-10); absent until it has. */
   appVersion?: string;
+  /** The name it gave then, like `claude-ai` or `claude-code` (HAT-1071); absent until it has. */
+  appName?: string;
 }
 
 /**
@@ -5788,31 +6154,30 @@ export function readMcpRelayRouting(value: unknown): McpRelayRouting {
 }
 
 /**
- * How long an adult's Agree lasts for one AI app (HAT-880, HAT-1000), chosen on the ask or in Settings.
- * `connect`: the AI app connects without asking, as with `askFirst` off, for this AI app only.
- * `add`: what it adds to the library runs without asking, up to 2 hours.
- * `edit`: its edits to the library run without asking, up to 15 minutes. Removing always asks, and
- * so do parental changes and anything that reaches a child.
- * Each AI app and kind is its own user pref of the adult's (`mcpRelayAgreedUntilPrefKey`), an ISO
- * time, so a save is one write and two saves never overwrite each other. The relay reads `connect`
- * on every call; the answering Kindredly reads `add` and `edit` before asking.
+ * How long an adult trusts one AI app (HAT-1360), chosen on the ask or in Settings: until then it
+ * connects without asking, as with `askFirst` off, and everything it changes runs without asking:
+ * the library, tasks and family settings, and reading a child's activity. What is refused stays
+ * refused. Disconnect ends it.
+ * Each AI app's time is its own user pref of the adult's (`mcpRelayAgreedUntilPrefKey`), an ISO
+ * time, so a save is one write and two saves never overwrite each other. The relay reads it on
+ * every call; the answering Kindredly reads it before asking.
  */
-export const MCP_RELAY_AGREE_PERIODS = ['2h', '24h', 'week', 'month', 'year'] as const;
-/** The times Agree may cover adding (HAT-1000): short, since an AI app can add a lot in an hour. */
-export const MCP_RELAY_ADD_PERIODS = ['15m', '2h'] as const;
-export const MCP_RELAY_EDIT_PERIODS = ['15m'] as const;
-export type McpRelayAgreePeriod = (typeof MCP_RELAY_AGREE_PERIODS)[number] | (typeof MCP_RELAY_ADD_PERIODS)[number];
-export const MCP_RELAY_AGREED_KINDS = ['connect', 'add', 'edit'] as const;
+export const MCP_RELAY_TRUST_PERIODS = ['15m', '2h', '24h', 'week', 'month'] as const;
+export type McpRelayAgreePeriod = (typeof MCP_RELAY_TRUST_PERIODS)[number];
+export const MCP_RELAY_AGREED_KINDS = ['trust'] as const;
 export type McpRelayAgreedKind = (typeof MCP_RELAY_AGREED_KINDS)[number];
 /**
- * HAT-880's one `changes` time, which covered adding, editing and archiving for up to a year. No
- * longer read (HAT-1000): the adult is asked again. Kept so removing an AI app clears it.
+ * Times no longer read, kept so removing an AI app clears them: HAT-880's `changes` (adding,
+ * editing and archiving, up to a year), HAT-1000's separate `add` and `edit`, and HAT-1163's
+ * `connect` (up to a year) and `library` (up to 2 hours), which HAT-1360 made one `trust` time.
+ * Anyone who agreed to one is asked again.
  */
-export const MCP_RELAY_RETIRED_AGREED_KIND = 'changes';
+export const MCP_RELAY_RETIRED_AGREED_KINDS = ['changes', 'add', 'edit', 'connect', 'library'] as const;
+export type McpRelayRetiredAgreedKind = (typeof MCP_RELAY_RETIRED_AGREED_KINDS)[number];
 
 export function mcpRelayAgreedUntilPrefKey(
   connectionId: string,
-  kind: McpRelayAgreedKind | typeof MCP_RELAY_RETIRED_AGREED_KIND,
+  kind: McpRelayAgreedKind | McpRelayRetiredAgreedKind,
 ): string {
   return `connectedAiApps.agreedUntil.${connectionId}.${kind}`;
 }
@@ -5825,29 +6190,24 @@ const AGREE_PERIOD_MS: Record<McpRelayAgreePeriod, number> = {
   '24h': 24 * HOUR_MS,
   week: 7 * 24 * HOUR_MS,
   month: 30 * 24 * HOUR_MS,
-  year: 365 * 24 * HOUR_MS,
 };
 
 /**
- * The longest a saved time may run for each kind, slack included: the time was worked out on the
- * saving device's clock, which can differ from this one's.
+ * The longest a saved time may run, slack included: the time was worked out on the saving device's
+ * clock, which can differ from this one's.
  */
-const LONGEST_AGREED_MS: Record<McpRelayAgreedKind, number> = {
-  connect: AGREE_PERIOD_MS.year + 24 * HOUR_MS,
-  add: AGREE_PERIOD_MS['2h'] + HOUR_MS,
-  edit: AGREE_PERIOD_MS['15m'] + HOUR_MS,
-};
+const LONGEST_AGREED_MS = AGREE_PERIOD_MS.month + 24 * HOUR_MS;
 
 /** The value to save for `period` from now: when it ends, as an ISO time. */
 export function mcpRelayAgreedUntilValue(period: McpRelayAgreePeriod, now = Date.now()): string {
   return new Date(now + AGREE_PERIOD_MS[period]).toISOString();
 }
 
-/** Until when (ms) a saved value lets the AI app connect, add or edit without asking, or null when it must ask. */
-export function readMcpRelayAgreedUntil(value: unknown, now = Date.now(), kind: McpRelayAgreedKind = 'connect'): number | null {
+/** Until when (ms) a saved value lets the AI app connect and change things without asking, or null when it must ask. */
+export function readMcpRelayAgreedUntil(value: unknown, now = Date.now()): number | null {
   const until = typeof value === 'string' ? Date.parse(value) : NaN;
   // Never past the longest choice, so an edited pref cannot make it last for ever.
-  return Number.isFinite(until) && until > now && until <= now + LONGEST_AGREED_MS[kind] ? until : null;
+  return Number.isFinite(until) && until > now && until <= now + LONGEST_AGREED_MS ? until : null;
 }
 
 /** A connected AI app as one Kindredly sees it: answering here, or asking for Agree (HAT-814). */
@@ -5857,6 +6217,18 @@ export interface McpRelaySessionView {
   state: 'here' | 'asking';
   /** While `here`: when the session ends if the AI app makes no call before then. */
   until: string | null;
+  /**
+   * Who is asking (HAT-1071): what the AI app said it is when it last started a session, like
+   * `{name: 'claude-ai'}` for a Claude chat; absent until it has. Absent from a server older than
+   * 2026-11-09, as are the next three.
+   */
+  app?: {name?: string; version?: string; title?: string};
+  /** How the connection was made: the AI app's sign-in, a token, or a pairing code (end-to-end encrypted). */
+  madeBy?: 'signIn' | 'token' | 'paired';
+  /** When the connection was made. */
+  createdAt?: string;
+  /** While `asking`: the tool the call waiting for Agree is for. Never on an end-to-end encrypted one. */
+  wantsTool?: string;
 }
 
 /** One call, sent down the answering device's stream as the `mcpRelayFrame` event. */
@@ -5877,6 +6249,17 @@ export interface McpRelayFrame {
   clientName?: string;
   /** The version the AI app gave in `initialize` (AIM-1). Absent from a server older than 2026-11-02. */
   clientVersion?: string;
+  /**
+   * This call is the one the adult agreed to on the bar's ask, which named its tool (HAT-1360): a
+   * library change it makes needs no second ask. Absent from a server older than 2026-11-25.
+   */
+  agreedOnAsk?: boolean;
+  /**
+   * How long the server still waits for this call's answer, in ms (HAT-1360): an ask on the device
+   * ends before then, so an Agree after it is kept for the AI app's next call instead of running a
+   * change nobody hears about. Absent from a server older than 2026-11-25.
+   */
+  msLeft?: number;
 }
 
 /**
@@ -6205,19 +6588,223 @@ export type FilePiecesReadRequest = { readId: string; offset: number; length: nu
 export type FilePiecesReadResponse = { data: string };
 export type FilePiecesCloseRequest = { readId?: string; uploadId?: string };
 
-/**
- * A project (AIM-13): the display name and note of a `project:` tag. The tag on each item never
- * changes; renaming changes only this record.
- */
-export interface ProjectView {
-  tag: string;
-  name: string;
-  note?: string;
-  createdAt: string;
+// ---------------------------------------------------------------------------
+// Projects (HAT-1064, PRJ-6): an adult's request for help getting started on something, made into
+// an outline of parts and each part filled with Kindredly AI. Plus only, adults only, metered; nothing
+// is saved on the server. Every link an item carries came from the library, Kindredly's catalog, a
+// lookup, or a page fetch that worked; what could not be confirmed is left out and named in
+// `warnings`. Limits: tset-sharedlib/src/project-generation.ts.
+// ---------------------------------------------------------------------------
+
+/** The three questions asked before an outline: where they start, their time, what they want at the end. */
+export type ProjectAnswers = { start?: string; time?: string; goal?: string }
+/** An item from the person's own library, sent from the device only with their library consent. */
+export type ProjectLibraryCandidate = { itemId: string; title: string; url?: string; subType?: string }
+/** One part: a sub-collection. A dashboard, not a lesson: no order unless `inOrder`. */
+export type ProjectOutlinePart = { name: string; why: string; inOrder: boolean }
+export type ProjectOutline = { title: string; goal: string; pace: string; parts: ProjectOutlinePart[] }
+export type ProjectDraftItemKind = 'read' | 'watch' | 'listen' | 'follow' | 'do' | 'talk'
+export type ProjectDraftItem = {
+  kind: ProjectDraftItemKind
+  title: string
+  why: string
+  origin: 'library' | 'catalog' | 'web' | 'ai'   // 'ai' only for kind 'do' and 'talk' (no link)
+  by?: string; time?: string
+  url?: string            // confirmed link (web), or the catalog/library item's url
+  itemId?: string         // origin 'library'
+  publishId?: string      // origin 'catalog'
+  feedUrl?: string        // kind 'follow' (podcast/news feed), confirmed by checkFeedLink
+  prompt?: string         // kind 'talk': the question to start a Kinbot conversation with
 }
-export type ProjectListRequest = { refresh?: boolean };
-export type ProjectListResponse = { projects: ProjectView[] };
-export type ProjectCreateRequest = { name: string };
-export type ProjectRenameRequest = { tag: string; name: string };
-export type ProjectSetNoteRequest = { tag: string; note: string };
-export type ProjectResponse = { project: ProjectView };
+export interface ProjectOutlineRequest { request: string; answers?: ProjectAnswers; libraryCandidates?: ProjectLibraryCandidate[] }
+/** Either an outline of 3–6 parts, or exactly one `question` when the request is too vague to plan. */
+export interface ProjectOutlineResponse { outline?: ProjectOutline; question?: string; warnings: string[] }
+export interface ProjectFillPartRequest {
+  request: string; answers?: ProjectAnswers; outline: ProjectOutline; partIndex: number; libraryCandidates?: ProjectLibraryCandidate[]
+  /** Titles already in the project's other parts, so this part doesn't repeat them. Optional; up to 60. */
+  otherItems?: string[]
+}
+export interface ProjectFillPartResponse {
+  items: ProjectDraftItem[]; warnings: string[]
+  /** How many suggestions were left out because nothing confirmed their link; each is also named in `warnings`. */
+  leftOut: number
+}
+/** The part as it stands (`items`) and the adult's words (`instruction`); the answer is the whole part, changed. */
+export interface ProjectChangePartRequest extends ProjectFillPartRequest { items: ProjectDraftItem[]; instruction: string }
+export type ProjectChangePartResponse = ProjectFillPartResponse
+
+// ---------------------------------------------------------------------------
+// Classifier versions (CLS-3, CLS-4): saved on the server, one active at a time, sent to apps
+// without a release. The document itself is `ClassifierVersion` in classifiers/classifierVersion.ts.
+// ---------------------------------------------------------------------------
+
+/** The version apps should use. `hash` is the sha256 hex of `JSON.stringify(version)`. */
+export type ClassifierActiveVersion = { id: string; hash: string; schema: number; textModel: string }
+
+/** One version as the admin list shows it. The bundled 'v1' is in the list with `bundled: true`. */
+export type ClassifierVersionSummary = {
+  id: string
+  parent: string | null
+  schema: number
+  textModel: string
+  notes: string
+  hash: string
+  createdBy: string | null
+  createdAt: string
+  bundled: boolean
+  active: boolean
+}
+
+/** One row of the activation log: who made which version active, when, and why. */
+export type ClassifierActivationRecord = {
+  id: number
+  versionId: string
+  activatedBy: string | null
+  reason: string | null
+  activatedAt: string
+}
+
+// ---------------------------------------------------------------------------
+// Classifier scorecards (CLS-7): how a version did on a dataset. The browser sends only its answer
+// for each page; the server reads the gold labels and works out the totals.
+// ---------------------------------------------------------------------------
+
+/** The classifier's answer for one page of a dataset. `predicted: null` = it gave no answer. */
+/**
+ * One page's answer. `topics` (CLS-11): the Topics tree topics the app would count the page under,
+ * best first; [] when it would count none. Left out when the browser could not answer topics.
+ */
+export type ClassifierScorecardAnswer = { sampleId: number; predicted: string | null; topics?: string[] }
+
+/**
+ * Topic scores over the pages with gold topics (CLS-11). `topRight`: the share whose first topic is
+ * one of the page's gold topics; `anyRight`: whose topics include one; `none`: given no topic.
+ * `perTopic`: each gold topic, how many pages have it, and the share of those whose topics include
+ * it. `wrongSampleIds`: the pages whose first topic is not a gold one.
+ */
+export type ClassifierTopicMetrics = {
+  pages: number
+  topRight: number
+  anyRight: number
+  none: number
+  perTopic: Array<{ topicId: string; pages: number; found: number }>
+  wrongSampleIds: number[]
+}
+
+/**
+ * `computeMetrics` over every labelled page of the dataset (an unanswered page counts as no
+ * answer), plus: `unknownRate`, the share of labelled pages answered 'eduval_unknown', null or not
+ * at all; `wrongSampleIds`, the labelled pages whose answer is not the gold label; `labelled`, how
+ * many labelled pages there are.
+ */
+export type ClassifierScorecardMetrics = Omit<ScoreResult, 'predictions'> & {
+  unknownRate: number
+  wrongSampleIds: number[]
+  labelled: number
+  /** Only when the answers carried topics and some page has gold topics (CLS-11). */
+  topics?: ClassifierTopicMetrics
+}
+
+/** One saved scorecard. `current` is false once the dataset's pages or labels have changed since. */
+export type ClassifierScorecardRecord = {
+  id: number
+  versionId: string
+  datasetId: string
+  datasetSignature: string
+  current: boolean
+  metrics: ClassifierScorecardMetrics
+  createdBy: string | null
+  createdAt: string
+  /** Only when the list was asked for `includeAnswers`. */
+  answers?: ClassifierScorecardAnswer[]
+}
+
+/**
+ * A labelling prompt that has been in use (CLS-5). `hash` is what each AI label made with it
+ * records as `promptHash`; `savedAt` is null for the prompt that was in use before history began.
+ */
+export type LabelingPromptHistoryEntry = { hash: string; prompt: string; isDefault: boolean; savedAt: string | null }
+
+/**
+ * One cell of the weak spots grid (CLS-10): the test pages of one Category and kind of page, on a
+ * version's current test-set score. `right` is the share answered right; `answeredInstead` the
+ * wrong answers, most first (null: no answer). `trainingPages` counts the training and hard-case
+ * pages of the same Category and kind, `syntheticPages` how many of those are synthetic.
+ */
+export type ClassifierWeakSpotCell = {
+  category: string
+  kind: string
+  testPages: number
+  right: number | null
+  answeredInstead: Array<{ label: string | null; pages: number }>
+  trainingPages: number
+  syntheticPages: number
+}
+
+/** One topic's row (CLS-10): its test pages with the topic, the share found, and training pages with it. */
+export type ClassifierWeakSpotTopic = { topicId: string; testPages: number; found: number | null; trainingPages: number }
+
+/**
+ * The weak spots of a version. `datasetId` is null when it has no current test-set score.
+ * `topicsScored` is false when no current score of that set was taken with topics (the browser
+ * that scored it couldn't answer them), so an empty `topics` then says nothing about the pages.
+ */
+export type ClassifierWeakSpots = {
+  versionId: string
+  datasetId: string | null
+  scoredAt: string | null
+  cells: ClassifierWeakSpotCell[]
+  topics: ClassifierWeakSpotTopic[]
+  topicsScored: boolean
+}
+
+/**
+ * What synthetic pages to write (CLS-10), made by an admin from a weak spot. It describes the cell,
+ * never a test page, so nothing written from it can copy one. Open until an admin closes it.
+ */
+export type ClassifierRecipe = {
+  id: number
+  category: string
+  kind: string
+  topicId: string | null
+  notes: string
+  pages: number
+  status: 'open' | 'closed'
+  createdBy: string | null
+  createdAt: string
+  /** Batches sent for it. */
+  batches: number
+}
+
+/** A batch of synthetic pages an AI sent for the classifier (CLS-9). */
+export type ClassifierSynthBatch = {
+  id: number
+  /** The batch's own dataset (role 'synthetic'). */
+  datasetId: string
+  keyLabel: string | null
+  /** The Category the pages were written for. */
+  category: string
+  kind: string
+  notes: string | null
+  /** The recipe it was written from (CLS-10), if any. */
+  recipeId?: number | null
+  status: 'labelling' | 'ready' | 'failed' | 'accepted' | 'dropped'
+  /** `agree`: pages the blind relabel gave `category`; `kept`: pages copied into a training set. */
+  counts: { pages: number; agree: number; disagree: number; unlabelled: number; kept?: number }
+  decisionReason: string | null
+  intoDatasetId: string | null
+  createdAt: string
+  decidedAt: string | null
+}
+
+/** One synthetic page and what the blind relabel said (null: no label). */
+export type ClassifierSynthPage = {
+  sampleId: number
+  title: string
+  description: string
+  text: string
+  blindLabel: string | null
+  /** The topics the blind relabel gave (CLS-11); kept with the page when it is accepted. */
+  blindTopics?: string[]
+}
+

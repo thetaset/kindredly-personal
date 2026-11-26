@@ -10,6 +10,7 @@ import PermissionService from '@/services/permission.service';
 import ItemListService from '@/services/item.list.service';
 import ItemRelationService from '@/services/item.relations';
 import ChangeLogService from '@/services/change_log.service';
+import {SyncType} from '@/db/user_changelog.repo';
 import ItemQueryService from '@/services/item.query.service';
 import ItemMergeService from '@/services/item.merge.service';
 import {RefStateRepo} from '@/db/ref_state.repo';
@@ -294,6 +295,12 @@ class ItemRoute implements Routes {
       errorHelper(async (req: ApiReq<'/item/delete'>, res) => {
         const ctx = RequestContext.instance(req);
         const item = await ctx.getItemById(req.body.itemId);
+        if (!item && req.body.itemId) {
+          // Already gone: deleted on another device, or this delete sent again after its first
+          // answer was lost (OFS-3). Nothing to delete or log; deleteItem answers the same.
+          res.json({success: true, results: true});
+          return;
+        }
         const actingUserId = ctx.getActingUserId() || ctx.currentUserId;
         const isOwner = !!item && !!actingUserId && item.userId === actingUserId;
 
@@ -384,11 +391,14 @@ class ItemRoute implements Routes {
       authenticateJWT,
       errorHelper(async (req: ApiReq<'/item/update'>, res) => {
         const ctx = RequestContext.instance(req);
-        const {itemId, data, allowDecrypt, skipEncUpdate} = req.body;
+        const {itemId, data, allowDecrypt, skipEncUpdate, ifUpdatedAt, nudge} = req.body;
 
         const results = await this.itemService.updateItem(ctx, itemId, data, {
           allowDecrypt: allowDecrypt == true,
           skipEncUpdate: skipEncUpdate == true,
+          ifUpdatedAt,
+          // Only an explicit false: a note's text upload follows and nudges (SYNC-15).
+          nudge: nudge !== false,
         });
 
         // No changelog call here: updateItem logs it, through the same wider
@@ -492,7 +502,9 @@ class ItemRoute implements Routes {
           req.body.existingFileId,
         );
 
-        await this.changeLogService.logItemChange(ctx, itemId);
+        // `nudge: false` when the request that follows nudges: a note's `/item/update` after its
+        // text, or `page0.md` after the history page. The row is written either way (SYNC-15).
+        await this.changeLogService.logItemChange(ctx, itemId, SyncType.itemUpdate, {nudge: req.body.nudge !== false});
         res.json({success: true, results});
       }),
     );
@@ -537,13 +549,20 @@ class ItemRoute implements Routes {
       '/item/feedback/value/update',
       authenticateJWT,
       errorHelper(async (req: ApiReq<'/item/feedback/value/update'>, res) => {
+        const ctx = RequestContext.instance(req);
         const results = await this.itemService.updateItemFeedbackValue(
-          RequestContext.instance(req),
+          ctx,
           req.body.itemId,
           req.body.attr,
           req.body.value,
         );
-        await this.changeLogService.logItemChange(RequestContext.instance(req), req.body.itemId);
+        // Feedback is per person: an item is read with the reader's own feedback row only
+        // (item.list.service.ts joins item_feedback on the target user), so nobody else's copy
+        // changed. Journalled for everyone who could see the item, each of them pulled an item
+        // identical to the one they had. The person's own row still reaches their other devices,
+        // and a guardian's copy of a child's library, which syncs from the child's rows. Other
+        // people's hearts are read fresh from /item/reactions/list when a page opens. SYNC-14.
+        await this.changeLogService.logItemChangeForUserIds([ctx.currentUserId], [req.body.itemId]);
 
         const result = {
           success: true,
@@ -980,6 +999,7 @@ class ItemRoute implements Routes {
           getTargetUserId(req),
           req.body.details,
           req.body.options,
+          req.body.newItemId,
         );
         res.json({
           success: true,

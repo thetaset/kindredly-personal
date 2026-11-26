@@ -86,6 +86,12 @@ export const userPrefDefaults = {
         email: false,
         push: false,
       },
+      // A child asked for a Helper AI helper (HAT-1105). Push on: the child is waiting on an
+      // answer, and it is at most five a day. Never emailed.
+      HELPER_REQUEST: {
+        email: false,
+        push: true,
+      },
       // Family Downtime started, on an admin's phone (HAT-380). Push only: an email
       // would still be in the inbox long after downtime ended.
       FAMILY_DOWNTIME: {

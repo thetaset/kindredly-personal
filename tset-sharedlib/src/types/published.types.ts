@@ -49,6 +49,8 @@ export interface PublishedStatsView {
 
 export interface PublishedCurationView {
   curated?: boolean;
+  /** 'curator' = Curator's Choice; null or absent = in the catalog only (CCH-1). */
+  choice?: string | null;
   curationStatus?: string;
   curatedDate?: DateString;
   curatorId?: string;
@@ -200,9 +202,9 @@ export type SubscriptionConsumeSettingsV1 = {
   paceItemsPerDay?: number;
   workThrough?: SubscriptionWorkThroughProgressV1;
   /**
-   * Whether Today's "New from your sources" card may mention this subscription.
-   * Absent means yes; the card is the only surface that announces new items, and
-   * this is the per-source way to keep one quiet.
+   * Nothing reads or writes this. It was whether Today's "New from your sources" card
+   * mentioned this subscription; Today was retired (HAT-1084), and saved subscriptions
+   * still hold it, which a save's `...consumeSettings` carries forward.
    */
   announceNew?: boolean;
   /**

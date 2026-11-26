@@ -81,6 +81,11 @@ export default interface Published {
   easyId?: string | null;
 
   curated?: boolean | null;
+  /**
+   * Curator's Choice (CCH-1): 'curator' when Kindredly recommends the item, null when it is only in
+   * the catalog. `curated` stays the visibility gate; only updateCurationStatus writes this.
+   */
+  choice?: string | null;
 
   curatorId?: string | null;
 

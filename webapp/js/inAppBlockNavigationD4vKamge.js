@@ -1,0 +1,1 @@
+const p="kindredlyInAppNavigate",i=new Set(["in-app","in-app-audio"]);function a(n){return typeof n=="string"&&i.has(n)}function e(n){const t=typeof n=="string"?n.indexOf("#/"):-1;return t>=0?n.slice(t+1):null}export{p as I,e as a,a as i};

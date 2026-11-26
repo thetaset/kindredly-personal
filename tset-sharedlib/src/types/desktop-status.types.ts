@@ -220,6 +220,11 @@ export type DesktopStatus = {
     rulesCount?: number;
     blockedAppsCount?: number;
     /**
+     * The Browsers setting in force here (HAT-1348), so the window counts Browser lockdown as missing
+     * only where a guardian chose Locked down. Absent on older builds and while nothing is linked.
+     */
+    browsersLevel?: 'any' | 'withKindredly' | 'lockedDown';
+    /**
      * Whether this computer can reach Kindredly (CMP-56). The last check-in's and the last settings
      * fetch's error ('' while they work), and when the current run of failures began (epoch ms, 0
      * while they work), so the window can say "Can't reach Kindredly since 9:40". After a wake both

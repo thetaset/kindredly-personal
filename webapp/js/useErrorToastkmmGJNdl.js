@@ -1,0 +1,1 @@
+import{B as a,D as t}from"./appHandoffGuestD3H_h1r5.js";import{a0 as i,w as e}from"./vue-runtimeCY_KIElv.js";function m(o){if(!i(o)){console.warn("useErrorToast: errorMessage must be a ref");return}e(o,(r,s)=>{r&&r!==s&&!a(r)&&t(r,{title:"Error",variant:"danger",solid:!0})})}export{m as u};

@@ -1,1 +1,0 @@
-import{f as r,h as i}from"./appHandoffGuestDd1k1hMt.js";import{c as s}from"./kindredapp233M96nJ.js";import{b7 as o,a as t}from"./appLifecycle.storeBsQj5XV4.js";import{r as n}from"./freshSignInBAHzCFz2.js";function a(){var e;return{userType:(e=t.currentUser)==null?void 0:e.type,isDeveloperMode:o(),isAdvancedMode:i(),canAccess:r,canSeeFriends:s()}}n(a);

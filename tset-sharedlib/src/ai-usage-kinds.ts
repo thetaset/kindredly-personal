@@ -27,6 +27,10 @@ export const AI_USAGE_KIND_ORDER: readonly AiUsageKind[] = [
 const FEATURE_KIND: Readonly<Record<string, AiUsageKind>> = {
   // AI Chat, the command bar and the agent's tool loop.
   chatStream: 'assistant',
+  // A Helper AI chat turn (HAT-1105), metered apart for its output cap, counted with Kinbot's.
+  'chatStream.helper': 'assistant',
+  // Helper AI's topic check before each of a child's messages (HAI-3), counted with its chat.
+  helperTopicCheck: 'assistant',
   'aitask.agentInteraction': 'assistant',
   'aitask.stream.agentInteraction': 'assistant',
   // Suggestions, extraction and the other one-shot helpers across the app.
@@ -34,11 +38,17 @@ const FEATURE_KIND: Readonly<Record<string, AiUsageKind>> = {
   'aitask.accessRequestReview': 'requestReview',
   'aitask.lessonGenLesson': 'lessons',
   'aitask.lessonCheck': 'lessons',
+  'aitask.lessonSourceArticles': 'lessons',
   'aitask.lessonGradeAnswer': 'lessons',
   // Learning tracks: planning, writing and checking items (TRK-17).
   'aitask.trackSyllabus': 'tracks',
   'aitask.trackWrite': 'tracks',
   'aitask.trackImprove': 'tracks',
+  // Projects filled with AI (HAT-1064, PRJ-6): an AI tool, counted with the others until the AI
+  // Usage page has a row of its own for them.
+  'aitask.projectOutline': 'tools',
+  'aitask.projectFill': 'tools',
+  'aitask.projectChange': 'tools',
   // The feed builder's chat, which plans and edits a feed with the parent (HAT-757).
   'chatStream.feedBuilder': 'tracks',
   // Lesson Builder's chat, which writes and edits a lesson with the parent (HAT-762).

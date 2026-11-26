@@ -1,6 +1,6 @@
 {
   "id": "23-block-all-cancels-pause",
-  "behaviour": "While \"Block all access\" is on there is no pause, as in the browser, which checks it first. The device cannot block everything yet, so it keeps the ordinary blocks rather than lifting them.",
+  "behaviour": "While \"Block all access\" is on there is no pause, as in the browser, which checks it first. Block all closes the game and, on a phone, the other browser (CMP-118).",
   "clock": {
     "nowMs": 1789491600000,
     "familyTimeZone": "America/Los_Angeles",
@@ -91,15 +91,31 @@
     {
       "pkg": "com.roblox.client",
       "action": "block",
-      "reason": "budget-exhausted",
-      "ruleId": "r-fun"
+      "reason": "block-all",
+      "ruleId": null
     },
     {
       "pkg": "com.android.chrome",
       "action": "block",
-      "reason": "app-blocked",
+      "reason": "block-all",
       "ruleId": null
     }
   ],
-  "browserNotApplicable": "Device-only here: the browser lifts a pause where it enforces, through getRestrictionEffectiveStatus in the client's restrictionState.ts, tested in restrictionState.test.ts. This case pins the phone to the same reading."
+  "browserNotApplicable": "Device-only here: the browser lifts a pause where it enforces, through getRestrictionEffectiveStatus in the client's restrictionState.ts, tested in restrictionState.test.ts. This case pins the phone to the same reading.",
+  "expectDeviceByPlatform": {
+    "macos": [
+      {
+        "pkg": "com.roblox.client",
+        "action": "block",
+        "reason": "block-all",
+        "ruleId": null
+      },
+      {
+        "pkg": "com.android.chrome",
+        "action": "allow",
+        "reason": null,
+        "ruleId": null
+      }
+    ]
+  }
 }

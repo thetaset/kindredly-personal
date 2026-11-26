@@ -1,0 +1,1 @@
+import{S as s}from"./appHandoffGuestD3H_h1r5.js";import{s as a}from"./freshSignInCbwIUx06.js";import{e as t}from"./SearchHistoryStoreDhj1YF5I.js";const e=[...s],m=e.map(o=>`^https?:\\/\\/([^\\/?#]*\\.)?${t(o)}(?:[\\/:?#]|$).*`);function p(o){return a(o)!==null}export{e as S,m as a,p as i};

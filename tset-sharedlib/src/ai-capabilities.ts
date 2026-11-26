@@ -89,10 +89,10 @@ export const AI_CAPABILITIES: AICapability[] = [
   {
     id: 'thing-extract',
     label: 'Extract things from a page',
-    description: 'Identify the films, shows, or books a page is about.',
+    description: 'Find the dates on a page, and the films, books, places and other things it is about.',
     defaultChain: [HOSTED_DEFAULT],
     fit: 'good',
-    fitNote: 'Structured and capped at three results, with a parser that drops bad rows.',
+    fitNote: 'Structured and capped at six dates and six things, with a parser that drops bad rows and past dates.',
     inputBudgetChars: 16_000,
     // The hosted budget is a real context load for a 2-3B model; precision holds
     // at a quarter of it.

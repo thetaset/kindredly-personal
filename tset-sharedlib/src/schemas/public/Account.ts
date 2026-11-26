@@ -1,5 +1,6 @@
 import type { AssistantReviewConfig } from '../../restrictions/assistantReview';
 import type { FamilyDowntimeSettings } from '../../restrictions/familyDowntime';
+import type { SchoolDaysSettings } from '../../restrictions/schoolDays';
 import type { FamilyAiSetting } from '../../family-ai';
 import type { OwnAiStored } from '../../own-ai';
 
@@ -36,6 +37,14 @@ export interface AccountOptions {
    * it, except `dismissals`, which is withheld from non-admins.
    */
   familyDowntime?: FamilyDowntimeSettings | null;
+
+  /**
+   * School days (HAT-1283, `restrictions/schoolDays.ts`): the family's school week and its breaks and
+   * days off, one for every child. Admin-write through `updateAccountOptions`, which normalizes it and
+   * raises every member's device settings version. Readable by every member, since each device works
+   * out from it which schedule applies today.
+   */
+  schoolDays?: SchoolDaysSettings | null;
 
   /**
    * The family AI setting (PLN-3, `family-ai.ts`): Off, Private AI only or On. Absent reads as Off,

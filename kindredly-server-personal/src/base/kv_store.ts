@@ -46,6 +46,7 @@ export interface KvPipeline {
   expire(key: string, seconds: number): this;
   exists(key: string): this;
   del(...keys: string[]): this;
+  sadd(key: string, ...members: string[]): this;
   srem(key: string, ...members: string[]): this;
   set(key: string, value: string, mode: 'EX', seconds: number): this;
   exec(): Promise<[Error | null, unknown][] | null>;

@@ -39,6 +39,7 @@ import PostRoute from './routes/post.route';
 import SubscriptionRoute from './routes/subscription.route';
 import SyncRoute from './routes/sync.route';
 import ThinkingPuzzlesRoute from './routes/thinking_puzzles.route';
+import BlockPageRoute from './routes/block_page.route';
 import UserActivityRoute from './routes/user_activity.route';
 import UserEncryptionRoute from './routes/user_encryption.route';
 import UserFeedRoute from './routes/user_feed.route';
@@ -57,6 +58,7 @@ import {adminPathGuardMiddleware} from './middlewares/admin_path_guard.middlewar
 import AccountRoute from './routes/account.route';
 import McpRelayRoute, {McpRelayWellKnownRoute} from './routes/mcp_relay.route';
 import DeviceUnlockRoute from './routes/device_unlock.route';
+import DeviceFolderRoute from './routes/device_folder.route';
 import UserRoute from './routes/user.route';
 import UserShowcaseRoute from './routes/user_showcase.route';
 import ExternalDataRoute from './routes/external_data.route';
@@ -128,6 +130,7 @@ class App {
         new SyncRoute(),
         container.resolve(SystemRoute),
         new ThinkingPuzzlesRoute(),
+        new BlockPageRoute(),
         new UserActivityRoute(),
         new UserEncryptionRoute(),
         new UserFeedRoute(),
@@ -138,6 +141,7 @@ class App {
         new UserShowcaseRoute(),
         new McpRelayRoute(),
         new DeviceUnlockRoute(),
+        new DeviceFolderRoute(),
       ];
 
       this.initializeRoutes([...mainRoutes, ...cloudOnlyRoutes()]);

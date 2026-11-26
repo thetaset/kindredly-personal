@@ -349,6 +349,11 @@ const config = {
     apiKey: process.env.DEEPSEEK_API_KEY || '',
     baseUrl: process.env.DEEPSEEK_BASE_URL || 'https://api.deepseek.com',
   },
+  // DeepInfra hosts open models, DeepSeek's among them, at its own address (Helper AI, HAT-1125).
+  deepinfra: {
+    apiKey: process.env.DEEPINFRA_API_KEY || '',
+    baseUrl: process.env.DEEPINFRA_BASE_URL || 'https://api.deepinfra.com/v1/openai',
+  },
   // Ten wrong PINs in fifteen minutes and that person's PIN waits fifteen minutes; their password
   // still works (HAT-848). PIN_LOCKOUT_ENABLED=false turns it off.
   pinLockout: {
@@ -396,6 +401,16 @@ const config = {
   podcastIndex: {
     key: process.env.PODCAST_INDEX_KEY || '',
     secret: process.env.PODCAST_INDEX_SECRET || '',
+  },
+  // Device folders' fallback (HAT-1321): Cloudflare's TURN carries a connection when two devices
+  // can't connect directly. Off unless all four are set: the key's id and API token (Realtime ›
+  // TURN), the account id, and a token with Account Analytics Read, which counts each person's use.
+  deviceFolderRelay: {
+    turnKeyId: process.env.CLOUDFLARE_TURN_KEY_ID || '',
+    turnKeyApiToken: process.env.CLOUDFLARE_TURN_KEY_API_TOKEN || '',
+    accountId: process.env.CLOUDFLARE_ACCOUNT_ID || '',
+    analyticsToken: process.env.CLOUDFLARE_ANALYTICS_TOKEN || '',
+    gbPerPersonPerMonth: Number(process.env.DEVICE_FOLDER_RELAY_GB_PER_MONTH) || 5,
   },
   // Free stock-image providers for the admin Banner Library importer. Openverse
   // and Wikimedia Commons need no key (keyless, rate-limited); Pexels needs a

@@ -99,5 +99,21 @@
       "ruleId": null
     }
   ],
-  "browserNotApplicable": "Device-only here: the browser lifts a pause where it enforces, through getRestrictionEffectiveStatus in the client's restrictionState.ts, tested in restrictionState.test.ts. This case pins the phone to the same reading."
+  "browserNotApplicable": "Device-only here: the browser lifts a pause where it enforces, through getRestrictionEffectiveStatus in the client's restrictionState.ts, tested in restrictionState.test.ts. This case pins the phone to the same reading.",
+  "expectDeviceByPlatform": {
+    "macos": [
+      {
+        "pkg": "com.roblox.client",
+        "action": "block",
+        "reason": "budget-exhausted",
+        "ruleId": "r-fun"
+      },
+      {
+        "pkg": "com.android.chrome",
+        "action": "allow",
+        "reason": null,
+        "ruleId": null
+      }
+    ]
+  }
 }

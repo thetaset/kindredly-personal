@@ -459,7 +459,7 @@ const EVENT_COPY: Record<DeviceTamperKind, (device: string) => string> = {
   adminDisableRequested: (device) => `Someone started turning off uninstall protection on ${device}.`,
   adminDisabled: (device) =>
     `Uninstall protection was turned off on ${device}. Kindredly Companion can now be removed.`,
-  screenGuardDisabled: (device) => `The screen guard was switched off in accessibility settings on ${device}.`,
+  screenGuardDisabled: (device) => `Kindredly Companion's accessibility switch was turned off on ${device}.`,
   uninstallScreen: (device) => `Someone opened the screen used to remove apps on ${device}.`,
   // Android's setting name alone told a guardian nothing (founder, 2026-09-14): the effect, then where to fix it.
   usageAccessRevoked: (device) =>

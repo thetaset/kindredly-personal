@@ -24,6 +24,13 @@ interface SSEMessage {
 // broadcast + heartbeat accumulates in this process's heap indefinitely.
 export const SSE_MAX_BUFFERED_BYTES = 1024 * 1024;
 
+/**
+ * How long a connection's record lasts in Redis (`sse_connection:*`, `sse_user_connections:*`)
+ * without being renewed. The process holding the connection renews it on the cleanup timer, so it
+ * runs out only when that process is gone.
+ */
+const CONNECTION_TTL_SECONDS = 3600;
+
 class SSEManager {
   private static instance: SSEManager;
   private redis: KeyValueStore;
@@ -34,6 +41,8 @@ class SSEManager {
    */
   private bus: EventBus;
   private localConnections = new Map<string, Response>();
+  /** What `addConnection` wrote to Redis for each local connection, so it can be written again. */
+  private localConnectionRecords = new Map<string, SSEConnection>();
   /**
    * Connections that may receive only the events named here. A connection with no entry receives
    * everything addressed to its user, as every browser stream always has.
@@ -253,16 +262,13 @@ class SSEManager {
       serverId: this.serverId,
       connectedAt: new Date(),
     };
+    this.localConnectionRecords.set(clientId, connection);
 
-    await this.redis.setex(
-      `sse_connection:${clientId}`,
-      3600, // 1 hour TTL
-      JSON.stringify(connection),
-    );
+    await this.redis.setex(`sse_connection:${clientId}`, CONNECTION_TTL_SECONDS, JSON.stringify(connection));
 
     // Add to user's connection set
     await this.redis.sadd(`sse_user_connections:${userId}`, clientId);
-    await this.redis.expire(`sse_user_connections:${userId}`, 3600);
+    await this.redis.expire(`sse_user_connections:${userId}`, CONNECTION_TTL_SECONDS);
 
     console.info(`SSE connection registered: ${clientId} for user ${userId} on ${this.serverId}`);
   }
@@ -337,6 +343,7 @@ class SSEManager {
 
     // Remove locally
     this.localConnections.delete(clientId);
+    this.localConnectionRecords.delete(clientId);
     this.eventFilters.delete(clientId);
     for (const listener of this.removalListeners) {
       try {
@@ -371,12 +378,10 @@ class SSEManager {
     };
 
     await this.bus.publish(this.channelName, JSON.stringify(message));
-
-    // Get connection count for logging
-    const connectionCount = await this.getUserConnectionCount(userId);
-    if (connectionCount > 0) {
-      console.info(`Broadcasted '${event}' event to user ${userId} (${connectionCount} connections across cluster)`);
-    }
+    // Nothing else. This used to read the person's connection count from Redis (SMEMBERS, then
+    // EXISTS) only to print it in a log line: two round trips and a line per person on every
+    // change anyone in the family saved. Nothing read the line. Each delivery is still logged, by
+    // handleIncomingBroadcast. SYNC-18.
   }
 
   /**
@@ -389,9 +394,8 @@ class SSEManager {
     };
 
     await this.bus.publish(this.channelName, JSON.stringify(message));
-
-    const totalConnections = await this.getTotalConnectionCount();
-    console.info(`Broadcasted '${event}' event to all clients (${totalConnections} connections across cluster)`);
+    // No connection count: it was a KEYS scan over every connection, only for this line. SYNC-18.
+    console.info(`Broadcasted '${event}' event to all clients`);
   }
 
   /**
@@ -486,6 +490,32 @@ class SSEManager {
   /**
    * Clean up expired connections (run periodically)
    */
+  /**
+   * Writes this process's open connections back to Redis with a fresh expiry.
+   *
+   * `addConnection` writes them once, and the keepalive ping holds a stream open for hours. After an
+   * hour the record ran out and `cleanupExpiredConnections` took the device off its person's list, so
+   * everything that asks "is this device connected" (`getConnectionDetailsForUser`) answered no for a
+   * device that was: Live View showed it as away and never re-sent it a start, and remote actions
+   * refused it as not live.
+   */
+  async renewLocalConnections(): Promise<void> {
+    const pipeline = this.redis.pipeline();
+    const userIds = new Set<string>();
+
+    this.localConnectionRecords.forEach((connection, clientId) => {
+      const res = this.localConnections.get(clientId);
+      if (!res || res.destroyed || res.writableEnded) return;
+      pipeline.set(`sse_connection:${clientId}`, JSON.stringify(connection), 'EX', CONNECTION_TTL_SECONDS);
+      pipeline.sadd(`sse_user_connections:${connection.userId}`, clientId);
+      userIds.add(connection.userId);
+    });
+    if (!userIds.size) return;
+
+    userIds.forEach((userId) => pipeline.expire(`sse_user_connections:${userId}`, CONNECTION_TTL_SECONDS));
+    await pipeline.exec();
+  }
+
   async cleanupExpiredConnections(): Promise<void> {
     const userKeys = await this.redis.keys('sse_user_connections:*');
 
@@ -579,9 +609,13 @@ class SSEManager {
       return;
     }
 
-    // 5 minutes default
+    // 5 minutes default. This process's own connections are renewed first, so the cleanup never
+    // reads one that is still open as gone.
     const timer = setInterval(() => {
-      this.cleanupExpiredConnections().catch(console.error);
+      this.renewLocalConnections()
+        .catch(console.error)
+        .then(() => this.cleanupExpiredConnections())
+        .catch(console.error);
     }, intervalMs);
     timer.unref?.();
 
@@ -814,6 +848,7 @@ class SSEManager {
       }
     });
     this.localConnections.clear();
+    this.localConnectionRecords.clear();
     this.eventFilters.clear();
 
     console.info(

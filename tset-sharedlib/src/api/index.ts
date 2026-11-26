@@ -10,6 +10,7 @@ export { buildParameterizedRoute } from './api-route-map';
 export * from './api-route-map';
 export * from './api-types';
 export * from './mcp-relay.types';
+export * from './device-folders.types';
 
 // Route layer metadata helpers
 export * from './api-route-layers';

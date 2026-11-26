@@ -52,6 +52,7 @@ export const TEMPLATE_GROUP_ORDER: string[] = [
   'Home & Family',
   'Finance',
   'School & Learning',
+  'Projects',
 ]
 
 /**
@@ -135,5 +136,17 @@ export const COLLECTION_TEMPLATE_SEED: CollectionTemplate[] = [
     seedText: 'photo gallery pictures images album grid art screenshots snapshots',
     kindTemplateId: 'kindtpl.gallery.v1',
     icon: 'images',
+  },
+  {
+    // HAT-1064. No tags: a project is the collection itself, never a tag.
+    // Adults only — the chooser leaves it out for a restricted user.
+    id: 'personal.project.v1',
+    name: 'Project',
+    group: 'Projects',
+    description: 'Something you are starting: its parts, what to read, watch and do, and your progress.',
+    seedText: 'project plan learn start goal remodel course study research build parts progress',
+    kindTemplateId: 'kindtpl.project.v1',
+    icon: 'kanban',
+    minAgeGroups: ADULT_BANDS,
   },
 ]

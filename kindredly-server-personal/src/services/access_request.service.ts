@@ -148,6 +148,7 @@ class AccessRequestService {
       if (!this._shouldAutoExpire(request, now)) continue;
       try {
         await this._deleteAccessRequestRow(ctx, request._id);
+        this._resolveNotifications(ctx.accountId, request._id);
       } catch (err) {
         // Best-effort cleanup; listing should still succeed.
         console.warn('[access_request] Failed to auto-expire request', {
@@ -198,6 +199,16 @@ class AccessRequestService {
       .limit(100);
   }
 
+  /**
+   * The request is answered, withdrawn or expired: its notification goes, here and on every guardian's
+   * phone (HAT-1286). Never awaited, and never allowed to fail the answer.
+   */
+  private _resolveNotifications(accountId: string | null | undefined, requestId: string) {
+    this.notificationsService.resolveAccessRequestNotifications(accountId, requestId).catch((err) => {
+      console.warn('[access_request] could not clear the notification', requestId, err?.message || err);
+    });
+  }
+
   /** Unguarded delete, for the internal expiry and approval paths. */
   private async _deleteAccessRequestRow(ctx: RequestContext, id: string) {
     return await this.accessRequests.deleteWithId(id, {accountId: ctx.accountId});
@@ -238,7 +249,11 @@ class AccessRequestService {
       return true;
     }
 
-    return await this._deleteAccessRequestRow(ctx, id);
+    const deleted = await this._deleteAccessRequestRow(ctx, id);
+    // Withdrawn by the child, or cleared by an admin: no admin's popup keeps asking (HAT-1141).
+    this.notificationsService.nudgeAdminsOfAccessRequestDecided(ctx.accountId, id, ctx.currentUserId);
+    this._resolveNotifications(ctx.accountId, id);
+    return deleted;
   }
 
   /**
@@ -785,6 +800,10 @@ class AccessRequestService {
         await this._deleteAccessRequestRow(ctx, id);
       }
     }
+
+    // Every admin device showing this request closes it, whichever one answered (HAT-1141).
+    this.notificationsService.nudgeAdminsOfAccessRequestDecided(ctx.accountId, id, ctx.currentUserId);
+    this._resolveNotifications(ctx.accountId, id);
 
     // The key is a publishId (not a URL) for published-catalog add requests,
     // and an itemId for library-item add requests.

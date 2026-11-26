@@ -55,7 +55,7 @@ const ICON_RE = /^[a-z0-9-]{1,40}$/
 
 const ACCENTS = new Set<string>(['rose', 'teal', 'amber', 'violet', 'sky'])
 const EMPHASES = new Set<string>(['standard', 'bold'])
-const LAYOUTS = new Set<string>(['cards', 'symbols', 'gallery', 'cart'])
+const LAYOUTS = new Set<string>(['cards', 'symbols', 'gallery', 'cart', 'project'])
 const IMPORTANCES = new Set<string>(['recommended', 'optional'])
 const MIN_AGE_GROUPS = new Set<string>(ALL_MIN_AGE_GROUPS)
 

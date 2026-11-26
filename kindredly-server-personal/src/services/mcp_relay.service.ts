@@ -16,8 +16,9 @@
  *      switched to someone else replies `notHere`
  *
  * One Kindredly answers an AI app at a time (HAT-814, `mcp_relay_session.ts`): the one where the
- * adult tapped Agree. With no session the ask goes up on every Kindredly they have open; a tool list
- * does not wait for it (the protocol lists the read-only tools meanwhile), a call waits up to 45 s.
+ * adult tapped Agree. With no session a call puts the ask up on every Kindredly they have open and
+ * waits up to 45 s. A tool list never asks (HAT-1071): a Claude chat lists the tools as it opens,
+ * and the protocol lists them itself meanwhile, so an ask always comes with the call it is for.
  *
  * How a call travels between server processes:
  *   - the frame goes out on `mcpRelay:frames`; the process holding the device's stream writes it and
@@ -59,8 +60,13 @@ import type {
   McpRelaySessionView,
   McpRelayStatus,
 } from 'tset-sharedlib/api';
+import {MCP_RELAY_TOOLS} from 'tset-sharedlib/api/mcp-relay-tools.generated';
 
 export const MCP_RELAY_TOKEN_PREFIX = 'kmr_';
+/** The tools a device offers an AI app: the only names an ask records (HAT-1071). */
+const RELAY_TOOL_NAMES: ReadonlySet<string> = new Set(
+  (MCP_RELAY_TOOLS as unknown as Array<{name: string}>).map((t) => t.name),
+);
 export const MCP_RELAY_FRAME_EVENT = 'mcpRelayFrame';
 
 const FRAMES_CHANNEL = 'mcpRelay:frames';
@@ -193,6 +199,7 @@ function toView(row: McpRelayChannelRow, viewerId: string): McpRelayConnectionVi
     lastUsedAt: day,
     mine: row.userId === viewerId,
     ...(row.clientInfo?.version ? {appVersion: row.clientInfo.version} : {}),
+    ...(row.clientInfo?.name ? {appName: row.clientInfo.name} : {}),
   };
 }
 
@@ -311,13 +318,10 @@ export default class McpRelayService {
     }
   }
 
-  /** The adult agreed to this AI app connecting without asking, and that time has not ended (HAT-880). */
+  /** The adult trusts this AI app, so it connects without asking, and that time has not ended (HAT-880, HAT-1360). */
   private async agreedToConnect(channel: McpRelayChannelRow): Promise<boolean> {
     try {
-      const saved = await this.userPrefs.getUserPref(
-        channel.userId,
-        mcpRelayAgreedUntilPrefKey(channel._id, 'connect'),
-      );
+      const saved = await this.userPrefs.getUserPref(channel.userId, mcpRelayAgreedUntilPrefKey(channel._id, 'trust'));
       return readMcpRelayAgreedUntil(saved) !== null;
     } catch {
       // A read that failed asks, as the default does.
@@ -635,7 +639,7 @@ export default class McpRelayService {
     try {
       const deadline = Date.now() + DEADLINE_MS;
       const routing = await this.routing(channel.userId);
-      // Agreed for a set time (HAT-880): this AI app connects as if asking were off, until it ends.
+      // Trusted for a set time (HAT-880, HAT-1360): this AI app connects as if asking were off, until it ends.
       const askFirst = routing.askFirst && !(await this.agreedToConnect(channel));
       // With asking off there is no Kindredly agreed on, so the one used last answers.
       const followRecent = !askFirst || routing.device === 'recent';
@@ -654,11 +658,17 @@ export default class McpRelayService {
         return await this.tryRecent(channel, frame, deadline);
       }
 
-      const open = (await this.answerers(channel.userId)).length > 0;
-      if (!open && frame.op === 'listTools') throw new McpRelayError('not_connected');
-      // Asked even with none open: a Kindredly opened while the call waits shows the ask.
-      await this.sessions.ask(channel.userId, channel._id);
-      if (frame.op === 'listTools') throw new McpRelayError('awaiting_agree');
+      // A tool list alone never asks (HAT-1071): an AI app lists the tools when a chat opens, so the
+      // ask went up with nothing asked for. The protocol lists the tools itself meanwhile.
+      if (frame.op === 'listTools') {
+        const open = (await this.answerers(channel.userId)).length > 0;
+        throw new McpRelayError(open ? 'awaiting_agree' : 'not_connected');
+      }
+      // Asked even with none open: a Kindredly opened while the call waits shows the ask. It names
+      // the tool, so the adult sees what the call is for; an end-to-end encrypted one cannot.
+      const tool = frame.op === 'callTool' ? String(frame.name || '').toLowerCase() : '';
+      const named = RELAY_TOOL_NAMES.has(tool) ? tool : undefined;
+      const askedHere = await this.sessions.ask(channel.userId, channel._id, named);
       const answer = await this.sessions.waitForAnswer(channel._id, Math.min(deadline, Date.now() + ASK_WAIT_MS));
       if (answer === 'denied') throw new McpRelayError('declined');
       session = await this.sessions.session(channel._id);
@@ -666,6 +676,9 @@ export default class McpRelayService {
         const openNow = (await this.answerers(channel.userId)).length > 0;
         throw new McpRelayError(openNow ? 'awaiting_agree' : 'not_connected');
       }
+      // The call the ask named is the one the adult agreed to (HAT-1360): the device asks no second
+      // time for a library change it makes. Another call that waited on the same ask is not.
+      if (askedHere && named && frame.op === 'callTool') frame = {...frame, agreedOnAsk: true};
       if (followRecent) return await this.tryRecent(channel, frame, deadline);
       const attempt = await this.trySession(channel, session.clientId, frame, deadline);
       if (attempt !== NOT_DELIVERED) return attempt;
@@ -797,9 +810,12 @@ export default class McpRelayService {
 
     let timer: NodeJS.Timeout | undefined;
     try {
+      // `msLeft` (HAT-1360): an ask on the device ends before this call does, so a late Agree waits
+      // for the AI app's next call rather than run a change whose answer nobody reads.
+      const msLeft = Math.max(0, deadline - Date.now());
       await this.bus.publish(
         FRAMES_CHANNEL,
-        JSON.stringify({clientId, replyTo: this.taskId, frame: {...frame, frameId, replyTo: this.taskId}}),
+        JSON.stringify({clientId, replyTo: this.taskId, frame: {...frame, frameId, replyTo: this.taskId, msLeft}}),
       );
       const wasDelivered = await Promise.race([
         delivered.then(() => true),

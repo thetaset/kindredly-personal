@@ -1,28 +1,38 @@
 import {
-  getRedditPostFeedUrl,
+  galleryHasMore,
+  getRedditPostEmbedUrl,
   getRedditPostId,
   imageContentType,
   originalRedditImageUrl,
   pickRedditVideoFiles,
   postMediaFromRedditPage,
-  readRedditFeedPostMedia,
-  redditFeedToItemMeta,
+  readRedditEmbedPostMedia,
 } from '../src/reddit-media.utils';
 
 // HAT-635: a parent can save a Reddit post's picture instead of its link.
-describe('getRedditPostFeedUrl', () => {
-  test("a post's feed, from any of its addresses", () => {
-    expect(getRedditPostFeedUrl('https://www.reddit.com/r/EarthPorn/comments/1xa1mu2/dawn_in_the_north/')).toBe(
-      'https://www.reddit.com/r/EarthPorn/comments/1xa1mu2/.rss',
+// HAT-1260: Reddit's post feed stopped answering on 2026-11-13; the embed page replaces it.
+describe('getRedditPostEmbedUrl', () => {
+  test("a post's embed page, from any of its addresses", () => {
+    expect(getRedditPostEmbedUrl('https://www.reddit.com/r/EarthPorn/comments/1xa1mu2/dawn_in_the_north/')).toBe(
+      'https://embed.reddit.com/r/EarthPorn/comments/1xa1mu2/',
     );
-    expect(getRedditPostFeedUrl('https://old.reddit.com/comments/1XA1MU2')).toBe('https://www.reddit.com/comments/1xa1mu2/.rss');
-    expect(getRedditPostFeedUrl('https://redd.it/1xa1mu2')).toBe('https://www.reddit.com/comments/1xa1mu2/.rss');
+    expect(getRedditPostEmbedUrl('https://old.reddit.com/r/pics/comments/1XA1MU2')).toBe(
+      'https://embed.reddit.com/r/pics/comments/1xa1mu2/',
+    );
+  });
+
+  // HAT-1269: the bare `/comments/<id>/` embed does not name the post, but any subreddit finds it.
+  test('a link with no subreddit asks under r/all', () => {
+    expect(getRedditPostEmbedUrl('https://redd.it/1xa1mu2')).toBe('https://embed.reddit.com/r/all/comments/1xa1mu2/');
+    expect(getRedditPostEmbedUrl('https://www.reddit.com/comments/1XA1MU2/')).toBe(
+      'https://embed.reddit.com/r/all/comments/1xa1mu2/',
+    );
   });
 
   test('nothing for a subreddit, a share link before it is followed, or another site', () => {
-    expect(getRedditPostFeedUrl('https://www.reddit.com/r/pics/')).toBeNull();
-    expect(getRedditPostFeedUrl('https://www.reddit.com/r/pics/s/AbC123')).toBeNull();
-    expect(getRedditPostFeedUrl('https://example.com/r/pics/comments/abc/')).toBeNull();
+    expect(getRedditPostEmbedUrl('https://www.reddit.com/r/pics/')).toBeNull();
+    expect(getRedditPostEmbedUrl('https://www.reddit.com/r/pics/s/AbC123')).toBeNull();
+    expect(getRedditPostEmbedUrl('https://example.com/r/pics/comments/abc/')).toBeNull();
     expect(getRedditPostId('https://www.reddit.com/user/someone/')).toBeNull();
   });
 });
@@ -88,44 +98,59 @@ describe('postMediaFromRedditPage', () => {
   });
 });
 
-describe('readRedditFeedPostMedia', () => {
-  // The first entry of a real post's feed (r/EarthPorn, 2026-10-19), shortened.
-  const feed = (link: string, img = 'https://preview.redd.it/kpdiy8h3bgwh1.jpeg?width=640&amp;amp;crop=smart') =>
-    `<?xml version="1.0" encoding="UTF-8"?><feed xmlns="http://www.w3.org/2005/Atom" xmlns:media="http://search.yahoo.com/mrss/">` +
-    `<entry><author><name>/u/takepacific</name></author><content type="html">&lt;table&gt; &lt;tr&gt;&lt;td&gt; ` +
-    `&lt;a href=&quot;https://www.reddit.com/r/EarthPorn/comments/1xa1mu2/dawn/&quot;&gt; &lt;img src=&quot;${img}&quot; alt=&quot;Dawn&quot; /&gt; &lt;/a&gt; ` +
-    `&lt;/td&gt;&lt;td&gt; &amp;#32; submitted by &amp;#32; &lt;a href=&quot;https://www.reddit.com/user/takepacific&quot;&gt; /u/takepacific &lt;/a&gt; &lt;br/&gt; ` +
-    `&lt;span&gt;&lt;a href=&quot;${link}&quot;&gt;[link]&lt;/a&gt;&lt;/span&gt; &amp;#32; &lt;span&gt;&lt;a href=&quot;https://www.reddit.com/r/EarthPorn/comments/1xa1mu2/dawn/&quot;&gt;[comments]&lt;/a&gt;&lt;/span&gt; ` +
-    `&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;</content><media:thumbnail url="${img}" /></entry>` +
-    `<entry><content type="html">a comment &lt;a href=&quot;https://i.redd.it/other.png&quot;&gt;[link]&lt;/a&gt;</content></entry></feed>`;
+describe('readRedditEmbedPostMedia', () => {
+  // What an embed page marks a post with (r/AbsoluteUnits, r/EarthPorn and r/pics, read 2026-11-21),
+  // shortened.
+  const embed = (post: { type: string; url: string }, body = '') => {
+    const data = JSON.stringify({ post, subreddit: { name: 'pics' } }).replace(/"/g, '&quot;');
+    return `<html><body><shreddit-screenview-data data="${data}"></shreddit-screenview-data>${body}</body></html>`;
+  };
 
-  test("the post's picture, from its [link]", () => {
-    expect(readRedditFeedPostMedia(feed('https://i.redd.it/kpdiy8h3bgwh1.jpeg'))).toEqual({
+  test("the post's picture, as the embed names it", () => {
+    expect(readRedditEmbedPostMedia(embed({ type: 'image', url: 'https://i.redd.it/kpdiy8h3bgwh1.jpeg' }))).toEqual({
       kind: 'image',
       urls: ['https://i.redd.it/kpdiy8h3bgwh1.jpeg'],
     });
   });
 
-  test("a video post, with its still from the feed's thumbnail", () => {
-    expect(readRedditFeedPostMedia(feed('https://v.redd.it/8ale3ufsygwh1'))).toEqual({
+  test("a video post, with its still from the player", () => {
+    const player =
+      '<shreddit-player src="https://v.redd.it/3tcm7u6bot2i1/HLSPlaylist.m3u8" ' +
+      'poster="https://external-preview.redd.it/p.png?width=640&amp;crop=smart"></shreddit-player>';
+    expect(readRedditEmbedPostMedia(embed({ type: 'video', url: 'https://v.redd.it/3tcm7u6bot2i1' }, player))).toEqual({
       kind: 'video',
-      urls: ['https://v.redd.it/8ale3ufsygwh1'],
-      poster: 'https://preview.redd.it/kpdiy8h3bgwh1.jpeg?width=640&amp;crop=smart',
+      urls: ['https://v.redd.it/3tcm7u6bot2i1'],
+      poster: 'https://external-preview.redd.it/p.png?width=640&crop=smart',
     });
   });
 
-  test("a gallery's first picture, from its resized copy", () => {
-    expect(
-      readRedditFeedPostMedia(
-        feed('https://www.reddit.com/gallery/1wmc84j', 'https://preview.redd.it/after-v0-we7cvor9gvqh1.png?width=640&amp;amp;crop=smart'),
-      ),
-    ).toEqual({ kind: 'gallery', urls: ['https://i.redd.it/we7cvor9gvqh1.png'], total: null });
+  test("a gallery's pictures, from its resized copies", () => {
+    const body =
+      '<li slot="page-1"><img src="https://preview.redd.it/after-v0-we7cvor9gvqh1.png?width=640&amp;crop=smart"></li>' +
+      '<li slot="page-2"><img src="https://preview.redd.it/after-v0-uj7bdscagvqh1.png?width=640"></li>';
+    expect(readRedditEmbedPostMedia(embed({ type: 'gallery', url: 'https://www.reddit.com/gallery/1wmc84j' }, body))).toEqual({
+      kind: 'gallery',
+      urls: ['https://i.redd.it/we7cvor9gvqh1.png', 'https://i.redd.it/uj7bdscagvqh1.png'],
+    });
   });
 
-  test('nothing for a link to another site, or no feed', () => {
-    expect(readRedditFeedPostMedia(feed('https://example.com/story'))).toBeNull();
-    expect(readRedditFeedPostMedia('<html>Prove your humanity</html>')).toBeNull();
-    expect(readRedditFeedPostMedia(null)).toBeNull();
+  test('a gallery counts the pictures it drew no address for', () => {
+    const body =
+      '<li slot="page-1"><img src="https://preview.redd.it/a1b2c3.png?width=640"></li>' +
+      '<li slot="page-2"><img src="https://preview.redd.it/d4e5f6.png?width=640"></li>' +
+      '<li slot="page-3"></li>';
+    expect(readRedditEmbedPostMedia(embed({ type: 'gallery', url: 'https://www.reddit.com/gallery/1wmc84j' }, body))).toEqual({
+      kind: 'gallery',
+      urls: ['https://i.redd.it/a1b2c3.png', 'https://i.redd.it/d4e5f6.png'],
+      total: 3,
+    });
+  });
+
+  test('nothing for a text or link post, another site, or no page', () => {
+    expect(readRedditEmbedPostMedia(embed({ type: 'text', url: 'https://www.reddit.com/r/x/comments/abc/' }))).toBeNull();
+    expect(readRedditEmbedPostMedia(embed({ type: 'link', url: 'https://example.com/story' }))).toBeNull();
+    expect(readRedditEmbedPostMedia('<html>Prove your humanity</html>')).toBeNull();
+    expect(readRedditEmbedPostMedia(null)).toBeNull();
   });
 });
 
@@ -209,40 +234,16 @@ describe('pickRedditVideoFiles', () => {
   });
 });
 
-describe('redditFeedToItemMeta', () => {
-  // A real video post's first entry (r/oddlysatisfying, 2026-10-19), shortened.
-  const FEED =
-    '<?xml version="1.0" encoding="UTF-8"?><feed xmlns="http://www.w3.org/2005/Atom" xmlns:media="http://search.yahoo.com/mrss/">' +
-    '<entry><author><name>/u/MuttapuffsHater</name><uri>https://www.reddit.com/user/MuttapuffsHater</uri></author>' +
-    '<category term="oddlysatisfying" label="r/oddlysatisfying"/>' +
-    '<content type="html">&lt;span&gt;&lt;a href=&quot;https://v.redd.it/8ale3ufsygwh1&quot;&gt;[link]&lt;/a&gt;&lt;/span&gt;</content>' +
-    '<id>t3_1xa59cg</id><media:thumbnail url="https://external-preview.redd.it/p.png?width=320&amp;crop=smart" />' +
-    '<link href="https://www.reddit.com/r/oddlysatisfying/comments/1xa59cg/peeling_a_pineapple_one_eye_at_a_time/" />' +
-    '<title>Peeling a pineapple, one eye at a time</title></entry></feed>';
-
-  test('one request names the post, says who posted it where, and finds its video', () => {
-    const meta = redditFeedToItemMeta('https://www.reddit.com/r/oddlysatisfying/s/AbC123', FEED);
-    expect(meta).toMatchObject({
-      url: 'https://www.reddit.com/r/oddlysatisfying/s/AbC123',
-      title: 'Peeling a pineapple, one eye at a time',
-      siteName: 'Reddit',
-      imageSrc: 'https://external-preview.redd.it/p.png?width=320&crop=smart',
-      tsExtractedInfo: {
-        sourceId: 'provider_api',
-        redditSubreddit: 'oddlysatisfying',
-        redditAuthor: 'MuttapuffsHater',
-        postMedia: { kind: 'video', urls: ['https://v.redd.it/8ale3ufsygwh1'] },
-        recognized: {
-          provider: 'reddit',
-          externalId: '1xa59cg',
-          canonicalUrl: 'https://www.reddit.com/r/oddlysatisfying/comments/1xa59cg/peeling_a_pineapple_one_eye_at_a_time/',
-        },
-      },
-    });
-  });
-
-  test('nothing from a page that is not a feed', () => {
-    expect(redditFeedToItemMeta('https://www.reddit.com/r/x/comments/abc/', '<html><title>Reddit</title></html>')).toBeNull();
+// HAT-1269: an embed page that drew fewer slides than the gallery has still sends the popup to read
+// the rest, as a feed's first picture did (HAT-689).
+describe('galleryHasMore', () => {
+  test('a count above the addresses, or only the first known', () => {
+    expect(galleryHasMore({kind: 'gallery', urls: ['a', 'b'], total: 8})).toBe(true);
+    expect(galleryHasMore({kind: 'gallery', urls: ['a'], total: null})).toBe(true);
+    expect(galleryHasMore({kind: 'gallery', urls: ['a', 'b'], total: 2})).toBe(false);
+    expect(galleryHasMore({kind: 'gallery', urls: ['a', 'b']})).toBe(false);
+    expect(galleryHasMore({kind: 'image', urls: ['a'], total: null})).toBe(false);
+    expect(galleryHasMore(null)).toBe(false);
   });
 });
 

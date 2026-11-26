@@ -25,6 +25,10 @@ export class ClassificationDatasetRepo extends BaseRepo<ClassificationDatasetRow
     return (await this.query().where({datasetId}).first()) as any;
   }
 
+  async listByRole(role: string): Promise<ClassificationDatasetRow[]> {
+    return (await this.query().where({role}).orderBy('datasetId', 'asc')) as ClassificationDatasetRow[];
+  }
+
   async create(input: ClassificationDatasetRow) {
     return (await this.query().insert(this._updateInput(input)).returning('*')) as any;
   }

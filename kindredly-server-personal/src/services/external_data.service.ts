@@ -373,10 +373,10 @@ class ExternalDataService {
 
     if (metaLookup.extendedInfo?.madeForKids === true) {
       return {
-        classification: 'cat_educational',
+        classification: 'gen_education',
         confidence: 0.88,
         details: {
-          categories: [{value: 'cat_educational', confidence: 0.88}],
+          categories: [{value: 'gen_education', confidence: 0.88}],
           eduValue: {value: 'eduval_educational', confidence: 0.86},
           shortReason: 'Trusted metadata indicates children-focused content.',
           provenance: {

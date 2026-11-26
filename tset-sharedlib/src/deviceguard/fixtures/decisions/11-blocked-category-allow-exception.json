@@ -65,5 +65,21 @@
       "ruleId": null
     }
   ],
-  "browserNotApplicable": "Device-only: app blocks are enforced only on devices."
+  "browserNotApplicable": "Device-only: app blocks are enforced only on devices.",
+  "expectDeviceByPlatform": {
+    "macos": [
+      {
+        "pkg": "com.android.chrome",
+        "action": "allow",
+        "reason": null,
+        "ruleId": null
+      },
+      {
+        "pkg": "org.mozilla.firefox",
+        "action": "allow",
+        "reason": null,
+        "ruleId": null
+      }
+    ]
+  }
 }

@@ -1,0 +1,107 @@
+{
+  "id": "56-school-days-break-day",
+  "behaviour": "School days (HAT-1283): on a weekday in the family's winter break, a limit of none on School days gives way to its Not school days amount, so 10 minutes of Roblox is allowed.",
+  "clock": {
+    "nowMs": 1797980400000,
+    "familyTimeZone": "America/Los_Angeles",
+    "deviceTimeZone": "America/Los_Angeles"
+  },
+  "settings": {
+    "usageLimitsData": {
+      "contentUsageLimits": [
+        {
+          "id": "r-fun",
+          "name": "Fun",
+          "type": "advanced",
+          "conditions": [
+            {
+              "type": "eduValue",
+              "values": [
+                "eduval_fun"
+              ]
+            }
+          ],
+          "timeLimits": [
+            {
+              "hours": 0,
+              "daysOfWeek": [
+                1,
+                2,
+                3,
+                4,
+                5
+              ],
+              "dayKind": "school"
+            },
+            {
+              "hours": 2,
+              "daysOfWeek": [
+                0,
+                6
+              ],
+              "dayKind": "notSchool"
+            }
+          ]
+        }
+      ],
+      "temporaryRules": []
+    },
+    "ruleOverrideSettings": {
+      "ruleOverrides": []
+    },
+    "accessControlSettings": {},
+    "appPolicy": null,
+    "appPolicyStatus": "absent",
+    "schoolDays": {
+      "week": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "daysOff": [
+        {
+          "id": "winter",
+          "name": "Winter break",
+          "from": "2026-12-21",
+          "to": "2027-01-01"
+        }
+      ],
+      "updatedAt": 0,
+      "updatedBy": ""
+    }
+  },
+  "installedApps": [
+    {
+      "pkg": "com.roblox.client",
+      "label": "Roblox",
+      "platform": "android"
+    }
+  ],
+  "floor": [],
+  "usage": {
+    "appMsByPkg": {
+      "com.roblox.client": 600000
+    },
+    "webLogs": []
+  },
+  "usageSeed": {
+    "perRuleUsedMs": {}
+  },
+  "expectDevice": [
+    {
+      "pkg": "com.roblox.client",
+      "action": "allow",
+      "reason": null,
+      "ruleId": null
+    }
+  ],
+  "expectBrowser": [
+    {
+      "ruleId": "r-fun",
+      "exceeded": false,
+      "reason": null
+    }
+  ]
+}

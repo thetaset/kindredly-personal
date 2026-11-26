@@ -159,6 +159,7 @@ export const AI_MODEL_DISPLAY_NAMES: Record<string, string> = {
   'gpt-6-luna': 'GPT-6 Luna',
   'deepseek-v4-pro': 'DeepSeek V4 Pro',
   'gpt-6-sol': 'GPT-6 Sol',
+  'deepseek-ai/DeepSeek-V4-Flash-0731': 'DeepSeek V4 Flash',
 };
 
 export function hostedModelDisplayName(modelId: string): string {

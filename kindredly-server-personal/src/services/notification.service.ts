@@ -43,11 +43,15 @@ const typeToTitle = {
   CHILD_SAFETY_ALERT: 'A child may need you',
   PLATFORM_ALERT: 'Platform Alert',
   LESSON_PART_DONE: 'Digital citizenship',
+  HELPER_REQUEST: 'Helper AI',
   ACTIVITY_REPORT: 'Activity report',
 };
 
 /** At most this many lesson notices per child a day: a pack has five parts, and the child's device reports them. */
 const LESSON_PART_DONE_PER_DAY = 5;
+
+/** At most this many "asked for a helper" notices per child a day: the child's device sends them. */
+const HELPER_REQUEST_PER_DAY = 5;
 
 /**
  * Types whose push is titled by the notice itself. Every other type has one fixed push title, so
@@ -68,6 +72,20 @@ const maxAgeOfDevicesInDays = 10;
 /** The Family Downtime notice's tag on Android and identifier on iOS. The phones' code uses the same strings. */
 export const FAMILY_DOWNTIME_NOTICE_ID = 'family-downtime';
 export const CLEAR_FAMILY_DOWNTIME_NOTICE = 'clearFamilyDowntimeNotice';
+
+/**
+ * Notification cleanup (HAT-1286, docs/specs/notification-cleanup.md). A push made from a stored
+ * notification is posted under `notificationTag(id)` (Android's tag, iOS's `apns-collapse-id`), so a
+ * silent `clearNotifications` push can take it off the phone once it is read or dealt with. The
+ * phones' code uses the same strings.
+ */
+export const CLEAR_NOTIFICATIONS_ACTION = 'clearNotifications';
+const NOTIFICATION_TAG_PREFIX = 'n:';
+/** Tags per clear push: a push's data is capped at 4 KB, and a tag is about 40 bytes. */
+const CLEAR_TAGS_PER_PUSH = 50;
+export function notificationTag(notificationId: string) {
+  return `${NOTIFICATION_TAG_PREFIX}${notificationId}`;
+}
 import {TYPES} from '@/types';
 import type SetupService from './_interfaces/syssetup.service';
 import {inject} from 'inversify';
@@ -87,6 +105,8 @@ class NotificationService {
     if (tokens.length > 0) {
       const message = {
         apns: {
+          // A tagged notice is known on iOS by this id, so a clear push can remove it (HAT-1286).
+          ...(data?.notificationTag ? {headers: {'apns-collapse-id': String(data.notificationTag)}} : {}),
           payload: {
             aps: {
               alert: {
@@ -237,6 +257,70 @@ class NotificationService {
     return {sent: tokens.length};
   }
 
+  /**
+   * Takes these notifications off the phones of `userIds` (HAT-1286). Silent, like the rule sync: it
+   * shows nothing of its own, and a phone not showing them changes nothing. Never awaited by the
+   * caller's request, and never allowed to fail it.
+   */
+  async sendNotificationClear(userIds: string[], notificationIds: string[]) {
+    const ids = [...new Set(notificationIds.filter(Boolean))];
+    const users = [...new Set(userIds.filter(Boolean))];
+    if (ids.length === 0 || users.length === 0) return {sent: 0};
+    const tokens = await this.clientInfoService.listDeviceTokensForUsersUsedSinceXDaysAgo(users, maxAgeOfDevicesInDays);
+    if (tokens.length === 0) return {sent: 0};
+
+    let pushes = 0;
+    for (let i = 0; i < ids.length; i += CLEAR_TAGS_PER_PUSH) {
+      this.setupService.sendPushNotification({
+        apns: {
+          headers: {'apns-push-type': 'background', 'apns-priority': '5'},
+          payload: {aps: {'content-available': 1}},
+        },
+        android: {priority: 'high'},
+        // A push's data takes strings only.
+        data: {
+          kndAction: CLEAR_NOTIFICATIONS_ACTION,
+          notificationTags: ids
+            .slice(i, i + CLEAR_TAGS_PER_PUSH)
+            .map((id) => notificationTag(id))
+            .join(','),
+        },
+        tokens,
+      });
+      pushes++;
+    }
+    return {sent: tokens.length, pushes};
+  }
+
+  private clearFromPhones(userIds: string[], notificationIds: string[]) {
+    this.sendNotificationClear(userIds, notificationIds).catch((err) => {
+      console.warn('[notification] clear push failed', err?.message || err);
+    });
+  }
+
+  private async listAdminIds(accountId: string): Promise<string[]> {
+    const users = await this.userRepo.listByAccountId(accountId);
+    return users.filter((u) => u.type == UserType.admin).map((u) => u._id);
+  }
+
+  /**
+   * A request was answered, withdrawn or expired: its notification has nothing left to do, so it is
+   * deleted (the answer stays in the request history) and taken off every guardian's phones (HAT-1286).
+   */
+  async resolveAccessRequestNotifications(accountId: string | null | undefined, requestId: string) {
+    if (!accountId || !requestId) return {removed: 0};
+    const rows = await this.notificationsRepo
+      .query()
+      .select('_id')
+      .where({targetKey: accountId, type: NotificationType.ACCESS_REQUEST})
+      .whereRaw(`"data"->'refInfo'->>'requestId' = ?`, [requestId]);
+    const ids = rows.map((r: any) => r._id);
+    if (ids.length === 0) return {removed: 0};
+    await this.notificationsRepo.query().whereIn('_id', ids).delete();
+    this.clearFromPhones(await this.listAdminIds(accountId), ids);
+    return {removed: ids.length};
+  }
+
   async sendPushNotificationToAllUserDevicesMultipleUsers(
     userIds: string[],
     notification: {title: string; body: string},
@@ -249,6 +333,8 @@ class NotificationService {
     if (tokens.length > 0) {
       const message = {
         apns: {
+          // A tagged notice is known on iOS by this id, so a clear push can remove it (HAT-1286).
+          ...(data?.notificationTag ? {headers: {'apns-collapse-id': String(data.notificationTag)}} : {}),
           payload: {
             aps: {
               alert: {
@@ -352,6 +438,8 @@ class NotificationService {
           // The notification's type wins over refInfo's, except a `NAVIGATE_PATH`: that is what makes
           // a tap on the push open `refInfo.path` (useNativeIntegration), as account notices do.
           type: data.refInfo?.type === 'NAVIGATE_PATH' ? 'NAVIGATE_PATH' : type,
+          // A NEW_POST is not stored, so there is nothing to mark read or clear later.
+          ...(type != NotificationType.NEW_POST ? {sysId: id, notificationTag: notificationTag(id)} : {}),
         },
       ).catch((err) => {
         console.log(err);
@@ -441,6 +529,8 @@ class NotificationService {
     const notification = await this.notificationsRepo.findById(id);
     if (notification && (notification.targetKey == ctx.accountId || notification.targetKey == ctx.currentUserId)) {
       await this.notificationsRepo.deleteWithId(id); //todo, pass check auth function
+      // Dismissed here, so gone from this person's phones too (HAT-1286).
+      this.clearFromPhones([ctx.currentUserId], [id]);
       if (notification.type == NotificationGroupType.USER) {
         await this.listUserNotifcations(ctx);
       }
@@ -451,10 +541,15 @@ class NotificationService {
 
   // ROUTE-METHOD
   async clearNotifications(ctx: RequestContext) {
-    if (await ctx.isAdmin()) {
-      await this.notificationsRepo.deleteWhere({targetKey: ctx.accountId});
-    }
-    await this.notificationsRepo.deleteWhere({targetKey: ctx.currentUserId});
+    const targetKeys = (await ctx.isAdmin()) ? [ctx.currentUserId, ctx.accountId] : [ctx.currentUserId];
+    const keys = targetKeys.filter(Boolean) as string[];
+    const rows = await this.notificationsRepo.query().select('_id').whereIn('targetKey', keys);
+    await this.notificationsRepo.query().whereIn('targetKey', keys).delete();
+    // Dismiss all here clears this person's phones too (HAT-1286).
+    this.clearFromPhones(
+      [ctx.currentUserId],
+      rows.map((r: any) => r._id),
+    );
   }
 
   /**
@@ -496,6 +591,65 @@ class NotificationService {
         // A tap on the push opens the page too (`NAVIGATE_PATH` replaces the push's type).
         refInfo: {type: 'NAVIGATE_PATH', path, resourceType: 'lessonPack', resourceId: childUserId},
         actions: [{name: 'openPath', label: 'Talk it over', data: {path}}],
+      },
+      true,
+    );
+    return {notified: true};
+  }
+
+  /**
+   * A child asked for a Helper AI helper (HAT-1105, HAI-14), so the family's adults can make it or
+   * decline it; or a child's helper asked their adults a question (`question`, HAI-10). The child's
+   * own device reports it once the request or question is saved. The notice names the child only:
+   * the request and the question are end-to-end encrypted, and this text is stored in the clear and
+   * shown on lock screens. Self-reported, so capped per child per day, both kinds together.
+   */
+  async addHelperRequestNotification(
+    ctx: RequestContext,
+    nowMs = Date.now(),
+    kind: 'asked' | 'question' = 'asked',
+  ): Promise<{notified: boolean}> {
+    const childUserId = ctx.getSessionUserId();
+    if (!childUserId || !ctx.accountId) return {notified: false};
+    const child = await ctx.getUserById(childUserId);
+    // Adults make helpers themselves; only a child asks.
+    if (!child || child.type === UserType.admin) return {notified: false};
+
+    const since = new Date(nowMs - 24 * 60 * 60 * 1000);
+    const sentToday = await this.notificationsRepo.countFromSenderSince(
+      childUserId,
+      NotificationType.HELPER_REQUEST,
+      since,
+    );
+    if (sentToday >= HELPER_REQUEST_PER_DAY) return {notified: false};
+
+    const name = child.displayedName || child.username || 'Your child';
+    const path = '/helper';
+    const words =
+      kind === 'question'
+        ? {
+            title: `${name}'s helper has a question for you`,
+            message: `Open Helper AI to read it and answer, from ${name}'s progress with the helper.`,
+            shortMessage: `${name}'s helper has a question for you. Open Helper AI to answer it.`,
+            label: 'Answer',
+          }
+        : {
+            title: `${name} asked for a helper`,
+            message: `Open Helper AI to see what ${name} asked for, then make it or decline it.`,
+            shortMessage: `${name} asked for a helper. Open Helper AI to see it.`,
+            label: 'See request',
+          };
+    await this.addAccountNotification(
+      ctx,
+      NotificationType.HELPER_REQUEST,
+      childUserId,
+      ctx.accountId,
+      {
+        title: words.title,
+        message: escapeHtml(words.message),
+        shortMessage: words.shortMessage,
+        refInfo: {type: 'NAVIGATE_PATH', path, resourceType: 'helperRequest', resourceId: childUserId},
+        actions: [{name: 'openPath', label: words.label, data: {path}}],
       },
       true,
     );
@@ -561,6 +715,7 @@ class NotificationService {
             type: type,
             ...data.refInfo,
             sysId: id,
+            notificationTag: notificationTag(id),
           },
         ).catch((err) => {
           console.log(err);
@@ -720,7 +875,7 @@ class NotificationService {
     if (!ctx.isAuthenticated()) {
       throw new Error('User not authenticated');
     }
-    await this.notificationsRepo
+    const updated = await this.notificationsRepo
       .query()
       .whereIn('_id', ids)
       .where(function () {
@@ -730,7 +885,15 @@ class NotificationService {
       })
       .update({
         readAt: new Date(),
-      });
+      })
+      .returning('_id');
+    // Read here, so gone from this person's phones (HAT-1286). Only theirs: an account notice has one
+    // read state, and a co-guardian reading the list must not pull a request off the other's phone.
+    // Answering the request is what clears it for everyone (`resolveAccessRequestNotifications`).
+    this.clearFromPhones(
+      [ctx.currentUserId],
+      (updated as any[]).map((r) => (typeof r === 'string' ? r : r?._id)),
+    );
   }
 
   // ROUTE-METHOD
@@ -897,13 +1060,30 @@ class NotificationService {
    * child's request.
    */
   private nudgeAdminsOfAccessRequest(accountId: string | null | undefined): void {
+    this.broadcastToAdmins(accountId, 'accessRequestAdded', {});
+  }
+
+  /**
+   * Tell each admin's open Kindredly that a request was answered, or taken back by the child who
+   * asked, so a popup showing it on another device closes (HAT-1141). `byUserId` is who did it.
+   * Never awaited, and never allowed to fail the answer.
+   */
+  nudgeAdminsOfAccessRequestDecided(
+    accountId: string | null | undefined,
+    requestId: string,
+    byUserId: string | null | undefined,
+  ): void {
+    this.broadcastToAdmins(accountId, 'accessRequestDecided', {requestId, byUserId: byUserId || null});
+  }
+
+  private broadcastToAdmins(accountId: string | null | undefined, event: string, data: Record<string, unknown>): void {
     if (!accountId) return;
     void (async () => {
       const users = await this.userRepo.listByAccountId(accountId);
       const sse = SSEManager.getInstance();
       for (const user of users.filter((u) => u.type == UserType.admin)) {
-        sse.broadcastToUser(user._id, 'accessRequestAdded', {}).catch((e) => {
-          console.warn('[access-request] SSE nudge failed', e?.message || e);
+        sse.broadcastToUser(user._id, event, data).catch((e) => {
+          console.warn('[access-request] SSE nudge failed', event, e?.message || e);
         });
       }
     })().catch((e) => console.warn('[access-request] could not list admins to nudge', e?.message || e));

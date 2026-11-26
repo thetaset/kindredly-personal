@@ -1,1 +1,0 @@
-import{a as e,aj as i}from"./appLifecycle.storeBsQj5XV4.js";function c(n=Date.now()){var o,a;const t=(a=(o=e.account)==null?void 0:o.options)==null?void 0:a.familyTimeZone;return i(n,t??null)}export{c as p};

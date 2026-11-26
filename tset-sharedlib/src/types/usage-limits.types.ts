@@ -5,6 +5,7 @@
 import type { ReasonCode, ActivityResultType, ActivityEventContext, InterventionMode } from './activity.types';
 import type { EduValue } from '../content.types';
 import type { EarnAccessOpenings, EarnAccessSettings } from './earn-access.types';
+import type { InspirationSettings } from '../inspiration/inspiration';
 
 export interface TimeRange {
   start: string;
@@ -15,7 +16,9 @@ export interface LimitMatchCondition {
   // 'appId': device-app packages (android:<pkg>, ios:selection:<uuid>, or the
   // all-device-apps sentinel) enforced by the Companion satellite app.
   // 'game': games from the games list (restrictions/gamesList.ts) by id — their sites and their apps.
-  type: 'eduValue' | 'intent' | 'sessionIntent' | 'urlPatterns' | 'itemIds' | 'attribute' | 'usageRequirement' | 'socialDesignation' | 'appId' | 'game';
+  // 'libraryItem': a page that is an item in the child's library, of one of these categories (eduValues;
+  // none = any). Read in the browser only: an app is never a library item (HAT-1092).
+  type: 'eduValue' | 'intent' | 'sessionIntent' | 'urlPatterns' | 'itemIds' | 'attribute' | 'usageRequirement' | 'socialDesignation' | 'appId' | 'game' | 'libraryItem';
   values: string[];
   timeAmount?: number;
 }
@@ -24,6 +27,22 @@ export interface TimeLimit {
   hours: number;
   daysOfWeek: number[];
   timeRanges?: TimeRange[];
+  /**
+   * HAT-1283: this schedule is the family's School days or its Not school days
+   * (`account.options.schoolDays`). `daysOfWeek` still holds the weekdays it covers in an ordinary
+   * week, so a reader that ignores this field enforces it as a weekday schedule;
+   * `restrictions/schoolDays.ts` → `applySchoolDays` moves a day off onto Not school days.
+   */
+  dayKind?: 'school' | 'notSchool';
+  /**
+   * HAT-1326: these hours were chosen as "Same as" another limit's, named by its rule id. Only the
+   * Time limits editor reads it, to keep the two sets of hours the same when the other limit's are
+   * changed there. `timeRanges` still holds the hours, so everything that enforces limits ignores this.
+   * HAT-1328: on Junk and Social media it is `own` for hours a guardian gave that limit: saved with
+   * nothing, hours equal to Entertainment's are read as the same as Entertainment's, as they were
+   * before those two had hours of their own.
+   */
+  hoursFrom?: string;
 }
 
 export interface LimitReqs {
@@ -38,10 +57,26 @@ export interface LimitRule {
   conditions?: LimitMatchCondition[];
   reqs?: LimitReqs;
   timeLimits: TimeLimit[];
+  /**
+   * HAT-1086: the most time a week, in hours, counted from Monday's start on the family clock
+   * (`familyWeekStartMs`), on top of any daily amounts in `timeLimits`. Absent: no weekly total.
+   * It counts every day of the week, so on a day with no TimeLimit the rule has this and no daily
+   * amount. See `restrictions/weeklyLimit.ts`.
+   */
+  weeklyHours?: number;
+  /**
+   * HAT-1092: what this limit leaves out — a minute that matches any of these does not count toward
+   * it, though it still counts toward every other limit it matches. Written by Time limits'
+   * Exceptions ("Games can have more time than Entertainment" leaves games out of Entertainment;
+   * see `restrictions/limitExceptions.ts`). Each condition is read on its own. Absent: nothing left out.
+   */
+  excludes?: LimitMatchCondition[];
 }
 
 export interface LimitRuleInfo {
   isOverride: boolean;
+  /** The override only moves this limit's allowed hours for another limit's extra time (`RuleOverride.hoursFor`). */
+  overrideMovesHoursOnly?: boolean;
   timeLimit: TimeLimit;
   limitRule: LimitRule;
   origTimeLimit: TimeLimit | null;
@@ -67,7 +102,20 @@ export interface UsageStatus {
   reasonCode?: ReasonCode;
   selectedByFilter?: boolean;
   logTimes?: { start: number; end: number }[];
+  /**
+   * HAT-1086: the rule's weekly total, present only when it has one. `usage` is this week's time
+   * so far, today's included; `timeLeft` is what the week has left. The status's own `timeLeft` is
+   * already the smaller of the day's and the week's, and `weekUsedUp` says the week is why.
+   */
+  week?: { hours: number; usage: number; timeLeft: number; startMs: number };
+  /** The weekly total is used up (or 0), so the rule blocks until Monday whatever today's amount says. */
+  weekUsedUp?: boolean;
+  /** No daily amount today: only the weekly total limits this rule today. */
+  weekOnly?: boolean;
 }
+
+/** Video, Games, Social media and AI (HAT-1359): counted on top of a page's category (HAT-872). */
+export type UsageKindKey = 'video' | 'games' | 'social' | 'ai';
 
 export interface UsageSummaryData {
   overallUsage: UsageStatus;
@@ -83,6 +131,13 @@ export interface UsageSummaryData {
    * count toward `overallUsage`.
    */
   eduValueUsage?: Partial<Record<EduValue, number>>;
+  /**
+   * HAT-1274: total ms today on video playing, games and social media, interval-merged like
+   * `overallUsage`, matched as the Video, Games and Social media limits match. Counted whether or
+   * not those limits exist, so a page can show the time when there is no limit. Each also counts
+   * toward a category, so these overlap `eduValueUsage`. Only kinds with time are present.
+   */
+  kindUsage?: Partial<Record<UsageKindKey, number>>;
   filterContext?: ActivityEventContext;
   noUsageLimits?: boolean;
   /** No limit applies right now: usage limits are paused, or all restrictions are (`restrictionsPaused`). */
@@ -245,6 +300,8 @@ export interface AccessControlSettings {
   earnAccessSettings?: EarnAccessSettings;
   /** When each Earn access rule was last opened, by rule id. */
   earnAccessOpenings?: EarnAccessOpenings;
+  /** The block page's pictures and words (HAT-1216). Absent: on, with the collections for their age. */
+  inspiration?: InspirationSettings;
 }
 
 export interface RemoteActionSettings {
@@ -273,6 +330,8 @@ export interface TakeBreakSettings {
   breakMinutes?: number;
   includeAllTypes?: boolean;
   appliesToEduValues?: EduValue[];
+  /** Off until this time (epoch ms), then on again by itself (HAT-1255). Past or absent: not paused. */
+  pausedUntil?: number;
 }
 
 export interface TakeBreakAdvisory {
@@ -321,9 +380,17 @@ export interface RuleOverride {
   ruleId: string;
   timeLimit: TimeLimit;
   expiresAt: number;
+  /**
+   * Set when this override only moves the limit's allowed hours, for extra time given to these
+   * limits (HAT-1146): its time is today's own. It is no extra time of its own, and goes once none
+   * of these limits has an override left. Edited by hand, it becomes an ordinary override.
+   */
+  hoursFor?: string[];
 }
 
 export interface RuleOverrideSettings {
   ruleOverrides: RuleOverride[];
   lastUpdated?: number;
+  /** Written by the server only (RVW-9, S6): `restrictions/optionRevisions.ts`. */
+  revision?: number;
 }

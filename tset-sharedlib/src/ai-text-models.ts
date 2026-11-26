@@ -1,8 +1,16 @@
+import { HELPER_CHAT_MODE } from './helper-ai';
+
 /**
  * Every hosted text model the server can price: the one offered, and those it no longer offers,
  * whose recorded usage still needs a price.
  */
-export const AI_HOSTED_TEXT_MODELS = ['deepseek-flash', 'gpt-6-luna', 'deepseek-v4-pro', 'gpt-6-sol'] as const;
+export const AI_HOSTED_TEXT_MODELS = [
+  'deepseek-flash',
+  'gpt-6-luna',
+  'deepseek-v4-pro',
+  'gpt-6-sol',
+  'deepseek-ai/DeepSeek-V4-Flash-0731',
+] as const;
 
 export type AiTextModelId = (typeof AI_HOSTED_TEXT_MODELS)[number];
 
@@ -14,7 +22,8 @@ export type AiTextModelId = (typeof AI_HOSTED_TEXT_MODELS)[number];
  * DeepSeek … for EnvoyTo. But for Kindredly, let's use OpenAI Luna … the cheapest"). DeepSeek's
  * terms don't rule out training on what it is sent, it offers no data agreement, and it stores data
  * in China; Kindredly's Privacy Policy promises service providers under data protection agreements.
- * A request that names another model, such as an older app's, is answered on Luna.
+ * A request that names another model, such as an older app's, is answered on Luna; the one
+ * exception is a Helper AI helper's chat, on DeepSeek at DeepInfra (`resolveChatModel`).
  *
  * Ollama, the browser's built-in model and a family's own API key never reach this list: they
  * do not run on Kindredly's account.
@@ -34,8 +43,8 @@ export const AI_BACKUP_MODEL: AiTextModelId = 'gpt-6-luna';
  */
 export const AI_WRITING_TIMEOUT_MS = 240_000;
 
-/** The companies that run Kindredly AI's text models. */
-export type AiTextProvider = 'openai' | 'deepseek';
+/** The companies that run Kindredly AI's text models. DeepInfra runs open models, DeepSeek's among them. */
+export type AiTextProvider = 'openai' | 'deepseek' | 'deepinfra';
 
 /** Who runs each hosted model, which decides the key and address a call goes to. */
 export const AI_MODEL_PROVIDER: Record<AiTextModelId, AiTextProvider> = {
@@ -43,6 +52,7 @@ export const AI_MODEL_PROVIDER: Record<AiTextModelId, AiTextProvider> = {
   'gpt-6-luna': 'openai',
   'deepseek-v4-pro': 'deepseek',
   'gpt-6-sol': 'openai',
+  'deepseek-ai/DeepSeek-V4-Flash-0731': 'deepinfra',
 };
 
 /** The provider for `model`, OpenAI for a name this list does not know. */
@@ -93,6 +103,8 @@ export const AI_MODEL_REQUEST_MULTIPLE: Record<AiTextModelId, number> = {
   'gpt-6-luna': 1,
   'deepseek-v4-pro': 8,
   'gpt-6-sol': 20,
+  // $0.06 in and $0.18 out a million tokens at DeepInfra (2026-11-13), against Luna's $0.10 and $0.50.
+  'deepseek-ai/DeepSeek-V4-Flash-0731': 0.4,
 };
 
 /**
@@ -112,6 +124,8 @@ export const AI_MODEL_REASONING_EFFORT: Record<AiTextModelId, 'none' | 'low' | '
   // The careful model reasons more, as Sol did.
   'deepseek-v4-pro': 'medium',
   'gpt-6-sol': 'medium',
+  // A helper chat calls tools, and answered well without reasoning in HAI-7's live run.
+  'deepseek-ai/DeepSeek-V4-Flash-0731': 'none',
 };
 
 /**
@@ -148,4 +162,33 @@ export function resolvePlanModel(accountType: string | null | undefined, request
   const allowed = modelsForAccountType(accountType);
   const name = replaceRetiredModel(typeof requested === 'string' ? requested.trim() : '');
   return name && allowed.includes(name) ? name : allowed[0];
+}
+
+/**
+ * What a Helper AI helper's chat runs on (founder, 2026-11-13: "the app too for now"): DeepSeek's
+ * V4 Flash, hosted by DeepInfra rather than DeepSeek, on every plan. The pinned snapshot keeps eval
+ * results comparable. A server without a DeepInfra key answers on GPT-6 Luna (`servableModel`).
+ * Kindredly's other AI stays on Luna (HAT-503).
+ */
+export const HELPER_DEFAULT_MODEL: AiTextModelId = 'deepseek-ai/DeepSeek-V4-Flash-0731';
+
+/**
+ * GPT-6 Sol, for one Helper AI helper on Plus (HAI-9, HAT-1105). A parent picks it for a helper
+ * that needs more careful answers. It uses AI limits twenty times faster than Luna
+ * (`AI_MODEL_REQUEST_MULTIPLE`), so it is never the family's model and never runs outside a
+ * helper's chat. OpenAI runs it under the same agreement as Luna.
+ */
+export const HELPER_PLUS_MODELS = ['gpt-6-sol'] as const satisfies readonly AiTextModelId[];
+
+/**
+ * The model one chat turn runs: `resolvePlanModel`, except a helper's chat, which runs on
+ * `HELPER_DEFAULT_MODEL`, or on one of `HELPER_PLUS_MODELS` when a Plus family named it. The chat
+ * route and the cost guard's estimate both use it, so a turn is admitted on the price of the model
+ * it runs.
+ */
+export function resolveChatModel(accountType: string | null | undefined, requested: unknown, mode: unknown): string {
+  if (mode !== HELPER_CHAT_MODE) return resolvePlanModel(accountType, requested);
+  const name = replaceRetiredModel(typeof requested === 'string' ? requested.trim() : '');
+  const plus = accountType === 'plus' || accountType === 'superplus';
+  return plus && (HELPER_PLUS_MODELS as readonly string[]).includes(name) ? name : HELPER_DEFAULT_MODEL;
 }

@@ -1,0 +1,1 @@
+const o="User not found";function r(t){return`No Kindredly account uses this ${t} account. Sign in another way, or create an account.`}function i(t){if(typeof t!="string")return!1;const n=t.trim();return n===o?!0:["Google","Apple"].some(e=>n.startsWith(r(e).split(". ")[0]))}export{i};

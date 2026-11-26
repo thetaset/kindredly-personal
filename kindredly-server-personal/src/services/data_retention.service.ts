@@ -27,6 +27,13 @@ const MS_PER_DAY = 24 * 60 * 60 * 1000;
 const CLASSIFICATION_SAMPLE_RETENTION_DAYS = 180;
 
 /**
+ * A frozen test or pinned set is kept whole, however old its pages are (CLS-7). Deleting one page
+ * would change the set's signature, and every classifier version scored on it would silently stop
+ * counting. Only frozen ones: an unfrozen set is still being built and ages out like any other.
+ */
+const KEPT_FROZEN_DATASET_ROLES = ['test', 'pinned'];
+
+/**
  * An activity record is one device's day: its `createdAt` is when that day's record started, and
  * entries in it can be up to a day newer (`tset-client/src/utils/usage.ts`). So a person keeping N
  * days has records deleted only once they are N + 1 days old, and "Keep history for 1 day" never
@@ -51,7 +58,20 @@ type PurgeTarget = {
   table: 'user_change_log' | 'audit_log' | 'event_log' | 'security_event' | 'classification_dataset_sample';
   retentionDays: number;
   repo: UserChangeLogRepo | AuditLogRepo | EventLogRepo | SecurityEventRepo | ClassificationDatasetSampleRepo;
+  /** Narrows the delete to the rows that may go. */
+  keep?: (query: any) => any;
 };
+
+/** Leaves out the samples of a frozen test or pinned set. */
+function keepFrozenTestAndPinnedSets(query: any) {
+  return query.whereNotExists(function (this: any) {
+    this.select('classification_dataset._id')
+      .from('classification_dataset')
+      .whereRaw('"classification_dataset"."datasetId" = "classification_dataset_sample"."datasetId"')
+      .whereIn('classification_dataset.role', KEPT_FROZEN_DATASET_ROLES)
+      .andWhere('classification_dataset.frozen', true);
+  });
+}
 
 export class DataRetentionService {
   private static _staticInstance: DataRetentionService | null = null;
@@ -101,9 +121,11 @@ export class DataRetentionService {
 
     // Dual-guard delete: match both intended retention cutoff and the global 30-day safety floor.
     // If retentionCutoff is ever wrong, this still prevents deleting records newer than 30 days.
-    const deleted = await (
-      target.repo.query().where('createdAt', '<', retentionCutoff).andWhere('createdAt', '<', minSafeCutoff) as any
-    ).del();
+    const query = target.repo
+      .query()
+      .where('createdAt', '<', retentionCutoff)
+      .andWhere('createdAt', '<', minSafeCutoff) as any;
+    const deleted = await (target.keep ? target.keep(query) : query).del();
 
     return {table: target.table, deleted: Number(deleted || 0)};
   }
@@ -207,6 +229,7 @@ export class DataRetentionService {
         table: 'classification_dataset_sample',
         retentionDays: CLASSIFICATION_SAMPLE_RETENTION_DAYS,
         repo: this.classificationDatasetSampleRepo,
+        keep: keepFrozenTestAndPinnedSets,
       },
     ];
 

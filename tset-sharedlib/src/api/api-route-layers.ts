@@ -49,6 +49,7 @@ export const serverOnlyRoutes: Array<keyof ApiRouteMap> = [
   '/admin/published/enrich',
   '/admin/published/applyEnrichmentPatches',
   '/admin/published/importBatches',
+  '/admin/published/intakeSummary',
   '/admin/published/approveBatch',
   '/admin/contentBundles/reset',
   '/admin/contentBundles/update',
@@ -127,7 +128,14 @@ export const serverOnlyRoutes: Array<keyof ApiRouteMap> = [
  * These routes operate on local state, browser APIs, or native features.
  */
 export const clientOnlyRoutes: Array<keyof ApiRouteMap> = [
+  '/deviceFolder/connect',
+  '/deviceFolder/myIceServers',
+  '/deviceFolder/myList',
+  '/deviceFolder/search',
+  '/deviceFolder/thumbs',
   '/appbuild/seal',
+  '/appbuild/cache/get',
+  '/appbuild/cache/set',
   '/auth/localFamilyStatus',
   '/auth/eraseLocalFamily',
   '/auth/verifyOwnPinpass',
@@ -179,6 +187,8 @@ export const clientOnlyRoutes: Array<keyof ApiRouteMap> = [
   '/pageNotes/reminderFor',
   '/pageNotes/read',
   '/pageNotes/choices',
+  '/pageNotes/carryOn',
+  '/pageNotes/pages',
   '/pageNotes/openOnPage',
   // Events are items whose times live in the encrypted `info` blob, so listing
   // and expanding them can only happen on a signed-in client.
@@ -197,6 +207,11 @@ export const clientOnlyRoutes: Array<keyof ApiRouteMap> = [
   // Whether THIS person is locked right now depends on the device's clock and its account copy;
   // the server stores the schedule, the device answers the question.
   '/familyDowntime/state',
+  // A pinned search's words are encrypted and opened with the person's own key (HAT-1107).
+  '/search/pinned/seal',
+  '/search/pinned/open',
+  // The library's links and the known sites, read from this device for the native Home (PNH-5).
+  '/search/homeSuggestSources',
 ];
 
 /**
@@ -227,6 +242,11 @@ export const requiresBGRouterHandler: Array<keyof ApiRouteMap> = [
   // Sync-related routes
   '/sync/update',
   '/sync/getStatus',
+  // Offline saves (HAT-1225): the changes this device has not sent, read and acted on here.
+  '/sync/unsent/list',
+  '/sync/unsent/retry',
+  '/sync/unsent/discard',
+  '/sync/unsent/send',
   
   // Search with local index
   '/search/main',

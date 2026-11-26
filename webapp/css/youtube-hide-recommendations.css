@@ -10,6 +10,32 @@ ytd-banner-promo-renderer-background,
 .ytp-autonav-overlay,
 .ytp-autonav-endscreen-upnext-thumbnail,
 .ytp-autonav-endscreen-countdown-container,
-.ytp-endscreen-content {
+.ytp-endscreen-content,
+/* Fullscreen: the shelf of suggested videos that peeks above the controls, and the wall of
+   suggestions shown when a video ends. ytp-fullscreen-grid-main-content, the hover overlay,
+   the expand button and the More videos pill all sit inside this one container. */
+.ytp-fullscreen-grid {
   display: none !important;
+}
+
+/* The player still marks the root peeking or active and reserves room for the hidden grid:
+   peeking lifts the controls and captions by the peek height, and active hides the controls. */
+.html5-video-player.ytp-fullscreen-grid-peeking {
+  --ytp-grid-peek-height: 0px !important;
+}
+
+.html5-video-player.ytp-fullscreen-grid-active:not(.ended-mode) .ytp-chrome-bottom {
+  display: block !important;
+  bottom: 0 !important;
+  opacity: 1 !important;
+  pointer-events: auto !important;
+}
+
+.html5-video-player.ytp-fullscreen-grid-active .ytp-caption-window-container {
+  display: block !important;
+}
+
+.html5-video-player.ytp-fullscreen-grid-active .caption-window.ytp-caption-window-bottom {
+  display: block !important;
+  opacity: 1 !important;
 }

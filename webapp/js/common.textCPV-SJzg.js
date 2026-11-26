@@ -1,0 +1,1 @@
+const e={state:{tryAgain:"Try again",emptyTitle:"Nothing here yet",loading:"Loading…"},unsaved:{title:"Discard changes?",message:"What you changed here has not been saved.",discard:"Discard",keepEditing:"Keep editing"}};export{e as c};

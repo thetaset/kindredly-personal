@@ -10,6 +10,11 @@ import {outboundFetchCounter} from '@/services/outbound_fetch_counter';
 import {resolveShortLink} from '@/utils/short_link';
 import {callCheckedService} from '@/services/app_service.service';
 import {findWork} from '@/services/work_lookup.service';
+import {config} from '@/config';
+import {HttpException} from '@/exceptions/HttpException';
+import {builtInClassifierVersion, bundledClassifierActive} from '@/utils/classifier_version_hash';
+// Type only: services/_internal is withheld from Kindredly Personal, so the class is required lazily.
+import type {ClassifierVersionService} from '@/services/_internal/classifier_version.service';
 
 class ExternalDataRoute implements Routes {
   public router = Router();
@@ -22,6 +27,17 @@ class ExternalDataRoute implements Routes {
     console.info(`Initializing routes ${this.constructor.name}`);
 
     this.initializeRoutes();
+  }
+
+  /**
+   * The saved classifier versions, or null on a self-hosted server: it has no admin console to
+   * save or activate one, so its apps use the bundled version (CLS-4).
+   */
+  private get classifierVersions(): ClassifierVersionService | null {
+    if (config.privateServer) return null;
+    // personal-optional: guarded, never reached on a self-hosted server
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    return require('../services/_internal/classifier_version.service').ClassifierVersionService.instance;
   }
 
   private initializeRoutes() {
@@ -53,6 +69,37 @@ class ExternalDataRoute implements Routes {
       errorHelper(async (req: ApiReq<'/data/learnedClassifierModel/getActive'>, res) => {
         const model = await this.externalDataService.getActiveLearnedClassifierModel(req.body?.kind);
         res.json({success: true, results: {model: model || null}});
+      }),
+    );
+
+    // The active classifier version (CLS-4). An app asks when it classifies a page and its copy is
+    // over 6 hours old, and downloads the version with /data/classifier/get only when the id has
+    // changed. Any signed-in user: every app runs the classifier itself, and a version holds rules
+    // and example sentences, not anyone's data.
+    this.router.post(
+      '/data/classifier/active',
+      authenticateJWT,
+      errorHelper(async (_req: ApiReq<'/data/classifier/active'>, res) => {
+        // A server with no versions of its own has activated nothing: apps keep the version they ship.
+        const state = (await this.classifierVersions?.getActiveState()) ?? {
+          active: bundledClassifierActive(),
+          activated: false,
+        };
+        res.json({success: true, results: state});
+      }),
+    );
+
+    // One classifier version by id: a saved one, 'v1', or the one this build ships. Anything else is a 404.
+    this.router.post(
+      '/data/classifier/get',
+      authenticateJWT,
+      errorHelper(async (req: ApiReq<'/data/classifier/get'>, res) => {
+        const id = req.body?.id;
+        const service = this.classifierVersions;
+        const builtIn = builtInClassifierVersion(id);
+        if (!service && !builtIn) throw new HttpException(404, 'No such classifier version');
+        const version = service ? await service.getVersion(id) : builtIn;
+        res.json({success: true, results: {version}});
       }),
     );
 

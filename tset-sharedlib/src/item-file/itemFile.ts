@@ -168,7 +168,9 @@ export type ItemFileErrorCode =
   | 'newer_version'
   | 'too_large'
   | 'damaged'
-  | 'empty';
+  | 'empty'
+  /** The app could not load the code that opens the file (a deploy while the page was open): reload. */
+  | 'needs_reload';
 
 /** A file that cannot be opened. `message` is written for the person opening it. */
 export class ItemFileError extends Error {

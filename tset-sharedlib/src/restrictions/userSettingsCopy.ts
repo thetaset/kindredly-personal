@@ -323,22 +323,49 @@ function resolveRedditDistractionSetting(
   return resolveRestrictedSiteToggle(userType, configuredValue);
 }
 
+/**
+ * The parts of a child's `accessControlSettings` that are that child's own: a pause, Block all, Live
+ * View and remote actions. Copying time limits never copies them, and never removes them from the
+ * child being copied to.
+ */
+const TARGET_OWN_ACCESS_CONTROL_KEYS = [
+  'disableRestrictions',
+  'disableRestrictionsExpires',
+  'disableRestrictionsTimeStamp',
+  'disableUsageLimits',
+  'disableUsageLimitsExpires',
+  'disableUsageLimitsTimeStamp',
+  'restrictAll',
+  'restrictAllExpires',
+  'restrictAllTimeStamp',
+  'remoteActionSettings',
+  'liveViewSettings',
+] as const;
+
 export function sanitizeUsageLimitsAccessControlSettings(raw: Record<string, unknown> | null | undefined) {
   if (!raw || typeof raw !== 'object') return null;
 
   const next = cloneValue(raw) as Record<string, unknown>;
+  for (const key of TARGET_OWN_ACCESS_CONTROL_KEYS) delete next[key];
 
-  delete next.disableRestrictions;
-  delete next.disableRestrictionsExpires;
-  delete next.disableRestrictionsTimeStamp;
-  delete next.disableUsageLimits;
-  delete next.disableUsageLimitsExpires;
-  delete next.disableUsageLimitsTimeStamp;
-  delete next.restrictAll;
-  delete next.restrictAllExpires;
-  delete next.restrictAllTimeStamp;
-  delete next.remoteActionSettings;
-  delete next.liveViewSettings;
+  return Object.keys(next).length > 0 ? next : null;
+}
+
+/**
+ * The copied `accessControlSettings` with the target's own values put back. The copy replaces the
+ * target's object whole, so without this copying time limits turned off the target's Live View and
+ * remote actions and ended their pause (UX-087).
+ */
+export function keepTargetOwnAccessControlSettings(
+  copied: Record<string, unknown> | null | undefined,
+  target: Record<string, unknown> | null | undefined,
+) {
+  const next = cloneValue(copied && typeof copied === 'object' ? copied : {}) as Record<string, unknown>;
+  if (target && typeof target === 'object') {
+    for (const key of TARGET_OWN_ACCESS_CONTROL_KEYS) {
+      if (key in target) next[key] = cloneValue(target[key]);
+    }
+  }
 
   return Object.keys(next).length > 0 ? next : null;
 }

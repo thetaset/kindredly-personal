@@ -1,0 +1,1 @@
+var o=Object.defineProperty;var a=(s,r,e)=>r in s?o(s,r,{enumerable:!0,configurable:!0,writable:!0,value:e}):s[r]=e;var E=(s,r,e)=>a(s,typeof r!="symbol"?r+"":r,e);const t="USER_MESSAGE";class U extends Error{constructor(e){super(e);E(this,"errorType",t);this.name="UserMessageError"}}export{U,t as a};

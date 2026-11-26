@@ -27,6 +27,10 @@ export * from './device-guard.types';
 // Desktop Companion status (shared by the Electron main process, its preload, and the extension)
 export * from './desktop-status.types';
 
+// The Home copy: what the web app hands the native Home (PNH-4)
+export * from './home-copy.types';
+export * from './home-suggest.types';
+
 // Reason codes (precedence helpers)
 export * from './reason-code.utils';
 export * from './reason-metadata';

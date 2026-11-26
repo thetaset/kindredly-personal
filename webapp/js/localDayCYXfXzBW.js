@@ -1,0 +1,1 @@
+function n(e){const t=new Date(e);return t.setHours(0,0,0,0),t.getTime()}function o(e,t){return n(e)===n(t)}function s(e,t){const a=new Date(e);return a.setHours(0,0,0,0),a.setDate(a.getDate()+t),a.getTime()}export{s as a,o as i,n as t};

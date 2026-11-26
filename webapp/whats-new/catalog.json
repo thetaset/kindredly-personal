@@ -1,0 +1,136 @@
+{
+  "revision": "2026-11-25.1",
+  "entries": [
+    {
+      "id": "blocked-and-time-limits",
+      "version": "3.1.7",
+      "released": "2026-11-24",
+      "audience": "adults",
+      "color": "blue",
+      "icon": "shield-check",
+      "title": "Blocked and Time limits",
+      "line": "What is always off and how long things may be used now live in two clear places. A site you block reaches your child's browser within seconds.",
+      "steps": [
+        "Open Settings and choose a child.",
+        "Under Filtering and blocking, Blocked and allowed sites lists the sites and parts of sites that are always off.",
+        "Time limits sets how long they can use sites and apps each day."
+      ],
+      "tip": "A site blocked on one child's list blocks only that child.",
+      "tryIt": {
+        "label": "Open Settings",
+        "route": "/settings"
+      },
+      "video": "whats-new/media/blocked-and-time-limits.mp4",
+      "poster": "whats-new/media/blocked-and-time-limits.jpg"
+    },
+    {
+      "id": "explore-search",
+      "version": "3.1.7",
+      "released": "2026-11-24",
+      "audience": "everyone",
+      "color": "yellow",
+      "icon": "search",
+      "title": "Explore starts with search",
+      "line": "A search box sits above Discover and Topics, so finding vetted content doesn't start with browsing.",
+      "tryIt": {
+        "label": "Open Explore",
+        "route": "/explore"
+      },
+      "video": "whats-new/media/explore-search.mp4",
+      "poster": "whats-new/media/explore-search.jpg"
+    },
+    {
+      "id": "library-page",
+      "version": "3.1.7",
+      "released": "2026-11-24",
+      "audience": "everyone",
+      "color": "green",
+      "icon": "collection",
+      "title": "Library has a page of its own",
+      "line": "A card for each section, drawn as what it holds, then what's new, what you visited recently, and what you starred and hearted.",
+      "tryIt": {
+        "label": "Open Library",
+        "route": "/library"
+      },
+      "video": "whats-new/media/library-page.mp4",
+      "poster": "whats-new/media/library-page.jpg"
+    },
+    {
+      "id": "subscriptions-rack",
+      "version": "3.1.7",
+      "released": "2026-11-24",
+      "audience": "everyone",
+      "color": "purple",
+      "icon": "journals",
+      "title": "Subscriptions is a rack",
+      "line": "Each source you follow is a cover on a shelf, grouped by kind: YouTube channels, podcasts, news and blogs, and more.",
+      "tryIt": {
+        "label": "Open Subscriptions",
+        "route": "/library/subscriptions"
+      },
+      "video": "whats-new/media/subscriptions-rack.mp4",
+      "poster": "whats-new/media/subscriptions-rack.jpg"
+    },
+    {
+      "id": "library-health",
+      "version": "3.1.7",
+      "released": "2026-11-24",
+      "audience": "adults",
+      "color": "teal",
+      "icon": "heart-pulse",
+      "title": "Library Health tidies up when you say so",
+      "line": "Cleanup lists the items you haven't opened in months. Tick the ones you're done with and archive them in one go.",
+      "tryIt": {
+        "label": "Open Library Health",
+        "route": "/library/health"
+      },
+      "video": "whats-new/media/library-health.mp4",
+      "poster": "whats-new/media/library-health.jpg"
+    },
+    {
+      "id": "family-downtime",
+      "released": "2026-09-14",
+      "audience": "adults",
+      "color": "red",
+      "video": "whats-new/media/family-downtime.mp4",
+      "poster": "whats-new/media/family-downtime.jpg",
+      "title": "Family Downtime",
+      "line": "Set screen-free times for the whole family, parents included.",
+      "tryIt": {
+        "label": "Open Family Downtime",
+        "route": "/family/downtime"
+      }
+    },
+    {
+      "id": "ai-approves-requests",
+      "released": "2026-03-05",
+      "audience": "adults",
+      "color": "blue",
+      "video": "whats-new/media/ai-approves-requests.mp4",
+      "poster": "whats-new/media/ai-approves-requests.jpg",
+      "title": "AI can approve requests",
+      "line": "When your child asks for something new, AI can approve it if it's educational and fits your guidelines. It is optional, and only for the situations you specify."
+    },
+    {
+      "id": "learning-tracks",
+      "released": "2026-09-24",
+      "audience": "everyone",
+      "planReadinessKey": "contentAuthoring",
+      "color": "yellow",
+      "video": "whats-new/media/learning-tracks.mp4",
+      "poster": "whats-new/media/learning-tracks.jpg",
+      "title": "Learning tracks",
+      "line": "Short lessons on a topic, from the topic to the first item."
+    },
+    {
+      "id": "save-to-collection",
+      "released": "2024-06-26",
+      "audience": "everyone",
+      "color": "green",
+      "video": "whats-new/media/save-to-collection.mp4",
+      "poster": "whats-new/media/save-to-collection.jpg",
+      "title": "Save a page to a collection",
+      "line": "Keep what you find in collections, and share a collection with the people you choose."
+    }
+  ]
+}

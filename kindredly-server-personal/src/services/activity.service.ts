@@ -15,7 +15,17 @@ import {ClassificationFeedbackReportRepo} from '@/db/classification_feedback_rep
 import {ClassificationDatasetSampleRepo} from '@/db/classification_dataset_sample.repo';
 import {ClassificationDatasetRepo} from '@/db/classification_dataset.repo';
 import {UserType} from 'tset-sharedlib/shared.types';
-import {IMAGE_IMPROVEMENT_PREF_KEY} from 'tset-sharedlib/types';
+import {CATEGORY_CORRECTIONS_PREF_KEY, IMAGE_IMPROVEMENT_PREF_KEY, PAGE_SHARING_PREF_KEY} from 'tset-sharedlib/types';
+import {
+  MAX_SHARED_PAGES_PER_UPLOAD,
+  categorySourceOf,
+  sharedPageFrom,
+  type SharedPage,
+} from 'tset-sharedlib/classifiers/pageSharing';
+
+/** A Category's source as an upload states it, or null when it names none of the known ones. */
+const sharedCategorySource = (value: unknown) =>
+  typeof value === 'string' ? categorySourceOf({srcType: value}) : null;
 import UserActivityLog from 'tset-sharedlib/schemas/public/UserActivityLog';
 import {assertEncInfoUpdateIsSafe, assertEncryptedUpdateHasEncInfo} from '@/utils/encinfo_guards';
 import {createHash} from 'crypto';
@@ -31,6 +41,8 @@ import type {
   UploadClassificationDatasetSamplesResponse,
   UploadImageClassificationSamplesRequest,
   UploadImageClassificationSamplesResponse,
+  SharePagesRequest,
+  SharePagesResponse,
 } from 'tset-sharedlib/api';
 import type {EduValue} from 'tset-sharedlib/content.types';
 import type {ActivityNavOrigin} from 'tset-sharedlib/types/activity.types';
@@ -83,6 +95,8 @@ class ActivityService {
   private static readonly PAGE_REPORT_WINDOW_MS = 60 * 60 * 1000;
 
   private static readonly IMAGE_SAMPLE_MAX_PER_REQUEST = 200;
+  /** CLS-19: the most shared pages kept from one member in a day. */
+  private static readonly SHARED_PAGES_PER_DAY = 1000;
   private static readonly IMAGE_SAMPLE_MAX_VECTOR_DIMS = 2048;
   /** ~64KB of base64, comfortably above a 224x224 JPEG and well below abuse. */
   private static readonly IMAGE_SAMPLE_MAX_IMAGE_CHARS = 90_000;
@@ -94,6 +108,8 @@ class ActivityService {
   private classificationDatasetSampleRepo = new ClassificationDatasetSampleRepo();
   private classificationDatasetRepo = new ClassificationDatasetRepo();
   private userPrefRepo = new UserPrefRepo();
+  /** Shared pages kept today, per member: in memory only, so nothing stored says who shared. */
+  private sharedPagesToday = new Map<string, {day: string; count: number}>();
   private feedback = new ItemFeedbackRepo();
 
   private getActivityControlRowId(userId: string): string {
@@ -106,11 +122,25 @@ class ActivityService {
     return typeof cutoffValue === 'number' && cutoffValue > 0 ? cutoffValue : 0;
   }
 
+  /**
+   * Removing or relabelling usage is a guardian's action. A restricted user is never allowed it on
+   * their own records: their time limits are counted from these rows, so clearing them would hand
+   * back the day's and the week's time (RVW-4). The app already refuses; this is the same rule on
+   * the server. A guardian's PIN on the child's device makes the guardian the acting user.
+   */
+  private async verifyMayRewriteUsage(ctx: RequestContext, targetUserId: string) {
+    await ctx.verifySelfOrAdminOverUser(targetUserId);
+    const actingUser = await ctx.getCurrentUser();
+    if (!actingUser || actingUser.type === UserType.restricted) {
+      throw new Error('Only a guardian can change usage records');
+    }
+  }
+
   async invalidateActivityMonitors(
     ctx: RequestContext,
     targetUserId: string,
   ): Promise<InvalidateActivityMonitorsResponse> {
-    await ctx.verifySelfOrAdminOverUser(targetUserId);
+    await this.verifyMayRewriteUsage(ctx, targetUserId);
 
     const invalidateBeforeCreatedAtMs = Date.now();
     await this.userActivityLogRepo.create({
@@ -154,7 +184,17 @@ class ActivityService {
 
   private async ensureClassificationDatasetRegistry(
     ctx: RequestContext,
-    input: {datasetId: string; name?: string; description?: string | null; role?: string | null; task?: string | null},
+    input: {
+      datasetId: string;
+      name?: string;
+      description?: string | null;
+      role?: string | null;
+      task?: string | null;
+      /** Left out: the member asking. Null for a dataset no one should be named on (CLS-19). */
+      createdBy?: string | null;
+      composedFromKind?: string;
+      at?: Date;
+    },
   ): Promise<void> {
     const datasetId = (input.datasetId || '').trim();
     if (!datasetId) return;
@@ -177,10 +217,13 @@ class ActivityService {
         task: input.task ?? 'content',
         role: input.role ?? 'mixed',
         frozen: false,
-        composedFrom: {kind: input.task === 'image' ? 'imageClassificationSamples' : 'pipelineResultsImport'},
-        createdBy: ctx.currentUserId,
-        createdAt: new Date(),
-        updatedAt: new Date(),
+        composedFrom: {
+          kind:
+            input.composedFromKind ?? (input.task === 'image' ? 'imageClassificationSamples' : 'pipelineResultsImport'),
+        },
+        createdBy: input.createdBy === undefined ? ctx.currentUserId : input.createdBy,
+        createdAt: input.at ?? new Date(),
+        updatedAt: input.at ?? new Date(),
       } as any);
     } catch (error) {
       if (this.isMissingClassificationDatasetTableError(error)) return;
@@ -215,6 +258,28 @@ class ActivityService {
       return (await this.userPrefRepo.getUserPref(userId, IMAGE_IMPROVEMENT_PREF_KEY)) === true;
     } catch {
       // Fail closed — an unreadable pref is not consent.
+      return false;
+    }
+  }
+
+  /** Agreed with the wording that covers Category changes (CLS-12); an earlier agreement does not. */
+  private async hasCategoryCorrectionsConsent(ctx: RequestContext): Promise<boolean> {
+    const userId = ctx.currentUserId;
+    if (!userId) return false;
+    try {
+      return (await this.userPrefRepo.getUserPref(userId, CATEGORY_CORRECTIONS_PREF_KEY)) === true;
+    } catch {
+      return false;
+    }
+  }
+
+  /** Agreed with the wording that covers pages (CLS-19); an earlier agreement does not. */
+  private async hasPageSharingConsent(ctx: RequestContext): Promise<boolean> {
+    const userId = ctx.currentUserId;
+    if (!userId) return false;
+    try {
+      return (await this.userPrefRepo.getUserPref(userId, PAGE_SHARING_PREF_KEY)) === true;
+    } catch {
       return false;
     }
   }
@@ -412,6 +477,46 @@ class ActivityService {
       },
     };
 
+    // A parent's Category correction, from a parent who agreed to help improve the filters (CLS-12,
+    // decided 2026-11-10): the page's address and title and the old and new Category, nothing else.
+    // Not when it was visited, on which device, the parent's note, or the page's other details.
+    if (!isPageReport && !(await ctx.isAdmin())) {
+      if (!(await this.hasCategoryCorrectionsConsent(ctx))) {
+        throw new HttpException(403, 'Agree to share Category changes in Help improve the filters first');
+      }
+      normalized.source = {
+        ...normalized.source,
+        logRefId: null,
+        startTime: null,
+        endTime: null,
+        clientId: null,
+        duringBlock: false,
+      };
+      normalized.evidence = {
+        pageTitle: this.normalizeDatasetText(data?.evidence?.pageTitle, 500),
+        pageDescription: null,
+        imageSampleKeys: [],
+        imagesBlocked: null,
+        imagesTotal: null,
+      };
+      normalized.classification = {
+        restricted: null,
+        reasonCode: null,
+        eduValue: normalized.classification.eduValue,
+        flags: [],
+        contentTypes: [],
+        categories: [],
+        topics: [],
+      };
+      normalized.feedback = {
+        issueType: 'wrong_edu_value',
+        comment: '',
+        expectedEduValue: normalized.feedback.expectedEduValue,
+        expectedRestricted: null,
+      };
+      normalized.context = {pipelineSummary: null};
+    }
+
     const dedupeRaw = JSON.stringify({
       source: normalized.source,
       classification: normalized.classification,
@@ -593,6 +698,78 @@ class ActivityService {
     return trimmed;
   }
 
+  /**
+   * CLS-19: pages from a member who agreed to share them. Each is checked again with
+   * `sharedPageFrom`, so a device that skips the check still can't have a personal page kept. A
+   * kept page holds its address, title, description, text and the classifier's Category, in one
+   * dataset a month: the row has no user, and its times are the month's first day, so nothing
+   * stored says whose page it was or when it was visited. A page shared again only counts again.
+   */
+  async sharePages(ctx: RequestContext, data: SharePagesRequest): Promise<SharePagesResponse> {
+    if (!(await this.hasImageImprovementConsent(ctx)) || !(await this.hasPageSharingConsent(ctx))) {
+      throw new HttpException(403, 'Sharing pages needs Help improve the filters turned on with pages.');
+    }
+    const userId = ctx.currentUserId as string;
+    const day = new Date().toISOString().slice(0, 10);
+    const used = this.sharedPagesToday.get(userId);
+    const usedToday = used?.day === day ? used.count : 0;
+    const room = Math.max(0, ActivityService.SHARED_PAGES_PER_DAY - usedToday);
+
+    const incoming = (Array.isArray(data?.pages) ? data.pages : []).slice(0, MAX_SHARED_PAGES_PER_UPLOAD);
+    const pages = incoming.map((page) => sharedPageFrom(page)).filter((page): page is SharedPage => !!page);
+    const toKeep = pages.slice(0, room);
+    this.sharedPagesToday.set(userId, {day, count: usedToday + toKeep.length});
+    if (!toKeep.length) return {kept: 0, leftOut: incoming.length};
+
+    const month = day.slice(0, 7);
+    const datasetId = `shared-pages-${month}`;
+    const monthStart = new Date(`${month}-01T00:00:00.000Z`);
+    await this.ensureClassificationDatasetRegistry(ctx, {
+      datasetId,
+      name: `Shared pages ${month}`,
+      description:
+        'Pages from families who agreed to help improve the filters (CLS-19). No account, device or visit time.',
+      role: 'mixed',
+      createdBy: null,
+      composedFromKind: 'sharedPages',
+      at: monthStart,
+    });
+
+    for (const page of toKeep) {
+      const normalizedUrl = this.normalizeUrlForReport(page.url) || page.url;
+      const dedupeKey = this.stringHash(`sharedPage:${datasetId}:${normalizedUrl}`);
+      const existing = await this.classificationDatasetSampleRepo.findLatestByDedupeKey(dedupeKey);
+      if (existing?._id) {
+        await this.classificationDatasetSampleRepo.updateWithId(existing._id, {
+          sampleCount: (Number((existing as any).sampleCount) || 1) + 1,
+        } as any);
+        continue;
+      }
+      await this.classificationDatasetSampleRepo.create({
+        dedupeKey,
+        datasetId,
+        userId: null,
+        sourceType: 'sharedPage',
+        sourceId: dedupeKey,
+        details: {
+          datasetId,
+          source: {url: page.url, normalizedUrl},
+          pageData: {
+            pageTitle: page.title,
+            description: page.description,
+            extractedText: page.text,
+            canonicalUrl: page.url,
+          },
+          classification: {eduValue: page.eduValue, categoryFrom: page.categoryFrom},
+        },
+        sampleCount: 1,
+        lastSeenAt: monthStart,
+        createdAt: monthStart,
+      } as any);
+    }
+    return {kept: toKeep.length, leftOut: incoming.length - toKeep.length};
+  }
+
   async uploadClassificationDatasetSamples(
     ctx: RequestContext,
     data: UploadClassificationDatasetSamplesRequest,
@@ -636,6 +813,8 @@ class ActivityService {
           ? sample.classification.categories.slice(0, 20).sort()
           : [],
         topics: Array.isArray(sample?.classification?.topics) ? sample.classification.topics.slice(0, 20).sort() : [],
+        // Whose answer the Category was (HAT-1109): checked like a shared page's.
+        categoryFrom: sharedCategorySource(sample?.classification?.categoryFrom),
       };
 
       const normalizedSummary = {
@@ -783,7 +962,7 @@ class ActivityService {
   }
 
   async clearUsageLog(ctx: RequestContext, targetUserId: string) {
-    await ctx.verifySelfOrAdminOverUser(targetUserId);
+    await this.verifyMayRewriteUsage(ctx, targetUserId);
     await this.userActivityLogRepo.deleteWhere({userId: targetUserId});
     await this.invalidateActivityMonitors(ctx, targetUserId);
     return true;
@@ -802,7 +981,7 @@ class ActivityService {
     },
   ) {
     const targetUserId = input.userId || ctx.currentUserId;
-    await ctx.verifySelfOrAdminOverUser(targetUserId);
+    await this.verifyMayRewriteUsage(ctx, targetUserId);
 
     const normalizedUrl = String(input.url || '').trim();
     const startTime = Number(input.startTime || 0);
@@ -970,7 +1149,10 @@ class ActivityService {
     try {
       await this.userActivityLogRepo.create(info);
     } catch (e) {
-      return {saved: true};
+      // `create` upserts, so a duplicate key is the row already being there. Anything else is a
+      // record that was not saved: answering saved made the computer app mark its sessions
+      // uploaded and never send them again (RVW-4).
+      if ((e as any)?.code !== '23505') throw e;
     }
 
     return {saved: true};

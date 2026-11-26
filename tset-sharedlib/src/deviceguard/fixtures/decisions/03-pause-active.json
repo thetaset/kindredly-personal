@@ -104,5 +104,21 @@
       "exceeded": false,
       "reason": null
     }
-  ]
+  ],
+  "expectDeviceByPlatform": {
+    "macos": [
+      {
+        "pkg": "com.roblox.client",
+        "action": "allow",
+        "reason": null,
+        "ruleId": null
+      },
+      {
+        "pkg": "com.android.chrome",
+        "action": "allow",
+        "reason": null,
+        "ruleId": null
+      }
+    ]
+  }
 }

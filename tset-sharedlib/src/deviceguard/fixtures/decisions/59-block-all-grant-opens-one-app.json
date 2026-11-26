@@ -1,0 +1,65 @@
+{
+  "id": "59-block-all-grant-opens-one-app",
+  "behaviour": "A guardian's yes to one app from a request opens it during \"Block all access\", as a temporary allow does in the browser; the rest stay closed.",
+  "clock": {
+    "nowMs": 1789491600000,
+    "familyTimeZone": "America/Los_Angeles",
+    "deviceTimeZone": "America/Los_Angeles"
+  },
+  "settings": {
+    "usageLimitsData": {
+      "contentUsageLimits": [],
+      "temporaryRules": []
+    },
+    "ruleOverrideSettings": {
+      "ruleOverrides": []
+    },
+    "accessControlSettings": {
+      "restrictAll": true,
+      "restrictAllExpires": 1789495200000
+    },
+    "appPolicy": null,
+    "appPolicyStatus": "readable",
+    "appGrants": [
+      {
+        "appId": "com.roblox.client",
+        "until": 1789492500000
+      }
+    ]
+  },
+  "installedApps": [
+    {
+      "pkg": "com.roblox.client",
+      "label": "Roblox",
+      "platform": "android"
+    },
+    {
+      "pkg": "com.duolingo",
+      "label": "Duolingo",
+      "platform": "android"
+    }
+  ],
+  "floor": [],
+  "usage": {
+    "appMsByPkg": {},
+    "webLogs": []
+  },
+  "usageSeed": {
+    "perRuleUsedMs": {}
+  },
+  "expectDevice": [
+    {
+      "pkg": "com.roblox.client",
+      "action": "allow",
+      "reason": null,
+      "ruleId": null
+    },
+    {
+      "pkg": "com.duolingo",
+      "action": "block",
+      "reason": "block-all",
+      "ruleId": null
+    }
+  ],
+  "browserNotApplicable": "Device-only: the browser applies the same setting to pages through its own gate; this case pins what a phone and a computer close."
+}

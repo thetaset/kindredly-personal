@@ -17,7 +17,7 @@ export const MCP_RELAY_TOOLS = [
         },
         "project": {
           "type": "string",
-          "description": "The project this belongs to, by name (see listProjects); a new name starts a project"
+          "description": "The project to put this in, by name (see listProjects). A project is a collection; a new name makes one"
         },
         "madeWithAi": {
           "type": "boolean",
@@ -58,6 +58,10 @@ export const MCP_RELAY_TOOLS = [
         "navigate": {
           "type": "boolean",
           "description": "Navigate to the new item (default true)"
+        },
+        "asApp": {
+          "type": "boolean",
+          "description": "true when the file is an app or game you made: it becomes a Kindredly App the family opens from Kindredly Apps, and it runs inside Kindredly. Send one self-contained HTML page, or a .zip with index.html at its top and the files it uses (scripts, styles, pictures, sounds, data). Put everything inside, libraries too, so it runs without the network; nothing loads from another address except scripts from cdnjs.cloudflare.com, cdn.jsdelivr.net or unpkg.com, and fetch to a website goes through Kindredly, which may ask the person first. Its own files work with fetch, new Image, new Audio and XMLHttpRequest; scripts that import each other as modules do not, so bundle them into one. Links to other pages do not open, and alert, confirm and prompt do nothing: show messages in the page. localStorage is kept. Keep pictures to a few sprite sheets: on a child's account at most 40 are checked and shown. With itemId (from an earlier asApp result) it replaces that app with this version"
         }
       },
       "additionalProperties": true
@@ -157,7 +161,7 @@ export const MCP_RELAY_TOOLS = [
   },
   {
     "name": "adjustlimit",
-    "description": "Change one daily limit a preset set up, on some days: set it (minutes), move it (change, ±minutes), lift it (minutes \"none\"), and/or set the hours it may be used (allowedFrom/allowedUntil as HH:MM; give only allowedUntil for \"no screens after 8pm\"; \"any\" on both lifts the hours). Hours belong to the limit named: overall is all screen time (\"no screens after 8\"), games has its own (\"no games after 8\", \"an hour of games a day\": game sites, and game apps on phones and computers; \"no games after 8\" is allowedUntil 20:00, never minutes 0; minutes 0 only when the parent wants none at all on those days: \"no games on school days\", \"block games\"), video has its own (\"no YouTube after 8\"), entertainment, social or junk share one set. social 0 also blocks the Social apps on a linked phone or computer. games needs no preset. Other days and other limits' hours stay as they are. Values outside 0–1440 minutes are refused. Must be confirmed by a guardian. For today only, use grantExtraTime instead. For one site, use limitSite. Kindredly asks the person to tap Agree first, and this call waits up to 45 seconds for it. If it says it is still waiting, tell the person to look in Kindredly, then call again with the same arguments once they say they have.",
+    "description": "Change one daily limit a preset set up, on some days: set it (minutes), move it (change, ±minutes), lift it (minutes \"none\"), and/or set the hours it may be used (allowedFrom/allowedUntil as HH:MM; give only allowedUntil for \"no screens after 8pm\"; \"any\" on both lifts the hours). Hours belong to the limit named: overall is all screen time (\"no screens after 8\"), games has its own (\"no games after 8\", \"an hour of games a day\": game sites, and game apps on phones and computers; \"no games after 8\" is allowedUntil 20:00, never minutes 0; minutes 0 only when the parent wants none at all on those days: \"no games on school days\", \"block games\"), video has its own (\"no YouTube after 8\"), entertainment, social or junk share one set. social 0 also blocks the Social apps on a linked phone or computer. games needs no preset. Other days and other limits' hours stay as they are. Values outside 0–1440 minutes are refused. A limit can also have a weekly total (weeklyMinutes) beside its daily minutes; whichever runs out first stops it, and the week starts Monday. \"Games 5 hours a week\" is limit games, weeklyMinutes 300; \"none\" takes the weekly total off; days don't apply to it, and given alone it needs no preset. Must be confirmed by a guardian. For today only, use grantExtraTime instead. For one site, use limitSite. Kindredly asks the person to tap Agree first, and this call waits up to 45 seconds for it. If it says it is still waiting, tell the person to look in Kindredly, then call again with the same arguments once they say they have.",
     "inputSchema": {
       "type": "object",
       "properties": {
@@ -180,6 +184,10 @@ export const MCP_RELAY_TOOLS = [
         "change": {
           "type": "number",
           "description": "Minutes to add (positive) or take away (negative)"
+        },
+        "weeklyMinutes": {
+          "type": "number",
+          "description": "The most minutes a week, from Monday, on top of the daily minutes (300 is 5 hours), or \"none\" to take the weekly total off"
         },
         "allowedFrom": {
           "type": "string",
@@ -336,7 +344,7 @@ export const MCP_RELAY_TOOLS = [
   },
   {
     "name": "archiveitem",
-    "description": "Archive a library item: it leaves the library lists and search, and is kept under Archived, where it can be restored (archived: false). Nothing is deleted. Kindredly asks the person to tap Agree first, and this call waits up to 45 seconds for it. If it says it is still waiting, tell the person to look in Kindredly, then call again with the same arguments once they say they have.",
+    "description": "Archive library items: they leave the library lists and search, and are kept under Archived, where they can be restored (archived: false). Nothing is deleted. To archive several, pass them all in itemIds (at most 50): the person is asked once for the whole list. Kindredly asks the person to tap Agree first, and this call waits up to 45 seconds for it. If it says it is still waiting, tell the person to look in Kindredly, then call again with the same arguments once they say they have.",
     "inputSchema": {
       "type": "object",
       "properties": {
@@ -344,14 +352,16 @@ export const MCP_RELAY_TOOLS = [
           "type": "string",
           "description": "Id of the item to archive"
         },
+        "itemIds": {
+          "type": "array",
+          "description": "Ids of several items to archive, instead of itemId (at most 50)",
+          "items": {}
+        },
         "archived": {
           "type": "boolean",
-          "description": "false restores an archived item (default true)"
+          "description": "false restores archived items (default true)"
         }
       },
-      "required": [
-        "itemId"
-      ],
       "additionalProperties": true
     },
     "annotations": {
@@ -453,6 +463,32 @@ export const MCP_RELAY_TOOLS = [
     }
   },
   {
+    "name": "checkapp",
+    "description": "Run a Kindredly App and say whether it works: its errors, what it logged, and what is on screen. It runs on the person's open Kindredly, hidden, with their saved data, and nothing it changes is kept. Without steps it fills every field and presses the main button; with steps it uses the app the way a person would: click a button by its words, type into a field by its label, press a key, expect text on screen, restart to see what was saved.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "itemId": {
+          "type": "string",
+          "description": "The app (from saveApp)"
+        },
+        "steps": {
+          "type": "array",
+          "description": "Up to 20, in order, stopping at the first that fails: {action: click|type|press|select|expect|expectnot|wait|restart, target?, text?, key?, ms?}",
+          "items": {}
+        }
+      },
+      "required": [
+        "itemId"
+      ],
+      "additionalProperties": true
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false
+    }
+  },
+  {
     "name": "copysettings",
     "description": "Copy one child’s settings to another child, as Copy settings does (\"give Sam the same limits as Jordan\"): what is filtering (restriction mode, filter mix, advanced filters), time limits (saved schedules; temporary overrides stay behind), distraction filters (YouTube, Reddit, Google, where items open), or all. userId is the child who receives them; fromUserId the child copied from. Replaces what is copied. Adults are never either end. Must be confirmed by a guardian. Kindredly asks the person to tap Agree first, and this call waits up to 45 seconds for it. If it says it is still waiting, tell the person to look in Kindredly, then call again with the same arguments once they say they have.",
     "inputSchema": {
@@ -522,6 +558,48 @@ export const MCP_RELAY_TOOLS = [
     }
   },
   {
+    "name": "createlesson",
+    "description": "Make a lesson: a short run of steps a child works through, with questions that check understanding. Kindredly writes it in the background from `request` and the optional settings; you never write the lesson, its steps or its questions. Returns the new lesson’s id and the page to open it at once; it fills in about a minute, and the person can open it in Lessons or from the returned path. Kindredly asks the person to tap Agree first, and this call waits up to 45 seconds for it. If it says it is still waiting, tell the person to look in Kindredly, then call again with the same arguments once they say they have.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "request": {
+          "type": "string",
+          "description": "What the lesson teaches and who it is for, in the person’s words, with anything else they said. One sentence is enough."
+        },
+        "grade_band": {
+          "type": "string",
+          "description": "Who it is written for: early, elementary, middle, high or adult. Omit when the request says."
+        },
+        "style": {
+          "type": "string",
+          "description": "conceptual (understanding), exam_prep (recall and practice), vocabulary (terms), socratic (questions that make them think), practice (worked problems) or story (a narrative). Omit for conceptual."
+        },
+        "depth": {
+          "type": "string",
+          "description": "quick, standard, deep or comprehensive. Omit for standard."
+        },
+        "question_types": {
+          "type": "array",
+          "description": "Any of multiple_choice, true_false, short_answer, free_response or flashcard. Omit to let the style pick.",
+          "items": {}
+        },
+        "extra_instructions": {
+          "type": "string",
+          "description": "Anything else the writer should know, in the person’s words."
+        }
+      },
+      "required": [
+        "request"
+      ],
+      "additionalProperties": true
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": false
+    }
+  },
+  {
     "name": "createlibraryitem",
     "description": "Create a library item whose kind is not a plain note, link, or collection — a game, a place, and so on — named by `kind`. For those three, call createNote / createLink / createCollection directly; this tool only delegates to them. For a book, film, TV series, album or song, call addWork. Never for an app: to make an app, call startApp. File it in a collection with parentCollectionId. Kindredly asks the person to tap Agree first, and this call waits up to 45 seconds for it. If it says it is still waiting, tell the person to look in Kindredly, then call again with the same arguments once they say they have.",
     "inputSchema": {
@@ -537,7 +615,7 @@ export const MCP_RELAY_TOOLS = [
         },
         "project": {
           "type": "string",
-          "description": "The project this belongs to, by name (see listProjects); a new name starts a project"
+          "description": "The project to put this in, by name (see listProjects). A project is a collection; a new name makes one"
         },
         "kind": {
           "type": "string",
@@ -598,7 +676,7 @@ export const MCP_RELAY_TOOLS = [
         },
         "project": {
           "type": "string",
-          "description": "The project this belongs to, by name (see listProjects); a new name starts a project"
+          "description": "The project to put this in, by name (see listProjects). A project is a collection; a new name makes one"
         },
         "url": {
           "type": "string",
@@ -651,7 +729,7 @@ export const MCP_RELAY_TOOLS = [
         },
         "project": {
           "type": "string",
-          "description": "The project this belongs to, by name (see listProjects); a new name starts a project"
+          "description": "The project to put this in, by name (see listProjects). A project is a collection; a new name makes one"
         },
         "content": {
           "type": "string",
@@ -691,7 +769,7 @@ export const MCP_RELAY_TOOLS = [
   },
   {
     "name": "createtask",
-    "description": "Create a task. File it in a collection with parentCollectionId, like any other new item: a task that is part of a project goes in that project's collection, and a task asked for in the same message as a collection goes in that one. Put how it repeats and when it is due in their own fields, never in the title. Navigates to the task unless navigate is false. Kindredly asks the person to tap Agree first, and this call waits up to 45 seconds for it. If it says it is still waiting, tell the person to look in Kindredly, then call again with the same arguments once they say they have.",
+    "description": "Create a task. File it in a collection with parentCollectionId, like any other new item: a task that is part of a project goes in that project's collection, and a task asked for in the same message as a collection goes in that one. Put how it repeats and when it is due in their own fields, never in the title. A task made of several parts (\"work through these PDFs and videos\", \"pack: clothes, toothbrush, book\") is one task with subtasks: parts the person ticks in any order, and the last tick finishes the task. subtasksFromCollectionId makes one subtask per item in a collection. Subtasks are not the task's Attached items or aboutItemId, which are context only. Navigates to the task unless navigate is false. Kindredly asks the person to tap Agree first, and this call waits up to 45 seconds for it. If it says it is still waiting, tell the person to look in Kindredly, then call again with the same arguments once they say they have.",
     "inputSchema": {
       "type": "object",
       "properties": {
@@ -714,6 +792,15 @@ export const MCP_RELAY_TOOLS = [
         "aboutItemId": {
           "type": "string",
           "description": "A library item the task is about, e.g. the book to read"
+        },
+        "subtasks": {
+          "type": "array",
+          "description": "The task's subtasks, ticked in any order (at most 100). Each is a title string, or {\"title\",\"itemId\"} where itemId is a library item the subtask opens (the title may be left out to use the item's name)",
+          "items": {}
+        },
+        "subtasksFromCollectionId": {
+          "type": "string",
+          "description": "Makes one subtask per item in this collection, in the collection's order, each opening its item (collections inside it are skipped). Added after any subtasks given"
         },
         "assignedToUserId": {
           "type": "string",
@@ -850,6 +937,24 @@ export const MCP_RELAY_TOOLS = [
     }
   },
   {
+    "name": "getappguide",
+    "description": "How to make a Kindredly App: an app or game the family opens inside Kindredly, written as one HTML page. Read it before saveApp: what runs, how the app saves data for each person or the whole family, who is using it, the internet, and a starter page. With topic, one part in full.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "topic": {
+          "type": "string",
+          "description": "One part in full: sharedrefstate, refstate, net, files. Omit for the guide"
+        }
+      },
+      "additionalProperties": true
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false
+    }
+  },
+  {
     "name": "getchildactivitysummary",
     "description": "Summarize what a child has been doing lately: total time, most-used sites/apps, and top topics over the last N days. Admin only. Kindredly asks the person to tap Agree first, and this call waits up to 45 seconds for it. If it says it is still waiting, tell the person to look in Kindredly, then call again with the same arguments once they say they have.",
     "inputSchema": {
@@ -907,7 +1012,7 @@ export const MCP_RELAY_TOOLS = [
   },
   {
     "name": "getcurrentuserinfo",
-    "description": "Read the signed-in user's profile: username, display name, account type. Needs the user's approval. If you only need their role or what they are allowed to do, call getCurrentAuthContext instead — it needs no approval. Kindredly asks the person to tap Agree first, and this call waits up to 45 seconds for it. If it says it is still waiting, tell the person to look in Kindredly, then call again with the same arguments once they say they have.",
+    "description": "Read the signed-in user's profile: username, display name, account type. If you only need their role or what they are allowed to do, call getCurrentAuthContext instead.",
     "inputSchema": {
       "type": "object",
       "properties": {},
@@ -933,13 +1038,17 @@ export const MCP_RELAY_TOOLS = [
   },
   {
     "name": "getitem",
-    "description": "Read one library item by id: its name, type, link, description, the collections it is in, and a note's text (the first 500 characters). Use it to answer what a note says, or before changing one.",
+    "description": "Read one library item by id: its name, type, link, description, the collections it is in, and a note's text, 16,000 characters at a time (when textTruncated, call again with textFrom: nextTextFrom for the rest). Use it to answer what a note says, or before changing one.",
     "inputSchema": {
       "type": "object",
       "properties": {
         "itemId": {
           "type": "string",
           "description": "Item id, from searchLibrary or getItemsInCollection"
+        },
+        "textFrom": {
+          "type": "number",
+          "description": "Where in a note's text to start reading (nextTextFrom from the last read; default 0)"
         }
       },
       "required": [
@@ -1085,7 +1194,7 @@ export const MCP_RELAY_TOOLS = [
   },
   {
     "name": "limitsite",
-    "description": "Limit one site, or one game, for a child by day and hour: only on some days (onlyOn: \"weekends\" makes every other day Not allowed), so many minutes a day (minutes; 0 is Not allowed), and/or only between some hours (allowedFrom/allowedUntil, HH:MM 24-hour). \"survev.io only on weekends\" is site survev.io, onlyOn weekends, never blockSite. A game by name (\"Minecraft only on weekends\", \"an hour of Roblox a day\") is game, which counts its sites and its apps on phones and computers; a game not on Kindredly's list is limited by its site. One of the child's own limits by its name or id from getChildControlsSnapshot (\"change his Homework limit to an hour\", \"remove the Minecraft limit\") is limit; it keeps counting what it counts. action remove takes the limit off. Other days keep what they had. Category and Overall limits still count the site. Must be confirmed by a guardian. Kindredly asks the person to tap Agree first, and this call waits up to 45 seconds for it. If it says it is still waiting, tell the person to look in Kindredly, then call again with the same arguments once they say they have.",
+    "description": "Limit one site, one game or one library item for a child by day, hour and week: only on some days (onlyOn: \"weekends\" makes every other day Not allowed), so many minutes a day (minutes; 0 is Not allowed), and/or only between some hours (allowedFrom/allowedUntil, HH:MM 24-hour). \"survev.io only on weekends\" is site survev.io, onlyOn weekends, never blockSite. A game by name (\"Minecraft only on weekends\", \"an hour of Roblox a day\") is game, which counts its sites and its apps on phones and computers; a game not on Kindredly's list is limited by its site. One of the child's own limits by its name or id from getChildControlsSnapshot (\"change his Homework limit to an hour\", \"remove the Minecraft limit\") is limit; it keeps counting what it counts. Something in the child's library by its name, such as a YouTube channel, is item; a channel's limit counts its videos too. One not in their library can't be limited this way: say so, and it can be added first (allowSite with its address) if the parent wants. A limit can also have a weekly total (weeklyMinutes) beside its minutes a day; whichever runs out first stops it, and the week starts Monday. \"Only 20 minutes of Science Max a week\" is item \"Science Max\", weeklyMinutes 20; given alone, the limit has only the weekly total. action remove takes the limit off. Other days keep what they had. Category and Overall limits still count the site. Must be confirmed by a guardian. Kindredly asks the person to tap Agree first, and this call waits up to 45 seconds for it. If it says it is still waiting, tell the person to look in Kindredly, then call again with the same arguments once they say they have.",
     "inputSchema": {
       "type": "object",
       "properties": {
@@ -1105,6 +1214,10 @@ export const MCP_RELAY_TOOLS = [
           "type": "string",
           "description": "One of the child's own limits, by name or id (instead of site or game)"
         },
+        "item": {
+          "type": "string",
+          "description": "Something in the child's library, like a YouTube channel, by its name, or by its id from the choices an earlier call gave (instead of site, game or limit)"
+        },
         "onlyOn": {
           "type": "string",
           "description": "The only days it may be used: weekends | weekdays | day names (\"friday\", \"sat,sun\"). Every other day becomes Not allowed."
@@ -1116,6 +1229,10 @@ export const MCP_RELAY_TOOLS = [
         "minutes": {
           "type": "number",
           "description": "Minutes a day on those days; 0 is Not allowed; \"none\" lifts the minutes"
+        },
+        "weeklyMinutes": {
+          "type": "number",
+          "description": "The most minutes a week, from Monday, on top of the minutes a day (300 is 5 hours), or \"none\" to take the weekly total off"
         },
         "allowedFrom": {
           "type": "string",
@@ -1243,7 +1360,7 @@ export const MCP_RELAY_TOOLS = [
   },
   {
     "name": "listprojects",
-    "description": "List the person's projects by name. Before saving something with a project, use a name from this list when one fits, so the item joins that project instead of starting a near-copy.",
+    "description": "List the person's projects by name, with each one's note. A project is a collection. Before saving something with a project, use a name from this list when one fits, so the item goes in that project instead of starting a near-copy.",
     "inputSchema": {
       "type": "object",
       "properties": {},
@@ -1256,7 +1373,7 @@ export const MCP_RELAY_TOOLS = [
   },
   {
     "name": "listreadlater",
-    "description": "What is in Read Later, newest first — the queue of things the user meant to get to. Snoozed, hidden and archived items are left out, as on the Today card.",
+    "description": "What is in Read Later, newest first — the queue of things the user meant to get to. Snoozed, hidden and archived items are left out.",
     "inputSchema": {
       "type": "object",
       "properties": {
@@ -1296,7 +1413,7 @@ export const MCP_RELAY_TOOLS = [
   },
   {
     "name": "listusers",
-    "description": "List every member of this account: their name, their type, and the userId other tools take. Needs the user's approval. Use it to turn a person's name into a userId. To the user, say each name with 'admin' or 'child' (type 'restricted' is a child), never the word restricted and never the userId. Kindredly asks the person to tap Agree first, and this call waits up to 45 seconds for it. If it says it is still waiting, tell the person to look in Kindredly, then call again with the same arguments once they say they have.",
+    "description": "List every member of this account: their name, their type, and the userId other tools take. Use it to turn a person's name into a userId. To the user, say each name with 'admin' or 'child' (type 'restricted' is a child), never the word restricted and never the userId.",
     "inputSchema": {
       "type": "object",
       "properties": {},
@@ -1422,6 +1539,27 @@ export const MCP_RELAY_TOOLS = [
     }
   },
   {
+    "name": "readapp",
+    "description": "A Kindredly App's page, to change it: edit the html and saveApp with the same itemId. An app made in the App Builder comes back as its files, to read only.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "itemId": {
+          "type": "string",
+          "description": "The app (from saveApp or searchLibrary)"
+        }
+      },
+      "required": [
+        "itemId"
+      ],
+      "additionalProperties": true
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false
+    }
+  },
+  {
     "name": "refreshitem",
     "description": "Refresh an item's metadata — its title, picture and type — from its link, as the item editor's Refresh does. Use it when an item's title or picture is stale or missing. Needs itemIds (or one itemId) from searchLibrary. Kindredly asks the person to tap Agree first, and this call waits up to 45 seconds for it. If it says it is still waiting, tell the person to look in Kindredly, then call again with the same arguments once they say they have.",
     "inputSchema": {
@@ -1490,6 +1628,59 @@ export const MCP_RELAY_TOOLS = [
       },
       "required": [
         "userId"
+      ],
+      "additionalProperties": true
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": false
+    }
+  },
+  {
+    "name": "saveapp",
+    "description": "Save a Kindredly App: the whole HTML page as text in html (up to 500 KB; read getAppGuide first). Without itemId it makes a new app in the library; with itemId it replaces that app's page with this one. Then call checkApp with the itemId it returns. Kindredly asks the person to tap Agree first, and this call waits up to 45 seconds for it. If it says it is still waiting, tell the person to look in Kindredly, then call again with the same arguments once they say they have.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "request": {
+          "type": "string",
+          "description": "What the person asked for, in one sentence, so they can find this again by it"
+        },
+        "summary": {
+          "type": "string",
+          "description": "Two lines on what this is; used as the description when none is given"
+        },
+        "project": {
+          "type": "string",
+          "description": "The project to put this in, by name (see listProjects). A project is a collection; a new name makes one"
+        },
+        "madeWithAi": {
+          "type": "boolean",
+          "description": "false when the file is one the person gave you rather than one you made (default true)"
+        },
+        "html": {
+          "type": "string",
+          "description": "The whole page, from <!doctype html> to </html>"
+        },
+        "name": {
+          "type": "string",
+          "description": "The app's name, as the family will see it (needed for a new app)"
+        },
+        "itemId": {
+          "type": "string",
+          "description": "The app to replace (from an earlier saveApp); omit for a new app"
+        },
+        "parentCollectionId": {
+          "type": "string",
+          "description": "Collection to file a new app in (from listCollections)"
+        },
+        "parentCollectionName": {
+          "type": "string",
+          "description": "Collection name (exact match), instead of parentCollectionId"
+        }
+      },
+      "required": [
+        "html"
       ],
       "additionalProperties": true
     },
@@ -2055,7 +2246,7 @@ export const MCP_RELAY_TOOLS = [
   },
   {
     "name": "updateitem",
-    "description": "Change an item already in the library — a note, link, collection or anything else: rename it, change its description or link, or change a note's text. Needs an id from searchLibrary, getItemsInCollection or listCollections. To add to a note, use appendContent; content replaces the whole text and is refused for a note longer than the 500 characters you can read. Kindredly asks the person to tap Agree first, and this call waits up to 45 seconds for it. If it says it is still waiting, tell the person to look in Kindredly, then call again with the same arguments once they say they have.",
+    "description": "Change an item already in the library — a note, link, collection or anything else: rename it, change its description or link, or change a note's text. Needs an id from searchLibrary, getItemsInCollection or listCollections. A note's text, read first with getItem: edits changes parts of it, on a note of any length; appendContent adds to the end; content replaces the whole text of a note up to 16,000 characters. The text a change replaces is kept in the note's Version history, where the person can bring it back. Kindredly asks the person to tap Agree first, and this call waits up to 45 seconds for it. If it says it is still waiting, tell the person to look in Kindredly, then call again with the same arguments once they say they have.",
     "inputSchema": {
       "type": "object",
       "properties": {
@@ -2083,14 +2274,21 @@ export const MCP_RELAY_TOOLS = [
           "type": "string",
           "description": "Replaces a note's whole text"
         },
+        "edits": {
+          "type": "array",
+          "description": "Changes parts of a note's text, in order: a list of { oldText, newText }. Each oldText is copied exactly from getItem's text and must be in the note once; newText \"\" removes it.",
+          "items": {}
+        },
         "appendContent": {
           "type": "string",
           "description": "Added to the end of a note's text, on a new line"
+        },
+        "changes": {
+          "type": "array",
+          "description": "To rename or redescribe several items at once, instead of itemId: a list of { itemId, name?, description?, url? } (at most 50). The person is asked once for the whole list.",
+          "items": {}
         }
       },
-      "required": [
-        "itemId"
-      ],
       "additionalProperties": true
     },
     "annotations": {
@@ -2146,7 +2344,7 @@ export const MCP_RELAY_TOOLS = [
   },
   {
     "name": "uploadfile",
-    "description": "Get a one-time link to send Kindredly a file you already have — one the person attached, or one your code made — instead of writing its bytes into a call. From your code, POST the file to uploadUrl, the file as the body: curl --data-binary @page.html \"<uploadUrl>\" (a form works too: curl -F file=@page.html \"<uploadUrl>\"). The answer says whether it is in the library yet. If your code cannot reach the internet, give the person the link instead: opened in a browser, it lets them pick the file in Kindredly. One file per link, up to 20 MB; the link lasts an hour. With itemId the file attaches to that item; without, it becomes a new item. For a file at a public address, use addFile with url instead. Kindredly asks the person to tap Agree first, and this call waits up to 45 seconds for it. If it says it is still waiting, tell the person to look in Kindredly, then call again with the same arguments once they say they have.",
+    "description": "Add a file you already have — one the person attached in your chat, or one your code made — to Kindredly. It returns a one-time link (one file, an hour): show the person the link, and opened in their browser it lets them pick the file, so nothing leaves this conversation. Only send the file yourself with a POST if it is on the person's own computer: curl --data-binary @page.html \"<uploadUrl>\" (a form works too: curl -F file=@page.html \"<uploadUrl>\"). A chat sandbox usually cannot reach Kindredly and the POST fails with a proxy error — do not retry it, show the link. A paid plan can allow the host under Capabilities. An HTML page under 500 KB needs no link: use saveApp with the html. With itemId the file attaches to that item; without, it becomes a new item. For a file at a public address, use addFile with url instead. Kindredly asks the person to tap Agree first, and this call waits up to 45 seconds for it. If it says it is still waiting, tell the person to look in Kindredly, then call again with the same arguments once they say they have.",
     "inputSchema": {
       "type": "object",
       "properties": {
@@ -2160,7 +2358,7 @@ export const MCP_RELAY_TOOLS = [
         },
         "project": {
           "type": "string",
-          "description": "The project this belongs to, by name (see listProjects); a new name starts a project"
+          "description": "The project to put this in, by name (see listProjects). A project is a collection; a new name makes one"
         },
         "madeWithAi": {
           "type": "boolean",
@@ -2185,6 +2383,10 @@ export const MCP_RELAY_TOOLS = [
         "parentCollectionName": {
           "type": "string",
           "description": "Collection name (exact match), instead of parentCollectionId"
+        },
+        "asApp": {
+          "type": "boolean",
+          "description": "true when the file is an app or game you made: it becomes a Kindredly App the family opens from Kindredly Apps, and it runs inside Kindredly. Send one self-contained HTML page, or a .zip with index.html at its top and the files it uses (scripts, styles, pictures, sounds, data). Put everything inside, libraries too, so it runs without the network; nothing loads from another address except scripts from cdnjs.cloudflare.com, cdn.jsdelivr.net or unpkg.com, and fetch to a website goes through Kindredly, which may ask the person first. Its own files work with fetch, new Image, new Audio and XMLHttpRequest; scripts that import each other as modules do not, so bundle them into one. Links to other pages do not open, and alert, confirm and prompt do nothing: show messages in the page. localStorage is kept. Keep pictures to a few sprite sheets: on a child's account at most 40 are checked and shown. With itemId (from an earlier asApp result) it replaces that app with this version"
         }
       },
       "additionalProperties": true

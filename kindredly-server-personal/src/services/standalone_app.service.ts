@@ -59,8 +59,9 @@ export const standaloneAppRegistry: Record<string, StandaloneAppRegistryEntry> =
   },
   // The critical-thinking puzzle app. Content is authored in the `puzzle_content` store and read
   // through /thinkingPuzzles/catalog; the client also carries a bundled seed it falls back to when
-  // no live puzzle comes back. `hidden` keeps it out of the Apps directory while staying reachable
-  // at /apps/thinking-puzzles.
+  // no live puzzle comes back. On hold since 2026-11-25 (HAT-1374): stays `hidden`, so listApps()
+  // leaves it out and it opens only for someone who has the address /apps/thinking-puzzles. Do not
+  // list it until the founder takes the project up again.
   'thinking-puzzles': {
     slug: 'thinking-puzzles',
     title: 'Thinking Puzzles',
@@ -155,6 +156,10 @@ export const standaloneAppRegistry: Record<string, StandaloneAppRegistryEntry> =
     allowedRoles: [],
     allowedAccountTypes: [],
   },
+  // Notes is no longer a standalone app (HAT-1067): the client opens it as its own page, /notes.
+  // Kept, hidden, only for released extension and iOS builds, which still ask this registry and
+  // then frame the website's /apps/notes (website.router.ts sends that straight to the page).
+  // Remove once those builds are gone.
   notes: {
     slug: 'notes',
     title: 'Notes',
@@ -163,7 +168,7 @@ export const standaloneAppRegistry: Record<string, StandaloneAppRegistryEntry> =
     runtimeKind: 'bundled',
     canonicalPath: '/apps/notes',
     runtimeEntryPath: null,
-    discoverability: 'listed',
+    discoverability: 'hidden',
     requiresLogin: true,
     featureGate: null,
     allowedRoles: [],

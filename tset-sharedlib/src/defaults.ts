@@ -52,6 +52,8 @@ export interface UserOptions{
   explorePublishedEnabled?: boolean;
   /** Curated email, per person. Admin-granted — see `types/user.types.ts` for why these are here. */
   emailEnabled?: boolean;
+  /** Offline saves (HAT-1225): an adult's changes save on the device first. Admin-granted, never a child. */
+  offlineSavesEnabled?: boolean;
   /** Speech mode: talk to the assistant and hear the reply. Admin-granted per person. */
   speechModeEnabled?: boolean;
   /** The wake word inside speech mode. Admin-granted per person. */
@@ -95,6 +97,7 @@ export const DEFAULT_USER_OPTIONS:UserOptions = {
   // `appEditorEnabled` above: this is what device-only mode reads when there is no server record,
   // not the live default — an absent value resolves through the feature control.
   emailEnabled: false,
+  offlineSavesEnabled: false,
   speechModeEnabled: false,
   wakeWordEnabled: false,
   communityContentEnabled: false,

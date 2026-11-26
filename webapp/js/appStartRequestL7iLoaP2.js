@@ -1,0 +1,1 @@
+const a="appStartRequest";function o(n){var r;const s=(n==null?void 0:n.info)||((r=n==null?void 0:n.details)==null?void 0:r.info),t=s==null?void 0:s[a];return typeof t=="string"&&t.trim()?t.trim():null}export{a as A,o as g};

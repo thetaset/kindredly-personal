@@ -77,3 +77,8 @@ export function holdOverridesToExtraTimeMax(input: {
     return {...override, timeLimit: {...override.timeLimit, hours: Math.min(24, base + ceiling / 60)}};
   });
 }
+
+/** An override that only moves a limit's allowed hours for other limits' extra time (`RuleOverride.hoursFor`, HAT-1146). */
+export function isHoursOnlyOverride(override: RuleOverride | null | undefined): boolean {
+  return Array.isArray(override?.hoursFor) && override!.hoursFor!.length > 0;
+}

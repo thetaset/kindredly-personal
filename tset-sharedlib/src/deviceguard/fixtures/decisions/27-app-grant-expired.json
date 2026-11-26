@@ -65,5 +65,21 @@
       "ruleId": null
     }
   ],
-  "browserNotApplicable": "Device-only: a guardian's yes to an app from a request is enforced only on devices (HAT-178)."
+  "browserNotApplicable": "Device-only: a guardian's yes to an app from a request is enforced only on devices (HAT-178).",
+  "expectDeviceByPlatform": {
+    "macos": [
+      {
+        "pkg": "com.android.chrome",
+        "action": "allow",
+        "reason": null,
+        "ruleId": null
+      },
+      {
+        "pkg": "org.mozilla.firefox",
+        "action": "allow",
+        "reason": null,
+        "ruleId": null
+      }
+    ]
+  }
 }

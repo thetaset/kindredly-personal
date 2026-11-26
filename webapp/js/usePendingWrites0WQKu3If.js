@@ -1,0 +1,1 @@
+import{M as i}from"./vue-runtimeCY_KIElv.js";function l(n){const t=new Set;function r(e){return t.add(e),e.finally(()=>t.delete(e)).catch(()=>{}),e}function o(){return t.size?Promise.allSettled([...t]):Promise.resolve()}return i(()=>{const e=n();!t.size||!e||Promise.allSettled([...t]).then(()=>e())}),{track:r,waitForWrites:o}}export{l as u};

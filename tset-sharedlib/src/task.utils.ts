@@ -250,9 +250,10 @@ export function buildTaskOccurrenceView(input: {
   completionAtMs?: number
   completionNote?: string
   completedByUserId?: string
+  subtasksDoneKeys?: string[]
   nowMs: number
 }): TaskOccurrenceView {
-  const { task, userId, occurrenceStartMs, completed, completionStatus, completionAtMs, completionNote, completedByUserId, nowMs } = input
+  const { task, userId, occurrenceStartMs, completed, completionStatus, completionAtMs, completionNote, completedByUserId, subtasksDoneKeys, nowMs } = input
   const dueAtMs = getDueAtMsForOccurrence({ task, occurrenceStartMs })
   const displayDateMs = getDisplayDateMs({ occurrenceStartMs, dueAtMs, dueDateMs: task.dueDateMs })
   const occurrenceIdentityUserId = task.completionScope === 'once' ? GLOBAL_TASK_COMPLETION_OWNER_ID : userId
@@ -271,6 +272,7 @@ export function buildTaskOccurrenceView(input: {
     completionNote,
     completedByUserId,
     overdue: !completed && typeof dueAtMs === 'number' ? nowMs > dueAtMs : false,
+    ...(subtasksDoneKeys?.length ? { subtasksDoneKeys } : {}),
   }
 }
 
@@ -297,4 +299,19 @@ export function toCompletionStateSubKey(occurrenceStartMs: number): string {
 
 export function toCompletionStateSubKeys(occurrenceStartMsList: number[]): string[] {
   return occurrenceStartMsList.map(toCompletionStateSubKey)
+}
+
+/**
+ * A task's Attached items, in order (HAT-1083). A task the assistant made before attaching existed
+ * kept the item it was about in `sourceItemId`; that item comes first, so it shows with the rest.
+ */
+export function taskAttachedItemIds(task: Pick<TaskDefinition, 'linkedItemIds' | 'sourceItemId'> | null | undefined): string[] {
+  const ids = [task?.sourceItemId, ...(Array.isArray(task?.linkedItemIds) ? task!.linkedItemIds! : [])]
+  return Array.from(new Set(ids.map((id) => (typeof id === 'string' ? id.trim() : '')).filter((id) => id.length > 0)))
+}
+
+/** Whether a task points at an item: one of its Attached items, or one a subtask opens. */
+export function taskPointsAtItem(task: Pick<TaskDefinition, 'linkedItemIds' | 'sourceItemId' | 'subtasks'> | null | undefined, itemId: string): boolean {
+  if (!task || !itemId) return false
+  return taskAttachedItemIds(task).includes(itemId) || (task.subtasks || []).some((subtask) => subtask?.itemId === itemId)
 }

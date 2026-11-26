@@ -29,12 +29,16 @@ import {
   earnAccessHoldCondition,
 } from '../src/restrictions/earnAccess';
 
+import { AI_APP_IDS } from '../src/restrictions/ai';
+
 const OUT = path.resolve(__dirname, '../src/deviceguard/generated/device-compile-data.json');
 
 function build() {
   return {
     generatedBy: 'tset-sharedlib/tests/deviceCompileData.test.ts — regenerate, never edit by hand',
     categoryDefaultEduValue: Object.fromEntries(APP_CATEGORY_DEFS.map((c) => [c.id, c.defaultEduValue])),
+    // Each category's name, for the shield's "A parent turned off Social media in App controls" (HAT-1348).
+    categoryLabels: Object.fromEntries(APP_CATEGORY_DEFS.map((c) => [c.id, c.label])),
     androidCategoryToAppCategory: ANDROID_CATEGORY_TO_APP_CATEGORY,
     appCategorySeed: Object.fromEntries(Object.entries(APP_CATEGORY_SEED).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))),
     safetyFloorAndroid: [...DEVICE_SAFETY_FLOOR_STATIC],
@@ -45,6 +49,8 @@ function build() {
     devicePlatforms: [...DEVICE_PLATFORMS],
     // A limit on one game names it by id (HAT-634); its apps on every platform, from the games list.
     gameApps: Object.fromEntries(GAMES_LIST.map((game) => [game.id, [...game.apps]])),
+    // The AI limit's apps on every platform (HAT-1359), from Kindredly's AI list.
+    aiApps: [...AI_APP_IDS],
     // Earn access (HAT-836): what each hold matches, in the order rules list them, and the Usage
     // types a minutes step may count (a step counting none is dropped, as `normalizeEarnAccessRule`
     // drops it). A list, not an object: Guard's JSON reader does not keep key order.

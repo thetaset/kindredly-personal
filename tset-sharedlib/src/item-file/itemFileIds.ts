@@ -13,6 +13,7 @@
 // rules, and a test fails when a new one appears in the codebase without being added to it.
 
 import { KINDREDLY_APP_REF_SCHEMA_ID } from '../types/item.types';
+import { PAGE_NOTE_SCHEMA_ID, pageNoteFileIdOf, pageNoteItemIdOf, pageNoteItemKey } from '../pageNote.utils';
 
 /** Keys whose string value is the id of one of this item's own attachments. */
 export const ATTACHMENT_ID_KEYS: ReadonlySet<string> = new Set(['attachmentId', 'previewAttachmentId', 'assetId']);
@@ -21,7 +22,7 @@ export const ATTACHMENT_ID_KEYS: ReadonlySet<string> = new Set(['attachmentId', 
 export const ITEM_ID_KEYS: ReadonlySet<string> = new Set(['startsAt', 'sourceItemId', 'parentItemId', 'itemId']);
 
 /** Keys whose value is a list of item ids. */
-export const ITEM_ID_LIST_KEYS: ReadonlySet<string> = new Set(['itemOrder', 'linkedItemIds']);
+export const ITEM_ID_LIST_KEYS: ReadonlySet<string> = new Set(['itemOrder', 'linkedItemIds', 'inOrderPartIds']);
 
 /** Keys that name a person or an account in the sender's family. Removed on export. */
 export const PERSON_ID_KEYS: ReadonlySet<string> = new Set([
@@ -60,6 +61,7 @@ export const ITEM_FILE_SCHEMA_REVIEW: Readonly<Record<string, string>> = {
   'kindredly.appRef.v1': 'sourceId is an item id when sourceKind is "item" (handled below)',
   'kindredly.ebookReader.v1': 'no ids',
   'kindredly.event.v1': 'accountId, createdByUserId, attendeeUserIds, linkedItemIds, sourceItemId',
+  'kindredly.helper.v1': 'forUserIds (family members a helper is for, not items); no item or attachment ids',
   'kindredly.kindTemplate.v1': 'templateId names a built-in template, not an item',
   'kindredly.lesson.v1': 'attachmentId, previewAttachmentId; a source ref itemId',
   'kindredly.lessonWriting.v1': 'no ids',
@@ -68,16 +70,18 @@ export const ITEM_FILE_SCHEMA_REVIEW: Readonly<Record<string, string>> = {
   'kindredly.mediaRef.v1': 'attachmentId, previewAttachmentId',
   'kindredly.note.v1': 'no ids',
   'kindredly.origin.v1': 'connectionId, kinbotSessionId (the sender\'s); editedBy[].userId',
-  'kindredly.pageNote.v1': 'no ids (videoId and channelId are YouTube ids, not items)',
+  'kindredly.pageNote.v1': 'sourceUrl/sourceKey, also in morePages[]: kindredly-item:<id> is an item id, kindredly-file:<id> a file id (handled below); videoId, channelId are YouTube ids',
   'kindredly.parentSource.v1': 'subscriptionId, subscriptionRefId, feedId, parentItemId',
   'kindredly.playback.v1': 'no ids',
+  'kindredly.project.v1': 'inOrderPartIds (a Project\'s parts, its sub-collections)',
   'kindredly.siteStyle.v1': 'no ids',
-  'kindredly.task.v1': 'accountId, createdByUserId, assignedUserIds, linkedItemIds, sourceItemId',
+  'kindredly.task.v1': 'accountId, createdByUserId, assignedUserIds, linkedItemIds, sourceItemId; subtasks[].itemId (an item a subtask opens)',
   'kindredly.thing.v1': 'no ids',
   'kindredly.track.v1': 'startsAt, itemOrder',
   'kindredly.trackDraft.v1': 'items[].itemId (an item of the feed); syllabus.droppedSource.attachmentId (HAT-752)',
   'kindredly.trackUnpublished.v1': 'no ids',
   'kindredly.trackItem.v1': 'image assetId (an attachment, or a published asset kept as it is)',
+  'knd.subtype.ai_prompt.v1': 'no ids (a Talk row\'s question)',
   'knd.subtype.product.v1': 'no ids',
 };
 
@@ -132,9 +136,38 @@ function rewriteValue(value: unknown, maps: ItemFileIdMaps, depth: number): unkn
 }
 
 /**
+ * One page a page note is about. A note about an item or a file in Kindredly (HAT-1068, PGN-20) is
+ * filed under `kindredly-item:<itemId>` or `kindredly-file:<fileId>` in `sourceUrl` and `sourceKey`,
+ * which no key name reaches. The address decides, as every reader of the schema does: an item's key
+ * follows its item, and is removed with an item outside the file; a file's key is removed, since the
+ * copy could not read the file. A web page stays as it is. Null when the page is removed.
+ */
+function pageNotePageForFile(page: Record<string, unknown>, maps: ItemFileIdMaps): Record<string, unknown> | null {
+  const url = typeof page.sourceUrl === 'string' ? page.sourceUrl : null;
+  const itemId = pageNoteItemIdOf(url);
+  if (itemId) {
+    const key = pageNoteItemKey(maps.itemIds.get(itemId));
+    return key ? { ...page, sourceUrl: key, sourceKey: key } : null;
+  }
+  return pageNoteFileIdOf(url) ? null : page;
+}
+
+/** A page note with its pages rewritten; the first page left becomes the note's own. Null with none left. */
+function pageNoteForFile(schema: Record<string, unknown>, maps: ItemFileIdMaps): Record<string, unknown> | null {
+  const { schemaVersion, morePages, ...first } = schema;
+  const pages = [first, ...(Array.isArray(morePages) ? morePages : [])]
+    .filter(isPlainObject)
+    .map((page) => pageNotePageForFile(page, maps))
+    .filter((page): page is Record<string, unknown> => !!page);
+  if (!pages.length) return null;
+  const [own, ...more] = pages;
+  return { schemaVersion, ...own, ...(more.length ? { morePages: more } : {}) };
+}
+
+/**
  * Rewrite every id inside `info.schemas` with `maps`, and return the new schemas. The input is not
  * changed. An app ref whose code lives in an item outside the file is removed, because the app
- * could not run from it.
+ * could not run from it; so is a page note's schema with none of its pages left (the note stays).
  */
 export function rewriteItemFileSchemaIds(
   schemas: Record<string, unknown> | null | undefined,
@@ -148,6 +181,11 @@ export function rewriteItemFileSchemaIds(
       const mapped = typeof payload.sourceId === 'string' ? maps.itemIds.get(payload.sourceId) : undefined;
       if (!mapped) continue;
       out[schemaId] = { ...(rewriteValue(payload, maps, 1) as Record<string, unknown>), sourceId: mapped };
+      continue;
+    }
+    if (schemaId === PAGE_NOTE_SCHEMA_ID && isPlainObject(payload)) {
+      const next = pageNoteForFile(rewriteValue(payload, maps, 1) as Record<string, unknown>, maps);
+      if (next) out[schemaId] = next;
       continue;
     }
     const next = rewriteValue(payload, maps, 1);

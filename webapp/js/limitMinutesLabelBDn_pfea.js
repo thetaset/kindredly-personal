@@ -1,0 +1,1 @@
+import{f as o}from"./filluN4Jl4kJ.js";import{t as e}from"./timeLimits.textCZXiH6Nc.js";function n(r){const t=e.editor;return r>=60&&Number.isInteger(r/60)?o(t.hours,{count:r/60}):o(t.minutes,{count:r})}export{n as f};

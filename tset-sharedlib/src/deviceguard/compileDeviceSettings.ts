@@ -19,10 +19,11 @@ import type { LimitRule } from '../types/usage-limits.types'
 import type {
   CompiledDeviceRuleSet,
   DeviceAppInventoryEntry,
+  DeviceAppPolicy,
   DeviceSettings,
 } from '../types/device-guard.types'
 import type { EarnAccessOpenings } from '../types/earn-access.types'
-import { buildAppCatalog, compileAppPolicy, type AppCatalogEntry } from './deviceAppPolicy'
+import { buildAppCatalog, catalogAppId, chosenBrowsersLevel, compileAppPolicy, type AppCatalogEntry } from './deviceAppPolicy'
 import { withNewAppsBlocked } from './newApps'
 import { deviceAppGrants } from '../restrictions/appGrants'
 import { compileNotCountedAppIds } from './notScreenTime'
@@ -35,8 +36,14 @@ import {
   earnAccessRuleIsComplete,
   normalizeEarnAccessSettings,
 } from '../restrictions/earnAccess'
-import { familyClock } from './familyClock'
+import { familyClock, familyWeekKey } from './familyClock'
+import { checkpointSettingsOf } from '../restrictions/checkinRule'
+import { CHECKPOINT_FORBIDDEN_EDU_VALUE, resolveCheckpointMode } from '../restrictions/checkpoint'
+import type { CheckpointException, LimitMatchCondition } from '../types/usage-limits.types'
+import type { EduValue } from '../content.types'
+import { applySchoolDays } from '../restrictions/schoolDays'
 import {
+  ALL_DEVICE_APPS,
   applyOverrides,
   compileDeviceRules,
   isDeviceAppRule,
@@ -57,8 +64,13 @@ export type DeviceSettingsCompileInput = {
   familyTimeZone: string
   /** Every app on this device, with its platform stamped (one inventory reports it once). */
   installedApps: DeviceAppInventoryEntry[]
-  /** Today's web time per rule, in the family date. Missing counts as none. */
-  usageSeed?: { perRuleUsedMs: Record<string, number> }
+  /**
+   * Today's web time per rule, in the family date. Missing counts as none.
+   *
+   * HAT-1086: `perRuleWeekUsedMs` is this family week's web time per rule, today's included, counted
+   * under `weekKey` (`familyWeekKey`). One from another week counts as none, as a day's seed does.
+   */
+  usageSeed?: { perRuleUsedMs: Record<string, number>; weekKey?: string; perRuleWeekUsedMs?: Record<string, number> }
   serverTimeSkewMs?: number
 }
 
@@ -157,14 +169,19 @@ export function activeLimitRules(settings: DeviceSettings, nowMs: number): Limit
   return [...authored, ...rewards]
 }
 
+/** What a child with no App controls row is compiled as: nothing chosen, so every default applies. */
+const ABSENT_POLICY: DeviceAppPolicy = { version: 1, blockedCategories: [], entries: {}, updatedAt: 0 }
+
 export function compileDeviceSettings(input: DeviceSettingsCompileInput): CompiledDeviceRuleSet {
   const { settings, nowMs, familyTimeZone } = input
   const paused = isPaused(settings, nowMs)
 
   // Bonus time replaces today's allowance for its rule until `expiresAt` (`applyOverrides` drops the
   // expired ones). Today is the family's today, not the device's.
+  // School days first (HAT-1283): a day off takes the Not school days schedule, and extra time then
+  // replaces whichever schedule today has.
   const rules = applyOverrides(
-    activeLimitRules(settings, nowMs),
+    applySchoolDays(activeLimitRules(settings, nowMs), settings.schoolDays, familyClock(nowMs, familyTimeZone)),
     paused ? [] : settings.ruleOverrideSettings?.ruleOverrides,
     dayOfWeekInTimeZone(nowMs, familyTimeZone),
     nowMs,
@@ -172,7 +189,9 @@ export function compileDeviceSettings(input: DeviceSettingsCompileInput): Compil
 
   // A null policy compiles to no `appPolicy` key. The device keeps its sealed app blocks in that
   // case (DCP-5); deciding that is the device's job, not this function's.
-  const policy = settings.appPolicy
+  // No row at all compiles as an empty one, so a child's phone gets the Browsers default (HAT-1348:
+  // Browsers with Kindredly, founder 2026-11-25). A row that cannot be read stays null, as above.
+  const policy = settings.appPolicy ?? (settings.appPolicyStatus === 'absent' ? ABSENT_POLICY : null)
   const catalog = buildAppCatalog(input.installedApps, policy)
   // A stored `countInUsageLimits: false` is ignored: the switch is gone (HAT-042, BTL-3).
   const categoryExpansion: CategoryExpansion = 'all'
@@ -183,6 +202,15 @@ export function compileDeviceSettings(input: DeviceSettingsCompileInput): Compil
   const perRuleUsedMs: Record<string, number> = {}
   for (const [ruleId, ms] of Object.entries(input.usageSeed?.perRuleUsedMs || {})) {
     if (deviceRuleIds.has(ruleId) && typeof ms === 'number' && ms > 0) perRuleUsedMs[ruleId] = ms
+  }
+  // The week's web time (HAT-1086), only when counted this family week. `compileDeviceRules` keeps it
+  // only for rules with a weekly total, and drops the week entirely when no rule has one.
+  const weekKey = familyWeekKey(familyClock(nowMs, familyTimeZone))
+  const perRuleWeekUsedMs: Record<string, number> = {}
+  if (input.usageSeed?.weekKey === weekKey) {
+    for (const [ruleId, ms] of Object.entries(input.usageSeed.perRuleWeekUsedMs || {})) {
+      if (deviceRuleIds.has(ruleId) && typeof ms === 'number' && ms > 0) perRuleWeekUsedMs[ruleId] = ms
+    }
   }
 
   const access = settings.accessControlSettings || {}
@@ -201,6 +229,8 @@ export function compileDeviceSettings(input: DeviceSettingsCompileInput): Compil
     usageSeed: {
       dateKey: dateKeyInTimeZone(nowMs, familyTimeZone),
       perRuleUsedMs,
+      weekKey,
+      perRuleWeekUsedMs,
     },
     appCatalog: catalog,
     categoryExpansion,
@@ -220,7 +250,83 @@ export function compileDeviceSettings(input: DeviceSettingsCompileInput): Compil
   // browser either; "Pause all restrictions" is the device's to apply, as for every block.
   const earnAccess = compileEarnAccess(access, catalog, nowMs, familyTimeZone)
   const withEarnAccess = earnAccess ? { ...withGrants, earnAccess } : withGrants
-  return restrictionsPause ? { ...withEarnAccess, restrictionsPause } : withEarnAccess
+  const blockAll = compileBlockAll(access, catalog, nowMs)
+  const withBlockAll = blockAll ? { ...withEarnAccess, blockAll } : withEarnAccess
+  // From every authored limit, paused or not: "Pause just usage limits" lifts the limits, not the
+  // check-in, which the browser holds through it too.
+  const checkin = compileCheckin(access, activeLimitRules({ ...settings, accessControlSettings: {} }, nowMs), catalog)
+  const withCheckin = checkin ? { ...withBlockAll, checkin } : withBlockAll
+  // The Browsers setting as chosen (HAT-1348), for a computer; a phone's half is in `appPolicy`.
+  const browsers = chosenBrowsersLevel(policy)
+  const withBrowsers = browsers ? { ...withCheckin, browsers } : withCheckin
+  return restrictionsPause ? { ...withBrowsers, restrictionsPause } : withBrowsers
+}
+
+/**
+ * What "Block all access" closes on a device (CMP-118): every app but Task-Related and system ones,
+ * and on a phone the other browsers, which Kindredly does not filter. Kindredly and the Companion are
+ * in the floor, which the device checks first. Null while it is off or has run out. Guard's Kotlin
+ * compile ports it (`DeviceSettingsCompiler.compileBlockAll`).
+ */
+export const BLOCK_ALL_OPEN_EDU_VALUES: ReadonlySet<EduValue> = new Set<EduValue>(['eduval_task', 'eduval_unknown'])
+
+export function compileBlockAll(
+  access: { restrictAll?: boolean; restrictAllExpires?: number } | null | undefined,
+  catalog: AppCatalogEntry[],
+  nowMs: number,
+): CompiledDeviceRuleSet['blockAll'] | null {
+  if (access?.restrictAll !== true) return null
+  const untilMs = Number(access.restrictAllExpires) || 0
+  if (untilMs && untilMs <= nowMs) return null
+  const appIds = catalog
+    .filter((app) => !BLOCK_ALL_OPEN_EDU_VALUES.has(app.eduValue) || (app.categoryId === 'browsers' && (app.platform || 'android') === 'android'))
+    .map(catalogAppId)
+  return { untilMs, appIds: [...new Set(appIds)].sort() }
+}
+
+/** Conditions an app can answer. A site, library item or page condition can never match one. */
+const APP_CONDITION_TYPES: ReadonlySet<LimitMatchCondition['type']> = new Set(['appId', 'eduValue', 'attribute', 'socialDesignation'] as LimitMatchCondition['type'][])
+
+/**
+ * The apps a check-in exception leaves open on a device: one with only app-shaped conditions, read
+ * as a limit on them would be. "Unknown" is stripped, as the browser strips it, since it would open
+ * everything.
+ */
+function checkinExceptionAppIds(exception: CheckpointException, catalog: AppCatalogEntry[]): string[] {
+  const conditions = (exception?.conditions || [])
+    .filter(Boolean)
+    .map((c) => (c.type === 'eduValue' ? { ...c, values: (c.values || []).filter((v) => String(v) !== CHECKPOINT_FORBIDDEN_EDU_VALUE) } : c))
+  if (!conditions.length || conditions.some((c) => !APP_CONDITION_TYPES.has(c.type))) return []
+  const ids = resolveAppIds({ id: `checkin-exception:${exception.id}`, conditions } as unknown as LimitRule, catalog, 'all')
+  return Array.isArray(ids) ? ids : []
+}
+
+/**
+ * The Daily Check-in for a device (CMP-117): the apps it holds until today's is done, which are the
+ * apps the time limits cover here less the exceptions'. Null when it is off, a reminder, or covers no
+ * app here. Guard's Kotlin compile ports it (`DeviceSettingsCompiler.compileCheckin`).
+ */
+export function compileCheckin(
+  access: DeviceSettings['accessControlSettings'] | null | undefined,
+  rules: LimitRule[],
+  catalog: AppCatalogEntry[],
+): CompiledDeviceRuleSet['checkin'] | null {
+  const settings = checkpointSettingsOf(access)
+  if (settings?.enabled !== true) return null
+  const mode = resolveCheckpointMode(settings)
+  if (mode === 'reminder') return null
+  const covered = new Set<string>()
+  for (const rule of rules) {
+    if (!isDeviceAppRule(rule, catalog, 'all')) continue
+    const ids = resolveAppIds(rule, catalog, 'all')
+    for (const id of ids === ALL_DEVICE_APPS ? catalog.map(catalogAppId) : ids) covered.add(id)
+  }
+  for (const exception of settings.exceptions || []) {
+    for (const id of checkinExceptionAppIds(exception, catalog)) covered.delete(id)
+  }
+  if (!covered.size) return null
+  const releasedUntilMs = Number(access?.checkpointRelease?.releasedUntilMs)
+  return { mode, releasedUntilMs: Number.isFinite(releasedUntilMs) && releasedUntilMs > 0 ? releasedUntilMs : 0, appIds: [...covered].sort() }
 }
 
 /**

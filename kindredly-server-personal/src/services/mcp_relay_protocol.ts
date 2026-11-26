@@ -19,11 +19,17 @@ const SERVER_INFO = {name: 'kindredly', title: 'Kindredly', version: '1.0.0'};
 
 const INSTRUCTIONS =
   "Kindredly is a family's private library and parental controls app. These tools look things up in " +
-  "the signed-in person's Kindredly. If the person allowed it, a few also make small changes that end " +
-  "on their own (extra time, a pause, tonight's curfew); those tools say so, and anything bigger is " +
-  "refused. A call works only while Kindredly is open on one of the person's devices; if a tool says " +
+  "the signed-in person's Kindredly. Call one only when the person asks for something in their " +
+  'Kindredly (their family, library, tasks or controls), never on your own to answer anything else. ' +
+  'A tool that changes something asks the person to tap Agree in Kindredly first, unless they trust ' +
+  'you for a while; a tool says when it is waiting for them. ' +
+  "A call works only while Kindredly is open on one of the person's devices; if a tool says " +
   'it is not open, ask them to open it. When you save something to their library, pass what they ' +
-  'asked for (request) and, for something you made, a two-line summary, so they can find it again.';
+  'asked for (request) and, for something you made, a two-line summary, so they can find it again. ' +
+  'To make an app or game for the family (a Kindredly App), read getAppGuide, save it as one HTML ' +
+  'page with saveApp, then checkApp until it works; readApp gives an app back to change. A bigger ' +
+  'app goes in with uploadFile and asApp, as a .zip with index.html. An app for a child: plain ' +
+  'words, nothing that links out, sells or asks them to sign up.';
 
 export type McpRelayCall = (
   op: 'listTools' | 'callTool',

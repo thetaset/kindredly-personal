@@ -1,0 +1,116 @@
+{
+  "id": "63-checkin-self-exception",
+  "behaviour": "A check-in the child does, stored as an Earn access rule (HAT-913), with an exception for Educational: the game closes with words that say to check in, and the learning app stays open.",
+  "clock": {
+    "nowMs": 1789491600000,
+    "familyTimeZone": "America/Los_Angeles",
+    "deviceTimeZone": "America/Los_Angeles"
+  },
+  "settings": {
+    "usageLimitsData": {
+      "contentUsageLimits": [
+        {
+          "id": "r-screen",
+          "name": "Screen time",
+          "type": "advanced",
+          "conditions": [
+            {
+              "type": "eduValue",
+              "values": [
+                "eduval_fun",
+                "eduval_educational"
+              ]
+            }
+          ],
+          "timeLimits": [
+            {
+              "hours": 2,
+              "daysOfWeek": [
+                0,
+                1,
+                2,
+                3,
+                4,
+                5,
+                6
+              ]
+            }
+          ]
+        }
+      ],
+      "temporaryRules": []
+    },
+    "ruleOverrideSettings": {
+      "ruleOverrides": []
+    },
+    "accessControlSettings": {
+      "earnAccessSettings": {
+        "version": 2,
+        "rules": [
+          {
+            "id": "daily-checkin",
+            "kind": "checkin",
+            "name": "Daily Check-in",
+            "enabled": true,
+            "instructions": "",
+            "holds": [],
+            "steps": [],
+            "checkin": {
+              "mode": "self",
+              "exceptions": [
+                {
+                  "id": "x-edu",
+                  "conditions": [
+                    {
+                      "type": "eduValue",
+                      "values": [
+                        "eduval_educational"
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        ]
+      }
+    },
+    "appPolicy": null,
+    "appPolicyStatus": "readable"
+  },
+  "installedApps": [
+    {
+      "pkg": "com.roblox.client",
+      "label": "Roblox",
+      "platform": "android"
+    },
+    {
+      "pkg": "com.duolingo",
+      "label": "Duolingo",
+      "platform": "android"
+    }
+  ],
+  "floor": [],
+  "usage": {
+    "appMsByPkg": {},
+    "webLogs": []
+  },
+  "usageSeed": {
+    "perRuleUsedMs": {}
+  },
+  "expectDevice": [
+    {
+      "pkg": "com.roblox.client",
+      "action": "block",
+      "reason": "checkin-self",
+      "ruleId": null
+    },
+    {
+      "pkg": "com.duolingo",
+      "action": "allow",
+      "reason": null,
+      "ruleId": null
+    }
+  ],
+  "browserNotApplicable": "Device-only: the browser applies the same setting to pages through its own gate; this case pins what a phone and a computer close."
+}

@@ -153,6 +153,19 @@ describe('deviceBlockSubtitle', () => {
     expect(subtitle).not.toContain('quantum-flux');
   });
 
+  it('names the App controls category that turned the app off (HAT-1348)', () => {
+    expect(deviceBlockSubtitle({ ...base, reason: 'app-blocked', appCategory: 'browsers', platform: 'macos' })).toBe(
+      'Turned off in App controls: Other browsers.',
+    );
+    expect(deviceBlockCopy({ ...base, reason: 'app-blocked', appLabel: 'Firefox', appCategory: 'browsers' }).detail).toBe(
+      'A parent turned off Other browsers in App controls. Ask them if you need it.',
+    );
+    // An app turned off on its own, or a category this build does not know: the setting, no category.
+    expect(deviceBlockCopy({ ...base, reason: 'app-blocked', appCategory: 'nope' }).detail).toBe(
+      'A parent turned this app off in App controls. Ask them if you need it.',
+    );
+  });
+
   it('says computer on a computer and phone on a phone', () => {
     // "A parent chooses which apps can be used on this phone" was shown on a Mac.
     expect(deviceBlockSubtitle({ ...base, reason: 'app-blocked', platform: 'macos' })).toContain('this computer');
@@ -198,5 +211,47 @@ describe('deviceNoun', () => {
     expect(deviceNoun('steam')).toBe('this computer');
     expect(deviceNoun('android')).toBe('this phone');
     expect(deviceNoun('ios')).toBe('this phone');
+  });
+});
+
+describe('deviceBlockCopy for a used-up weekly total (HAT-1086)', () => {
+  // Wednesday noon; the week opens again Monday 24 August at midnight PDT.
+  const MONDAY = Date.UTC(2026, 7, 24, 7);
+
+  it('says this week and the day it opens, not tomorrow', () => {
+    const copy = deviceBlockCopy({ ...base, reason: 'budget-exhausted', ruleName: 'Games', unlockAtMs: MONDAY });
+    expect(copy.headline).toBe('No Games time left this week');
+    expect(copy.detail).toContain('Opens again on Monday.');
+    expect(deviceBlockCopy({ ...base, reason: 'budget-exhausted', coversEverything: true, unlockAtMs: MONDAY }).headline).toBe(
+      'No screen time left this week',
+    );
+  });
+
+  it('keeps today and tomorrow for a daily limit', () => {
+    const tomorrow = Date.UTC(2026, 7, 20, 7);
+    const copy = deviceBlockCopy({ ...base, reason: 'budget-exhausted', ruleName: 'Games', unlockAtMs: tomorrow });
+    expect(copy.headline).toBe('No Games time left today');
+    expect(copy.detail).toContain('Opens again tomorrow.');
+  });
+});
+
+/** CMP-117, CMP-118: Block all and the Daily Check-in on a phone or a computer. */
+describe('Block all and the check-in', () => {
+  const at = { appLabel: 'Roblox', nowMs: Date.UTC(2026, 10, 23, 18, 0), tzOffsetMinutes: 0 };
+
+  it('Block all names the app, says a parent did it, and when it opens when there is an end', () => {
+    expect(deviceBlockCopy({ ...at, reason: 'block-all' })).toEqual({
+      headline: 'Roblox is off for now',
+      detail: 'A parent turned off apps like this one.',
+    });
+    expect(deviceBlockCopy({ ...at, reason: 'block-all', unlockAtMs: at.nowMs + 3_600_000 }).detail).toBe(
+      'Opens again at 19:00. A parent turned off apps like this one.',
+    );
+  });
+
+  it('the check-in says who does it', () => {
+    expect(deviceBlockCopy({ ...at, reason: 'checkin' }).detail).toContain('A parent checks you in');
+    expect(deviceBlockCopy({ ...at, reason: 'checkin-self' }).detail).toContain('Check in on Kindredly');
+    expect(isDeviceBlockReason('checkin-self')).toBe(true);
   });
 });

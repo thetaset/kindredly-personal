@@ -1,0 +1,1 @@
+import{dl as n,dm as p}from"./appHandoffGuestD3H_h1r5.js";function d(t,i){if(n(t))return!1;const r=p(t);if(!r)return!0;const e=String(i||"").trim();return e?r.sourceKind==="item"&&String(r.sourceId||"").trim()===e:!1}export{d as i};

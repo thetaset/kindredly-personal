@@ -3,6 +3,7 @@ import knex from '@/db/knex_config';
 import {RefStateRepo} from '@/db/ref_state.repo';
 import SSEManager from './sse.manager';
 import {familyDowntimeForDevice, normalizeFamilyDowntime} from 'tset-sharedlib/restrictions/familyDowntime';
+import {normalizeSchoolDays} from 'tset-sharedlib/restrictions/schoolDays';
 import {normalizeAllowList} from 'tset-sharedlib/restrictions/alwaysAllowed';
 import {deviceAppGrants} from 'tset-sharedlib/restrictions/appGrants';
 import {restrictionsPauseAt} from 'tset-sharedlib/deviceguard/compileDeviceSettings';
@@ -23,7 +24,7 @@ import type {
  * each write's own statement or transaction.
  */
 
-/** The `accessControlSettings` fields a device reads. Everything else there (check-in, filters) is not. */
+/** The `accessControlSettings` fields a device reads. Everything else there (filters, the block page) is not. */
 const DEVICE_ACCESS_CONTROL_KEYS = [
   'disableUsageLimits',
   'disableUsageLimitsExpires',
@@ -42,6 +43,10 @@ const DEVICE_ACCESS_CONTROL_KEYS = [
   // hold with the same sharedlib math as the browser, so an opening on any device reaches the phone.
   'earnAccessSettings',
   'earnAccessOpenings',
+  // The Daily Check-in (CMP-117): stored as an Earn access rule since HAT-913, or in this field for
+  // data saved before it; and today's release, so a check-in done anywhere wakes the devices.
+  'checkpointSettings',
+  'checkpointRelease',
 ] as const;
 
 export const DEVICE_GUARD_REF_TYPE = 'device-guard';
@@ -242,6 +247,8 @@ export class DeviceSettingsService {
       ...deviceSettingsFromOptions(user.options),
       ...appPolicyFromRow(policyRow),
       familyDowntime,
+      // As stored: the device works out which schedule each day takes (HAT-1283).
+      schoolDays: normalizeSchoolDays(account?.options?.schoolDays),
     };
     return {version, serverTimeMs: nowMs, settings, familyTimeZone, ...guard};
   }

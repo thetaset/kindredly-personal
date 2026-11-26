@@ -104,6 +104,12 @@ export enum NotificationType {
   LESSON_PART_DONE = 'LESSON_PART_DONE',
 
   /**
+   * A child asked for a Helper AI helper (HAT-1105, HAI-14). Names the child only: what they asked
+   * for stays in the encrypted request, on the Helper AI page the notice opens.
+   */
+  HELPER_REQUEST = 'HELPER_REQUEST',
+
+  /**
    * Each admin's report of which children were active, weekly on Sunday evening by default, or
    * daily, or off (HAT-655). Sent even when no child was active, saying so, with nothing to open.
    */

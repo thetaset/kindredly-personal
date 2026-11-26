@@ -1,8 +1,8 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "generatedFrom": "src/api/api-route-map.ts",
-  "routeCount": 1049,
-  "validatedRouteCount": 1049,
+  "routeCount": 1141,
+  "validatedRouteCount": 1141,
   "unrepresentableTypes": {},
   "routes": {
     "/": "#/definitions/InlineRequest_",
@@ -26,6 +26,7 @@
     "/task/skip": "#/definitions/InlineRequest_task_skip",
     "/task/snooze": "#/definitions/InlineRequest_task_snooze",
     "/task/uncomplete": "#/definitions/InlineRequest_task_uncomplete",
+    "/task/subtask/set": "#/definitions/InlineRequest_task_subtask_set",
     "/task/status/list": "#/definitions/InlineRequest_task_status_list",
     "/task/occurrences/listByRange": "#/definitions/ListTaskOccurrencesByRangeRequest",
     "/checkpoint/taskgate/status": "#/definitions/InlineRequest_checkpoint_taskgate_status",
@@ -48,6 +49,8 @@
     "/task_items/collections": "#/definitions/InlineRequest_task_items_collections",
     "/task_items/convertFromNote": "#/definitions/InlineRequest_task_items_convertFromNote",
     "/task_items/convertToNote": "#/definitions/InlineRequest_task_items_convertToNote",
+    "/task_items/attachItem": "#/definitions/InlineRequest_task_items_attachItem",
+    "/task_items/listForItem": "#/definitions/InlineRequest_task_items_listForItem",
     "/task_completion/upsert": "#/definitions/InlineRequest_task_completion_upsert",
     "/task_completion/listForTask": "#/definitions/InlineRequest_task_completion_listForTask",
     "/lesson_progress/get": "#/definitions/InlineRequest_lesson_progress_get",
@@ -67,6 +70,9 @@
     "/usertask/track/syllabus": "#/definitions/TrackSyllabusRequest",
     "/usertask/track/writeItem": "#/definitions/TrackWriteItemRequest",
     "/usertask/track/improve": "#/definitions/TrackImproveRequest",
+    "/usertask/project/outline": "#/definitions/ProjectOutlineRequest",
+    "/usertask/project/fillPart": "#/definitions/ProjectFillPartRequest",
+    "/usertask/project/changePart": "#/definitions/ProjectChangePartRequest",
     "/access_request/add": "#/definitions/InlineRequest_access_request_add",
     "/access_request/listall": "#/definitions/InlineRequest_access_request_listall",
     "/access_request/listForUser": "#/definitions/InlineRequest_access_request_listForUser",
@@ -106,6 +112,21 @@
     "/sitestyle/matchReports": "#/definitions/SiteStyleMatchReportsRequest",
     "/sitestyle/list": "#/definitions/SiteStyleListRequest",
     "/sitestyle/forUrl": "#/definitions/SiteStyleForUrlRequest",
+    "/sitestyle/pageChanges/list": "#/definitions/PageChangeListRequest",
+    "/sitestyle/pageChanges/save": "#/definitions/PageChangeSaveRequest",
+    "/sitestyle/pageChanges/setFor": "#/definitions/PageChangeSetForRequest",
+    "/sitestyle/pageChanges/delete": "#/definitions/PageChangeDeleteRequest",
+    "/sitestyle/pageChanges/openOnPage": "#/definitions/PageChangeOpenOnPageRequest",
+    "/sitestyle/pageChanges/people": "#/definitions/PageChangePeopleRequest",
+    "/sitestyle/pageChanges/forPage": "#/definitions/PageChangeForPageRequest",
+    "/sitestyle/pageChanges/target": "#/definitions/PageChangeTargetRequest",
+    "/sitestyle/pageChanges/draft": "#/definitions/PageChangeDraftRequest",
+    "/sitestyle/pageChanges/draft/edit": "#/definitions/PageChangeDraftEditRequest",
+    "/sitestyle/pageChanges/draft/save": "#/definitions/PageChangeDraftSaveRequest",
+    "/sitestyle/pageChanges/draft/show": "#/definitions/PageChangeDraftShowRequest",
+    "/sitestyle/pageChanges/draft/pick": "#/definitions/PageChangeDraftPickRequest",
+    "/sitestyle/pageChanges/picked": "#/definitions/PageChangePickedRequest",
+    "/sitestyle/pageChanges/start": "#/definitions/PageChangeStartRequest",
     "/ref_state/session/upsert": "#/definitions/RefStateUpsertRequest",
     "/ref_state/session/list": "#/definitions/RefStateListRequest",
     "/ref_state/session/delete": "#/definitions/RefStateDeleteRequest",
@@ -117,16 +138,13 @@
     "/continue/record": "#/definitions/ContinueRecordRequest",
     "/continue/list": "#/definitions/ContinueListRequest",
     "/continue/remove": "#/definitions/ContinueRemoveRequest",
-    "/project/list": "#/definitions/ProjectListRequest",
-    "/project/create": "#/definitions/ProjectCreateRequest",
-    "/project/rename": "#/definitions/ProjectRenameRequest",
-    "/project/setNote": "#/definitions/ProjectSetNoteRequest",
     "/account/stats": "#/definitions/InlineRequest_account_stats",
     "/account/users": "#/definitions/InlineRequest_account_users",
     "/activity/clearHistory": "#/definitions/InlineRequest_activity_clearHistory",
     "/activity/expireRemoteState": "#/definitions/InlineRequest_activity_expireRemoteState",
     "/activity/getCurrentUsageSummary": "#/definitions/GetUsageSummaryRequest",
     "/activity/getUsageInsightsReport": "#/definitions/GetUsageInsightsReportRequest",
+    "/activity/getTimeSpent": "#/definitions/GetTimeSpentRequest",
     "/activity/lookupChannelNames": "#/definitions/InlineRequest_activity_lookupChannelNames",
     "/activity/getTopicAttention": "#/definitions/GetTopicAttentionRequest",
     "/activity/getUrlRuleExplanation": "#/definitions/GetUrlRuleExplanationRequest",
@@ -142,6 +160,8 @@
     "/activity/getClassificationEvalProgramStatus": "#/definitions/GetClassificationEvalProgramStatusRequest",
     "/activity/uploadClassificationDatasetSamples": "#/definitions/UploadClassificationDatasetSamplesRequest",
     "/activity/uploadImageClassificationSamples": "#/definitions/UploadImageClassificationSamplesRequest",
+    "/activity/sharePages": "#/definitions/SharePagesRequest",
+    "/activity/sharePagesNow": "#/definitions/InlineRequest_activity_sharePagesNow",
     "/activity/syncUsageLog": "#/definitions/InlineRequest_activity_syncUsageLog",
     "/activityMonitor/startFrameEventTrackingForCurrentTab": "#/definitions/InlineRequest_activityMonitor_startFrameEventTrackingForCurrentTab",
     "/activityMonitor/update": "#/definitions/UpdateActivityLogRequest",
@@ -188,6 +208,7 @@
     "/admin/classificationEval/samples/delete": "#/definitions/InlineRequest_admin_classificationEval_samples_delete",
     "/admin/classificationEval/samples/savePrediction": "#/definitions/InlineRequest_admin_classificationEval_samples_savePrediction",
     "/admin/classificationEval/samples/saveLabelOverride": "#/definitions/InlineRequest_admin_classificationEval_samples_saveLabelOverride",
+    "/admin/classificationEval/samples/saveTopics": "#/definitions/InlineRequest_admin_classificationEval_samples_saveTopics",
     "/admin/classificationEval/datasets/recrawlPageText": "#/definitions/InlineRequest_admin_classificationEval_datasets_recrawlPageText",
     "/admin/classificationEval/datasets/exportTrainingSamples": "#/definitions/InlineRequest_admin_classificationEval_datasets_exportTrainingSamples",
     "/admin/classificationEval/datasets/exportFull": "#/definitions/InlineRequest_admin_classificationEval_datasets_exportFull",
@@ -203,9 +224,24 @@
     "/admin/classificationEval/anchors/activate": "#/definitions/InlineRequest_admin_classificationEval_anchors_activate",
     "/admin/classificationEval/anchors/getActive": "#/definitions/InlineRequest_admin_classificationEval_anchors_getActive",
     "/admin/classificationEval/anchors/delete": "#/definitions/InlineRequest_admin_classificationEval_anchors_delete",
+    "/admin/classificationEval/datasets/acceptAgreeing": "#/definitions/InlineRequest_admin_classificationEval_datasets_acceptAgreeing",
     "/admin/classificationEval/labelPrompt/get": "#/definitions/InlineRequest_admin_classificationEval_labelPrompt_get",
     "/admin/classificationEval/labelPrompt/save": "#/definitions/InlineRequest_admin_classificationEval_labelPrompt_save",
     "/admin/classificationEval/labelPrompt/reset": "#/definitions/InlineRequest_admin_classificationEval_labelPrompt_reset",
+    "/admin/classifier/versions/list": "#/definitions/InlineRequest_admin_classifier_versions_list",
+    "/admin/classifier/versions/get": "#/definitions/InlineRequest_admin_classifier_versions_get",
+    "/admin/classifier/versions/save": "#/definitions/InlineRequest_admin_classifier_versions_save",
+    "/admin/classifier/versions/activate": "#/definitions/InlineRequest_admin_classifier_versions_activate",
+    "/admin/classifier/activations/list": "#/definitions/InlineRequest_admin_classifier_activations_list",
+    "/admin/classifier/scorecards/save": "#/definitions/InlineRequest_admin_classifier_scorecards_save",
+    "/admin/classifier/synth/list": "#/definitions/InlineRequest_admin_classifier_synth_list",
+    "/admin/classifier/synth/get": "#/definitions/InlineRequest_admin_classifier_synth_get",
+    "/admin/classifier/synth/decide": "#/definitions/InlineRequest_admin_classifier_synth_decide",
+    "/admin/classifier/weakSpots": "#/definitions/InlineRequest_admin_classifier_weakSpots",
+    "/admin/classifier/recipes/list": "#/definitions/InlineRequest_admin_classifier_recipes_list",
+    "/admin/classifier/recipes/save": "#/definitions/InlineRequest_admin_classifier_recipes_save",
+    "/admin/classifier/recipes/close": "#/definitions/InlineRequest_admin_classifier_recipes_close",
+    "/admin/classifier/scorecards/list": "#/definitions/InlineRequest_admin_classifier_scorecards_list",
     "/admin/classificationEval/datasets/create": "#/definitions/InlineRequest_admin_classificationEval_datasets_create",
     "/admin/classificationEval/datasets/updateMeta": "#/definitions/InlineRequest_admin_classificationEval_datasets_updateMeta",
     "/admin/classificationEval/evalRuns/save": "#/definitions/InlineRequest_admin_classificationEval_evalRuns_save",
@@ -220,6 +256,9 @@
     "/admin/setupCatalog/get": "#/definitions/InlineRequest_admin_setupCatalog_get",
     "/admin/setupCatalog/update": "#/definitions/AdminUpdateSetupCatalogRequest",
     "/admin/setupCatalog/reset": "#/definitions/InlineRequest_admin_setupCatalog_reset",
+    "/admin/blockPage/defaults/get": "#/definitions/InlineRequest_admin_blockPage_defaults_get",
+    "/admin/blockPage/defaults/save": "#/definitions/InlineRequest_admin_blockPage_defaults_save",
+    "/admin/blockPage/defaults/reset": "#/definitions/InlineRequest_admin_blockPage_defaults_reset",
     "/admin/thinkingPuzzles/list": "#/definitions/AdminPuzzleContentListRequest",
     "/admin/thinkingPuzzles/save": "#/definitions/AdminPuzzleContentSaveRequest",
     "/admin/thinkingPuzzles/setStatus": "#/definitions/AdminPuzzleContentSetStatusRequest",
@@ -272,6 +311,7 @@
     "/admin/published/enrich": "#/definitions/AdminPublishedEnrichRequest",
     "/admin/published/applyEnrichmentPatches": "#/definitions/AdminPublishedApplyPatchesRequest",
     "/admin/published/importBatches": "#/definitions/AdminPublishedImportBatchesRequest",
+    "/admin/published/intakeSummary": "#/definitions/AdminPublishedIntakeSummaryRequest",
     "/admin/published/approveBatch": "#/definitions/AdminPublishedApproveBatchRequest",
     "/admin/published/itemsSchemaUpdate": "#/definitions/InlineRequest_admin_published_itemsSchemaUpdate",
     "/admin/published/list": "#/definitions/InlineRequest_admin_published_list",
@@ -316,10 +356,13 @@
     "/ai/appendResponseToSession": "#/definitions/InlineRequest_ai_appendResponseToSession",
     "/ai/setCurrentSessionId": "#/definitions/InlineRequest_ai_setCurrentSessionId",
     "/ai/updateSession": "#/definitions/InlineRequest_ai_updateSession",
+    "/ai/appendRefusedTurn": "#/definitions/InlineRequest_ai_appendRefusedTurn",
+    "/ai/searchSessions": "#/definitions/InlineRequest_ai_searchSessions",
     "/ai/renameSession": "#/definitions/InlineRequest_ai_renameSession",
     "/ai/textRequest": "#/definitions/AITextRequest",
     "/ai/collectionAuthoringPrompt": "#/definitions/InlineRequest_ai_collectionAuthoringPrompt",
     "/ai/childMessageCheck": "#/definitions/InlineRequest_ai_childMessageCheck",
+    "/ai/helperTopicCheck": "#/definitions/InlineRequest_ai_helperTopicCheck",
     "/ai/provider/listOllamaModels": "#/definitions/InlineRequest_ai_provider_listOllamaModels",
     "/ai/provider/syncOriginRule": "#/definitions/InlineRequest_ai_provider_syncOriginRule",
     "/ai/image/generate": "#/definitions/InlineRequest_ai_image_generate",
@@ -415,6 +458,7 @@
     "/companion/apps/inventory": "#/definitions/InlineRequest_companion_apps_inventory",
     "/companion/rules/current": "#/definitions/InlineRequest_companion_rules_current",
     "/companion/settings/current": "#/definitions/DeviceSettingsCurrentRequest",
+    "/companion/usage/sync": "#/definitions/DeviceUsageSyncRequest",
     "/companion/settings/version": "#/definitions/InlineRequest_companion_settings_version",
     "/companion/devices/requestUpload": "#/definitions/InlineRequest_companion_devices_requestUpload",
     "/companion/settings/events": "#/definitions/InlineRequest_companion_settings_events",
@@ -428,6 +472,9 @@
     "/collection/suggestConfident": "#/definitions/InlineRequest_collection_suggestConfident",
     "/collection/recent": "#/definitions/InlineRequest_collection_recent",
     "/collection/related": "#/definitions/InlineRequest_collection_related",
+    "/collection/findItemsFor": "#/definitions/InlineRequest_collection_findItemsFor",
+    "/collection/mergeSuggestions": "#/definitions/InlineRequest_collection_mergeSuggestions",
+    "/collection/splitGroups": "#/definitions/InlineRequest_collection_splitGroups",
     "/collection/create": "#/definitions/SaveItemRequest",
     "/collection/decrypt": "#/definitions/InlineRequest_collection_decrypt",
     "/collection/encrypt": "#/definitions/InlineRequest_collection_encrypt",
@@ -493,6 +540,9 @@
     "/content/familyPolicyBlockRules/sync": "#/definitions/InlineRequest_content_familyPolicyBlockRules_sync",
     "/content/fixClassificationForVisits": "#/definitions/InlineRequest_content_fixClassificationForVisits",
     "/content/fixPipelineClassification": "#/definitions/InlineRequest_content_fixPipelineClassification",
+    "/content/videoCloseWatch/get": "#/definitions/InlineRequest_content_videoCloseWatch_get",
+    "/content/htmlFileCheck": "#/definitions/HtmlFileScan",
+    "/content/videoFrameFromScreen": "#/definitions/InlineRequest_content_videoFrameFromScreen",
     "/content/classificationLab": "#/definitions/InlineRequest_content_classificationLab",
     "/content/classifyLibraryMetadata": "#/definitions/InlineRequest_content_classifyLibraryMetadata",
     "/content/savePipelineResults": "#/definitions/InlineRequest_content_savePipelineResults",
@@ -501,6 +551,8 @@
     "/data/classifyContentType": "#/definitions/InlineRequest_data_classifyContentType",
     "/data/contentInfo": "#/definitions/ContentLookupRequest",
     "/data/learnedClassifierModel/getActive": "#/definitions/InlineRequest_data_learnedClassifierModel_getActive",
+    "/data/classifier/active": "#/definitions/InlineRequest_data_classifier_active",
+    "/data/classifier/get": "#/definitions/InlineRequest_data_classifier_get",
     "/data/siteOverrides/getActive": "#/definitions/Record%3Cstring%2Cnever%3E",
     "/data/meta": "#/definitions/InlineRequest_data_meta",
     "/data/readFullPage": "#/definitions/InlineRequest_data_readFullPage",
@@ -591,6 +643,22 @@
     "/following/listByUserId": "#/definitions/InlineRequest_following_listByUserId",
     "/following/listWithDetailsByUserId": "#/definitions/InlineRequest_following_listWithDetailsByUserId",
     "/following/remove": "#/definitions/InlineRequest_following_remove",
+    "/helper/list": "#/definitions/InlineRequest_helper_list",
+    "/helper/share": "#/definitions/InlineRequest_helper_share",
+    "/helper/chat/save": "#/definitions/InlineRequest_helper_chat_save",
+    "/helper/chat/list": "#/definitions/InlineRequest_helper_chat_list",
+    "/helper/chat/delete": "#/definitions/InlineRequest_helper_chat_delete",
+    "/helper/review/save": "#/definitions/InlineRequest_helper_review_save",
+    "/helper/review/list": "#/definitions/InlineRequest_helper_review_list",
+    "/helper/review/delete": "#/definitions/InlineRequest_helper_review_delete",
+    "/helper/family/list": "#/definitions/InlineRequest_helper_family_list",
+    "/helper/family/post": "#/definitions/InlineRequest_helper_family_post",
+    "/helper/family/delete": "#/definitions/InlineRequest_helper_family_delete",
+    "/helper/notifyQuestion": "#/definitions/InlineRequest_helper_notifyQuestion",
+    "/helper/notifyAsked": "#/definitions/InlineRequest_helper_notifyAsked",
+    "/helper/progress/load": "#/definitions/InlineRequest_helper_progress_load",
+    "/helper/progress/save": "#/definitions/InlineRequest_helper_progress_save",
+    "/helper/topicCheck": "#/definitions/InlineRequest_helper_topicCheck",
     "/invite/checkCode": "#/definitions/InlineRequest_invite_checkCode",
     "/invite/create": "#/definitions/InviteCreateRequest",
     "/invite/getInfo": "#/definitions/InlineRequest_invite_getInfo",
@@ -665,6 +733,8 @@
     "/pageNotes/forUrl": "#/definitions/InlineRequest_pageNotes_forUrl",
     "/pageNotes/save": "#/definitions/PageNoteSaveRequest",
     "/pageNotes/choices": "#/definitions/InlineRequest_pageNotes_choices",
+    "/pageNotes/carryOn": "#/definitions/InlineRequest_pageNotes_carryOn",
+    "/pageNotes/pages": "#/definitions/InlineRequest_pageNotes_pages",
     "/pageNotes/read": "#/definitions/InlineRequest_pageNotes_read",
     "/pageNotes/openOnPage": "#/definitions/InlineRequest_pageNotes_openOnPage",
     "/pageNotes/reminderFor": "#/definitions/InlineRequest_pageNotes_reminderFor",
@@ -710,6 +780,7 @@
     "/published/filteredSearch": "#/definitions/InlineRequest_published_filteredSearch",
     "/published/categoryCoverage": "#/definitions/Record%3Cstring%2Cnever%3E",
     "/content/bundle/recommend": "#/definitions/RecommendContentBundlesRequest",
+    "/blockPage/defaults": "#/definitions/InlineRequest_blockPage_defaults",
     "/setup/catalog/get": "#/definitions/GetSetupCatalogRequest",
     "/thinkingPuzzles/catalog": "#/definitions/ThinkingPuzzlesCatalogRequest",
     "/published/flag": "#/definitions/InlineRequest_published_flag",
@@ -739,6 +810,8 @@
     "/curationProposal/remove": "#/definitions/InlineRequest_curationProposal_remove",
     "/curationProposal/reject": "#/definitions/InlineRequest_curationProposal_reject",
     "/agent/mcp/curation": "#/definitions/InlineRequest_agent_mcp_curation",
+    "/agent/mcp/classifier": "#/definitions/InlineRequest_agent_mcp_classifier",
+    "/agent/mcp/classifier-versions": "#/definitions/InlineRequest_agent_mcp_classifier_versions",
     "/mcpRelay/status": "#/definitions/InlineRequest_mcpRelay_status",
     "/mcpRelay/setEnabled": "#/definitions/InlineRequest_mcpRelay_setEnabled",
     "/mcpRelay/connections/list": "#/definitions/InlineRequest_mcpRelay_connections_list",
@@ -781,6 +854,11 @@
     "/mcpRelay/connections/key": "#/definitions/InlineRequest_mcpRelay_connections_key",
     "/mcpRelayDevice/pairStart": "#/definitions/InlineRequest_mcpRelayDevice_pairStart",
     "/mcpRelayDevice/pairFinish": "#/definitions/InlineRequest_mcpRelayDevice_pairFinish",
+    "/aiAppPermission/pending": "#/definitions/InlineRequest_aiAppPermission_pending",
+    "/aiAppPermission/decide": "#/definitions/InlineRequest_aiAppPermission_decide",
+    "/mcpUploadPage/open": "#/definitions/InlineRequest_mcpUploadPage_open",
+    "/mcpUploadPage/add": "#/definitions/InlineRequest_mcpUploadPage_add",
+    "/aiAppCheck/answer": "#/definitions/InlineRequest_aiAppCheck_answer",
     "/mcpRelay/call": "#/definitions/InlineRequest_mcpRelay_call",
     "/mcpRelay/oauth/request": "#/definitions/InlineRequest_mcpRelay_oauth_request",
     "/mcpRelay/oauth/decide": "#/definitions/InlineRequest_mcpRelay_oauth_decide",
@@ -830,10 +908,13 @@
     "/search/embedded": "#/definitions/InlineRequest_search_embedded",
     "/search/status": "#/definitions/InlineRequest_search_status",
     "/search/lookupProviders": "#/definitions/InlineRequest_search_lookupProviders",
+    "/search/homeSuggestSources": "#/definitions/InlineRequest_search_homeSuggestSources",
     "/search/diagnostics": "#/definitions/InlineRequest_search_diagnostics",
     "/search/setShadowEnabled": "#/definitions/InlineRequest_search_setShadowEnabled",
     "/search/setCorpusEngineEnabled": "#/definitions/InlineRequest_search_setCorpusEngineEnabled",
     "/search/terms": "#/definitions/InlineRequest_search_terms",
+    "/search/pinned/seal": "#/definitions/InlineRequest_search_pinned_seal",
+    "/search/pinned/open": "#/definitions/InlineRequest_search_pinned_open",
     "/access/evaluate": "#/definitions/AccessEvaluateRequest",
     "/sentry/clearTempDisableBlocking": "#/definitions/InlineRequest_sentry_clearTempDisableBlocking",
     "/sentry/getTempDisableBlockingStatus": "#/definitions/InlineRequest_sentry_getTempDisableBlockingStatus",
@@ -869,6 +950,10 @@
     "/sync/getStatus": "#/definitions/InlineRequest_sync_getStatus",
     "/sync/updateClient": "#/definitions/InlineRequest_sync_updateClient",
     "/sync/fullResetLog": "#/definitions/InlineRequest_sync_fullResetLog",
+    "/sync/unsent/list": "#/definitions/InlineRequest_sync_unsent_list",
+    "/sync/unsent/retry": "#/definitions/InlineRequest_sync_unsent_retry",
+    "/sync/unsent/discard": "#/definitions/InlineRequest_sync_unsent_discard",
+    "/sync/unsent/send": "#/definitions/InlineRequest_sync_unsent_send",
     "/sync/retryFailed": "#/definitions/InlineRequest_sync_retryFailed",
     "/sync/retryOperation": "#/definitions/InlineRequest_sync_retryOperation",
     "/sync/trigger": "#/definitions/InlineRequest_sync_trigger",
@@ -900,6 +985,7 @@
     "/user/activity/getClassificationEvalProgramStatus": "#/definitions/GetClassificationEvalProgramStatusRequest",
     "/user/activity/uploadClassificationDatasetSamples": "#/definitions/UploadClassificationDatasetSamplesRequest",
     "/user/activity/uploadImageClassificationSamples": "#/definitions/UploadImageClassificationSamplesRequest",
+    "/user/activity/sharePages": "#/definitions/SharePagesRequest",
     "/user/activity/pushEntries": "#/definitions/InlineRequest_user_activity_pushEntries",
     "/user/activity/removeEntry": "#/definitions/InlineRequest_user_activity_removeEntry",
     "/activity/updateItemVisitHistory": "#/definitions/InlineRequest_activity_updateItemVisitHistory",
@@ -960,13 +1046,17 @@
     "/user/notification/list": "#/definitions/InlineRequest_user_notification_list",
     "/user/notification/markAllAsRead": "#/definitions/InlineRequest_user_notification_markAllAsRead",
     "/user/notification/lessonPartDone": "#/definitions/InlineRequest_user_notification_lessonPartDone",
+    "/user/notification/helperAsked": "#/definitions/InlineRequest_user_notification_helperAsked",
+    "/user/notification/helperQuestion": "#/definitions/InlineRequest_user_notification_helperQuestion",
     "/user/notification/markRead": "#/definitions/InlineRequest_user_notification_markRead",
     "/user/notification/markUnread": "#/definitions/InlineRequest_user_notification_markUnread",
     "/user/notification/remove": "#/definitions/InlineRequest_user_notification_remove",
     "/user/options/get": "#/definitions/InlineRequest_user_options_get",
     "/user/options/update": "#/definitions/InlineRequest_user_options_update",
     "/user/checkpoint/clear": "#/definitions/InlineRequest_user_checkpoint_clear",
+    "/user/blockPage/setOwn": "#/definitions/InlineRequest_user_blockPage_setOwn",
     "/user/checkpoint/approve": "#/definitions/InlineRequest_user_checkpoint_approve",
+    "/user/extraTime/grant": "#/definitions/InlineRequest_user_extraTime_grant",
     "/user/earnAccess/open": "#/definitions/InlineRequest_user_earnAccess_open",
     "/user/earnAccess/approve": "#/definitions/InlineRequest_user_earnAccess_approve",
     "/earnAccess/status": "#/definitions/InlineRequest_earnAccess_status",
@@ -999,6 +1089,8 @@
     "/userfile/pieces/read": "#/definitions/FilePiecesReadRequest",
     "/userfile/pieces/close": "#/definitions/FilePiecesCloseRequest",
     "/appbuild/seal": "#/definitions/InlineRequest_appbuild_seal",
+    "/appbuild/cache/get": "#/definitions/InlineRequest_appbuild_cache_get",
+    "/appbuild/cache/set": "#/definitions/InlineRequest_appbuild_cache_set",
     "/userfile/getMetaById": "#/definitions/InlineRequest_userfile_getMetaById",
     "/userfile/updateEncInfo": "#/definitions/InlineRequest_userfile_updateEncInfo",
     "/userfile/listByUser": "#/definitions/InlineRequest_userfile_listByUser",
@@ -1349,6 +1441,12 @@
         },
         "requiresApproval": {
           "type": "boolean"
+        },
+        "subtasks": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/TaskSubtask"
+          }
         }
       },
       "required": [
@@ -1514,6 +1612,24 @@
         "either"
       ]
     },
+    "TaskSubtask": {
+      "type": "object",
+      "properties": {
+        "key": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "itemId": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "key",
+        "title"
+      ]
+    },
     "InlineRequest_task_upsert": {
       "type": "object",
       "properties": {
@@ -1657,6 +1773,33 @@
         "taskId",
         "userId",
         "occurrenceStartMs"
+      ]
+    },
+    "InlineRequest_task_subtask_set": {
+      "type": "object",
+      "properties": {
+        "taskId": {
+          "type": "string"
+        },
+        "userId": {
+          "type": "string"
+        },
+        "occurrenceStartMs": {
+          "type": "number"
+        },
+        "key": {
+          "type": "string"
+        },
+        "done": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "taskId",
+        "userId",
+        "occurrenceStartMs",
+        "key",
+        "done"
       ]
     },
     "InlineRequest_task_status_list": {
@@ -2487,6 +2630,8 @@
         "podcast_episode",
         "project",
         "task",
+        "ai_prompt",
+        "helper",
         "song",
         "story",
         "video_game",
@@ -3298,7 +3443,7 @@
               "type": "number"
             },
             "previewMeta": {
-              "$ref": "#/definitions/Record%3Cstring%2Cstructure-1776665922-605-637-1776665922-590-638-1776665922-462-639-1776665922-361-645-1776665922-176-668-1776665922-153-669-1776665922-0-1648%3E"
+              "$ref": "#/definitions/Record%3Cstring%2Cstructure-1776665922-661-693-1776665922-646-694-1776665922-518-695-1776665922-417-701-1776665922-232-724-1776665922-209-725-1776665922-0-2511%3E"
             }
           },
           "required": [
@@ -3337,7 +3482,7 @@
         "unwrappingKeyId"
       ]
     },
-    "Record<string,structure-1776665922-605-637-1776665922-590-638-1776665922-462-639-1776665922-361-645-1776665922-176-668-1776665922-153-669-1776665922-0-1648>": {
+    "Record<string,structure-1776665922-661-693-1776665922-646-694-1776665922-518-695-1776665922-417-701-1776665922-232-724-1776665922-209-725-1776665922-0-2511>": {
       "type": "object",
       "additionalProperties": {
         "type": "object",
@@ -3503,6 +3648,32 @@
       ]
     },
     "InlineRequest_task_items_convertToNote": {
+      "type": "object",
+      "properties": {
+        "itemId": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "itemId"
+      ]
+    },
+    "InlineRequest_task_items_attachItem": {
+      "type": "object",
+      "properties": {
+        "taskId": {
+          "type": "string"
+        },
+        "itemId": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "taskId",
+        "itemId"
+      ]
+    },
+    "InlineRequest_task_items_listForItem": {
       "type": "object",
       "properties": {
         "itemId": {
@@ -4656,6 +4827,246 @@
         }
       }
     },
+    "ProjectOutlineRequest": {
+      "type": "object",
+      "properties": {
+        "request": {
+          "type": "string"
+        },
+        "answers": {
+          "$ref": "#/definitions/ProjectAnswers"
+        },
+        "libraryCandidates": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ProjectLibraryCandidate"
+          }
+        }
+      },
+      "required": [
+        "request"
+      ]
+    },
+    "ProjectAnswers": {
+      "type": "object",
+      "properties": {
+        "start": {
+          "type": "string"
+        },
+        "time": {
+          "type": "string"
+        },
+        "goal": {
+          "type": "string"
+        }
+      }
+    },
+    "ProjectLibraryCandidate": {
+      "type": "object",
+      "properties": {
+        "itemId": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "url": {
+          "type": "string"
+        },
+        "subType": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "itemId",
+        "title"
+      ]
+    },
+    "ProjectFillPartRequest": {
+      "type": "object",
+      "properties": {
+        "request": {
+          "type": "string"
+        },
+        "answers": {
+          "$ref": "#/definitions/ProjectAnswers"
+        },
+        "outline": {
+          "$ref": "#/definitions/ProjectOutline"
+        },
+        "partIndex": {
+          "type": "number"
+        },
+        "libraryCandidates": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ProjectLibraryCandidate"
+          }
+        },
+        "otherItems": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "request",
+        "outline",
+        "partIndex"
+      ]
+    },
+    "ProjectOutline": {
+      "type": "object",
+      "properties": {
+        "title": {
+          "type": "string"
+        },
+        "goal": {
+          "type": "string"
+        },
+        "pace": {
+          "type": "string"
+        },
+        "parts": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ProjectOutlinePart"
+          }
+        }
+      },
+      "required": [
+        "title",
+        "goal",
+        "pace",
+        "parts"
+      ]
+    },
+    "ProjectOutlinePart": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "why": {
+          "type": "string"
+        },
+        "inOrder": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "name",
+        "why",
+        "inOrder"
+      ]
+    },
+    "ProjectChangePartRequest": {
+      "type": "object",
+      "properties": {
+        "request": {
+          "type": "string"
+        },
+        "answers": {
+          "$ref": "#/definitions/ProjectAnswers"
+        },
+        "outline": {
+          "$ref": "#/definitions/ProjectOutline"
+        },
+        "partIndex": {
+          "type": "number"
+        },
+        "libraryCandidates": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ProjectLibraryCandidate"
+          }
+        },
+        "otherItems": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "items": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ProjectDraftItem"
+          }
+        },
+        "instruction": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "instruction",
+        "items",
+        "outline",
+        "partIndex",
+        "request"
+      ]
+    },
+    "ProjectDraftItem": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "$ref": "#/definitions/ProjectDraftItemKind"
+        },
+        "title": {
+          "type": "string"
+        },
+        "why": {
+          "type": "string"
+        },
+        "origin": {
+          "type": "string",
+          "enum": [
+            "library",
+            "catalog",
+            "web",
+            "ai"
+          ]
+        },
+        "by": {
+          "type": "string"
+        },
+        "time": {
+          "type": "string"
+        },
+        "url": {
+          "type": "string"
+        },
+        "itemId": {
+          "type": "string"
+        },
+        "publishId": {
+          "type": "string"
+        },
+        "feedUrl": {
+          "type": "string"
+        },
+        "prompt": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "title",
+        "why",
+        "origin"
+      ]
+    },
+    "ProjectDraftItemKind": {
+      "type": "string",
+      "enum": [
+        "read",
+        "watch",
+        "listen",
+        "follow",
+        "do",
+        "talk"
+      ]
+    },
     "InlineRequest_access_request_add": {
       "type": "object",
       "properties": {
@@ -4821,6 +5232,16 @@
           "anyOf": [
             {
               "$ref": "#/definitions/FamilyDowntimeSettings"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "schoolDays": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/SchoolDaysSettings"
             },
             {
               "type": "null"
@@ -5093,6 +5514,58 @@
         "urlPatterns",
         "itemIds",
         "appIds"
+      ]
+    },
+    "SchoolDaysSettings": {
+      "type": "object",
+      "properties": {
+        "week": {
+          "type": "array",
+          "items": {
+            "type": "number"
+          }
+        },
+        "daysOff": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/SchoolDayOff"
+          }
+        },
+        "updatedAt": {
+          "type": "number"
+        },
+        "updatedBy": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "week",
+        "daysOff",
+        "updatedAt",
+        "updatedBy"
+      ]
+    },
+    "SchoolDayOff": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "from": {
+          "type": "string"
+        },
+        "to": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "from",
+        "to"
       ]
     },
     "FamilyAiSetting": {
@@ -5517,6 +5990,9 @@
           "items": {
             "type": "string"
           }
+        },
+        "pageChange": {
+          "$ref": "#/definitions/FamilyPolicyPageChange"
         }
       },
       "required": [
@@ -5554,8 +6030,10 @@
       "enum": [
         "classify",
         "block",
+        "allow",
         "skip_image_scanning",
-        "curation_checked"
+        "curation_checked",
+        "page_change"
       ]
     },
     "EduValue": {
@@ -5567,6 +6045,43 @@
         "eduval_task",
         "eduval_unknown",
         "eduval_junk"
+      ]
+    },
+    "FamilyPolicyPageChange": {
+      "type": "object",
+      "properties": {
+        "css": {
+          "type": "string"
+        },
+        "label": {
+          "type": "string"
+        },
+        "request": {
+          "type": "string"
+        },
+        "pages": {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "page",
+                "prefix"
+              ]
+            },
+            "address": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "address"
+          ]
+        }
+      },
+      "required": [
+        "css",
+        "label"
       ]
     },
     "StoredFamilyPolicyTermOverrideRule": {
@@ -5787,6 +6302,15 @@
                   }
                 }
               }
+            },
+            "outline": {
+              "type": "string"
+            },
+            "viewport": {
+              "type": "string"
+            },
+            "truncated": {
+              "type": "boolean"
             }
           },
           "required": [
@@ -5795,6 +6319,20 @@
         },
         "instructions": {
           "type": "string"
+        },
+        "pageChange": {
+          "type": "object",
+          "properties": {
+            "request": {
+              "type": "string"
+            },
+            "currentCss": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "request"
+          ]
         }
       },
       "required": [
@@ -5872,6 +6410,305 @@
       "type": "object",
       "properties": {
         "url": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "url"
+      ]
+    },
+    "PageChangeListRequest": {
+      "$ref": "#/definitions/Record%3Cstring%2Cnever%3E"
+    },
+    "PageChangeSaveRequest": {
+      "type": "object",
+      "properties": {
+        "pageUrl": {
+          "type": "string"
+        },
+        "css": {
+          "type": "string"
+        },
+        "label": {
+          "type": "string"
+        },
+        "request": {
+          "type": "string"
+        },
+        "userIds": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "pages": {
+          "type": "string",
+          "enum": [
+            "page",
+            "prefix",
+            "site"
+          ]
+        }
+      },
+      "required": [
+        "pageUrl",
+        "css",
+        "label",
+        "userIds"
+      ]
+    },
+    "PageChangeSetForRequest": {
+      "type": "object",
+      "properties": {
+        "ruleId": {
+          "type": "string"
+        },
+        "userId": {
+          "type": "string"
+        },
+        "on": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "ruleId",
+        "userId",
+        "on"
+      ]
+    },
+    "PageChangeDeleteRequest": {
+      "type": "object",
+      "properties": {
+        "ruleId": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "ruleId"
+      ]
+    },
+    "PageChangeOpenOnPageRequest": {
+      "type": "object",
+      "properties": {
+        "url": {
+          "type": "string"
+        },
+        "opened": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "url"
+      ]
+    },
+    "PageChangePeopleRequest": {
+      "$ref": "#/definitions/Record%3Cstring%2Cnever%3E"
+    },
+    "PageChangeForPageRequest": {
+      "type": "object",
+      "properties": {
+        "url": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "url"
+      ]
+    },
+    "PageChangeTargetRequest": {
+      "type": "object",
+      "properties": {
+        "url": {
+          "type": "string"
+        },
+        "tabId": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "request": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "url"
+      ]
+    },
+    "PageChangeDraftRequest": {
+      "type": "object",
+      "properties": {
+        "sessionId": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "sessionId"
+      ]
+    },
+    "PageChangeDraftEditRequest": {
+      "type": "object",
+      "properties": {
+        "sessionId": {
+          "type": "string"
+        },
+        "edit": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "css": {
+              "type": "string"
+            },
+            "label": {
+              "type": "string"
+            },
+            "pages": {
+              "type": "string",
+              "enum": [
+                "page",
+                "prefix",
+                "site"
+              ]
+            },
+            "remove": {
+              "type": "boolean"
+            }
+          }
+        }
+      },
+      "required": [
+        "sessionId",
+        "edit"
+      ]
+    },
+    "PageChangeDraftSaveRequest": {
+      "type": "object",
+      "properties": {
+        "sessionId": {
+          "type": "string"
+        },
+        "userIds": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "names": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "sessionId",
+        "userIds",
+        "names"
+      ]
+    },
+    "PageChangeDraftShowRequest": {
+      "type": "object",
+      "properties": {
+        "sessionId": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "sessionId"
+      ]
+    },
+    "PageChangeDraftPickRequest": {
+      "type": "object",
+      "properties": {
+        "sessionId": {
+          "type": "string"
+        },
+        "canAsk": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "sessionId"
+      ]
+    },
+    "PageChangePickedRequest": {
+      "type": "object",
+      "properties": {
+        "sessionId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "action": {
+          "type": "string",
+          "enum": [
+            "hide",
+            "hideAll",
+            "ask",
+            "cancel"
+          ]
+        },
+        "label": {
+          "type": "string"
+        },
+        "css": {
+          "type": "string"
+        },
+        "part": {
+          "anyOf": [
+            {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "selector": {
+                  "type": "string"
+                },
+                "likeSelector": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "likeCount": {
+                  "type": "number"
+                },
+                "text": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "name",
+                "selector",
+                "likeSelector",
+                "likeCount",
+                "text"
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "action"
+      ]
+    },
+    "PageChangeStartRequest": {
+      "type": "object",
+      "properties": {
+        "url": {
+          "type": "string"
+        },
+        "request": {
           "type": "string"
         }
       },
@@ -6054,55 +6891,6 @@
         "itemId"
       ]
     },
-    "ProjectListRequest": {
-      "type": "object",
-      "properties": {
-        "refresh": {
-          "type": "boolean"
-        }
-      }
-    },
-    "ProjectCreateRequest": {
-      "type": "object",
-      "properties": {
-        "name": {
-          "type": "string"
-        }
-      },
-      "required": [
-        "name"
-      ]
-    },
-    "ProjectRenameRequest": {
-      "type": "object",
-      "properties": {
-        "tag": {
-          "type": "string"
-        },
-        "name": {
-          "type": "string"
-        }
-      },
-      "required": [
-        "tag",
-        "name"
-      ]
-    },
-    "ProjectSetNoteRequest": {
-      "type": "object",
-      "properties": {
-        "tag": {
-          "type": "string"
-        },
-        "note": {
-          "type": "string"
-        }
-      },
-      "required": [
-        "tag",
-        "note"
-      ]
-    },
     "InlineRequest_account_stats": {
       "type": "object"
     },
@@ -6170,6 +6958,35 @@
       "enum": [
         "7d",
         "30d"
+      ]
+    },
+    "GetTimeSpentRequest": {
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string"
+        },
+        "limitRuleId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "usageType": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "startTime": {
+          "type": "number"
+        },
+        "byUsageType": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "startTime"
       ]
     },
     "InlineRequest_activity_lookupChannelNames": {
@@ -6720,6 +7537,12 @@
                     "items": {
                       "type": "string"
                     }
+                  },
+                  "categoryFrom": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
                   }
                 }
               },
@@ -7063,6 +7886,46 @@
           "boolean"
         ]
       }
+    },
+    "SharePagesRequest": {
+      "type": "object",
+      "properties": {
+        "pages": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "url": {
+                "type": "string"
+              },
+              "title": {
+                "type": "string"
+              },
+              "description": {
+                "type": "string"
+              },
+              "text": {
+                "type": "string"
+              },
+              "eduValue": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "url"
+            ]
+          }
+        }
+      },
+      "required": [
+        "pages"
+      ]
+    },
+    "InlineRequest_activity_sharePagesNow": {
+      "type": "object"
     },
     "InlineRequest_activity_syncUsageLog": {
       "type": "object"
@@ -7611,6 +8474,9 @@
                 },
                 "mismatchOnly": {
                   "type": "boolean"
+                },
+                "notConfirmedOnly": {
+                  "type": "boolean"
                 }
               }
             },
@@ -7903,6 +8769,31 @@
       "required": [
         "sampleId",
         "humanOverride"
+      ]
+    },
+    "InlineRequest_admin_classificationEval_samples_saveTopics": {
+      "type": "object",
+      "properties": {
+        "sampleId": {
+          "type": "number"
+        },
+        "topics": {
+          "anyOf": [
+            {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "sampleId",
+        "topics"
       ]
     },
     "InlineRequest_admin_classificationEval_datasets_recrawlPageText": {
@@ -8321,6 +9212,17 @@
         "version"
       ]
     },
+    "InlineRequest_admin_classificationEval_datasets_acceptAgreeing": {
+      "type": "object",
+      "properties": {
+        "datasetId": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "datasetId"
+      ]
+    },
     "InlineRequest_admin_classificationEval_labelPrompt_get": {
       "type": "object"
     },
@@ -8337,6 +9239,561 @@
     },
     "InlineRequest_admin_classificationEval_labelPrompt_reset": {
       "type": "object"
+    },
+    "InlineRequest_admin_classifier_versions_list": {
+      "type": "object"
+    },
+    "InlineRequest_admin_classifier_versions_get": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id"
+      ]
+    },
+    "ClassifierKeywordRules": {
+      "type": "object",
+      "properties": {
+        "label": {
+          "type": "string"
+        },
+        "rules": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ClassifierTextRule"
+          }
+        }
+      },
+      "required": [
+        "label",
+        "rules"
+      ]
+    },
+    "ClassifierTextRule": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": "string"
+        },
+        "operator": {
+          "type": "string"
+        },
+        "values": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "caseSensitive": {
+          "type": "boolean"
+        },
+        "fields": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "negate": {
+          "type": "boolean"
+        },
+        "weight": {
+          "type": "number"
+        },
+        "wholeWord": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "type",
+        "operator",
+        "values"
+      ]
+    },
+    "ClassifierEntityRule": {
+      "type": "object",
+      "properties": {
+        "label": {
+          "type": "string"
+        },
+        "score": {
+          "type": "number"
+        },
+        "domains": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "urlContains": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "titleContains": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "textContains": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "note": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "label",
+        "note"
+      ]
+    },
+    "ClassifierSiteDefault": {
+      "type": "object",
+      "properties": {
+        "label": {
+          "type": "string"
+        },
+        "domains": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "pathPrefixes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "eduValue": {
+          "$ref": "#/definitions/EduValue"
+        },
+        "intent": {
+          "$ref": "#/definitions/IntentTag"
+        },
+        "sourceNote": {
+          "type": "string"
+        },
+        "alwaysApply": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "label",
+        "domains",
+        "eduValue",
+        "sourceNote"
+      ]
+    },
+    "IntentTag": {
+      "type": "string",
+      "enum": [
+        "intent_learn",
+        "intent_create",
+        "intent_play",
+        "intent_socialize",
+        "intent_relax",
+        "intent_news",
+        "intent_task",
+        "intent_doomscroll"
+      ]
+    },
+    "ClassifierThresholds": {
+      "type": "object",
+      "properties": {
+        "embeddingMinScore": {
+          "type": "number"
+        },
+        "ruleMinScore": {
+          "type": "number"
+        },
+        "ruleUnknownDominant": {
+          "type": "number"
+        },
+        "ruleEntertainmentLow": {
+          "type": "number"
+        },
+        "ruleEntertainmentHigh": {
+          "type": "number"
+        },
+        "ruleTaskOrEduCeiling": {
+          "type": "number"
+        },
+        "ruleTaskMin": {
+          "type": "number"
+        },
+        "ruleEducationalMin": {
+          "type": "number"
+        },
+        "ruleUnknownFallbackScore": {
+          "type": "number"
+        },
+        "unknownMargin": {
+          "type": "number"
+        },
+        "junkMargin": {
+          "type": "number"
+        }
+      },
+      "required": [
+        "embeddingMinScore",
+        "ruleMinScore",
+        "ruleUnknownDominant",
+        "ruleEntertainmentLow",
+        "ruleEntertainmentHigh",
+        "ruleTaskOrEduCeiling",
+        "ruleTaskMin",
+        "ruleEducationalMin",
+        "ruleUnknownFallbackScore"
+      ]
+    },
+    "ClassifierTopicSettings": {
+      "type": "object",
+      "properties": {
+        "minSimilarity": {
+          "type": "number"
+        },
+        "maxTopics": {
+          "type": "number"
+        },
+        "extraText": {
+          "$ref": "#/definitions/Record%3Cstring%2Cstring%3E"
+        }
+      },
+      "required": [
+        "minSimilarity",
+        "maxTopics"
+      ]
+    },
+    "Record<string,string>": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "string"
+      }
+    },
+    "ClassifierYouTubeChannel": {
+      "type": "object",
+      "properties": {
+        "handle": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "eduValue": {
+          "$ref": "#/definitions/EduValue"
+        }
+      },
+      "required": [
+        "eduValue"
+      ]
+    },
+    "ClassifierYouTubeGenre": {
+      "type": "object",
+      "properties": {
+        "genre": {
+          "type": "string"
+        },
+        "eduValue": {
+          "$ref": "#/definitions/EduValue"
+        },
+        "shorts": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "genre",
+        "eduValue"
+      ]
+    },
+    "InlineRequest_admin_classifier_versions_save": {
+      "type": "object",
+      "properties": {
+        "version": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "parent": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "createdAt": {
+              "type": "string"
+            },
+            "schema": {
+              "type": "number"
+            },
+            "textModel": {
+              "type": "string"
+            },
+            "notes": {
+              "type": "string"
+            },
+            "anchors": {
+              "$ref": "#/definitions/Record%3Cstring%2Cstring%5B%5D%3E"
+            },
+            "keywordRules": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/ClassifierKeywordRules"
+              }
+            },
+            "entityRules": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/ClassifierEntityRule"
+              }
+            },
+            "siteDefaults": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/ClassifierSiteDefault"
+              }
+            },
+            "thresholds": {
+              "$ref": "#/definitions/ClassifierThresholds"
+            },
+            "topics": {
+              "$ref": "#/definitions/ClassifierTopicSettings"
+            },
+            "youtubeChannels": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/ClassifierYouTubeChannel"
+              }
+            },
+            "youtubeGenres": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/ClassifierYouTubeGenre"
+              }
+            }
+          },
+          "required": [
+            "anchors",
+            "entityRules",
+            "keywordRules",
+            "notes",
+            "schema",
+            "siteDefaults",
+            "textModel",
+            "thresholds"
+          ]
+        }
+      },
+      "required": [
+        "version"
+      ]
+    },
+    "InlineRequest_admin_classifier_versions_activate": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "reason": {
+          "type": "string"
+        },
+        "datasetId": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "reason"
+      ]
+    },
+    "InlineRequest_admin_classifier_activations_list": {
+      "type": "object",
+      "properties": {
+        "limit": {
+          "type": "number"
+        }
+      }
+    },
+    "ClassifierScorecardAnswer": {
+      "type": "object",
+      "properties": {
+        "sampleId": {
+          "type": "number"
+        },
+        "predicted": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "topics": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "sampleId",
+        "predicted"
+      ]
+    },
+    "InlineRequest_admin_classifier_scorecards_save": {
+      "type": "object",
+      "properties": {
+        "versionId": {
+          "type": "string"
+        },
+        "datasetId": {
+          "type": "string"
+        },
+        "answers": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ClassifierScorecardAnswer"
+          }
+        }
+      },
+      "required": [
+        "versionId",
+        "datasetId",
+        "answers"
+      ]
+    },
+    "InlineRequest_admin_classifier_synth_list": {
+      "type": "object",
+      "properties": {
+        "limit": {
+          "type": "number"
+        }
+      }
+    },
+    "InlineRequest_admin_classifier_synth_get": {
+      "type": "object",
+      "properties": {
+        "batchId": {
+          "type": "number"
+        }
+      },
+      "required": [
+        "batchId"
+      ]
+    },
+    "InlineRequest_admin_classifier_synth_decide": {
+      "type": "object",
+      "properties": {
+        "batchId": {
+          "type": "number"
+        },
+        "accept": {
+          "type": "boolean"
+        },
+        "reason": {
+          "type": "string"
+        },
+        "keepSampleIds": {
+          "type": "array",
+          "items": {
+            "type": "number"
+          }
+        },
+        "intoDatasetId": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "batchId",
+        "accept",
+        "reason"
+      ]
+    },
+    "InlineRequest_admin_classifier_weakSpots": {
+      "type": "object",
+      "properties": {
+        "versionId": {
+          "type": "string"
+        }
+      }
+    },
+    "InlineRequest_admin_classifier_recipes_list": {
+      "type": "object",
+      "properties": {
+        "status": {
+          "type": "string",
+          "enum": [
+            "open",
+            "closed"
+          ]
+        },
+        "limit": {
+          "type": "number"
+        }
+      }
+    },
+    "InlineRequest_admin_classifier_recipes_save": {
+      "type": "object",
+      "properties": {
+        "category": {
+          "type": "string"
+        },
+        "kind": {
+          "type": "string"
+        },
+        "topicId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "notes": {
+          "type": "string"
+        },
+        "pages": {
+          "type": "number"
+        }
+      },
+      "required": [
+        "category",
+        "kind",
+        "notes",
+        "pages"
+      ]
+    },
+    "InlineRequest_admin_classifier_recipes_close": {
+      "type": "object",
+      "properties": {
+        "recipeId": {
+          "type": "number"
+        }
+      },
+      "required": [
+        "recipeId"
+      ]
+    },
+    "InlineRequest_admin_classifier_scorecards_list": {
+      "type": "object",
+      "properties": {
+        "versionId": {
+          "type": "string"
+        },
+        "datasetId": {
+          "type": "string"
+        },
+        "includeAnswers": {
+          "type": "boolean"
+        },
+        "limit": {
+          "type": "number"
+        }
+      }
     },
     "InlineRequest_admin_classificationEval_datasets_create": {
       "type": "object",
@@ -8670,6 +10127,12 @@
         "curated": {
           "type": "boolean"
         },
+        "choice": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
         "source": {
           "type": "string",
           "enum": [
@@ -8752,6 +10215,12 @@
         },
         "curated": {
           "type": "boolean"
+        },
+        "choice": {
+          "type": [
+            "string",
+            "null"
+          ]
         },
         "links": {
           "type": "array",
@@ -8904,6 +10373,12 @@
         "curated": {
           "type": "boolean"
         },
+        "choice": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
         "interestTags": {
           "type": "array",
           "items": {
@@ -8970,6 +10445,86 @@
       ]
     },
     "InlineRequest_admin_setupCatalog_reset": {
+      "type": "object"
+    },
+    "InlineRequest_admin_blockPage_defaults_get": {
+      "type": "object"
+    },
+    "BlockPageDefaultEntry": {
+      "anyOf": [
+        {
+          "type": "object",
+          "properties": {
+            "source": {
+              "type": "string",
+              "const": "builtin"
+            },
+            "id": {
+              "type": "string"
+            },
+            "onFor": {
+              "$ref": "#/definitions/BlockPageDefaultOnFor"
+            }
+          },
+          "required": [
+            "source",
+            "id",
+            "onFor"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "source": {
+              "type": "string",
+              "const": "published"
+            },
+            "id": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            },
+            "description": {
+              "type": "string"
+            },
+            "onFor": {
+              "$ref": "#/definitions/BlockPageDefaultOnFor"
+            }
+          },
+          "required": [
+            "source",
+            "id",
+            "name",
+            "onFor"
+          ]
+        }
+      ]
+    },
+    "BlockPageDefaultOnFor": {
+      "type": "string",
+      "enum": [
+        "younger",
+        "older",
+        "everyone",
+        "nobody"
+      ]
+    },
+    "InlineRequest_admin_blockPage_defaults_save": {
+      "type": "object",
+      "properties": {
+        "collections": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/BlockPageDefaultEntry"
+          }
+        }
+      },
+      "required": [
+        "collections"
+      ]
+    },
+    "InlineRequest_admin_blockPage_defaults_reset": {
       "type": "object"
     },
     "AdminPuzzleContentListRequest": {
@@ -10321,6 +11876,29 @@
         }
       }
     },
+    "AdminPublishedIntakeSummaryRequest": {
+      "type": "object",
+      "properties": {
+        "easyIds": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "sourceItemIds": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "urls": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
     "AdminPublishedApproveBatchRequest": {
       "type": "object",
       "properties": {
@@ -11023,6 +12601,40 @@
         "session"
       ]
     },
+    "InlineRequest_ai_appendRefusedTurn": {
+      "type": "object",
+      "properties": {
+        "sessionId": {
+          "type": "string"
+        },
+        "message": {
+          "type": "string"
+        },
+        "reply": {
+          "type": "string"
+        },
+        "replyId": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "sessionId",
+        "message",
+        "reply",
+        "replyId"
+      ]
+    },
+    "InlineRequest_ai_searchSessions": {
+      "type": "object",
+      "properties": {
+        "query": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "query"
+      ]
+    },
     "InlineRequest_ai_renameSession": {
       "type": "object",
       "properties": {
@@ -11068,6 +12680,26 @@
         }
       },
       "required": [
+        "text"
+      ]
+    },
+    "InlineRequest_ai_helperTopicCheck": {
+      "type": "object",
+      "properties": {
+        "mode": {
+          "type": "string",
+          "const": "helper"
+        },
+        "system": {
+          "type": "string"
+        },
+        "text": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "mode",
+        "system",
         "text"
       ]
     },
@@ -12231,6 +13863,12 @@
         },
         "syncRevision": {
           "type": "number"
+        },
+        "serverSupports": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
         }
       },
       "required": [
@@ -12277,6 +13915,9 @@
         "aiToolsEnabled": {
           "type": "boolean"
         },
+        "aiHelpersEnabled": {
+          "type": "boolean"
+        },
         "aiWebSearchEnabled": {
           "type": "boolean"
         },
@@ -12293,6 +13934,9 @@
           "type": "boolean"
         },
         "emailEnabled": {
+          "type": "boolean"
+        },
+        "offlineSavesEnabled": {
           "type": "boolean"
         },
         "speechModeEnabled": {
@@ -12438,6 +14082,9 @@
         },
         "lastUpdated": {
           "type": "number"
+        },
+        "revision": {
+          "type": "number"
         }
       },
       "required": [
@@ -12455,6 +14102,12 @@
         },
         "expiresAt": {
           "type": "number"
+        },
+        "hoursFor": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
         }
       },
       "required": [
@@ -12480,6 +14133,13 @@
           "items": {
             "$ref": "#/definitions/TimeRange"
           }
+        },
+        "dayKind": {
+          "type": "string",
+          "enum": [
+            "school",
+            "notSchool"
+          ]
         }
       },
       "required": [
@@ -12740,6 +14400,15 @@
               "items": {
                 "$ref": "#/definitions/TimeLimit"
               }
+            },
+            "weeklyHours": {
+              "type": "number"
+            },
+            "excludes": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/LimitMatchCondition"
+              }
             }
           },
           "required": [
@@ -12769,7 +14438,8 @@
             "usageRequirement",
             "socialDesignation",
             "appId",
-            "game"
+            "game",
+            "libraryItem"
           ]
         },
         "values": {
@@ -13531,6 +15201,36 @@
         }
       }
     },
+    "DeviceUsageSyncRequest": {
+      "type": "object",
+      "properties": {
+        "report": {
+          "$ref": "#/definitions/SealedUsageBlob"
+        },
+        "limitUsedUp": {
+          "type": "boolean"
+        }
+      }
+    },
+    "SealedUsageBlob": {
+      "type": "object",
+      "properties": {
+        "keyId": {
+          "type": "string"
+        },
+        "iv": {
+          "type": "string"
+        },
+        "data": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "keyId",
+        "iv",
+        "data"
+      ]
+    },
     "InlineRequest_companion_settings_version": {
       "type": "object",
       "properties": {
@@ -13655,6 +15355,51 @@
         "collectionId"
       ]
     },
+    "InlineRequest_collection_findItemsFor": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "description": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "excludeCollectionId": {
+          "type": "string"
+        },
+        "limit": {
+          "type": "number"
+        }
+      },
+      "required": [
+        "name"
+      ]
+    },
+    "InlineRequest_collection_mergeSuggestions": {
+      "type": "object",
+      "properties": {
+        "collectionId": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "collectionId"
+      ]
+    },
+    "InlineRequest_collection_splitGroups": {
+      "type": "object",
+      "properties": {
+        "collectionId": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "collectionId"
+      ]
+    },
     "SaveItemRequest": {
       "type": "object",
       "properties": {
@@ -13721,6 +15466,9 @@
             "postId",
             "key"
           ]
+        },
+        "newItemId": {
+          "type": "string"
         },
         "options": {
           "$ref": "#/definitions/CreateCollectionOptions"
@@ -14430,6 +16178,15 @@
         "channelId": {
           "type": "string"
         },
+        "channelHandle": {
+          "type": "string"
+        },
+        "channelName": {
+          "type": "string"
+        },
+        "youtubeGenre": {
+          "type": "string"
+        },
         "itemId": {
           "type": "string"
         },
@@ -14447,6 +16204,12 @@
             },
             "pageType": {
               "type": "string"
+            },
+            "keywords": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
             }
           }
         }
@@ -14686,6 +16449,105 @@
         "eduValue"
       ]
     },
+    "InlineRequest_content_videoCloseWatch_get": {
+      "type": "object"
+    },
+    "HtmlFileScan": {
+      "type": "object",
+      "properties": {
+        "title": {
+          "type": "string"
+        },
+        "text": {
+          "type": "string"
+        },
+        "pictureUrls": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "mediaUrls": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "dataPictures": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "tooManyDataPictures": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "title",
+        "text",
+        "pictureUrls",
+        "mediaUrls",
+        "dataPictures",
+        "tooManyDataPictures"
+      ]
+    },
+    "InlineRequest_content_videoFrameFromScreen": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "rect": {
+          "type": "object",
+          "properties": {
+            "x": {
+              "type": "number"
+            },
+            "y": {
+              "type": "number"
+            },
+            "width": {
+              "type": "number"
+            },
+            "height": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "x",
+            "y",
+            "width",
+            "height"
+          ]
+        },
+        "devicePixelRatio": {
+          "type": "number"
+        },
+        "decisionConfig": {
+          "type": "object",
+          "properties": {
+            "imageAggressionLevel": {
+              "type": "string",
+              "enum": [
+                "strict",
+                "moderate",
+                "relaxed",
+                "off"
+              ]
+            },
+            "disableSexyBlocking": {
+              "type": "boolean"
+            }
+          }
+        }
+      },
+      "required": [
+        "id",
+        "rect",
+        "devicePixelRatio"
+      ]
+    },
     "InlineRequest_content_classificationLab": {
       "type": "object",
       "properties": {
@@ -14805,6 +16667,20 @@
           "type": "string"
         }
       }
+    },
+    "InlineRequest_data_classifier_active": {
+      "type": "object"
+    },
+    "InlineRequest_data_classifier_get": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id"
+      ]
     },
     "InlineRequest_data_meta": {
       "type": "object",
@@ -15630,7 +17506,12 @@
       ]
     },
     "InlineRequest_encryption_generateRecoveryKey": {
-      "type": "object"
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string"
+        }
+      }
     },
     "InlineRequest_encryption_getKeyBackup": {
       "type": "object",
@@ -15638,10 +17519,7 @@
         "userId": {
           "type": "string"
         }
-      },
-      "required": [
-        "userId"
-      ]
+      }
     },
     "InlineRequest_encryption_getKeys": {
       "type": "object",
@@ -15652,7 +17530,12 @@
       }
     },
     "InlineRequest_encryption_getRecoveryKey": {
-      "type": "object"
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string"
+        }
+      }
     },
     "InlineRequest_encryption_keyCopy_remove": {
       "type": "object",
@@ -16034,6 +17917,223 @@
         "refId"
       ]
     },
+    "InlineRequest_helper_list": {
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string"
+        }
+      }
+    },
+    "InlineRequest_helper_share": {
+      "type": "object",
+      "properties": {
+        "itemId": {
+          "type": "string"
+        },
+        "viewerIds": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "editorIds": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "itemId"
+      ]
+    },
+    "InlineRequest_helper_chat_save": {
+      "type": "object",
+      "properties": {
+        "helperId": {
+          "type": "string"
+        },
+        "sessionId": {
+          "type": "string"
+        },
+        "data": {}
+      },
+      "required": [
+        "helperId",
+        "sessionId",
+        "data"
+      ]
+    },
+    "InlineRequest_helper_chat_list": {
+      "type": "object",
+      "properties": {
+        "helperId": {
+          "type": "string"
+        },
+        "ownerId": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "helperId"
+      ]
+    },
+    "InlineRequest_helper_chat_delete": {
+      "type": "object",
+      "properties": {
+        "helperId": {
+          "type": "string"
+        },
+        "sessionId": {
+          "type": "string"
+        },
+        "ownerId": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "helperId",
+        "sessionId"
+      ]
+    },
+    "InlineRequest_helper_review_save": {
+      "type": "object",
+      "properties": {
+        "helperId": {
+          "type": "string"
+        },
+        "key": {
+          "type": "string"
+        },
+        "data": {}
+      },
+      "required": [
+        "helperId",
+        "key",
+        "data"
+      ]
+    },
+    "InlineRequest_helper_review_list": {
+      "type": "object",
+      "properties": {
+        "helperId": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "helperId"
+      ]
+    },
+    "InlineRequest_helper_review_delete": {
+      "type": "object",
+      "properties": {
+        "helperId": {
+          "type": "string"
+        },
+        "key": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "helperId",
+        "key"
+      ]
+    },
+    "InlineRequest_helper_family_list": {
+      "type": "object",
+      "properties": {
+        "helperId": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "helperId"
+      ]
+    },
+    "InlineRequest_helper_family_post": {
+      "type": "object",
+      "properties": {
+        "helperId": {
+          "type": "string"
+        },
+        "key": {
+          "type": "string"
+        },
+        "data": {}
+      },
+      "required": [
+        "helperId",
+        "key",
+        "data"
+      ]
+    },
+    "InlineRequest_helper_family_delete": {
+      "type": "object",
+      "properties": {
+        "helperId": {
+          "type": "string"
+        },
+        "key": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "helperId",
+        "key"
+      ]
+    },
+    "InlineRequest_helper_notifyQuestion": {
+      "type": "object"
+    },
+    "InlineRequest_helper_notifyAsked": {
+      "type": "object"
+    },
+    "InlineRequest_helper_progress_load": {
+      "type": "object",
+      "properties": {
+        "helperId": {
+          "type": "string"
+        },
+        "ownerId": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "helperId"
+      ]
+    },
+    "InlineRequest_helper_progress_save": {
+      "type": "object",
+      "properties": {
+        "helperId": {
+          "type": "string"
+        },
+        "ownerId": {
+          "type": "string"
+        },
+        "data": {}
+      },
+      "required": [
+        "helperId",
+        "data"
+      ]
+    },
+    "InlineRequest_helper_topicCheck": {
+      "type": "object",
+      "properties": {
+        "system": {
+          "type": "string"
+        },
+        "text": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "system",
+        "text"
+      ]
+    },
     "InlineRequest_invite_checkCode": {
       "type": "object",
       "properties": {
@@ -16209,6 +18309,9 @@
         "encInfo": {},
         "existingFileId": {
           "type": "string"
+        },
+        "nudge": {
+          "type": "boolean"
         }
       },
       "required": [
@@ -17482,6 +19585,20 @@
         "url"
       ]
     },
+    "InlineRequest_pageNotes_carryOn": {
+      "type": "object",
+      "properties": {
+        "url": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "url"
+      ]
+    },
+    "InlineRequest_pageNotes_pages": {
+      "type": "object"
+    },
     "InlineRequest_pageNotes_read": {
       "type": "object",
       "properties": {
@@ -17592,6 +19709,12 @@
           "type": "boolean"
         },
         "skipEncUpdate": {
+          "type": "boolean"
+        },
+        "ifUpdatedAt": {
+          "type": "string"
+        },
+        "nudge": {
           "type": "boolean"
         },
         "tempAuthToken": {
@@ -18163,6 +20286,9 @@
         }
       }
     },
+    "InlineRequest_blockPage_defaults": {
+      "type": "object"
+    },
     "GetSetupCatalogRequest": {
       "type": "object"
     },
@@ -18569,6 +20695,9 @@
         "markCurated": {
           "type": "boolean"
         },
+        "makeChoice": {
+          "type": "boolean"
+        },
         "changes": {
           "$ref": "#/definitions/CurationProposalChanges"
         }
@@ -18701,6 +20830,32 @@
       ]
     },
     "InlineRequest_agent_mcp_curation": {
+      "anyOf": [
+        {
+          "$ref": "#/definitions/McpJsonRpcMessage"
+        },
+        {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/McpJsonRpcMessage"
+          }
+        }
+      ]
+    },
+    "InlineRequest_agent_mcp_classifier": {
+      "anyOf": [
+        {
+          "$ref": "#/definitions/McpJsonRpcMessage"
+        },
+        {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/McpJsonRpcMessage"
+          }
+        }
+      ]
+    },
+    "InlineRequest_agent_mcp_classifier_versions": {
       "anyOf": [
         {
           "$ref": "#/definitions/McpJsonRpcMessage"
@@ -19158,6 +21313,73 @@
         "connectionId"
       ]
     },
+    "InlineRequest_aiAppPermission_pending": {
+      "type": "object"
+    },
+    "InlineRequest_aiAppPermission_decide": {
+      "type": "object",
+      "properties": {
+        "requestId": {
+          "type": "string"
+        },
+        "approved": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "requestId",
+        "approved"
+      ]
+    },
+    "InlineRequest_mcpUploadPage_open": {
+      "type": "object",
+      "properties": {
+        "token": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "token"
+      ]
+    },
+    "InlineRequest_mcpUploadPage_add": {
+      "type": "object",
+      "properties": {
+        "token": {
+          "type": "string"
+        },
+        "fileData": {
+          "type": "string"
+        },
+        "fileType": {
+          "type": "string"
+        },
+        "filename": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "token",
+        "fileData",
+        "fileType",
+        "filename"
+      ]
+    },
+    "InlineRequest_aiAppCheck_answer": {
+      "type": "object",
+      "properties": {
+        "checkId": {
+          "type": "string"
+        },
+        "claim": {
+          "type": "boolean"
+        },
+        "report": {}
+      },
+      "required": [
+        "checkId"
+      ]
+    },
     "McpRelaySealedEnvelope": {
       "type": "object",
       "properties": {
@@ -19324,6 +21546,14 @@
       "properties": {
         "label": {
           "type": "string"
+        },
+        "scope": {
+          "type": "string",
+          "enum": [
+            "curation-propose",
+            "classifier-synth",
+            "classifier-versions"
+          ]
         }
       },
       "required": [
@@ -19779,6 +22009,16 @@
             "null"
           ]
         },
+        "choice": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "enum": [
+            "curator",
+            null
+          ]
+        },
         "declineReason": {
           "type": [
             "string",
@@ -20024,6 +22264,17 @@
     "InlineRequest_search_lookupProviders": {
       "type": "object"
     },
+    "InlineRequest_search_homeSuggestSources": {
+      "type": "object",
+      "properties": {
+        "links": {
+          "type": "boolean"
+        },
+        "rules": {
+          "type": "boolean"
+        }
+      }
+    },
     "InlineRequest_search_diagnostics": {
       "type": "object"
     },
@@ -20061,6 +22312,124 @@
       },
       "required": [
         "type"
+      ]
+    },
+    "PinnedSearch": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "searchType": {
+          "type": "string"
+        },
+        "value": {
+          "type": "string"
+        },
+        "place": {
+          "anyOf": [
+            {
+              "type": "object",
+              "properties": {
+                "label": {
+                  "type": "string"
+                },
+                "kind": {
+                  "$ref": "#/definitions/SearchPlaceKind"
+                },
+                "id": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "kind",
+                "label"
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "filters": {
+          "$ref": "#/definitions/Record%3Cstring%2Cunknown%3E"
+        },
+        "orderBy": {
+          "type": "string"
+        },
+        "pinnedAt": {
+          "type": "number"
+        }
+      },
+      "required": [
+        "id",
+        "searchType",
+        "value",
+        "place",
+        "filters",
+        "orderBy",
+        "pinnedAt"
+      ]
+    },
+    "InlineRequest_search_pinned_seal": {
+      "type": "object",
+      "properties": {
+        "searches": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/PinnedSearch"
+          }
+        }
+      },
+      "required": [
+        "searches"
+      ]
+    },
+    "PinnedSearchesPref": {
+      "anyOf": [
+        {
+          "type": "object",
+          "properties": {
+            "sealed": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "sealed"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "searches": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/PinnedSearch"
+              }
+            }
+          },
+          "required": [
+            "searches"
+          ]
+        }
+      ]
+    },
+    "InlineRequest_search_pinned_open": {
+      "type": "object",
+      "properties": {
+        "pref": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/PinnedSearchesPref"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "pref"
       ]
     },
     "AccessEvaluateRequest": {
@@ -20460,6 +22829,34 @@
       }
     },
     "InlineRequest_sync_fullResetLog": {
+      "type": "object"
+    },
+    "InlineRequest_sync_unsent_list": {
+      "type": "object"
+    },
+    "InlineRequest_sync_unsent_retry": {
+      "type": "object",
+      "properties": {
+        "key": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "key"
+      ]
+    },
+    "InlineRequest_sync_unsent_discard": {
+      "type": "object",
+      "properties": {
+        "key": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "key"
+      ]
+    },
+    "InlineRequest_sync_unsent_send": {
       "type": "object"
     },
     "InlineRequest_sync_retryFailed": {
@@ -21926,6 +24323,12 @@
     "InlineRequest_user_notification_lessonPartDone": {
       "type": "object"
     },
+    "InlineRequest_user_notification_helperAsked": {
+      "type": "object"
+    },
+    "InlineRequest_user_notification_helperQuestion": {
+      "type": "object"
+    },
     "InlineRequest_user_notification_markRead": {
       "type": "object",
       "properties": {
@@ -22013,6 +24416,9 @@
         "aiToolsEnabled": {
           "type": "boolean"
         },
+        "aiHelpersEnabled": {
+          "type": "boolean"
+        },
         "aiWebSearchEnabled": {
           "type": "boolean"
         },
@@ -22029,6 +24435,9 @@
           "type": "boolean"
         },
         "emailEnabled": {
+          "type": "boolean"
+        },
+        "offlineSavesEnabled": {
           "type": "boolean"
         },
         "speechModeEnabled": {
@@ -22103,6 +24512,17 @@
         }
       }
     },
+    "Partial<OptionRevisions>": {
+      "type": "object",
+      "properties": {
+        "usageLimitsData": {
+          "type": "number"
+        },
+        "ruleOverrideSettings": {
+          "type": "number"
+        }
+      }
+    },
     "InlineRequest_user_options_update": {
       "type": "object",
       "properties": {
@@ -22114,16 +24534,50 @@
         },
         "tempAuthToken": {
           "$ref": "#/definitions/TokenData"
+        },
+        "ifRevision": {
+          "$ref": "#/definitions/Partial%3COptionRevisions%3E"
         }
       }
     },
     "InlineRequest_user_checkpoint_clear": {
       "type": "object"
     },
+    "InlineRequest_user_blockPage_setOwn": {
+      "type": "object",
+      "properties": {
+        "off": {
+          "type": "boolean"
+        },
+        "collections": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
     "InlineRequest_user_checkpoint_approve": {
       "type": "object",
       "properties": {
         "userId": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "userId"
+      ]
+    },
+    "InlineRequest_user_extraTime_grant": {
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string"
+        },
+        "minutes": {
+          "type": "number"
+        },
+        "ruleId": {
           "type": "string"
         }
       },
@@ -22910,6 +25364,30 @@
         "libs"
       ]
     },
+    "InlineRequest_appbuild_cache_get": {
+      "type": "object",
+      "properties": {
+        "itemId": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "itemId"
+      ]
+    },
+    "InlineRequest_appbuild_cache_set": {
+      "type": "object",
+      "properties": {
+        "itemId": {
+          "type": "string"
+        },
+        "build": {}
+      },
+      "required": [
+        "itemId",
+        "build"
+      ]
+    },
     "InlineRequest_userfile_getMetaById": {
       "type": "object",
       "properties": {
@@ -23649,6 +26127,9 @@
         "lessonCheck": {
           "$ref": "#/definitions/AdminAiPromptOverride"
         },
+        "lessonSourceArticles": {
+          "$ref": "#/definitions/AdminAiPromptOverride"
+        },
         "lessonGradeAnswer": {
           "$ref": "#/definitions/AdminAiPromptOverride"
         },
@@ -23668,6 +26149,15 @@
           "$ref": "#/definitions/AdminAiPromptOverride"
         },
         "trackCritic": {
+          "$ref": "#/definitions/AdminAiPromptOverride"
+        },
+        "projectOutline": {
+          "$ref": "#/definitions/AdminAiPromptOverride"
+        },
+        "projectFill": {
+          "$ref": "#/definitions/AdminAiPromptOverride"
+        },
+        "projectChange": {
           "$ref": "#/definitions/AdminAiPromptOverride"
         }
       }

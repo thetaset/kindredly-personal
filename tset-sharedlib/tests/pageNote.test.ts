@@ -14,6 +14,10 @@ import {
   addPageToNoteSchemas,
   noteHasLinks,
   pageNotePagesOf,
+  pageNoteFileKey,
+  pageNoteFileIdOf,
+  pageNoteItemKey,
+  pageNoteItemIdOf,
 } from '../src/pageNote.utils';
 import { PAGE_NOTE_SCHEMA_KEY, getItemClaimedPatterns, getItemDetailPatterns } from '../src/url.utils';
 
@@ -124,6 +128,66 @@ describe('page-note details', () => {
 
   it('keeps the literal in url.utils equal to the schema id', () => {
     expect(PAGE_NOTE_SCHEMA_KEY).toBe(PAGE_NOTE_SCHEMA_ID);
+  });
+});
+
+describe('notes about a file in Kindredly (PGN-20)', () => {
+  const FILE = 'file_3f2a9c1e-7b4d-4e8a-9f10-2c3d4e5f6a7b';
+
+  it('files a file under its own key, which is no web address', () => {
+    const key = pageNoteFileKey(FILE);
+    expect(key).toBe(`kindredly-file:${FILE}`);
+    expect(pageNoteKey(key)).toBe(key);
+    expect(pageNoteFileIdOf(key)).toBe(FILE);
+    expect(pageNoteFileIdOf('https://example.com/kindredly-file:x')).toBeNull();
+    for (const bad of ['', 'a b', 'x/../y', '<script>', 'a'.repeat(129)]) {
+      expect(pageNoteFileKey(bad)).toBeNull();
+      expect(pageNoteKey(`kindredly-file:${bad}`)).toBeNull();
+    }
+  });
+
+  it('is a page note that claims nothing, and no reminder covers it', () => {
+    const details = buildPageNoteDetails({ url: pageNoteFileKey(FILE)!, title: 'Fractions workbook.pdf', text: 'p. 12 halves' })!;
+    expect(getPageNoteSchemaV1(details)).toEqual({ schemaVersion: 1, sourceUrl: `kindredly-file:${FILE}`, sourceKey: `kindredly-file:${FILE}`, title: 'Fractions workbook.pdf' });
+    expect(getItemDetailPatterns(details)).toEqual([]);
+    expect(getItemClaimedPatterns(details)).toEqual([]);
+    expect(youTubeVideoIdOf(pageNoteFileKey(FILE))).toBeNull();
+    const reminders = normalizePageNoteReminders([{ kind: 'site', value: 'kindredly-file' }]);
+    expect(pageNoteReminderFor(reminders, { url: pageNoteFileKey(FILE) })).toBeNull();
+    expect(pageNoteRemindersMayCover(reminders, pageNoteFileKey(FILE))).toBe(false);
+  });
+
+  it('can be added to a note about a web page, and the other way round', () => {
+    const video = buildPageNoteDetails({ url: 'https://www.youtube.com/watch?v=Fq0XRb7mB2s', text: 'x' })!;
+    const both = addPageToNoteSchemas(video.info.schemas, { url: pageNoteFileKey(FILE)!, title: 'Fractions workbook.pdf' })!;
+    expect(both.added).toBe(true);
+    expect(pageNotePagesOf({ info: { schemas: both.schemas } }).map((p) => p.sourceKey)).toEqual([
+      'https://youtube.com/watch?v=Fq0XRb7mB2s',
+      `kindredly-file:${FILE}`,
+    ]);
+  });
+});
+
+describe('notes about an item in Kindredly (HAT-1068)', () => {
+  const ITEM = 'item_4e48dbd4-deb0-471e-baa6-32a88a29cb68';
+
+  it('files an item under its own key, which is no web address and no file', () => {
+    const key = pageNoteItemKey(ITEM)!;
+    expect(key).toBe(`kindredly-item:${ITEM}`);
+    expect(pageNoteKey(key)).toBe(key);
+    expect(pageNoteItemIdOf(key)).toBe(ITEM);
+    expect(pageNoteFileIdOf(key)).toBeNull();
+    expect(pageNoteItemIdOf(pageNoteFileKey('file_x'))).toBeNull();
+    expect(pageNoteItemKey('a b')).toBeNull();
+  });
+
+  it('is a page note that claims nothing, and no reminder covers it', () => {
+    const details = buildPageNoteDetails({ url: pageNoteItemKey(ITEM)!, title: 'Cell division', text: '4:12 mitosis' })!;
+    expect(getPageNoteSchemaV1(details)?.sourceKey).toBe(`kindredly-item:${ITEM}`);
+    expect(getItemDetailPatterns(details)).toEqual([]);
+    expect(getItemClaimedPatterns(details)).toEqual([]);
+    const reminders = normalizePageNoteReminders([{ kind: 'site', value: 'kindredly-item' }]);
+    expect(pageNoteReminderFor(reminders, { url: pageNoteItemKey(ITEM) })).toBeNull();
   });
 });
 

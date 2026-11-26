@@ -13,7 +13,7 @@
  * none of those constraints, but it uses the same record shape and the same
  * category / useCriteria vocabularies.
  */
-import { tagOptionsWithDetailsMap, typeNameList } from './content.types';
+import { moveRetiredTopicTags, RETIRED_FORMAT_TOPIC_TAGS, RETIRED_SUBJECT_TOPIC_TREE, tagOptionsWithDetailsMap, typeNameList } from './content.types';
 import { CANONICAL_CATEGORIES, CANONICAL_CATEGORY_IDS, mapLegacyCategoryIds } from './publishedCategoryMapping';
 
 /** The canonical envelope — the same manifest the admin Import tab consumes. */
@@ -365,6 +365,11 @@ export function validateCollectionRecords(records: unknown[]): CollectionValidat
       } else {
         for (const t of record.useCriteria) {
           if (typeof t !== 'string' || KNOWN_CRITERIA_TAGS.has(t)) continue;
+          const movedTo = (RETIRED_SUBJECT_TOPIC_TREE as Record<string, string>)[t] || (RETIRED_FORMAT_TOPIC_TAGS as Record<string, string>)[t];
+          if (movedTo) {
+            warn(`topic tag "${t}" is retired — using "${movedTo}" instead.`);
+            continue;
+          }
           unknownCriteria.add(t);
           warn(`unknown useCriteria tag "${t}" — it will be dropped.`);
         }
@@ -389,11 +394,8 @@ export function sanitizeAuthoredTags(input: { categories?: unknown; useCriteria?
   categories: string[];
   useCriteria: string[];
 } {
-  const categories = mapLegacyCategoryIds(input.categories);
-
-  const useCriteria = Array.isArray(input.useCriteria)
-    ? [...new Set(input.useCriteria.filter((t): t is string => typeof t === 'string' && KNOWN_CRITERIA_TAGS.has(t)))]
-    : [];
-
-  return { categories, useCriteria };
+  // A retired topic tag becomes its Topics tree topic or its format tag (CLS-11).
+  const moved = moveRetiredTopicTags({ useCriteria: input.useCriteria, categories: mapLegacyCategoryIds(input.categories) });
+  const useCriteria = [...new Set(moved.useCriteria.filter((t) => KNOWN_CRITERIA_TAGS.has(t)))];
+  return { categories: moved.categories, useCriteria };
 }

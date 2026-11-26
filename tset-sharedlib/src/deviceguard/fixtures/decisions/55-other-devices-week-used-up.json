@@ -1,0 +1,113 @@
+{
+  "id": "55-other-devices-week-used-up",
+  "behaviour": "A weekly total counts the child's other devices too (DCP-27): an hour here since Monday and four on the computer use up five hours, with today's hour not used up.",
+  "clock": {
+    "nowMs": 1789491600000,
+    "familyTimeZone": "America/Los_Angeles",
+    "deviceTimeZone": "America/Los_Angeles"
+  },
+  "settings": {
+    "usageLimitsData": {
+      "contentUsageLimits": [
+        {
+          "id": "simple-custom-games",
+          "name": "Games",
+          "type": "advanced",
+          "conditions": [
+            {
+              "type": "attribute",
+              "values": [
+                "game"
+              ]
+            }
+          ],
+          "timeLimits": [
+            {
+              "hours": 1,
+              "daysOfWeek": [
+                0,
+                1,
+                2,
+                3,
+                4,
+                5,
+                6
+              ]
+            }
+          ],
+          "weeklyHours": 5
+        }
+      ],
+      "temporaryRules": []
+    },
+    "ruleOverrideSettings": {
+      "ruleOverrides": []
+    },
+    "accessControlSettings": {},
+    "appPolicy": null,
+    "appPolicyStatus": "absent"
+  },
+  "installedApps": [
+    {
+      "pkg": "com.roblox.client",
+      "label": "Roblox",
+      "platform": "android"
+    },
+    {
+      "pkg": "com.mojang.minecraftpe",
+      "label": "Minecraft",
+      "platform": "android"
+    },
+    {
+      "pkg": "com.duolingo",
+      "label": "Duolingo",
+      "platform": "android"
+    }
+  ],
+  "floor": [],
+  "usage": {
+    "appMsByPkg": {
+      "com.roblox.client": 1200000
+    },
+    "weekAppMsByPkg": {
+      "com.roblox.client": 3600000
+    },
+    "otherDevices": {
+      "dateKey": "2026-09-15",
+      "perRuleMs": {
+        "simple-custom-games": 600000
+      },
+      "weekKey": "2026-09-14",
+      "perRuleWeekMs": {
+        "simple-custom-games": 14400000
+      }
+    },
+    "webLogs": []
+  },
+  "usageSeed": {
+    "perRuleUsedMs": {},
+    "weekKey": "2026-09-14",
+    "perRuleWeekUsedMs": {}
+  },
+  "expectDevice": [
+    {
+      "pkg": "com.roblox.client",
+      "action": "block",
+      "reason": "budget-exhausted",
+      "ruleId": "simple-custom-games"
+    },
+    {
+      "pkg": "com.mojang.minecraftpe",
+      "action": "block",
+      "reason": "budget-exhausted",
+      "ruleId": "simple-custom-games"
+    },
+    {
+      "pkg": "com.duolingo",
+      "action": "allow",
+      "reason": null,
+      "ruleId": null
+    }
+  ],
+  "browserNotApplicable": "Device-only: another device's app time reaches a phone or a computer as the sealed report of DCP-27, which only Guard and the computer app read."
+}

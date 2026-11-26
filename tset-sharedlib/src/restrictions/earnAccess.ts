@@ -11,7 +11,7 @@
  * rather than growing a second one that drifts.
  */
 
-import { familyClock, type FamilyClock } from '../deviceguard/familyClock';
+import { familyClock, familyWeekStartMs, type FamilyClock } from '../deviceguard/familyClock';
 import type { EduValue } from '../content.types';
 import type { LimitMatchCondition, LimitRule } from '../types/usage-limits.types';
 import type { CheckpointMode } from '../types/usage-limits.types';
@@ -26,7 +26,6 @@ import type {
   EarnAccessStep,
 } from '../types/earn-access.types';
 
-const DAY_MS = 24 * 60 * 60 * 1000;
 
 export const EARN_ACCESS_HOLDS: readonly EarnAccessHold[] = ['entertainment', 'junk', 'games', 'social'];
 export const EARN_ACCESS_RESETS: readonly EarnAccessReset[] = ['day', 'week', 'never'];
@@ -251,19 +250,13 @@ export function earnAccessRuleAppliesOn(rule: EarnAccessRule, clock: FamilyClock
   return !rule.daysOfWeek?.length || rule.daysOfWeek.includes(clock.dayOfWeek);
 }
 
-/** The family day start `daysBack` days before the clock's, landing on the right wall-clock day across DST. */
-function dayStartDaysBack(clock: FamilyClock, daysBack: number): number {
-  if (daysBack <= 0) return clock.dayStartMs;
-  return familyClock(clock.dayStartMs - daysBack * DAY_MS + 12 * 60 * 60 * 1000, clock.timeZone).dayStartMs;
-}
-
 /**
  * When the period an opening must fall in began: the family day's start, this family week's Monday, or the
  * beginning of time for a rule that never starts over.
  */
 export function earnAccessPeriodStartMs(reset: EarnAccessReset, clock: FamilyClock): number {
   if (reset === 'never') return 0;
-  if (reset === 'week') return dayStartDaysBack(clock, (clock.dayOfWeek + 6) % 7);
+  if (reset === 'week') return familyWeekStartMs(clock);
   return clock.dayStartMs;
 }
 

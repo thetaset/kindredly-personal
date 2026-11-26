@@ -13,7 +13,7 @@ export type TargetAudience = 'ta_all' | 'ta_prek' | 'ta_kids' | 'ta_preteen' | '
 export type Cost = 'cost_free' | 'cost_freewithpaid' | 'cost_paid' | 'cost_unknown';
 export type Ads = 'ads_no' | 'ads_l' | 'ads_m' | 'ads_h' | 'ads_unknown';
 export type CostDetails = 'costd_pay2rm' | 'costd_no3rdpartyads' | 'costd_nosignin' | 'costd_opensource' | 'costd_unknown';
-export type ContentType = 'ct_app' | 'ct_article' | 'ct_cntcreator' | 'ct_game' | 'ct_music' | 'ct_org' | 'ct_phy_product' | 'ct_ref' | 'ct_video' | 'ct_unknown' | 'ct_other';
+export type ContentType = 'ct_app' | 'ct_article' | 'ct_cntcreator' | 'ct_documentary' | 'ct_game' | 'ct_music' | 'ct_org' | 'ct_phy_product' | 'ct_podcast' | 'ct_ref' | 'ct_video' | 'ct_unknown' | 'ct_other';
 // Ordinal UX/UI design quality — clean & focused → noisy & distracting. Descriptive editorial signal only (not a gate).
 export type DesignLevel = 'design_clean' | 'design_light' | 'design_busy' | 'design_noisy' | 'design_unknown';
 // Design attribute flags (multi-select). Own prefix so they never collide with the single-value DesignLevel scale.
@@ -270,6 +270,23 @@ export const typeNameList = [
   { key: 'podcast_episode', name: 'Podcast episode', icon: 'mic', parent: "thing" ,hide: true},
   { key: 'project', name: 'Project', icon: 'folder', parent: "thing" ,hide: true},
   { key: 'task', name: 'Task', icon: 'check2-square', parent: "thing" ,hide: true},
+  {
+    // A Talk row in a Project (HAT-1064, PRJ-4): a question that opens a Kinbot conversation. Made
+    // in a project, never offered in a picker. Its question is in `TALK_PROMPT_SCHEMA_ID`, kept apart
+    // from the name so a long question can sit under a short title.
+    key: 'ai_prompt',
+    name: 'Talk with Kinbot',
+    icon: 'chat-dots',
+    parent: "thing",
+    hide: true,
+    schema: [
+      { name: 'prompt', type: 'textarea', label: 'Question for Kinbot', placeholder: 'Leave empty to ask the name', uiGroup: 'details' },
+    ],
+  },
+  // A Helper AI helper (HAT-1105): an AI helper an adult set up for one task. Made and opened on
+  // `/helper`, never offered in a picker or shown as a Library tile. Its settings are in
+  // `HELPER_SCHEMA_ID` (helper-ai.ts).
+  { key: 'helper', name: 'Helper', icon: 'stars', parent: "thing", hide: true },
   { key: 'song', name: 'Song', icon: 'music-note-beamed', parent: "thing" ,hide: true},
   { key: 'story', name: 'Story', icon: 'file-richtext', parent: "thing" ,hide: true},
   { key: 'video_game', name: 'Video Game', icon: 'controller', parent: "thing" ,hide: true},
@@ -367,13 +384,16 @@ export type ItemTypeSecondary = (typeof typeNameList)[number]['key'];
  * A feed is deliberately NOT a kind. See the note on {@link getSubTypeFromFeeds}: a feed is a
  * capability that decorates a link (surfaced as the "Subscribable" filter), not an identity.
  * Podcasts are the one exception kept as a real kind, because audio is a different experience.
+ *
+ * Kindredly Apps (`kin_app`) are not a kind here: the founder took them off Explore (HAT-1368).
+ * `app` is an online app or tool (Scratch, Desmos), a link like any other.
  */
 export const PUBLISHED_SEARCH_KIND_KEYS = [
   'col',
   'website',
   'yt_channel',
   'podcast',
-  'kin_app',
+  'app',
   // Residual bucket — must stay last.
   'link',
   // Not shipped. 'yt_video' and 'information' are deliberately out: a single video is too
@@ -449,7 +469,7 @@ export const PUBLISHED_SEARCH_LINK_KIND_KEYS: readonly PublishedSearchKind[] =
     (key) => key !== 'col' && key !== 'link' && publishedKindParent(key) === 'link',
   );
 
-/** The `thing`-parented kinds on the allowlist (Info, Apps). */
+/** The `thing`-parented kinds on the allowlist; none since Kindredly Apps left (HAT-1368). */
 export const PUBLISHED_SEARCH_THING_KIND_KEYS: readonly PublishedSearchKind[] =
   PUBLISHED_SEARCH_KIND_KEYS.filter((key) => publishedKindParent(key) === 'thing');
 
@@ -659,6 +679,7 @@ export function getEditableItemTypeSelectorOptions(
     'thing',
     'feed_collection',
     'pub_col_slink',
+    'helper',
   ]);
 
   return typeNameList
@@ -1176,6 +1197,14 @@ export function isTaskItem(type: string | null | undefined, subType: string | nu
   return normalizeSubTypeForType(type, subType) === 'task';
 }
 
+/** A Talk row's subType (HAT-1064, PRJ-4) and where its question is kept in the encrypted info. */
+export const TALK_PROMPT_SUB_TYPE = 'ai_prompt';
+export const TALK_PROMPT_SCHEMA_ID = 'knd.subtype.ai_prompt.v1';
+
+export function isTalkPromptItem(type: string | null | undefined, subType: string | null | undefined): boolean {
+  return type === 'thing' && normalizeSubTypeForType(type, subType) === TALK_PROMPT_SUB_TYPE;
+}
+
 export function isEventItem(type: string | null | undefined, subType: string | null | undefined): boolean {
   return normalizeSubTypeForType(type, subType) === 'event';
 }
@@ -1671,8 +1700,8 @@ export const eduValueNutritionLabels: Record<EduValue, ContentTypeNutritionLabel
   },
 
   eduval_junk: {
-    title: 'Junk',
-    tagline: 'Junk, high pull.',
+    title: 'Low Value',
+    tagline: 'Distracting, highlyaddictive and unhealthy content.',
     description:
       'Content that is misleading, clickbait, rage-bait, or designed to be compulsive. Not “evil”, but easy to overconsume and often leaves users feeling worse.',
     ingredients: [
@@ -1813,8 +1842,8 @@ export const eduTagList: TagOptionDetail<EduValue>[] = [
     },
     {
       key: 'eduval_junk',
-      name: 'Junk',
-      selectedName: 'Junk',
+      name: 'Low Value',
+      selectedName: 'Low Value',
       description: 'Potentially unhealthy or low-value',
       extraDetails: 'Content considered addictive, misleading, clickbait, or lacking substantive value. Acceptable occasionally, but best consumed in moderation.',
       hideFromSearch: true,
@@ -1883,15 +1912,37 @@ export const contentTypeTagList: TagOptionDetail<ContentType>[] = [
   { key: 'ct_app', name: 'App or tool' },
   { key: 'ct_article', name: 'Article' },
   { key: 'ct_cntcreator', name: 'Content Creator' },
+  // Formats since CLS-11 (2026-11-10), when they stopped being topic tags.
+  { key: 'ct_documentary', name: 'Documentary' },
   { key: 'ct_game', name: 'Game' },
   { key: 'ct_music', name: 'Music' },
   { key: 'ct_org', name: 'Organzation' },
   { key: 'ct_phy_product', name: 'Physical Product' },
+  { key: 'ct_podcast', name: 'Podcast' },
   { key: 'ct_ref', name: 'Reference/Data Resource' },
   { key: 'ct_video', name: 'Video' },
 ];
 
+/**
+ * Topic tags: how a site is built, the six patterns that pull at attention. What a page is about
+ * is its Topics tree topic (`categories`, `categoryExplorerSets.ts`), not a tag (CLS-11, decided
+ * 2026-11-10).
+ */
 export const topicTagList: TagOptionDetail<TopicTag>[] = [
+  { key: 'topic_social_feed', name: 'Social Feed', description: 'Algorithmic social feeds and timelines', icon: 'people' },
+  { key: 'topic_forums', name: 'Forums / Communities', description: 'Forums, message boards, community threads', icon: 'chat-dots' },
+  { key: 'topic_group_chat', name: 'Group Chat', description: 'Messaging and group chat apps', icon: 'chat-square-text' },
+  { key: 'topic_creator_channels', name: 'Creator Channels', description: 'Creator channels and subscriptions', icon: 'person-video3' },
+  { key: 'topic_short_video_infinite_scroll', name: 'Short Video (Infinite Scroll)', description: 'Endless short-form video feeds', icon: 'arrow-repeat' },
+  { key: 'topic_clickbait_sensational_news', name: 'Clickbait / Sensational News', description: 'Sensational, rage-bait, or clickbait news', icon: 'newspaper' },
+];
+
+/**
+ * Topic tags retired on 2026-11-10 (CLS-11). Kept so an item that still carries one shows its
+ * name, but no picker offers them. The subject ones became Topics tree topics, podcasts and
+ * documentaries became formats; `moveRetiredTopicTags` moves them once.
+ */
+export const retiredTopicTagList: TagOptionDetail<TopicTag>[] = [
   { key: 'topic_streaming_tv', name: 'Streaming TV', description: 'Shows and streaming TV content', icon: 'tv' },
   { key: 'topic_movies', name: 'Movies', description: 'Movie watching and film content', icon: 'film' },
   { key: 'topic_kids_shows', name: 'Kids Shows', description: 'Child-focused shows and series', icon: 'emoji-smile' },
@@ -1902,15 +1953,6 @@ export const topicTagList: TagOptionDetail<TopicTag>[] = [
   { key: 'topic_video_games', name: 'Video Games', description: 'Gaming (general)', icon: 'controller' },
   { key: 'topic_sandbox_games', name: 'Sandbox / Builder Games', description: 'Minecraft-like sandbox play', icon: 'box' },
   { key: 'topic_memes_humor', name: 'Memes & Humor', description: 'Humor, memes, comedy content', icon: 'emoji-laughing' },
-
-  { key: 'topic_social_feed', name: 'Social Feed', description: 'Algorithmic social feeds and timelines', icon: 'people' },
-  { key: 'topic_forums', name: 'Forums / Communities', description: 'Forums, message boards, community threads', icon: 'chat-dots' },
-  { key: 'topic_group_chat', name: 'Group Chat', description: 'Messaging and group chat apps', icon: 'chat-square-text' },
-  { key: 'topic_creator_channels', name: 'Creator Channels', description: 'Creator channels and subscriptions', icon: 'person-video3' },
-
-  { key: 'topic_short_video_infinite_scroll', name: 'Short Video (Infinite Scroll)', description: 'Endless short-form video feeds', icon: 'arrow-repeat' },
-  { key: 'topic_clickbait_sensational_news', name: 'Clickbait / Sensational News', description: 'Sensational, rage-bait, or clickbait news', icon: 'newspaper' },
-
   { key: 'topic_homework_help', name: 'Homework Help', description: 'Homework assistance and study help', icon: 'mortarboard' },
   { key: 'topic_math_practice', name: 'Math Practice', description: 'Math drills, practice, and tutoring', icon: 'calculator' },
   { key: 'topic_language_learning', name: 'Language Learning', description: 'Language learning tools and lessons', icon: 'translate' },
@@ -1920,6 +1962,66 @@ export const topicTagList: TagOptionDetail<TopicTag>[] = [
   { key: 'topic_reference_research', name: 'Reference & Research', description: 'Reference and research resources', icon: 'search' },
   { key: 'topic_documentaries', name: 'Documentaries', description: 'Educational documentaries', icon: 'camera-reels' },
 ];
+
+/** Where each retired subject tag went: a General leaf topic of the Topics tree. */
+export const RETIRED_SUBJECT_TOPIC_TREE: Partial<Record<TopicTag, string>> = {
+  topic_streaming_tv: 'gen_entertainment_leaf',
+  topic_movies: 'gen_entertainment_leaf',
+  topic_kids_shows: 'gen_entertainment_leaf',
+  topic_anime: 'gen_entertainment_leaf',
+  topic_memes_humor: 'gen_entertainment_leaf',
+  topic_music_listening: 'gen_music',
+  topic_music_creation: 'gen_music',
+  topic_video_games: 'gen_gaming',
+  topic_sandbox_games: 'gen_gaming',
+  topic_homework_help: 'gen_education',
+  topic_reference_research: 'gen_education',
+  topic_math_practice: 'gen_math',
+  topic_language_learning: 'gen_language',
+  topic_coding_tutorials: 'gen_coding',
+  topic_science_learning: 'gen_science',
+  topic_history_civics: 'gen_history',
+};
+
+/** Where the retired format-like topic tags went: a format tag. */
+export const RETIRED_FORMAT_TOPIC_TAGS: Partial<Record<TopicTag, ContentType>> = {
+  topic_podcasts: 'ct_podcast',
+  topic_documentaries: 'ct_documentary',
+};
+
+/**
+ * Move an item's retired topic tags (CLS-11): a subject tag leaves `useCriteria` and its tree topic
+ * joins `categories`; a podcast or documentary tag becomes its format tag. Order-preserving,
+ * de-duplicated, and safe to run again. `moved` lists the tags taken out, so nothing is lost.
+ */
+export function moveRetiredTopicTags(input: { useCriteria?: unknown; categories?: unknown }): {
+  useCriteria: string[];
+  categories: string[];
+  moved: string[];
+} {
+  const useCriteria = Array.isArray(input.useCriteria) ? input.useCriteria.filter((t): t is string => typeof t === 'string') : [];
+  const categories = Array.isArray(input.categories) ? input.categories.filter((t): t is string => typeof t === 'string') : [];
+  const nextCriteria: string[] = [];
+  const nextCategories = [...categories];
+  const moved: string[] = [];
+  const add = (list: string[], value: string) => {
+    if (!list.includes(value)) list.push(value);
+  };
+  for (const tag of useCriteria) {
+    const topic = RETIRED_SUBJECT_TOPIC_TREE[tag as TopicTag];
+    const format = RETIRED_FORMAT_TOPIC_TAGS[tag as TopicTag];
+    if (topic) {
+      add(nextCategories, topic);
+      moved.push(tag);
+    } else if (format) {
+      add(nextCriteria, format);
+      moved.push(tag);
+    } else {
+      add(nextCriteria, tag);
+    }
+  }
+  return { useCriteria: nextCriteria, categories: nextCategories, moved };
+}
 
 export const intentTagList: TagOptionDetail<IntentTag>[] = [
   { key: 'intent_learn', name: 'Learn', description: 'Learning, studying, skill-building', icon: 'mortarboard' },
@@ -2042,7 +2144,8 @@ export const tagOptionsWithDetailsMap = {
 const eduValTagMap = Object.fromEntries(eduTagList.map((v) => [v.key, v]));
 
 const critTagMap =  Object.fromEntries(
-  Object.values(tagOptionsWithDetailsMap).flat().map((v) => [v.key, v])
+  // Retired topic tags keep their names, so an item that still carries one shows it (CLS-11).
+  [...Object.values(tagOptionsWithDetailsMap).flat(), ...retiredTopicTagList].map((v) => [v.key, v])
 );
 
 function getTagOptionsMapWithDetails() {
@@ -2105,7 +2208,11 @@ export function getUseCriteriaObjWithKeys(tags: Array<string>) {
 
       const tagVal = tagKey;
       if (tagKey.startsWith('eduval_')) {
-        result.eduValue = normalizeEduValueAlias(tagVal) || (tagVal as EduValue);
+        // One reader (W8, CLS-13): the first real eduval_ tag, as resolveItemEduValue reads it;
+        // Unknown only when there is no other. It used to be the last tag, Unknown included.
+        if (!result.eduValue || result.eduValue === 'eduval_unknown') {
+          result.eduValue = normalizeEduValueAlias(tagVal) || (tagVal as EduValue);
+        }
       } else if (tagKey.startsWith('minage_')) {
         result.minAgeGroup = tagVal as MinAgeGroup;
       } else if (tagKey.startsWith('ta_')) {
@@ -2204,7 +2311,10 @@ export function getUseCriteriaObjWithInfo(tags: Array<string>) {
       };
 
       if (tagKey.startsWith('eduval_')) {
-        result.eduValue = tagVal as TagOptionDetail<EduValue>;
+        // The same one reader as getUseCriteriaObjWithKeys (W8).
+        if (!result.eduValue || result.eduValue.key === 'eduval_unknown') {
+          result.eduValue = tagVal as TagOptionDetail<EduValue>;
+        }
       } else if (tagKey.startsWith('minage_')) {
         result.minAgeGroup = tagVal as TagOptionDetail<MinAgeGroup>;
       } else if (tagKey.startsWith('ta_')) {

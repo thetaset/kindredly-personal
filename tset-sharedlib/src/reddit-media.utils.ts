@@ -5,14 +5,13 @@
  * Two places say what a post holds, and neither needs Reddit's page to be read by a script:
  * - The post's page when it is open: Reddit marks the post element with its type and media
  *   address (`shreddit-post`, `post-type`, `content-href`). `readRedditPostPage` reads it there.
- * - The post's feed (`/comments/<id>/.rss`): one request, which Reddit answers without its
- *   "Prove your humanity" check but allows only a few of a minute (429 after three, 2026-10-19).
+ * - The post's embed page (`embed.reddit.com/r/<sub>/comments/<id>/`): one request, which Reddit
+ *   answers without its "Prove your humanity" check. Its `shreddit-screenview-data` names the
+ *   post's type and address, and its player carries a video's still. Reddit stopped answering
+ *   the post's feed (`/comments/<id>/.rss`) on 2026-11-13, which this replaced (HAT-1260).
  *
  * Parser-free, so the device and the server can both use it.
  */
-import { ItemResourceType } from './constants';
-import type { ItemMeta, ItemMetaExtracted } from './shared.types';
-
 export type PostMedia = {
   kind: 'image' | 'gallery' | 'video';
   /**
@@ -57,13 +56,17 @@ export function getRedditPostId(url: string | null | undefined): { subreddit: st
   return bare ? { subreddit: null, id: bare[1].toLowerCase() } : null;
 }
 
-/** The post's feed, which lists the post's own media first. */
-export function getRedditPostFeedUrl(url: string | null | undefined): string | null {
+/**
+ * The post's embed page, which Reddit renders for embedding without its humanity check. The bare
+ * `/comments/<id>/` embed does not name the post, but any subreddit in the address finds it: a
+ * `redd.it/<id>` or `/comments/<id>` link, which names none, asks under `r/all` (HAT-1269; checked
+ * live 2026-11-21, `r/x` and `r/all` gave the same post as its own subreddit). redd.it's redirect
+ * does not help: it leads to `/comments/<id>`, which Reddit refuses with a 403.
+ */
+export function getRedditPostEmbedUrl(url: string | null | undefined): string | null {
   const post = getRedditPostId(url);
   if (!post) return null;
-  return post.subreddit
-    ? `https://www.reddit.com/r/${post.subreddit}/comments/${post.id}/.rss`
-    : `https://www.reddit.com/comments/${post.id}/.rss`;
+  return `https://embed.reddit.com/r/${post.subreddit || 'all'}/comments/${post.id}/`;
 }
 
 const IMAGE_FILE = /\.(jpe?g|png|gif|webp)$/i;
@@ -132,6 +135,16 @@ export function postMediaFromRedditPage(page: {
   return null;
 }
 
+/**
+ * A gallery known to hold more than its `urls`: the count was read but not every address (an
+ * embed page draws only the first slides), or only the first picture is known (`total: null`).
+ * The popup then reads the open post or its full page for the rest (HAT-689, HAT-1269).
+ */
+export function galleryHasMore(media: PostMedia | null | undefined): boolean {
+  if (media?.kind !== 'gallery' || media.total === undefined) return false;
+  return media.total === null || media.total > media.urls.length;
+}
+
 function decodeEntities(value: string): string {
   return value
     .replace(/&lt;/g, '<')
@@ -143,87 +156,43 @@ function decodeEntities(value: string): string {
 }
 
 /**
- * What a post holds, from its feed: the first entry is the post, and its `[link]` points at the
- * media (`i.redd.it`, `v.redd.it`, or the post's gallery). A gallery's feed shows its first
- * picture only, as a resized copy, so its count is unknown (`total: null`) until the post's page
- * is read (HAT-689).
+ * What a post holds, from its embed page: `shreddit-screenview-data` names the post's type and
+ * address (`i.redd.it`, `v.redd.it`, or the post's gallery), the player carries a video's still,
+ * and a gallery's slides are the pictures it draws. Null when the page holds none or is not an
+ * embed page.
  */
-export function readRedditFeedPostMedia(xml: string | null | undefined): PostMedia | null {
-  if (!xml) return null;
-  const start = xml.indexOf('<entry>');
-  const end = xml.indexOf('</entry>', start);
-  if (start < 0 || end < 0) return null;
-  const entry = xml.slice(start, end);
-  const content = decodeEntities(entry.match(/<content[^>]*>([\s\S]*?)<\/content>/)?.[1] || '');
-  const link = decodeEntities(content.match(/<a href="([^"]+)">\s*\[link\]\s*<\/a>/)?.[1] || '');
-
-  const image = originalRedditImageUrl(link);
-  if (image) return { kind: 'image', urls: [image] };
-  const video = videoAddress(link);
-  if (video) {
-    const poster = decodeEntities(entry.match(/<media:thumbnail url="([^"]+)"/)?.[1] || '');
-    return poster ? { kind: 'video', urls: [video], poster } : { kind: 'video', urls: [video] };
+export function readRedditEmbedPostMedia(html: string | null | undefined): PostMedia | null {
+  if (!html) return null;
+  const raw = html.match(/<shreddit-screenview-data\b[^>]*\bdata="([^"]*)"/)?.[1];
+  if (!raw) return null;
+  let post: { type?: string | null; url?: string | null } | null = null;
+  try {
+    post = JSON.parse(decodeEntities(raw))?.post || null;
+  } catch {
+    return null;
   }
+  const type = (post?.type || '').toLowerCase();
+  const address = post?.url || null;
 
-  if (/^https:\/\/(www\.)?reddit\.com\/gallery\//i.test(link)) {
-    const pictures = [
-      ...Array.from(content.matchAll(/<img src="([^"]+)"/g), (m) => decodeEntities(m[1])),
-      ...Array.from(entry.matchAll(/<media:thumbnail url="([^"]+)"/g), (m) => decodeEntities(m[1])),
-    ];
+  if (type === 'image') {
+    const url = originalRedditImageUrl(address);
+    return url ? { kind: 'image', urls: [url] } : null;
+  }
+  if (type === 'video') {
+    const url = videoAddress(address);
+    if (!url) return null;
+    const poster = decodeEntities(html.match(/<shreddit-player\b[^>]*\bposter="([^"]+)"/)?.[1] || '');
+    return poster ? { kind: 'video', urls: [url], poster } : { kind: 'video', urls: [url] };
+  }
+  if (type === 'gallery') {
+    const pictures = Array.from(html.matchAll(/<img\b[^>]*\bsrc="([^"]+)"/g), (m) => decodeEntities(m[1]));
     const urls = originals(pictures);
-    return urls.length ? { kind: 'gallery', urls, total: null } : null;
+    if (!urls.length) return null;
+    // The slides the embed draws; a gallery with more pictures than it drew says how many it has.
+    const slides = (html.match(/<li\b[^>]*\bslot="page-/g) || []).length;
+    return slides > urls.length ? { kind: 'gallery', urls, total: slides } : { kind: 'gallery', urls };
   }
   return null;
-}
-
-/**
- * A post named by its feed, the one request that gives its title, author, subreddit, address and
- * media together. Reddit allows a device very few requests at a time, so this replaces the reads
- * that each asked for part of it (HAT-635). Null when the feed has no post.
- */
-export function redditFeedToItemMeta(url: string, xml: string | null | undefined): ItemMeta | null {
-  if (!xml) return null;
-  const start = xml.indexOf('<entry>');
-  const end = xml.indexOf('</entry>', start);
-  if (start < 0 || end < 0) return null;
-  const entry = xml.slice(start, end);
-  const title = decodeEntities(entry.match(/<title>([\s\S]*?)<\/title>/)?.[1] || '').trim();
-  if (!title) return null;
-
-  const author = decodeEntities(entry.match(/<author>\s*<name>([^<]+)<\/name>/)?.[1] || '').replace(/^\/?u\//, '').trim();
-  const subreddit = decodeEntities(entry.match(/<category term="([^"]+)"/)?.[1] || '').trim();
-  const postUrl = decodeEntities(entry.match(/<link href="([^"]+)"/)?.[1] || '');
-  const post = getRedditPostId(postUrl);
-  const media = readRedditFeedPostMedia(xml);
-  const picture = media?.kind === 'video' ? media.poster : media?.urls[0];
-
-  const extracted: ItemMetaExtracted = {
-    pageType: ItemResourceType.SITE_ITEM,
-    sourceId: 'provider_api',
-    ...(subreddit ? { redditSubreddit: subreddit } : {}),
-    ...(author ? { redditAuthor: author } : {}),
-    ...(media ? { postMedia: media } : {}),
-    ...(post && postUrl
-      ? {
-          recognized: {
-            provider: 'reddit',
-            resourceType: 'REDDIT_POST',
-            contentKind: 'post',
-            externalId: post.id,
-            parentExternalId: post.subreddit || subreddit || undefined,
-            canonicalUrl: postUrl,
-            confidence: 0.9,
-          } as ItemMetaExtracted['recognized'],
-        }
-      : {}),
-  };
-  return {
-    url,
-    title,
-    siteName: 'Reddit',
-    ...(picture ? { imageSrc: picture } : {}),
-    tsExtractedInfo: extracted,
-  };
 }
 
 /** The type of picture file at a Reddit original's address, for saving it. */

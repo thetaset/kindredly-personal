@@ -1,0 +1,108 @@
+{
+  "id": "66-learning-games",
+  "behaviour": "Learning games don't use Games time (HAT-1092): a game a parent marked Educational is left out of Games, and a plain game past the hour is blocked.",
+  "clock": {
+    "nowMs": 1789491600000,
+    "familyTimeZone": "America/Los_Angeles",
+    "deviceTimeZone": "America/Los_Angeles"
+  },
+  "settings": {
+    "usageLimitsData": {
+      "contentUsageLimits": [
+        {
+          "id": "simple-custom-games",
+          "name": "Games",
+          "type": "advanced",
+          "conditions": [
+            {
+              "type": "attribute",
+              "values": [
+                "game"
+              ]
+            }
+          ],
+          "timeLimits": [
+            {
+              "hours": 1,
+              "daysOfWeek": [
+                0,
+                1,
+                2,
+                3,
+                4,
+                5,
+                6
+              ]
+            }
+          ],
+          "excludes": [
+            {
+              "type": "eduValue",
+              "values": [
+                "eduval_educational",
+                "eduval_edutainment"
+              ]
+            }
+          ]
+        }
+      ],
+      "temporaryRules": []
+    },
+    "ruleOverrideSettings": {
+      "ruleOverrides": []
+    },
+    "accessControlSettings": {},
+    "appPolicy": {
+      "version": 1,
+      "blockedCategories": [],
+      "entries": {
+        "com.supercell.clashofclans": {
+          "pkg": "com.supercell.clashofclans",
+          "categoryId": "games",
+          "eduValue": "eduval_educational",
+          "updatedAt": 1
+        }
+      },
+      "updatedAt": 1
+    },
+    "appPolicyStatus": "readable"
+  },
+  "installedApps": [
+    {
+      "pkg": "com.supercell.clashofclans",
+      "label": "Clash of Clans",
+      "platform": "android"
+    },
+    {
+      "pkg": "com.roblox.client",
+      "label": "Roblox",
+      "platform": "android"
+    }
+  ],
+  "floor": [],
+  "usage": {
+    "appMsByPkg": {
+      "com.supercell.clashofclans": 4200000,
+      "com.roblox.client": 4200000
+    },
+    "webLogs": []
+  },
+  "usageSeed": {
+    "perRuleUsedMs": {}
+  },
+  "expectDevice": [
+    {
+      "pkg": "com.supercell.clashofclans",
+      "action": "allow",
+      "reason": null,
+      "ruleId": null
+    },
+    {
+      "pkg": "com.roblox.client",
+      "action": "block",
+      "reason": "budget-exhausted",
+      "ruleId": "simple-custom-games"
+    }
+  ],
+  "browserNotApplicable": "Device-only: per-app time exists only on the device; the browser reads the same rule for pages (CMP-128)."
+}

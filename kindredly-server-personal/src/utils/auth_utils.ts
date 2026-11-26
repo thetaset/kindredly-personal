@@ -241,6 +241,15 @@ export const authenticateJWTWithToken = (req, res, next, token: string) => {
             const tempAuthInfo: any = (await jwtverify(tempAuthToken.token)) as DataStoredInToken;
 
             if (tempAuthInfo && tempAuthInfo.expAtSec && tempAuthInfo.expAtSec >= Date.now() / 1000) {
+              // The token's user must belong to the session's family, read before the acting user is
+              // replaced. Any signed-in user can get a token for themself (`/auth/desktopHandoff/create`),
+              // so without this an admin of one family, such as a child who made a second family,
+              // would pass the admin checks of another (RVW-1).
+              const sessionUser = await ctx.getCurrentUser();
+              const tempAuthUser = await ctx.getUserById(tempAuthInfo.userId);
+              if (!sessionUser?.accountId || !tempAuthUser || tempAuthUser.accountId !== sessionUser.accountId) {
+                throw new Error('tempAuthToken is for a user outside this family');
+              }
               ctx.setTempAuthUserId(tempAuthInfo.userId);
             } else {
               throw new Error('token corrupted or expired' + tempAuthInfo);
@@ -365,7 +374,10 @@ export const errorHelper = (fn) => (req, res, next) => {
     //
     // `statusCode` MUST stay in the body regardless of the HTTP status: AuthService branches on
     // `body.statusCode == 409` for federated signin, and older clients read the body only.
-    const body = {success: false, message: error.message, statusCode};
+    // `errorType` only when the error names one: a `UserMessageError` says its message is written
+    // for people, so a page shows it as it is (UIC-27, tset-client/src/app/actionFailure.ts).
+    const body: Record<string, unknown> = {success: false, message: error.message, statusCode};
+    if (typeof error?.errorType === 'string') body.errorType = error.errorType;
 
     if (SOFT_STATUS_CODES.has(statusCode)) {
       res.json(body);
@@ -531,6 +543,10 @@ export const DEVICE_AGENT_ALLOWED_PATHS = new Set([
   // The settings THIS device compiles its rules from (DCP-5). Read-only, takes no user or device id:
   // the user is the token's, so rules 1 and 2 above hold the same way they do for the route above.
   '/companion/settings/current',
+  // DCP-27: this device's own app time per limit, sealed so the server cannot read it, and the
+  // child's other devices' the same way. It grants nothing and changes no setting; the child and
+  // the device come from the token, so a device reports only for itself and rules 1 and 2 hold.
+  '/companion/usage/sync',
   // The desktop Companion's nudge stream (DCP-8): an SSE stream that carries only the content-free
   // `deviceSettingsChanged` for the token's own user, answered by a fetch of the route above. It
   // grants nothing, changes nothing and takes no id, so rules 1 and 2 hold.
@@ -557,6 +573,25 @@ export const DEVICE_AGENT_ALLOWED_PATHS = new Set([
   // id: the child and the device come from the token, it writes only that device's `appInventory`
   // row, and it refuses anything not end-to-end encrypted, so rules 1 and 2 hold.
   '/companion/apps/inventory',
+  // Device folders (HAT-1321): this computer serving a folder it holds. `share` records nothing on
+  // the token alone: it needs a guardian's approval from their PIN at this computer, as `removeSelf`
+  // does, and a Plus family. `stop` only takes away. `mine` reads the folders THIS device serves.
+  // `events` carries only sealed frames the server cannot read, and `answer` returns one, accepted
+  // only for a frame sent to this device. `keys` stores the host's sealed copies of a folder key for
+  // people who may already open it, which the server cannot read and which grant nothing new. None
+  // takes a device id, and the only user ids taken are checked against the folder's own people, so
+  // rules 1 and 2 hold. What the token reaches is a folder already on this computer. `family` and
+  // `update` (choosing people) need the same approval as `share`: `family` lists the names in the
+  // approving admin's own family for the picker, and `update` changes only a folder this device
+  // serves, with user ids checked against that family.
+  '/companion/deviceFolders/share',
+  '/companion/deviceFolders/family',
+  '/companion/deviceFolders/update',
+  '/companion/deviceFolders/stop',
+  '/companion/deviceFolders/mine',
+  '/companion/deviceFolders/events',
+  '/companion/deviceFolders/answer',
+  '/companion/deviceFolders/keys',
 ]);
 
 /** How long a parent's approval at the computer lasts: as long as the Companion keeps their PIN. */

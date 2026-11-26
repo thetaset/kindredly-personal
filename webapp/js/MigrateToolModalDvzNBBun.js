@@ -1,0 +1,1 @@
+import{d as o,v as r,e as s,p as t}from"./vue-runtimeCY_KIElv.js";import"./cjs-helpersC4iS2aBk.js";const m=o({__name:"MigrateToolModal",emits:["close"],setup(a,{emit:l}){return(n,e)=>(s(),r("div",null,[...e[0]||(e[0]=[t("div",{class:"text-center p-4"},[t("p",null,"Migration tool is currently disabled.")],-1)])]))}});export{m as default};

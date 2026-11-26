@@ -1,0 +1,522 @@
+{
+  "v": 1,
+  "about": "How the native Home matches and ranks suggestions as someone types (PNH-6). Written once here; HomeSuggestMatcher.kt and HomeSuggestMatcher.swift both pass every case. Change a rule here first, then both sides. A case may name inlineUrl: the address Go opens when the fill-in is accepted, the row's own URL, or its origin when only the host was filled in.",
+  "rules": [
+    "Query: trim, lower case, a Greek final sigma (ς) read as σ, runs of whitespace (any Unicode space) become one space. Empty: no rows, no inline.",
+    "Term: a one-word query loses a leading https:// or http://, then www., then trailing slashes. A query with a space is used as it is. A term left empty: no rows.",
+    "Address of a row: an http(s) URL's host, lower case, without www., then its path without the query, fragment or trailing slashes, all lower case. A known site's address is its domain; a search and a catalog item without a URL have none. A visited page, tab or library link without an http(s) address is left out.",
+    "Words of a row: its title and its address split on anything that is not a letter, a combining mark or a digit, lower case.",
+    "Prefix match: the address or the title starts with the term. Word match: every word of the term starts some word of the row. Mid match: the title or the address contains the term, only for a term of two code points or more.",
+    "Tiers: visited pages 0, open tabs 1, a known site whose address or name is the term 2, library links 3, recent searches 4, other known sites 5, catalog 6.",
+    "Order: prefix and word matches before mid matches; then tier; then prefix before word before mid; then the row's place in its own list (each list arrives most recent or most relevant first).",
+    "One row per address with its query string (two videos on one page are two rows; the fragment never counts), a search per its words, a catalog item without a URL per its id; the first one in order that fits its kind's cap stays.",
+    "At most per kind: visited 4, tab 2, site 3, link 4, search 3, catalog 3; at most 8 in all, taken in order. A row over its kind's cap does not take its address from a row of another kind.",
+    "Inline completion: only for a one-word term, and not when the query ends in a space. The first row, in order, whose address gives a completion: its host (or, when the term has a slash, its whole address) starting with the term and longer than it. The completion is the rest of it after the term.",
+    "A row is identified here as kind:url for visited, tab, link and site rows (a site's url is https:// and its domain), search:words, and catalog:id."
+  ],
+  "limits": {
+    "total": 8,
+    "visited": 4,
+    "tab": 2,
+    "site": 3,
+    "link": 4,
+    "search": 3,
+    "catalog": 3
+  },
+  "sources": {
+    "visited": [
+      {
+        "url": "https://www.khanacademy.org/math/algebra",
+        "title": "Algebra | Khan Academy"
+      },
+      {
+        "url": "https://en.wikipedia.org/wiki/Volcano",
+        "title": "Volcano - Wikipedia"
+      },
+      {
+        "url": "https://www.youtube.com/watch?v=abc",
+        "title": "How volcanoes form - YouTube"
+      },
+      {
+        "url": "https://docs.google.com/document/d/1",
+        "title": "Science report - Google Docs"
+      }
+    ],
+    "tabs": [
+      {
+        "url": "https://www.nasa.gov/missions",
+        "title": "Missions - NASA"
+      }
+    ],
+    "links": [
+      {
+        "title": "Khan Academy math",
+        "url": "https://www.khanacademy.org/math"
+      },
+      {
+        "title": "Duolingo",
+        "url": "https://www.duolingo.com/"
+      },
+      {
+        "title": "Fractions practice",
+        "url": "https://www.mathplayground.com/fractions.html"
+      }
+    ],
+    "searches": [
+      "volcanoes",
+      "fraction games",
+      "playground games"
+    ],
+    "sites": [
+      {
+        "domain": "khanacademy.org",
+        "name": "Khan Academy",
+        "eduValue": "eduval_educational"
+      },
+      {
+        "domain": "kiddle.co",
+        "name": "Kiddle",
+        "eduValue": "eduval_educational"
+      },
+      {
+        "domain": "pbskids.org",
+        "name": "PBS Kids",
+        "eduValue": "eduval_edutainment"
+      },
+      {
+        "domain": "nasa.gov",
+        "name": "NASA",
+        "eduValue": "eduval_educational"
+      },
+      {
+        "domain": "duolingo.com",
+        "name": "Duolingo",
+        "eduValue": "eduval_educational"
+      }
+    ],
+    "catalog": [
+      {
+        "id": "p1",
+        "title": "Khan Academy Kids",
+        "url": "https://learn.khanacademy.org/khan-academy-kids/",
+        "type": "link"
+      },
+      {
+        "id": "p2",
+        "title": "Volcano Explorers",
+        "url": null,
+        "type": "col"
+      },
+      {
+        "id": "p3",
+        "title": "Crash Course Kids",
+        "url": "https://www.youtube.com/@crashcoursekids",
+        "type": "link"
+      }
+    ]
+  },
+  "cases": [
+    {
+      "name": "two letters: the page visited first, then the library link, the known site and the catalog title",
+      "query": "kh",
+      "rows": [
+        "visited:https://www.khanacademy.org/math/algebra",
+        "link:https://www.khanacademy.org/math",
+        "site:https://khanacademy.org",
+        "catalog:p1"
+      ],
+      "inline": "anacademy.org",
+      "inlineUrl": "https://www.khanacademy.org"
+    },
+    {
+      "name": "a scheme and www typed: matched as the bare host, completed after what was typed",
+      "query": "https://www.Kha",
+      "rows": [
+        "visited:https://www.khanacademy.org/math/algebra",
+        "link:https://www.khanacademy.org/math",
+        "site:https://khanacademy.org",
+        "catalog:p1"
+      ],
+      "inline": "nacademy.org"
+    },
+    {
+      "name": "a title prefix before a word match in the same tier; a search, then a catalog item with no address",
+      "query": "volc",
+      "rows": [
+        "visited:https://en.wikipedia.org/wiki/Volcano",
+        "visited:https://www.youtube.com/watch?v=abc",
+        "search:volcanoes",
+        "catalog:p2"
+      ],
+      "inline": null
+    },
+    {
+      "name": "case does not matter",
+      "query": "  VOLCANO ",
+      "rows": [
+        "visited:https://en.wikipedia.org/wiki/Volcano",
+        "visited:https://www.youtube.com/watch?v=abc",
+        "search:volcanoes",
+        "catalog:p2"
+      ],
+      "inline": null
+    },
+    {
+      "name": "a word-start match in a later tier comes before a mid-word match in an earlier one",
+      "query": "play",
+      "rows": [
+        "search:playground games",
+        "link:https://www.mathplayground.com/fractions.html"
+      ],
+      "inline": null
+    },
+    {
+      "name": "one letter: no mid-word matches",
+      "query": "y",
+      "rows": [
+        "visited:https://www.youtube.com/watch?v=abc",
+        "catalog:p3"
+      ],
+      "inline": "outube.com",
+      "inlineUrl": "https://www.youtube.com"
+    },
+    {
+      "name": "an exact known site comes after open tabs and before library links",
+      "query": "nasa",
+      "rows": [
+        "tab:https://www.nasa.gov/missions",
+        "site:https://nasa.gov"
+      ],
+      "inline": ".gov"
+    },
+    {
+      "name": "an exact known site and a library link with the same address are one row",
+      "query": "Duolingo",
+      "rows": [
+        "site:https://duolingo.com"
+      ],
+      "inline": ".com",
+      "inlineUrl": "https://duolingo.com"
+    },
+    {
+      "name": "two words: each must start a word of the row, and nothing is completed inline",
+      "query": "khan  math",
+      "rows": [
+        "visited:https://www.khanacademy.org/math/algebra",
+        "link:https://www.khanacademy.org/math"
+      ],
+      "inline": null
+    },
+    {
+      "name": "a slash typed: completed to the whole address",
+      "query": "khanacademy.org/m",
+      "rows": [
+        "visited:https://www.khanacademy.org/math/algebra",
+        "link:https://www.khanacademy.org/math"
+      ],
+      "inline": "ath/algebra",
+      "inlineUrl": "https://www.khanacademy.org/math/algebra"
+    },
+    {
+      "name": "a slash typed at the end: filled in after it, not with a second one",
+      "query": "khanacademy.org/math/",
+      "rows": [
+        "visited:https://www.khanacademy.org/math/algebra",
+        "link:https://www.khanacademy.org/math"
+      ],
+      "inline": "algebra",
+      "inlineUrl": "https://www.khanacademy.org/math/algebra"
+    },
+    {
+      "name": "a visited page and a library link with the same address are one row, the visited one",
+      "query": "duo",
+      "sources": {
+        "visited": [
+          {
+            "url": "https://www.duolingo.com",
+            "title": "Duolingo - Learn a language"
+          }
+        ],
+        "links": [
+          {
+            "title": "Duolingo",
+            "url": "https://duolingo.com/"
+          }
+        ]
+      },
+      "rows": [
+        "visited:https://www.duolingo.com"
+      ],
+      "inline": "lingo.com"
+    },
+    {
+      "name": "at most three recent searches",
+      "query": "sp",
+      "sources": {
+        "searches": [
+          "space",
+          "spiders",
+          "spelling",
+          "sports",
+          "spain"
+        ]
+      },
+      "rows": [
+        "search:space",
+        "search:spiders",
+        "search:spelling"
+      ],
+      "inline": null
+    },
+    {
+      "name": "at most four visited and two tabs, and eight in all",
+      "query": "a",
+      "sources": {
+        "visited": [
+          {
+            "url": "https://a1.example",
+            "title": ""
+          },
+          {
+            "url": "https://a2.example",
+            "title": ""
+          },
+          {
+            "url": "https://a3.example",
+            "title": ""
+          },
+          {
+            "url": "https://a4.example",
+            "title": ""
+          },
+          {
+            "url": "https://a5.example",
+            "title": ""
+          }
+        ],
+        "tabs": [
+          {
+            "url": "https://ab1.example",
+            "title": ""
+          },
+          {
+            "url": "https://ab2.example",
+            "title": ""
+          },
+          {
+            "url": "https://ab3.example",
+            "title": ""
+          }
+        ],
+        "links": [
+          {
+            "title": "",
+            "url": "https://ac1.example"
+          },
+          {
+            "title": "",
+            "url": "https://ac2.example"
+          },
+          {
+            "title": "",
+            "url": "https://ac3.example"
+          }
+        ],
+        "searches": [],
+        "sites": [],
+        "catalog": []
+      },
+      "rows": [
+        "visited:https://a1.example",
+        "visited:https://a2.example",
+        "visited:https://a3.example",
+        "visited:https://a4.example",
+        "tab:https://ab1.example",
+        "tab:https://ab2.example",
+        "link:https://ac1.example",
+        "link:https://ac2.example"
+      ],
+      "inline": "1.example"
+    },
+    {
+      "name": "only spaces: nothing",
+      "query": "   ",
+      "rows": [],
+      "inline": null
+    },
+    {
+      "name": "only a scheme: nothing",
+      "query": "https://",
+      "rows": [],
+      "inline": null
+    },
+    {
+      "name": "two videos on one page address are two rows",
+      "query": "volc",
+      "sources": {
+        "visited": [
+          {
+            "url": "https://www.youtube.com/watch?v=a1",
+            "title": "Volcano facts"
+          },
+          {
+            "url": "https://www.youtube.com/watch?v=b2#t=30",
+            "title": "Volcano song"
+          }
+        ],
+        "tabs": [],
+        "links": [],
+        "searches": [],
+        "sites": [],
+        "catalog": []
+      },
+      "rows": [
+        "visited:https://www.youtube.com/watch?v=a1",
+        "visited:https://www.youtube.com/watch?v=b2#t=30"
+      ],
+      "inline": null
+    },
+    {
+      "name": "a visited page over its cap leaves its address to the library link",
+      "query": "a",
+      "sources": {
+        "visited": [
+          {
+            "url": "https://a1.example",
+            "title": ""
+          },
+          {
+            "url": "https://a2.example",
+            "title": ""
+          },
+          {
+            "url": "https://a3.example",
+            "title": ""
+          },
+          {
+            "url": "https://a4.example",
+            "title": ""
+          },
+          {
+            "url": "https://a5.example",
+            "title": ""
+          }
+        ],
+        "tabs": [],
+        "links": [
+          {
+            "title": "",
+            "url": "https://a5.example"
+          }
+        ],
+        "searches": [],
+        "sites": [],
+        "catalog": []
+      },
+      "rows": [
+        "visited:https://a1.example",
+        "visited:https://a2.example",
+        "visited:https://a3.example",
+        "visited:https://a4.example",
+        "link:https://a5.example"
+      ],
+      "inline": "1.example"
+    },
+    {
+      "name": "a space typed after the word: nothing is filled in",
+      "query": "khan ",
+      "rows": [
+        "visited:https://www.khanacademy.org/math/algebra",
+        "link:https://www.khanacademy.org/math",
+        "site:https://khanacademy.org",
+        "catalog:p1"
+      ],
+      "inline": null
+    },
+    {
+      "name": "a trailing slash still finds the site",
+      "query": "duolingo.com/",
+      "rows": [
+        "site:https://duolingo.com"
+      ],
+      "inline": null
+    },
+    {
+      "name": "a tab that is not a web page is left out",
+      "query": "new",
+      "sources": {
+        "tabs": [
+          {
+            "url": "about:blank",
+            "title": "New tab"
+          },
+          {
+            "url": "moz-extension://x/index.html",
+            "title": "New Kindredly page"
+          }
+        ]
+      },
+      "rows": [],
+      "inline": null
+    },
+    {
+      "name": "combining marks stay inside a word (Hindi)",
+      "query": "सीखें हिन्दी",
+      "sources": {
+        "visited": [
+          {
+            "url": "https://hi.example/learn",
+            "title": "हिन्दी सीखें"
+          }
+        ],
+        "tabs": [],
+        "links": [],
+        "searches": [],
+        "sites": [],
+        "catalog": []
+      },
+      "rows": [
+        "visited:https://hi.example/learn"
+      ],
+      "inline": null
+    },
+    {
+      "name": "a Greek final sigma matches the medial one",
+      "query": "οδος",
+      "sources": {
+        "visited": [
+          {
+            "url": "https://gr.example/",
+            "title": "ΟΔΟΣ ΤΕΣΤ"
+          }
+        ],
+        "tabs": [],
+        "links": [],
+        "searches": [],
+        "sites": [],
+        "catalog": []
+      },
+      "rows": [
+        "visited:https://gr.example/"
+      ],
+      "inline": null
+    },
+    {
+      "name": "an ideographic or non-breaking space separates words like any other",
+      "query": "khan　math ",
+      "rows": [
+        "visited:https://www.khanacademy.org/math/algebra",
+        "link:https://www.khanacademy.org/math"
+      ],
+      "inline": null
+    }
+  ],
+  "recentSearches": {
+    "about": "The rows an empty field shows once tapped (PNH-23): the recent searches, newest first as the sources list them, five at most.",
+    "rows": [
+      "search:volcanoes",
+      "search:fraction games",
+      "search:playground games"
+    ]
+  }
+}

@@ -1,0 +1,1 @@
+const n="project:";function r(t){return typeof t=="string"&&t.startsWith(n)&&t.length>n.length}function e(t){return typeof t=="string"&&!r(t)}function s(t){return typeof t!="string"?"":t.replace(/\s+/g," ").trim().slice(0,80)}export{r as a,s as c,e as i};
